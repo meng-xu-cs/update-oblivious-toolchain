@@ -253,6 +253,17 @@ agreement. The docs should then be generated or checked against the compiler and
 Lean acceptance predicates so the advertised subset and proof-grade subset stay
 identical for these features.
 
+Status: Fixed. Lean source/IR semantics now evaluate struct projection and local
+array indexing, the confidential fragment admits those forms while still
+rejecting non-branchless select arms, and the named/slot confidential-kernel DSLs
+lower and preserve schedules for both constructs. The generated confidential
+kernel runtime evaluates `StructField`/`ArrayIndex` through fixed public-shape
+helpers, Rust lowering and slot execution cover them, obsolete unsupported-form
+errors were removed, and translation/hash-bound importers now derive projection
+lengths from actual struct/array types. Verified with the proof root build,
+focused Rust tests, `cargo check -p mplus-probe`, and
+`kernel_model_alignment_validation` accepting the new 11/8 profile tables.
+
 ## F8. Raw sidecar metadata hash is optional
 
 Review grouping: `F8`, `T1.5`, `O2.8`.

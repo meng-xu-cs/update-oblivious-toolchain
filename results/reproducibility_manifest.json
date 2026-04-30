@@ -169,8 +169,8 @@
     },
     {
       "path": "kernel_model_alignment_validation.json",
-      "bytes": 76303,
-      "sha256": "85da6e97534414e06ffca30cb8776b27ed28ccebffe16a9ed8f30572dbf28bf4"
+      "bytes": 77851,
+      "sha256": "b6ff38f67a5a806d2d845b89f6f833e1ca5c8187bcacc9eb1b07b4bca33b1f0c"
     },
     {
       "path": "kernel_refinement_boundary_validation.json",

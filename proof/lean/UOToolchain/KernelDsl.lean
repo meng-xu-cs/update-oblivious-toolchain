@@ -65,6 +65,8 @@ inductive KernelExpr where
   | cellGet (objectId : Nat)
   | arrayGet (objectId : Nat) (index : KernelExpr)
   | mapGet (objectId : Nat) (key : KernelExpr)
+  | structField (base : KernelExpr) (field : String)
+  | arrayIndex (base : KernelExpr) (index : KernelExpr)
   | keccak256 (parts : List KernelExpr)
 
 /-- Mirror of `ConfidentialKernelPureExpr`. Strict subset of `KernelExpr`
@@ -78,6 +80,8 @@ inductive KernelPureExpr where
       (cond : KernelPureExpr)
       (whenTrue : KernelPureExpr)
       (whenFalse : KernelPureExpr)
+  | structField (base : KernelPureExpr) (field : String)
+  | arrayIndex (base : KernelPureExpr) (index : KernelPureExpr)
   | keccak256 (parts : List KernelPureExpr)
 
 end
@@ -203,6 +207,26 @@ def evalKernelExpr (cfg : OperationalConfig) (env : LocalEnv) :
                     .status (.evalError s!"mapGet on non-map object {objectId}")
           | none =>
               .status (.evalError s!"mapGet on unknown object {objectId}")
+  | .structField base field =>
+      match evalKernelExpr cfg env base with
+      | .status s => .status s
+      | .value (.structValue fields) =>
+          match Value.structField? fields field with
+          | some value => .value value
+          | none => .status (.evalError s!"unknown struct field {field}")
+      | .value _ => .status (.evalError "structField base not struct")
+  | .arrayIndex base indexExpr =>
+      match evalKernelExpr cfg env base with
+      | .status s => .status s
+      | .value (.array values) =>
+          match evalKernelExpr cfg env indexExpr with
+          | .status s => .status s
+          | .value (.uint idx) =>
+              match Value.arrayIndex? values idx with
+              | some value => .value value
+              | none => .status (.evalError "arrayIndex out of bounds")
+          | .value _ => .status (.evalError "arrayIndex index not uint")
+      | .value _ => .status (.evalError "arrayIndex base not array")
   | .keccak256 parts =>
       match evalKernelExprList cfg env parts with
       | .error s => .status s
@@ -252,6 +276,26 @@ def evalKernelPureExpr (cfg : OperationalConfig) (env : LocalEnv) :
       | .value (.bool true) => evalKernelPureExpr cfg env wt
       | .value (.bool false) => evalKernelPureExpr cfg env wf
       | .value _ => .status (.evalError "select condition not boolean")
+  | .structField base field =>
+      match evalKernelPureExpr cfg env base with
+      | .status s => .status s
+      | .value (.structValue fields) =>
+          match Value.structField? fields field with
+          | some value => .value value
+          | none => .status (.evalError s!"unknown struct field {field}")
+      | .value _ => .status (.evalError "structField base not struct")
+  | .arrayIndex base indexExpr =>
+      match evalKernelPureExpr cfg env base with
+      | .status s => .status s
+      | .value (.array values) =>
+          match evalKernelPureExpr cfg env indexExpr with
+          | .status s => .status s
+          | .value (.uint idx) =>
+              match Value.arrayIndex? values idx with
+              | some value => .value value
+              | none => .status (.evalError "arrayIndex out of bounds")
+          | .value _ => .status (.evalError "arrayIndex index not uint")
+      | .value _ => .status (.evalError "arrayIndex base not array")
   | .keccak256 parts =>
       match evalKernelPureExprList cfg env parts with
       | .error s => .status s
@@ -559,8 +603,13 @@ def lowerExpr : Expr → Except KernelLoweringError KernelExpr
   | .mapGet id key => do
       let kk ← lowerExpr key
       .ok (.mapGet id kk)
-  | .structField _ _ => .error .confidentialStructField
-  | .arrayIndex _ _ => .error .confidentialArrayIndex
+  | .structField base field => do
+      let kb ← lowerExpr base
+      .ok (.structField kb field)
+  | .arrayIndex base index => do
+      let kb ← lowerExpr base
+      let ki ← lowerExpr index
+      .ok (.arrayIndex kb ki)
   | .keccak256 parts => do
       let kparts ← lowerExprList parts
       .ok (.keccak256 kparts)
@@ -595,8 +644,13 @@ def lowerPureExpr : Expr → Except KernelLoweringError KernelPureExpr
   | .cellGet _ => .error .selectArmOutsideBranchlessFragment
   | .arrayGet _ _ => .error .selectArmOutsideBranchlessFragment
   | .mapGet _ _ => .error .selectArmOutsideBranchlessFragment
-  | .structField _ _ => .error .confidentialStructField
-  | .arrayIndex _ _ => .error .confidentialArrayIndex
+  | .structField base field => do
+      let kb ← lowerPureExpr base
+      .ok (.structField kb field)
+  | .arrayIndex base index => do
+      let kb ← lowerPureExpr base
+      let ki ← lowerPureExpr index
+      .ok (.arrayIndex kb ki)
   | .keccak256 parts => do
       let kparts ← lowerPureExprList parts
       .ok (.keccak256 kparts)
@@ -797,8 +851,15 @@ theorem branchlessPureExpr_implies_lowerPureExpr_ok :
   | .cellGet _, h => by simp [branchlessPureExpr] at h
   | .arrayGet _ _, h => by simp [branchlessPureExpr] at h
   | .mapGet _ _, h => by simp [branchlessPureExpr] at h
-  | .structField _ _, h => by simp [branchlessPureExpr] at h
-  | .arrayIndex _ _, h => by simp [branchlessPureExpr] at h
+  | .structField base field, h => by
+      simp only [branchlessPureExpr] at h
+      rcases branchlessPureExpr_implies_lowerPureExpr_ok base h with ⟨kb, hkb⟩
+      exact ⟨.structField kb field, by unfold lowerPureExpr; rw [hkb]; rfl⟩
+  | .arrayIndex base index, h => by
+      simp only [branchlessPureExpr, Bool.and_eq_true] at h
+      rcases branchlessPureExpr_implies_lowerPureExpr_ok base h.1 with ⟨kb, hkb⟩
+      rcases branchlessPureExpr_implies_lowerPureExpr_ok index h.2 with ⟨ki, hki⟩
+      exact ⟨.arrayIndex kb ki, by unfold lowerPureExpr; rw [hkb, hki]; rfl⟩
   | .keccak256 parts, h => by
       simp only [branchlessPureExpr] at h
       rcases branchlessPureExprList_implies_lowerPureExprList_ok parts h
@@ -854,8 +915,15 @@ theorem fragmentValid_implies_lowerExpr_ok :
       simp only [Expr.fragmentValid] at h
       rcases fragmentValid_implies_lowerExpr_ok key h with ⟨kk, hkk⟩
       exact ⟨.mapGet id kk, by unfold lowerExpr; rw [hkk]; rfl⟩
-  | .structField _ _, h => by simp [Expr.fragmentValid] at h
-  | .arrayIndex _ _, h => by simp [Expr.fragmentValid] at h
+  | .structField base field, h => by
+      simp only [Expr.fragmentValid] at h
+      rcases fragmentValid_implies_lowerExpr_ok base h with ⟨kb, hkb⟩
+      exact ⟨.structField kb field, by unfold lowerExpr; rw [hkb]; rfl⟩
+  | .arrayIndex base index, h => by
+      simp only [Expr.fragmentValid, Bool.and_eq_true] at h
+      rcases fragmentValid_implies_lowerExpr_ok base h.1 with ⟨kb, hkb⟩
+      rcases fragmentValid_implies_lowerExpr_ok index h.2 with ⟨ki, hki⟩
+      exact ⟨.arrayIndex kb ki, by unfold lowerExpr; rw [hkb, hki]; rfl⟩
   | .keccak256 parts, h => by
       simp only [Expr.fragmentValid] at h
       rcases fragmentValidList_implies_lowerExprList_ok parts h
@@ -1236,8 +1304,57 @@ theorem lowerExpr_preserves_semantics
                   | none => rfl
                   | some v' => cases v' <;> rfl
               | some v' => cases v' <;> rfl
-  | .structField _ _, _, h => by simp [lowerExpr] at h
-  | .arrayIndex _ _, _, h => by simp [lowerExpr] at h
+  | .structField base field, ke, h => by
+      cases hB : lowerExpr base with
+      | error err =>
+          have : lowerExpr (.structField base field) = .error err := by
+            unfold lowerExpr; rw [hB]; rfl
+          rw [this] at h; cases h
+      | ok kb =>
+          have hSF : lowerExpr (.structField base field) = .ok (.structField kb field) := by
+            unfold lowerExpr; rw [hB]; rfl
+          rw [hSF] at h
+          have : ke = .structField kb field := (Except.ok.inj h).symm
+          subst this
+          have ih := lowerExpr_preserves_semantics cfg env base kb hB
+          unfold evalExpr evalKernelExpr
+          rw [ih]
+          rfl
+  | .arrayIndex base index, ke, h => by
+      cases hB : lowerExpr base with
+      | error err =>
+          have : lowerExpr (.arrayIndex base index) = .error err := by
+            unfold lowerExpr; rw [hB]; rfl
+          rw [this] at h; cases h
+      | ok kb =>
+          cases hI : lowerExpr index with
+          | error err =>
+              have : lowerExpr (.arrayIndex base index) = .error err := by
+                unfold lowerExpr; rw [hB, hI]; rfl
+              rw [this] at h; cases h
+          | ok ki =>
+              have hAI : lowerExpr (.arrayIndex base index) = .ok (.arrayIndex kb ki) := by
+                unfold lowerExpr; rw [hB, hI]; rfl
+              rw [hAI] at h
+              have : ke = .arrayIndex kb ki := (Except.ok.inj h).symm
+              subst this
+              have ihB := lowerExpr_preserves_semantics cfg env base kb hB
+              have ihI := lowerExpr_preserves_semantics cfg env index ki hI
+              unfold evalExpr evalKernelExpr
+              rw [ihB]
+              cases evalKernelExpr cfg env kb with
+              | status _ => rfl
+              | value v =>
+                  cases v with
+                  | array _ =>
+                      rw [ihI]
+                      rfl
+                  | bool _ => rfl
+                  | uint _ => rfl
+                  | bytes32 _ => rfl
+                  | address _ => rfl
+                  | structValue _ => rfl
+                  | map _ => rfl
   | .keccak256 parts, ke, h => by
       cases hP : lowerExprList parts with
       | error err =>
@@ -1374,8 +1491,57 @@ theorem lowerPureExpr_preserves_semantics
   | .cellGet _, _, h => by simp [lowerPureExpr] at h
   | .arrayGet _ _, _, h => by simp [lowerPureExpr] at h
   | .mapGet _ _, _, h => by simp [lowerPureExpr] at h
-  | .structField _ _, _, h => by simp [lowerPureExpr] at h
-  | .arrayIndex _ _, _, h => by simp [lowerPureExpr] at h
+  | .structField base field, ke, h => by
+      cases hB : lowerPureExpr base with
+      | error err =>
+          have : lowerPureExpr (.structField base field) = .error err := by
+            unfold lowerPureExpr; rw [hB]; rfl
+          rw [this] at h; cases h
+      | ok kb =>
+          have hSF : lowerPureExpr (.structField base field) = .ok (.structField kb field) := by
+            unfold lowerPureExpr; rw [hB]; rfl
+          rw [hSF] at h
+          have : ke = .structField kb field := (Except.ok.inj h).symm
+          subst this
+          have ih := lowerPureExpr_preserves_semantics cfg env base kb hB
+          unfold evalExpr evalKernelPureExpr
+          rw [ih]
+          rfl
+  | .arrayIndex base index, ke, h => by
+      cases hB : lowerPureExpr base with
+      | error err =>
+          have : lowerPureExpr (.arrayIndex base index) = .error err := by
+            unfold lowerPureExpr; rw [hB]; rfl
+          rw [this] at h; cases h
+      | ok kb =>
+          cases hI : lowerPureExpr index with
+          | error err =>
+              have : lowerPureExpr (.arrayIndex base index) = .error err := by
+                unfold lowerPureExpr; rw [hB, hI]; rfl
+              rw [this] at h; cases h
+          | ok ki =>
+              have hAI : lowerPureExpr (.arrayIndex base index) = .ok (.arrayIndex kb ki) := by
+                unfold lowerPureExpr; rw [hB, hI]; rfl
+              rw [hAI] at h
+              have : ke = .arrayIndex kb ki := (Except.ok.inj h).symm
+              subst this
+              have ihB := lowerPureExpr_preserves_semantics cfg env base kb hB
+              have ihI := lowerPureExpr_preserves_semantics cfg env index ki hI
+              unfold evalExpr evalKernelPureExpr
+              rw [ihB]
+              cases evalKernelPureExpr cfg env kb with
+              | status _ => rfl
+              | value v =>
+                  cases v with
+                  | array _ =>
+                      rw [ihI]
+                      rfl
+                  | bool _ => rfl
+                  | uint _ => rfl
+                  | bytes32 _ => rfl
+                  | address _ => rfl
+                  | structValue _ => rfl
+                  | map _ => rfl
   | .keccak256 parts, ke, h => by
       cases hP : lowerPureExprList parts with
       | error err =>
@@ -1811,8 +1977,15 @@ theorem branchlessPureExpr_implies_fragmentValid :
   | .cellGet _, h => by simp [branchlessPureExpr] at h
   | .arrayGet _ _, h => by simp [branchlessPureExpr] at h
   | .mapGet _ _, h => by simp [branchlessPureExpr] at h
-  | .structField _ _, h => by simp [branchlessPureExpr] at h
-  | .arrayIndex _ _, h => by simp [branchlessPureExpr] at h
+  | .structField base _, h => by
+      simp only [branchlessPureExpr] at h
+      simp only [Expr.fragmentValid]
+      exact branchlessPureExpr_implies_fragmentValid base h
+  | .arrayIndex base index, h => by
+      simp only [branchlessPureExpr, Bool.and_eq_true] at h
+      simp only [Expr.fragmentValid, Bool.and_eq_true]
+      exact ⟨branchlessPureExpr_implies_fragmentValid base h.1,
+        branchlessPureExpr_implies_fragmentValid index h.2⟩
   | .keccak256 parts, h => by
       simp only [branchlessPureExpr] at h
       simp only [Expr.fragmentValid]
@@ -1893,8 +2066,26 @@ theorem lowerPureExpr_ok_implies_branchlessPureExpr :
   | .cellGet _, _, h => by simp [lowerPureExpr] at h
   | .arrayGet _ _, _, h => by simp [lowerPureExpr] at h
   | .mapGet _ _, _, h => by simp [lowerPureExpr] at h
-  | .structField _ _, _, h => by simp [lowerPureExpr] at h
-  | .arrayIndex _ _, _, h => by simp [lowerPureExpr] at h
+  | .structField base field, _, h => by
+      unfold lowerPureExpr at h
+      cases hB : lowerPureExpr base with
+      | error _ => simp [hB, bind, Except.bind] at h
+      | ok kb =>
+          simp [hB, bind, Except.bind] at h
+          simp [branchlessPureExpr]
+          exact lowerPureExpr_ok_implies_branchlessPureExpr base kb hB
+  | .arrayIndex base index, _, h => by
+      unfold lowerPureExpr at h
+      cases hB : lowerPureExpr base with
+      | error _ => simp [hB, bind, Except.bind] at h
+      | ok kb =>
+          cases hI : lowerPureExpr index with
+          | error _ => simp [hB, hI, bind, Except.bind] at h
+          | ok ki =>
+              simp [hB, hI, bind, Except.bind] at h
+              simp [branchlessPureExpr]
+              exact ⟨lowerPureExpr_ok_implies_branchlessPureExpr base kb hB,
+                lowerPureExpr_ok_implies_branchlessPureExpr index ki hI⟩
   | .keccak256 parts, _, h => by
       unfold lowerPureExpr at h
       cases hParts : lowerPureExprList parts with
@@ -1990,8 +2181,26 @@ theorem lowerExpr_ok_implies_fragmentValid :
           simp [hK, bind, Except.bind] at h
           simp [Expr.fragmentValid]
           exact lowerExpr_ok_implies_fragmentValid key kk hK
-  | .structField _ _, _, h => by simp [lowerExpr] at h
-  | .arrayIndex _ _, _, h => by simp [lowerExpr] at h
+  | .structField base field, _, h => by
+      unfold lowerExpr at h
+      cases hB : lowerExpr base with
+      | error _ => simp [hB, bind, Except.bind] at h
+      | ok kb =>
+          simp [hB, bind, Except.bind] at h
+          simp [Expr.fragmentValid]
+          exact lowerExpr_ok_implies_fragmentValid base kb hB
+  | .arrayIndex base index, _, h => by
+      unfold lowerExpr at h
+      cases hB : lowerExpr base with
+      | error _ => simp [hB, bind, Except.bind] at h
+      | ok kb =>
+          cases hI : lowerExpr index with
+          | error _ => simp [hB, hI, bind, Except.bind] at h
+          | ok ki =>
+              simp [hB, hI, bind, Except.bind] at h
+              simp [Expr.fragmentValid]
+              exact ⟨lowerExpr_ok_implies_fragmentValid base kb hB,
+                lowerExpr_ok_implies_fragmentValid index ki hI⟩
   | .keccak256 parts, _, h => by
       unfold lowerExpr at h
       cases hParts : lowerExprList parts with
@@ -2397,6 +2606,87 @@ theorem evalKernelExpr_status_ne_completed
                       exact EvalStatus_evalError_ne_completed _
                   | map entries =>
                       simp [hRead, Value.mapLookupD] at h
+  | .structField base field, s, h => by
+      unfold evalKernelExpr at h
+      cases hB : evalKernelExpr cfg env base with
+        | status s' =>
+            simp only [hB] at h
+            have heq : s' = s := by injection h
+            rw [← heq]
+            exact evalKernelExpr_status_ne_completed cfg env base s' hB
+        | value bv =>
+            simp only [hB] at h
+            cases bv with
+            | structValue fields =>
+                cases hField : Value.structField? fields field with
+                | some value => simp [hField] at h
+                | none =>
+                    simp [hField] at h
+                    rw [← h]
+                    exact EvalStatus_evalError_ne_completed _
+            | bool _ =>
+                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+            | uint _ =>
+                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+            | bytes32 _ =>
+                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+            | address _ =>
+                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+            | array _ =>
+                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+            | map _ =>
+                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+  | .arrayIndex base indexExpr, s, h => by
+      unfold evalKernelExpr at h
+      cases hB : evalKernelExpr cfg env base with
+        | status s' =>
+            simp only [hB] at h
+            have heq : s' = s := by injection h
+            rw [← heq]
+            exact evalKernelExpr_status_ne_completed cfg env base s' hB
+        | value bv =>
+            simp only [hB] at h
+            cases bv with
+            | array values =>
+                cases hI : evalKernelExpr cfg env indexExpr with
+                | status s' =>
+                    simp [hI] at h
+                    rw [← h]
+                    exact evalKernelExpr_status_ne_completed cfg env indexExpr s' hI
+                | value iv =>
+                    simp [hI] at h
+                    cases iv with
+                    | uint idx =>
+                        cases hValue : Value.arrayIndex? values idx with
+                        | some value => simp [hValue] at h
+                        | none =>
+                            simp [hValue] at h
+                            rw [← h]
+                            exact EvalStatus_evalError_ne_completed _
+                    | bool _ =>
+                        simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                    | bytes32 _ =>
+                        simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                    | address _ =>
+                        simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                    | structValue _ =>
+                        simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                    | array _ =>
+                        simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                    | map _ =>
+                        simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+            | bool _ =>
+                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+            | uint _ =>
+                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+            | bytes32 _ =>
+                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+            | address _ =>
+                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+            | structValue _ =>
+                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+            | map _ =>
+                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
   | .keccak256 parts, s, h => by
       unfold evalKernelExpr at h
       cases hList : evalKernelExprList cfg env parts with
@@ -2515,6 +2805,87 @@ theorem evalKernelPureExpr_status_ne_completed
               simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
           | map _ =>
               simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+  | .structField base field, s, h => by
+      unfold evalKernelPureExpr at h
+      cases hB : evalKernelPureExpr cfg env base with
+        | status s' =>
+            rw [hB] at h
+            have heq : s' = s := by injection h
+            rw [← heq]
+            exact evalKernelPureExpr_status_ne_completed cfg env base s' hB
+        | value bv =>
+            rw [hB] at h
+            cases bv with
+            | structValue fields =>
+                cases hField : Value.structField? fields field with
+                | some value => simp [hField] at h
+                | none =>
+                    simp [hField] at h
+                    rw [← h]
+                    exact EvalStatus_evalError_ne_completed _
+            | bool _ =>
+                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+            | uint _ =>
+                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+            | bytes32 _ =>
+                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+            | address _ =>
+                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+            | array _ =>
+                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+            | map _ =>
+                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+  | .arrayIndex base indexExpr, s, h => by
+      unfold evalKernelPureExpr at h
+      cases hB : evalKernelPureExpr cfg env base with
+        | status s' =>
+            rw [hB] at h
+            have heq : s' = s := by injection h
+            rw [← heq]
+            exact evalKernelPureExpr_status_ne_completed cfg env base s' hB
+        | value bv =>
+            rw [hB] at h
+            cases bv with
+            | array values =>
+                cases hI : evalKernelPureExpr cfg env indexExpr with
+                | status s' =>
+                    simp [hI] at h
+                    rw [← h]
+                    exact evalKernelPureExpr_status_ne_completed cfg env indexExpr s' hI
+                | value iv =>
+                    simp [hI] at h
+                    cases iv with
+                    | uint idx =>
+                        cases hValue : Value.arrayIndex? values idx with
+                        | some value => simp [hValue] at h
+                        | none =>
+                            simp [hValue] at h
+                            rw [← h]
+                            exact EvalStatus_evalError_ne_completed _
+                    | bool _ =>
+                        simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                    | bytes32 _ =>
+                        simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                    | address _ =>
+                        simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                    | structValue _ =>
+                        simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                    | array _ =>
+                        simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                    | map _ =>
+                        simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+            | bool _ =>
+                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+            | uint _ =>
+                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+            | bytes32 _ =>
+                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+            | address _ =>
+                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+            | structValue _ =>
+                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+            | map _ =>
+                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
   | .keccak256 parts, s, h => by
       unfold evalKernelPureExpr at h
       cases hList : evalKernelPureExprList cfg env parts with

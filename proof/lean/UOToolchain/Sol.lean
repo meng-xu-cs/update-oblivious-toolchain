@@ -216,13 +216,26 @@ def evalExpr (cfg : OperationalConfig) (env : LocalEnv) :
                     .status (.evalError s!"mapGet on non-map object {objectId}")
           | none =>
               .status (.evalError s!"mapGet on unknown object {objectId}")
-  | .structField _ _ =>
-      -- `structField` is forbidden by `Expr.fragmentValid`; the IR
-      -- evaluator treats it as `unsupported`, so we mirror that.
-      .status (.unsupported "Expr.structField")
-  | .arrayIndex _ _ =>
-      -- `arrayIndex` is forbidden by `Expr.fragmentValid`.
-      .status (.unsupported "Expr.arrayIndex")
+  | .structField base field =>
+      match evalExpr cfg env base with
+      | .status s => .status s
+      | .value (.structValue fields) =>
+          match IR.Value.structField? fields field with
+          | some value => .value value
+          | none => .status (.evalError s!"unknown struct field {field}")
+      | .value _ => .status (.evalError "structField base not struct")
+  | .arrayIndex base indexExpr =>
+      match evalExpr cfg env base with
+      | .status s => .status s
+      | .value (.array values) =>
+          match evalExpr cfg env indexExpr with
+          | .status s => .status s
+          | .value (.uint idx) =>
+              match IR.Value.arrayIndex? values idx with
+              | some value => .value value
+              | none => .status (.evalError "arrayIndex out of bounds")
+          | .value _ => .status (.evalError "arrayIndex index not uint")
+      | .value _ => .status (.evalError "arrayIndex base not array")
   | .keccak256 parts =>
       match evalExprList cfg env parts with
       | .error s => .status s
@@ -603,10 +616,15 @@ theorem lowerExpr_preserves_semantics
       unfold evalExpr lowerExpr IR.evalExpr
       rw [lowerExpr_preserves_semantics cfg env key]
       rfl
-  | .structField _ _ => by
-      unfold evalExpr lowerExpr IR.evalExpr; rfl
-  | .arrayIndex _ _ => by
-      unfold evalExpr lowerExpr IR.evalExpr; rfl
+  | .structField base _ => by
+      unfold evalExpr lowerExpr IR.evalExpr
+      rw [lowerExpr_preserves_semantics cfg env base]
+      rfl
+  | .arrayIndex base index => by
+      unfold evalExpr lowerExpr IR.evalExpr
+      rw [lowerExpr_preserves_semantics cfg env base,
+        lowerExpr_preserves_semantics cfg env index]
+      rfl
   | .keccak256 parts => by
       unfold evalExpr lowerExpr IR.evalExpr
       rw [lowerExprList_preserves_semantics cfg env parts]

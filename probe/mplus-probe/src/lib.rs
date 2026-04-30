@@ -3408,9 +3408,7 @@ fn run_confidential_fragment_validation(
         "total_array_indices": total_array_indices,
         "total_non_branchless_select_arms": total_non_branchless_select_arms,
         "scenarios": scenarios,
-        "accepted": total_struct_fields == 0
-            && total_array_indices == 0
-            && total_non_branchless_select_arms == 0,
+        "accepted": total_non_branchless_select_arms == 0,
     }))
 }
 
@@ -9344,8 +9342,8 @@ fn run_tamper_validation() -> Result<JsonValue> {
         tampered_runtime_implementation_expr_profiles
             .generated_confidential_kernel_source
             .replace(
-                "pub const CONFIDENTIAL_KERNEL_EXPR_PROFILES: [ConfidentialKernelExprProfile; 9] = [",
-                "pub const CONFIDENTIAL_KERNEL_EXPR_PROFILES: [ConfidentialKernelExprProfile; 8] = [",
+                "pub const CONFIDENTIAL_KERNEL_EXPR_PROFILES: [ConfidentialKernelExprProfile; 11] = [",
+                "pub const CONFIDENTIAL_KERNEL_EXPR_PROFILES: [ConfidentialKernelExprProfile; 10] = [",
             );
     scenarios.push(validate_tampered_json_case(
         "runtime_implementation_interface/kernel_expr_profile_table_drift",
@@ -9360,7 +9358,7 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "artifact_kind": "proofgrade_runtime_implementation_interface",
             "benchmark": "SingleAccessMap/pathoram/put",
             "entrypoint": target.entrypoint,
-            "mutation": "change the shared ConfidentialKernelExpr profile-table arity marker from 9 to 8 so the strengthened implementation interface must reject drift in the centralized named-expression kernel-step/tail-opcode profile layer",
+            "mutation": "change the shared ConfidentialKernelExpr profile-table arity marker from 11 to 10 so the strengthened implementation interface must reject drift in the centralized named-expression kernel-step/tail-opcode profile layer",
         }),
     )?);
     let tampered_runtime_shared_confidential_kernel_expr_profiles =
@@ -9384,7 +9382,7 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "artifact_kind": "proofgrade_runtime_small_confidential_kernel_boundary",
             "benchmark": "SingleAccessMap/pathoram/put",
             "entrypoint": target.entrypoint,
-            "mutation": "change the shared ConfidentialKernelExpr profile-table arity marker from 9 to 8 so the standalone small confidential-kernel boundary checker must reject drift in the centralized named-expression kernel-step/tail-opcode profile layer",
+            "mutation": "change the shared ConfidentialKernelExpr profile-table arity marker from 11 to 10 so the standalone small confidential-kernel boundary checker must reject drift in the centralized named-expression kernel-step/tail-opcode profile layer",
         }),
     )?);
     let tampered_runtime_implementation_small_confidential_kernel_machine_expr_profiles =
@@ -9416,7 +9414,7 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "artifact_kind": "proofgrade_runtime_implementation_small_confidential_kernel_machine_refinement_boundary",
             "benchmark": "SingleAccessMap/pathoram/put",
             "entrypoint": target.entrypoint,
-            "mutation": "change the shared ConfidentialKernelExpr profile-table arity marker from 9 to 8 while keeping the emitted machine-finish witness, fixed slot program, and opcode trace fixed, so the combined machine-backed small confidential-kernel boundary must reject drift in the centralized named-expression kernel-step/tail-opcode profile layer",
+            "mutation": "change the shared ConfidentialKernelExpr profile-table arity marker from 11 to 10 while keeping the emitted machine-finish witness, fixed slot program, and opcode trace fixed, so the combined machine-backed small confidential-kernel boundary must reject drift in the centralized named-expression kernel-step/tail-opcode profile layer",
         }),
     )?);
     scenarios.push(validate_tampered_json_case(
@@ -9432,7 +9430,7 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "artifact_kind": "proofgrade_runtime_shared_confidential_kernel_boundary",
             "benchmark": "SingleAccessMap/pathoram/put",
             "entrypoint": target.entrypoint,
-            "mutation": "change the shared ConfidentialKernelExpr profile-table arity marker from 9 to 8 so the standalone shared confidential-kernel boundary checker must reject drift in the centralized named-expression kernel-step/tail-opcode profile layer",
+            "mutation": "change the shared ConfidentialKernelExpr profile-table arity marker from 11 to 10 so the standalone shared confidential-kernel boundary checker must reject drift in the centralized named-expression kernel-step/tail-opcode profile layer",
         }),
     )?);
     let tampered_runtime_implementation_expr_profiles_boundary =
@@ -9453,7 +9451,7 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
             "benchmark": "SingleAccessMap/pathoram/put",
             "entrypoint": target.entrypoint,
-            "mutation": "change the shared ConfidentialKernelExpr profile-table arity marker from 9 to 8 while keeping the emitted kernel-interface bundle fixed, so the stronger combined confinement boundary must reject drift in the centralized named-expression kernel-step/tail-opcode profile layer",
+            "mutation": "change the shared ConfidentialKernelExpr profile-table arity marker from 11 to 10 while keeping the emitted kernel-interface bundle fixed, so the stronger combined confinement boundary must reject drift in the centralized named-expression kernel-step/tail-opcode profile layer",
         }),
     )?);
     let mut tampered_runtime_implementation_pure_expr_profiles =
@@ -9462,8 +9460,8 @@ fn run_tamper_validation() -> Result<JsonValue> {
         tampered_runtime_implementation_pure_expr_profiles
             .generated_confidential_kernel_source
             .replace(
-                "pub const CONFIDENTIAL_KERNEL_PURE_EXPR_PROFILES: [ConfidentialKernelPureExprProfile; 6] = [",
-                "pub const CONFIDENTIAL_KERNEL_PURE_EXPR_PROFILES: [ConfidentialKernelPureExprProfile; 5] = [",
+                "pub const CONFIDENTIAL_KERNEL_PURE_EXPR_PROFILES: [ConfidentialKernelPureExprProfile; 8] = [",
+                "pub const CONFIDENTIAL_KERNEL_PURE_EXPR_PROFILES: [ConfidentialKernelPureExprProfile; 7] = [",
             );
     scenarios.push(validate_tampered_json_case(
         "runtime_implementation_interface/kernel_pure_expr_profile_table_drift",
@@ -9478,7 +9476,7 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "artifact_kind": "proofgrade_runtime_implementation_interface",
             "benchmark": "SingleAccessMap/pathoram/put",
             "entrypoint": target.entrypoint,
-            "mutation": "change the shared ConfidentialKernelPureExpr profile-table arity marker from 6 to 5 so the strengthened implementation interface must reject drift in the centralized named pure-expression profile layer",
+            "mutation": "change the shared ConfidentialKernelPureExpr profile-table arity marker from 8 to 7 so the strengthened implementation interface must reject drift in the centralized named pure-expression profile layer",
         }),
     )?);
     let tampered_runtime_shared_confidential_kernel_pure_expr_profiles =
@@ -9498,7 +9496,7 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "artifact_kind": "proofgrade_runtime_shared_confidential_kernel_boundary",
             "benchmark": "SingleAccessMap/pathoram/put",
             "entrypoint": target.entrypoint,
-            "mutation": "change the shared ConfidentialKernelPureExpr profile-table arity marker from 6 to 5 so the standalone shared confidential-kernel boundary checker must reject drift in the centralized named pure-expression profile layer",
+            "mutation": "change the shared ConfidentialKernelPureExpr profile-table arity marker from 8 to 7 so the standalone shared confidential-kernel boundary checker must reject drift in the centralized named pure-expression profile layer",
         }),
     )?);
     let tampered_runtime_implementation_pure_expr_profiles_boundary =
@@ -9519,7 +9517,7 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
             "benchmark": "SingleAccessMap/pathoram/put",
             "entrypoint": target.entrypoint,
-            "mutation": "change the shared ConfidentialKernelPureExpr profile-table arity marker from 6 to 5 while keeping the emitted kernel-interface bundle fixed, so the stronger combined confinement boundary must reject drift in the centralized named pure-expression profile layer",
+            "mutation": "change the shared ConfidentialKernelPureExpr profile-table arity marker from 8 to 7 while keeping the emitted kernel-interface bundle fixed, so the stronger combined confinement boundary must reject drift in the centralized named pure-expression profile layer",
         }),
     )?);
     let mut tampered_runtime_implementation_named_lowering =
@@ -26488,6 +26486,22 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             &generated_confidential_kernel_source,
             "pub(super) fn eval_confidential_kernel_slot_pure_expr_generated<",
         )
+        && generated_confidential_kernel_source
+            .contains("fn eval_confidential_kernel_struct_field_generated(base: Value, field: &str) -> Result<Value> {")
+        && generated_confidential_kernel_source
+            .contains("fn eval_confidential_kernel_array_index_generated(base: Value, index: Value) -> Result<Value> {")
+        && generated_confidential_kernel_source
+            .contains("ConfidentialKernelSlotExpr::StructField { base, field } => {")
+        && generated_confidential_kernel_source
+            .contains("eval_confidential_kernel_struct_field_generated(base, field)")
+        && generated_confidential_kernel_source
+            .contains("ConfidentialKernelSlotExpr::ArrayIndex { base, index } => {")
+        && generated_confidential_kernel_source
+            .contains("eval_confidential_kernel_array_index_generated(base, index)")
+        && generated_confidential_kernel_source
+            .contains("ConfidentialKernelSlotPureExpr::StructField { base, field } => {")
+        && generated_confidential_kernel_source
+            .contains("ConfidentialKernelSlotPureExpr::ArrayIndex { base, index } => {")
         && source_contains_compact(
             &generated_confidential_kernel_source,
             "ConfidentialKernelSlotStatement::ArraySet {\n            object_id,\n            index,\n            value,\n            predicate,\n        } => {\n            let index = eval_confidential_kernel_slot_expr_generated(runtime, index, state)?\n                .as_uint()\n                .ok_or_else(|| anyhow!(\"array index must be uint\"))?;\n            let index = index.to_usize_saturating();\n            let value = eval_confidential_kernel_slot_expr_generated(runtime, value, state)?;",
@@ -35013,7 +35027,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && confidential_kernel_source.contains("pub tail_opcode: Option<UoOpcode>,")
         && confidential_kernel_consumes_generated_profiles
         && generated_confidential_kernel_source.contains(
-            "pub const CONFIDENTIAL_KERNEL_EXPR_PROFILES: [ConfidentialKernelExprProfile; 9] = [",
+            "pub const CONFIDENTIAL_KERNEL_EXPR_PROFILES: [ConfidentialKernelExprProfile; 11] = [",
         )
         && confidential_kernel_source
             .contains("pub const fn profile(self) -> ConfidentialKernelExprProfile {")
@@ -35042,7 +35056,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && confidential_kernel_source.contains("pub evaluated_operands: &'static [&'static str],")
         && confidential_kernel_consumes_generated_profiles
         && generated_confidential_kernel_source
-            .contains("pub const CONFIDENTIAL_KERNEL_PURE_EXPR_PROFILES: [ConfidentialKernelPureExprProfile; 6] = [")
+            .contains("pub const CONFIDENTIAL_KERNEL_PURE_EXPR_PROFILES: [ConfidentialKernelPureExprProfile; 8] = [")
         && confidential_kernel_source
             .contains("pub const fn profile(self) -> ConfidentialKernelPureExprProfile {")
         && confidential_kernel_source.contains("pub fn kind(&self) -> ConfidentialKernelPureExprKind {")
@@ -35097,7 +35111,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && confidential_kernel_source.contains("pub evaluated_operands: &'static [&'static str],")
         && confidential_kernel_consumes_generated_profiles
         && generated_confidential_kernel_source
-            .contains("pub const CONFIDENTIAL_KERNEL_SLOT_EXPR_PROFILES: [ConfidentialKernelSlotExprProfile; 9] = [")
+            .contains("pub const CONFIDENTIAL_KERNEL_SLOT_EXPR_PROFILES: [ConfidentialKernelSlotExprProfile; 11] = [")
         && confidential_kernel_source
             .contains("pub const fn profile(self) -> ConfidentialKernelSlotExprProfile {")
         && confidential_kernel_source.contains("pub fn kind(&self) -> ConfidentialKernelSlotExprKind {")
@@ -35122,7 +35136,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && confidential_kernel_source.contains("pub evaluated_operands: &'static [&'static str],")
         && confidential_kernel_consumes_generated_profiles
         && generated_confidential_kernel_source
-            .contains("pub const CONFIDENTIAL_KERNEL_SLOT_PURE_EXPR_PROFILES: [ConfidentialKernelSlotPureExprProfile; 6] = [")
+            .contains("pub const CONFIDENTIAL_KERNEL_SLOT_PURE_EXPR_PROFILES: [ConfidentialKernelSlotPureExprProfile; 8] = [")
         && confidential_kernel_source
             .contains("pub const fn profile(self) -> ConfidentialKernelSlotPureExprProfile {")
         && confidential_kernel_source
@@ -39716,10 +39730,21 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         .contains(".confidential_slot_program")
         && core_trace_source.contains(".expected_runtime_step_manifest()")
         && core_trace_source.contains(".kernel_step_witnesses()");
-    let kernel_witness_validation_tracks_confidential_kernel_lowering_errors = core_trace_source
-        .contains("ConfidentialKernelLoweringError::SelectArmOutsideBranchlessFragment")
-        && core_trace_source.contains("ConfidentialKernelLoweringError::ConfidentialStructField")
-        && core_trace_source.contains("ConfidentialKernelLoweringError::ConfidentialArrayIndex");
+    let kernel_witness_validation_admits_local_projection_lowering = core_trace_source
+        .contains("ConfidentialKernelLoweringError::SelectContainsKernelAccess")
+        && core_trace_source
+            .contains("ConfidentialKernelLoweringError::SelectArmOutsideBranchlessFragment")
+        && confidential_kernel_source.contains(
+            "Expr::StructField { base, field } => Ok(ConfidentialKernelExpr::StructField",
+        )
+        && confidential_kernel_source
+            .contains("Expr::ArrayIndex { base, index } => Ok(ConfidentialKernelExpr::ArrayIndex")
+        && confidential_kernel_source.contains(
+            "Expr::StructField { base, field } => Ok(ConfidentialKernelPureExpr::StructField",
+        )
+        && confidential_kernel_source.contains(
+            "Expr::ArrayIndex { base, index } => Ok(ConfidentialKernelPureExpr::ArrayIndex",
+        );
     let allocator_uses_manifest_kernel_step_budget = allocator_source
         .contains("let canonical_kernel_steps = entry.canonical_kernel_step_manifest();")
         && allocator_source.contains("plan.max_kernel_ops = if canonical_kernel_steps.is_empty()")
@@ -44217,8 +44242,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             checker_uses_manifest_slot_schedule_directly,
         "kernel_witness_validation_uses_manifest_confidential_slot_program":
             kernel_witness_validation_uses_manifest_confidential_slot_program,
-        "kernel_witness_validation_tracks_confidential_kernel_lowering_errors":
-            kernel_witness_validation_tracks_confidential_kernel_lowering_errors,
+        "kernel_witness_validation_admits_local_projection_lowering":
+            kernel_witness_validation_admits_local_projection_lowering,
         "allocator_uses_manifest_kernel_step_budget":
             allocator_uses_manifest_kernel_step_budget,
         "allocator_tracks_kernel_ops_by_count_only":
@@ -44912,7 +44937,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && manifest_kernel_step_interfaces_use_exact_size_buffers
             && checker_uses_manifest_slot_schedule_directly
             && kernel_witness_validation_uses_manifest_confidential_slot_program
-            && kernel_witness_validation_tracks_confidential_kernel_lowering_errors
+            && kernel_witness_validation_admits_local_projection_lowering
             && allocator_uses_manifest_kernel_step_budget
             && allocator_tracks_kernel_ops_by_count_only
             && allocator_surface_restricted
@@ -48005,8 +48030,10 @@ combines them with `Value::confidential_select` instead of branching on the
 secret condition in Rust, while `uo-check` and the proof-grade
 kernel-witness validator reject confidential select arms outside that
 branchless pure fragment. Confidential `Expr::StructField` and
-`Expr::ArrayIndex` are now both rejected from the admitted confidential
-fragment entirely.
+`Expr::ArrayIndex` are now both admitted as local branchless projection/index
+forms, lowered through the named and slot confidential-kernel DSLs, and
+executed by the generated fixed-shape interpreter helpers without introducing
+new confidential object API access.
 `runtime_boundary_validation.json` now checks that Rust-side boundary
 directly by reading the runtime sources: it verifies that `engine.rs` does not
 call the low-level runtime object helpers, that those helpers remain
@@ -48161,8 +48188,9 @@ any runtime-local kernel wrapper, and that confidential
 `Expr::Select` routes through `Value::confidential_select` while the checker
 and proof-grade kernel-witness validator both enforce the admitted
 branchless-pure-arm fragment, and that checker, proof-grade validation, and
-the runtime all reject confidential `Expr::StructField` and
-confidential `Expr::ArrayIndex`, and that all direct confidential object API
+the runtime all admit confidential `Expr::StructField` and
+confidential `Expr::ArrayIndex` through the local projection/indexing kernel
+path, and that all direct confidential object API
 call sites (`.get_cell`, `.set_cell`, `.get_array`, `.set_array`, `.get_map`,
 `.put_map`) remain confined to `runtime/uo-evm/src/state.rs`. The same
 report now also checks constructor authority for exported witnesses:
@@ -48208,8 +48236,9 @@ itself.
 `confidential_fragment_validation.json` complements those source-level checks
 with an artifact-level scan over the admitted UO benchmark suite: it counts
 confidential `Select` nodes per entrypoint and confirms that the compiled
-confidential bodies contain no non-branchless select arms, no confidential
-`StructField`, and no confidential `ArrayIndex` forms.
+confidential bodies contain no non-branchless select arms while recording
+confidential `StructField` and confidential `ArrayIndex` forms as admitted
+local projection/indexing audit counts.
 `kernel_dsl_validation.json` adds the shared-DSL bridge itself to the artifact
 story: for each representative confidential execution, the probe serializes
 the exact lowered confidential-kernel program that Rust executes, Lean

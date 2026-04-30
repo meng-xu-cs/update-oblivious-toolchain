@@ -32,19 +32,20 @@ def importedConfidentialKernelStatementTailOpcodes : List String :=
   ["", "", "", "", "CellSet", "ArraySet", "MapPut", ""]
 
 def importedConfidentialKernelExprKindNames : List String :=
-  ["literal", "var", "unary", "binary", "select", "cell_get", "array_get", "map_get", "keccak256"]
+  ["literal", "var", "unary", "binary", "select", "cell_get", "array_get", "map_get",
+    "struct_field", "array_index", "keccak256"]
 
 def importedConfidentialKernelExprEvaluatedOperands : List String :=
-  ["", "", "expr", "lhs,rhs", "cond", "", "index", "key", "parts"]
+  ["", "", "expr", "lhs,rhs", "cond", "", "index", "key", "base", "base,index", "parts"]
 
 def importedConfidentialKernelExprTailOpcodes : List String :=
-  ["", "", "", "", "", "CellGet", "ArrayGet", "MapGet", ""]
+  ["", "", "", "", "", "CellGet", "ArrayGet", "MapGet", "", "", ""]
 
 def importedConfidentialKernelPureExprKindNames : List String :=
-  ["literal", "var", "unary", "binary", "select", "keccak256"]
+  ["literal", "var", "unary", "binary", "select", "struct_field", "array_index", "keccak256"]
 
 def importedConfidentialKernelPureExprEvaluatedOperands : List String :=
-  ["", "", "expr", "lhs,rhs", "cond,when_true,when_false", "parts"]
+  ["", "", "expr", "lhs,rhs", "cond,when_true,when_false", "base", "base,index", "parts"]
 
 def importedConfidentialKernelParamFieldNames : List String :=
   ["name", "ty"]
@@ -87,6 +88,8 @@ inductive ImportedConfidentialKernelExpr where
   | cellGet (objectId : Nat)
   | arrayGet (objectId : Nat) (index : ImportedConfidentialKernelExpr)
   | mapGet (objectId : Nat) (key : ImportedConfidentialKernelExpr)
+  | structField (base : ImportedConfidentialKernelExpr) (field : String)
+  | arrayIndex (base : ImportedConfidentialKernelExpr) (index : ImportedConfidentialKernelExpr)
   | keccak256 (parts : List ImportedConfidentialKernelExpr)
 
 
@@ -98,6 +101,8 @@ inductive ImportedConfidentialKernelPureExpr where
   | select
       (cond : ImportedConfidentialKernelPureExpr)
       (whenTrue whenFalse : ImportedConfidentialKernelPureExpr)
+  | structField (base : ImportedConfidentialKernelPureExpr) (field : String)
+  | arrayIndex (base : ImportedConfidentialKernelPureExpr) (index : ImportedConfidentialKernelPureExpr)
   | keccak256 (parts : List ImportedConfidentialKernelPureExpr)
  
 end
@@ -176,6 +181,14 @@ private partial def parseImportedConfidentialKernelExpr
       pure <| .mapGet
         (← json.getObjValAs? Nat "object_id")
         (← parseImportedConfidentialKernelExpr (← json.getObjValAs? Json "key"))
+  | "struct_field" =>
+      pure <| .structField
+        (← parseImportedConfidentialKernelExpr (← json.getObjValAs? Json "base"))
+        (← json.getObjValAs? String "field")
+  | "array_index" =>
+      pure <| .arrayIndex
+        (← parseImportedConfidentialKernelExpr (← json.getObjValAs? Json "base"))
+        (← parseImportedConfidentialKernelExpr (← json.getObjValAs? Json "index"))
   | "keccak256" =>
       pure <| .keccak256
         (← parseImportedConfidentialKernelExprList (← json.getObjValAs? (List Json) "parts"))
@@ -204,6 +217,14 @@ private partial def parseImportedConfidentialKernelPureExpr
         (← parseImportedConfidentialKernelPureExpr (← json.getObjValAs? Json "cond"))
         (← parseImportedConfidentialKernelPureExpr (← json.getObjValAs? Json "when_true"))
         (← parseImportedConfidentialKernelPureExpr (← json.getObjValAs? Json "when_false"))
+  | "struct_field" =>
+      pure <| .structField
+        (← parseImportedConfidentialKernelPureExpr (← json.getObjValAs? Json "base"))
+        (← json.getObjValAs? String "field")
+  | "array_index" =>
+      pure <| .arrayIndex
+        (← parseImportedConfidentialKernelPureExpr (← json.getObjValAs? Json "base"))
+        (← parseImportedConfidentialKernelPureExpr (← json.getObjValAs? Json "index"))
   | "keccak256" =>
       pure <| .keccak256
         (← parseImportedConfidentialKernelPureExprList (← json.getObjValAs? (List Json) "parts"))
@@ -294,6 +315,10 @@ def ImportedConfidentialKernelExpr.toConfidentialKernelExpr :
       .arrayGet objectId index.toConfidentialKernelExpr
   | .mapGet objectId key =>
       .mapGet objectId key.toConfidentialKernelExpr
+  | .structField base field =>
+      .structField base.toConfidentialKernelExpr field
+  | .arrayIndex base index =>
+      .arrayIndex base.toConfidentialKernelExpr index.toConfidentialKernelExpr
   | .keccak256 parts =>
       .keccak256 (parts.map ImportedConfidentialKernelExpr.toConfidentialKernelExpr)
 
@@ -311,6 +336,10 @@ def ImportedConfidentialKernelPureExpr.toConfidentialKernelPureExpr :
       .select cond.toConfidentialKernelPureExpr
         whenTrue.toConfidentialKernelPureExpr
         whenFalse.toConfidentialKernelPureExpr
+  | .structField base field =>
+      .structField base.toConfidentialKernelPureExpr field
+  | .arrayIndex base index =>
+      .arrayIndex base.toConfidentialKernelPureExpr index.toConfidentialKernelPureExpr
   | .keccak256 parts =>
       .keccak256 (parts.map ImportedConfidentialKernelPureExpr.toConfidentialKernelPureExpr)
 
@@ -377,6 +406,9 @@ def ImportedConfidentialKernelExpr.expectedRuntimeKernelSteps :
       index.expectedRuntimeKernelSteps ++ [importedRuntimeKernelStep "ArrayGet" (some objectId)]
   | .mapGet objectId key =>
       key.expectedRuntimeKernelSteps ++ [importedRuntimeKernelStep "MapGet" (some objectId)]
+  | .structField base _ => base.expectedRuntimeKernelSteps
+  | .arrayIndex base index =>
+      base.expectedRuntimeKernelSteps ++ index.expectedRuntimeKernelSteps
   | .keccak256 parts =>
       importedConfidentialKernelExprListExpectedRuntimeKernelSteps parts
 
@@ -390,6 +422,9 @@ def ImportedConfidentialKernelPureExpr.expectedRuntimeKernelSteps :
       cond.expectedRuntimeKernelSteps ++
         whenTrue.expectedRuntimeKernelSteps ++
         whenFalse.expectedRuntimeKernelSteps
+  | .structField base _ => base.expectedRuntimeKernelSteps
+  | .arrayIndex base index =>
+      base.expectedRuntimeKernelSteps ++ index.expectedRuntimeKernelSteps
   | .keccak256 parts =>
       importedConfidentialKernelPureExprListExpectedRuntimeKernelSteps parts
 
@@ -473,6 +508,17 @@ theorem importedConfidentialKernelExpr_expectedRuntimeKernelSteps_toRuntime :
         ImportedConfidentialKernelExpr.toConfidentialKernelExpr,
         ConfidentialKernelExpr.expectedRuntimeKernelSteps,
         importedConfidentialKernelExpr_expectedRuntimeKernelSteps_toRuntime key]
+  | .structField base field => by
+      simp [ImportedConfidentialKernelExpr.expectedRuntimeKernelSteps,
+        ImportedConfidentialKernelExpr.toConfidentialKernelExpr,
+        ConfidentialKernelExpr.expectedRuntimeKernelSteps,
+        importedConfidentialKernelExpr_expectedRuntimeKernelSteps_toRuntime base]
+  | .arrayIndex base index => by
+      simp [ImportedConfidentialKernelExpr.expectedRuntimeKernelSteps,
+        ImportedConfidentialKernelExpr.toConfidentialKernelExpr,
+        ConfidentialKernelExpr.expectedRuntimeKernelSteps,
+        importedConfidentialKernelExpr_expectedRuntimeKernelSteps_toRuntime base,
+        importedConfidentialKernelExpr_expectedRuntimeKernelSteps_toRuntime index]
   | .keccak256 parts => by
       simpa [ImportedConfidentialKernelExpr.expectedRuntimeKernelSteps,
         ImportedConfidentialKernelExpr.toConfidentialKernelExpr,
@@ -510,6 +556,17 @@ theorem importedConfidentialKernelPureExpr_expectedRuntimeKernelSteps_toRuntime 
         importedConfidentialKernelPureExpr_expectedRuntimeKernelSteps_toRuntime cond,
         importedConfidentialKernelPureExpr_expectedRuntimeKernelSteps_toRuntime whenTrue,
         importedConfidentialKernelPureExpr_expectedRuntimeKernelSteps_toRuntime whenFalse]
+  | .structField base field => by
+      simp [ImportedConfidentialKernelPureExpr.expectedRuntimeKernelSteps,
+        ImportedConfidentialKernelPureExpr.toConfidentialKernelPureExpr,
+        ConfidentialKernelPureExpr.expectedRuntimeKernelSteps,
+        importedConfidentialKernelPureExpr_expectedRuntimeKernelSteps_toRuntime base]
+  | .arrayIndex base index => by
+      simp [ImportedConfidentialKernelPureExpr.expectedRuntimeKernelSteps,
+        ImportedConfidentialKernelPureExpr.toConfidentialKernelPureExpr,
+        ConfidentialKernelPureExpr.expectedRuntimeKernelSteps,
+        importedConfidentialKernelPureExpr_expectedRuntimeKernelSteps_toRuntime base,
+        importedConfidentialKernelPureExpr_expectedRuntimeKernelSteps_toRuntime index]
   | .keccak256 parts => by
       simpa [ImportedConfidentialKernelPureExpr.expectedRuntimeKernelSteps,
         ImportedConfidentialKernelPureExpr.toConfidentialKernelPureExpr,
@@ -754,19 +811,19 @@ def importedConfidentialKernelSlotStatementTailOpcodes : List String :=
 
 def importedConfidentialKernelSlotExprKindNames : List String :=
   ["literal", "slot", "unary", "binary", "select", "cell_get", "array_get", "map_get",
-    "keccak256"]
+    "struct_field", "array_index", "keccak256"]
 
 def importedConfidentialKernelSlotExprEvaluatedOperands : List String :=
-  ["", "", "expr", "lhs,rhs", "cond", "", "index", "key", "parts"]
+  ["", "", "expr", "lhs,rhs", "cond", "", "index", "key", "base", "base,index", "parts"]
 
 def importedConfidentialKernelSlotExprTailOpcodes : List String :=
-  ["", "", "", "", "", "CellGet", "ArrayGet", "MapGet", ""]
+  ["", "", "", "", "", "CellGet", "ArrayGet", "MapGet", "", "", ""]
 
 def importedConfidentialKernelSlotPureExprKindNames : List String :=
-  ["literal", "slot", "unary", "binary", "select", "keccak256"]
+  ["literal", "slot", "unary", "binary", "select", "struct_field", "array_index", "keccak256"]
 
 def importedConfidentialKernelSlotPureExprEvaluatedOperands : List String :=
-  ["", "", "expr", "lhs,rhs", "cond,when_true,when_false", "parts"]
+  ["", "", "expr", "lhs,rhs", "cond,when_true,when_false", "base", "base,index", "parts"]
 
 def importedConfidentialKernelSlotProgramFieldNames : List String :=
   ["entrypoint_id", "param_count", "return_type", "secret_args", "slot_count", "body"]
@@ -805,6 +862,8 @@ inductive ImportedConfidentialKernelSlotExpr where
   | cellGet (objectId : Nat)
   | arrayGet (objectId : Nat) (index : ImportedConfidentialKernelSlotExpr)
   | mapGet (objectId : Nat) (key : ImportedConfidentialKernelSlotExpr)
+  | structField (base : ImportedConfidentialKernelSlotExpr) (field : String)
+  | arrayIndex (base : ImportedConfidentialKernelSlotExpr) (index : ImportedConfidentialKernelSlotExpr)
   | keccak256 (parts : List ImportedConfidentialKernelSlotExpr)
 
 inductive ImportedConfidentialKernelSlotPureExpr where
@@ -815,6 +874,9 @@ inductive ImportedConfidentialKernelSlotPureExpr where
   | select
       (cond : ImportedConfidentialKernelSlotPureExpr)
       (whenTrue whenFalse : ImportedConfidentialKernelSlotPureExpr)
+  | structField (base : ImportedConfidentialKernelSlotPureExpr) (field : String)
+  | arrayIndex (base : ImportedConfidentialKernelSlotPureExpr)
+      (index : ImportedConfidentialKernelSlotPureExpr)
   | keccak256 (parts : List ImportedConfidentialKernelSlotPureExpr)
 
 end
@@ -892,6 +954,14 @@ private partial def parseImportedConfidentialKernelSlotExpr
       pure <| .mapGet
         (← json.getObjValAs? Nat "object_id")
         (← parseImportedConfidentialKernelSlotExpr (← json.getObjValAs? Json "key"))
+  | "struct_field" =>
+      pure <| .structField
+        (← parseImportedConfidentialKernelSlotExpr (← json.getObjValAs? Json "base"))
+        (← json.getObjValAs? String "field")
+  | "array_index" =>
+      pure <| .arrayIndex
+        (← parseImportedConfidentialKernelSlotExpr (← json.getObjValAs? Json "base"))
+        (← parseImportedConfidentialKernelSlotExpr (← json.getObjValAs? Json "index"))
   | "keccak256" =>
       pure <| .keccak256
         (← parseImportedConfidentialKernelSlotExprList
@@ -921,6 +991,14 @@ private partial def parseImportedConfidentialKernelSlotPureExpr
         (← parseImportedConfidentialKernelSlotPureExpr (← json.getObjValAs? Json "cond"))
         (← parseImportedConfidentialKernelSlotPureExpr (← json.getObjValAs? Json "when_true"))
         (← parseImportedConfidentialKernelSlotPureExpr (← json.getObjValAs? Json "when_false"))
+  | "struct_field" =>
+      pure <| .structField
+        (← parseImportedConfidentialKernelSlotPureExpr (← json.getObjValAs? Json "base"))
+        (← json.getObjValAs? String "field")
+  | "array_index" =>
+      pure <| .arrayIndex
+        (← parseImportedConfidentialKernelSlotPureExpr (← json.getObjValAs? Json "base"))
+        (← parseImportedConfidentialKernelSlotPureExpr (← json.getObjValAs? Json "index"))
   | "keccak256" =>
       pure <| .keccak256
         (← parseImportedConfidentialKernelSlotPureExprList
@@ -1007,6 +1085,10 @@ def ImportedConfidentialKernelSlotExpr.toConfidentialKernelSlotExpr :
       .arrayGet objectId index.toConfidentialKernelSlotExpr
   | .mapGet objectId key =>
       .mapGet objectId key.toConfidentialKernelSlotExpr
+  | .structField base field =>
+      .structField base.toConfidentialKernelSlotExpr field
+  | .arrayIndex base index =>
+      .arrayIndex base.toConfidentialKernelSlotExpr index.toConfidentialKernelSlotExpr
   | .keccak256 parts =>
       .keccak256 (parts.map ImportedConfidentialKernelSlotExpr.toConfidentialKernelSlotExpr)
 
@@ -1024,6 +1106,10 @@ def ImportedConfidentialKernelSlotPureExpr.toConfidentialKernelSlotPureExpr :
       .select cond.toConfidentialKernelSlotPureExpr
         whenTrue.toConfidentialKernelSlotPureExpr
         whenFalse.toConfidentialKernelSlotPureExpr
+  | .structField base field =>
+      .structField base.toConfidentialKernelSlotPureExpr field
+  | .arrayIndex base index =>
+      .arrayIndex base.toConfidentialKernelSlotPureExpr index.toConfidentialKernelSlotPureExpr
   | .keccak256 parts =>
       .keccak256 (parts.map ImportedConfidentialKernelSlotPureExpr.toConfidentialKernelSlotPureExpr)
 
@@ -1136,6 +1222,12 @@ private def importedConfidentialKernelExprToSlotExpr :
       pure <| .arrayGet objectId (← importedConfidentialKernelExprToSlotExpr index env)
   | .mapGet objectId key, env => do
       pure <| .mapGet objectId (← importedConfidentialKernelExprToSlotExpr key env)
+  | .structField base field, env => do
+      pure <| .structField (← importedConfidentialKernelExprToSlotExpr base env) field
+  | .arrayIndex base index, env => do
+      pure <| .arrayIndex
+        (← importedConfidentialKernelExprToSlotExpr base env)
+        (← importedConfidentialKernelExprToSlotExpr index env)
   | .keccak256 parts, env => do
       pure <| .keccak256 (← importedConfidentialKernelExprsToSlotExprs parts env)
 termination_by expr _ => sizeOf expr
@@ -1158,6 +1250,12 @@ private def importedConfidentialKernelPureExprToSlotPureExpr :
         (← importedConfidentialKernelPureExprToSlotPureExpr cond env)
         (← importedConfidentialKernelPureExprToSlotPureExpr whenTrue env)
         (← importedConfidentialKernelPureExprToSlotPureExpr whenFalse env)
+  | .structField base field, env => do
+      pure <| .structField (← importedConfidentialKernelPureExprToSlotPureExpr base env) field
+  | .arrayIndex base index, env => do
+      pure <| .arrayIndex
+        (← importedConfidentialKernelPureExprToSlotPureExpr base env)
+        (← importedConfidentialKernelPureExprToSlotPureExpr index env)
   | .keccak256 parts, env => do
       pure <| .keccak256 (← importedConfidentialKernelPureExprsToSlotPureExprs parts env)
 termination_by expr _ => sizeOf expr
@@ -1635,6 +1733,74 @@ theorem importedConfidentialKernelExprToSlotExpr_toRuntime
               (importedConfidentialKernelExceptMap_ok
                 ImportedConfidentialKernelSlotExpr.toConfidentialKernelSlotExpr
                 (ImportedConfidentialKernelSlotExpr.mapGet objectId value)).symm)
+  | .structField base field, env => by
+      have hBase := importedConfidentialKernelExprToSlotExpr_toRuntime base env
+      cases h : importedConfidentialKernelExprToSlotExpr base env with
+      | error err =>
+          simp [h] at hBase
+          simpa only [confidentialKernelExprToSlotExpr, importedConfidentialKernelExprToSlotExpr,
+            ImportedConfidentialKernelExpr.toConfidentialKernelExpr, h, hBase] using
+            (show (.error err : Except String ConfidentialKernelSlotExpr) =
+                Except.map ImportedConfidentialKernelSlotExpr.toConfidentialKernelSlotExpr
+                  (.error err : Except String ImportedConfidentialKernelSlotExpr) from
+              (importedConfidentialKernelExceptMap_error
+                ImportedConfidentialKernelSlotExpr.toConfidentialKernelSlotExpr err).symm)
+      | ok value =>
+          simp [h] at hBase
+          simpa only [confidentialKernelExprToSlotExpr, importedConfidentialKernelExprToSlotExpr,
+            ImportedConfidentialKernelExpr.toConfidentialKernelExpr,
+            ImportedConfidentialKernelSlotExpr.toConfidentialKernelSlotExpr, h, hBase] using
+            (show (.ok
+                (ImportedConfidentialKernelSlotExpr.structField value field).toConfidentialKernelSlotExpr :
+                Except String ConfidentialKernelSlotExpr) =
+                Except.map ImportedConfidentialKernelSlotExpr.toConfidentialKernelSlotExpr
+                  (.ok (ImportedConfidentialKernelSlotExpr.structField value field) :
+                    Except String ImportedConfidentialKernelSlotExpr) from
+              (importedConfidentialKernelExceptMap_ok
+                ImportedConfidentialKernelSlotExpr.toConfidentialKernelSlotExpr
+                (ImportedConfidentialKernelSlotExpr.structField value field)).symm)
+  | .arrayIndex base index, env => by
+      have hBase := importedConfidentialKernelExprToSlotExpr_toRuntime base env
+      have hIndex := importedConfidentialKernelExprToSlotExpr_toRuntime index env
+      cases hB : importedConfidentialKernelExprToSlotExpr base env with
+      | error err =>
+          simp [hB] at hBase
+          simpa only [confidentialKernelExprToSlotExpr, importedConfidentialKernelExprToSlotExpr,
+            ImportedConfidentialKernelExpr.toConfidentialKernelExpr, hB, hBase] using
+            (show (.error err : Except String ConfidentialKernelSlotExpr) =
+                Except.map ImportedConfidentialKernelSlotExpr.toConfidentialKernelSlotExpr
+                  (.error err : Except String ImportedConfidentialKernelSlotExpr) from
+              (importedConfidentialKernelExceptMap_error
+                ImportedConfidentialKernelSlotExpr.toConfidentialKernelSlotExpr err).symm)
+      | ok baseValue =>
+          simp [hB] at hBase
+          cases hI : importedConfidentialKernelExprToSlotExpr index env with
+          | error err =>
+              simp [hI] at hIndex
+              simpa only [confidentialKernelExprToSlotExpr, importedConfidentialKernelExprToSlotExpr,
+                ImportedConfidentialKernelExpr.toConfidentialKernelExpr,
+                ImportedConfidentialKernelSlotExpr.toConfidentialKernelSlotExpr,
+                hB, hI, hBase, hIndex] using
+                (show (.error err : Except String ConfidentialKernelSlotExpr) =
+                    Except.map ImportedConfidentialKernelSlotExpr.toConfidentialKernelSlotExpr
+                      (.error err : Except String ImportedConfidentialKernelSlotExpr) from
+                  (importedConfidentialKernelExceptMap_error
+                    ImportedConfidentialKernelSlotExpr.toConfidentialKernelSlotExpr err).symm)
+          | ok indexValue =>
+              simp [hI] at hIndex
+              simpa only [confidentialKernelExprToSlotExpr, importedConfidentialKernelExprToSlotExpr,
+                ImportedConfidentialKernelExpr.toConfidentialKernelExpr,
+                ImportedConfidentialKernelSlotExpr.toConfidentialKernelSlotExpr,
+                hB, hI, hBase, hIndex] using
+                (show (.ok
+                    ((ImportedConfidentialKernelSlotExpr.arrayIndex baseValue indexValue).toConfidentialKernelSlotExpr) :
+                    Except String ConfidentialKernelSlotExpr) =
+                    Except.map ImportedConfidentialKernelSlotExpr.toConfidentialKernelSlotExpr
+                      (.ok (ImportedConfidentialKernelSlotExpr.arrayIndex baseValue indexValue) :
+                        Except String ImportedConfidentialKernelSlotExpr) from
+                  (importedConfidentialKernelExceptMap_ok
+                    ImportedConfidentialKernelSlotExpr.toConfidentialKernelSlotExpr
+                    (ImportedConfidentialKernelSlotExpr.arrayIndex baseValue indexValue)).symm)
   | .keccak256 parts, env => by
       have hParts := importedConfidentialKernelExprListToSlotExpr_toRuntime parts env
       cases h : importedConfidentialKernelExprsToSlotExprs parts env with
@@ -1803,6 +1969,74 @@ theorem importedConfidentialKernelPureExprToSlotPureExpr_toRuntime
                         ImportedConfidentialKernelSlotPureExpr.toConfidentialKernelSlotPureExpr
                         (ImportedConfidentialKernelSlotPureExpr.select condValue whenTrueValue
                           whenFalseValue)).symm)
+  | .structField base field, env => by
+      have hBase := importedConfidentialKernelPureExprToSlotPureExpr_toRuntime base env
+      cases h : importedConfidentialKernelPureExprToSlotPureExpr base env with
+      | error err =>
+          simp [h] at hBase
+          simpa only [confidentialKernelPureExprToSlotPureExpr, importedConfidentialKernelPureExprToSlotPureExpr,
+            ImportedConfidentialKernelPureExpr.toConfidentialKernelPureExpr, h, hBase] using
+            (show (.error err : Except String ConfidentialKernelSlotPureExpr) =
+                Except.map ImportedConfidentialKernelSlotPureExpr.toConfidentialKernelSlotPureExpr
+                  (.error err : Except String ImportedConfidentialKernelSlotPureExpr) from
+              (importedConfidentialKernelExceptMap_error
+                ImportedConfidentialKernelSlotPureExpr.toConfidentialKernelSlotPureExpr err).symm)
+      | ok value =>
+          simp [h] at hBase
+          simpa only [confidentialKernelPureExprToSlotPureExpr, importedConfidentialKernelPureExprToSlotPureExpr,
+            ImportedConfidentialKernelPureExpr.toConfidentialKernelPureExpr,
+            ImportedConfidentialKernelSlotPureExpr.toConfidentialKernelSlotPureExpr, h, hBase] using
+            (show (.ok
+                (ImportedConfidentialKernelSlotPureExpr.structField value field).toConfidentialKernelSlotPureExpr :
+                Except String ConfidentialKernelSlotPureExpr) =
+                Except.map ImportedConfidentialKernelSlotPureExpr.toConfidentialKernelSlotPureExpr
+                  (.ok (ImportedConfidentialKernelSlotPureExpr.structField value field) :
+                    Except String ImportedConfidentialKernelSlotPureExpr) from
+              (importedConfidentialKernelExceptMap_ok
+                ImportedConfidentialKernelSlotPureExpr.toConfidentialKernelSlotPureExpr
+                (ImportedConfidentialKernelSlotPureExpr.structField value field)).symm)
+  | .arrayIndex base index, env => by
+      have hBase := importedConfidentialKernelPureExprToSlotPureExpr_toRuntime base env
+      have hIndex := importedConfidentialKernelPureExprToSlotPureExpr_toRuntime index env
+      cases hB : importedConfidentialKernelPureExprToSlotPureExpr base env with
+      | error err =>
+          simp [hB] at hBase
+          simpa only [confidentialKernelPureExprToSlotPureExpr, importedConfidentialKernelPureExprToSlotPureExpr,
+            ImportedConfidentialKernelPureExpr.toConfidentialKernelPureExpr, hB, hBase] using
+            (show (.error err : Except String ConfidentialKernelSlotPureExpr) =
+                Except.map ImportedConfidentialKernelSlotPureExpr.toConfidentialKernelSlotPureExpr
+                  (.error err : Except String ImportedConfidentialKernelSlotPureExpr) from
+              (importedConfidentialKernelExceptMap_error
+                ImportedConfidentialKernelSlotPureExpr.toConfidentialKernelSlotPureExpr err).symm)
+      | ok baseValue =>
+          simp [hB] at hBase
+          cases hI : importedConfidentialKernelPureExprToSlotPureExpr index env with
+          | error err =>
+              simp [hI] at hIndex
+              simpa only [confidentialKernelPureExprToSlotPureExpr, importedConfidentialKernelPureExprToSlotPureExpr,
+                ImportedConfidentialKernelPureExpr.toConfidentialKernelPureExpr,
+                ImportedConfidentialKernelSlotPureExpr.toConfidentialKernelSlotPureExpr,
+                hB, hI, hBase, hIndex] using
+                (show (.error err : Except String ConfidentialKernelSlotPureExpr) =
+                    Except.map ImportedConfidentialKernelSlotPureExpr.toConfidentialKernelSlotPureExpr
+                      (.error err : Except String ImportedConfidentialKernelSlotPureExpr) from
+                  (importedConfidentialKernelExceptMap_error
+                    ImportedConfidentialKernelSlotPureExpr.toConfidentialKernelSlotPureExpr err).symm)
+          | ok indexValue =>
+              simp [hI] at hIndex
+              simpa only [confidentialKernelPureExprToSlotPureExpr, importedConfidentialKernelPureExprToSlotPureExpr,
+                ImportedConfidentialKernelPureExpr.toConfidentialKernelPureExpr,
+                ImportedConfidentialKernelSlotPureExpr.toConfidentialKernelSlotPureExpr,
+                hB, hI, hBase, hIndex] using
+                (show (.ok
+                    ((ImportedConfidentialKernelSlotPureExpr.arrayIndex baseValue indexValue).toConfidentialKernelSlotPureExpr) :
+                    Except String ConfidentialKernelSlotPureExpr) =
+                    Except.map ImportedConfidentialKernelSlotPureExpr.toConfidentialKernelSlotPureExpr
+                      (.ok (ImportedConfidentialKernelSlotPureExpr.arrayIndex baseValue indexValue) :
+                        Except String ImportedConfidentialKernelSlotPureExpr) from
+                  (importedConfidentialKernelExceptMap_ok
+                    ImportedConfidentialKernelSlotPureExpr.toConfidentialKernelSlotPureExpr
+                    (ImportedConfidentialKernelSlotPureExpr.arrayIndex baseValue indexValue)).symm)
   | .keccak256 parts, env => by
       have hParts := importedConfidentialKernelPureExprListToSlotPureExpr_toRuntime parts env
       cases h : importedConfidentialKernelPureExprsToSlotPureExprs parts env with
@@ -2802,6 +3036,9 @@ def ImportedConfidentialKernelSlotExpr.expectedRuntimeKernelSteps :
   | .mapGet objectId key =>
       key.expectedRuntimeKernelSteps ++
         [importedRuntimeKernelStep "MapGet" (some objectId)]
+  | .structField base _ => base.expectedRuntimeKernelSteps
+  | .arrayIndex base index =>
+      base.expectedRuntimeKernelSteps ++ index.expectedRuntimeKernelSteps
   | .keccak256 parts =>
       importedConfidentialKernelSlotExprListExpectedRuntimeKernelSteps parts
 
@@ -2815,6 +3052,9 @@ def ImportedConfidentialKernelSlotPureExpr.expectedRuntimeKernelSteps :
       cond.expectedRuntimeKernelSteps ++
         whenTrue.expectedRuntimeKernelSteps ++
         whenFalse.expectedRuntimeKernelSteps
+  | .structField base _ => base.expectedRuntimeKernelSteps
+  | .arrayIndex base index =>
+      base.expectedRuntimeKernelSteps ++ index.expectedRuntimeKernelSteps
   | .keccak256 parts =>
       importedConfidentialKernelSlotPureExprListExpectedRuntimeKernelSteps parts
 
@@ -2942,6 +3182,34 @@ theorem importedConfidentialKernelExprToSlotExpr_expectedRuntimeKernelSteps
           simp [ImportedConfidentialKernelExpr.expectedRuntimeKernelSteps,
             ImportedConfidentialKernelSlotExpr.expectedRuntimeKernelSteps,
             importedConfidentialKernelExprToSlotExpr_expectedRuntimeKernelSteps key env key' hKey]
+  | .structField base field, env, slotExpr, h => by
+      cases hBase : importedConfidentialKernelExprToSlotExpr base env with
+      | error err =>
+          simp [importedConfidentialKernelExprToSlotExpr, hBase] at h
+          cases h
+      | ok base' =>
+          simp [importedConfidentialKernelExprToSlotExpr, hBase] at h
+          cases h
+          simp [ImportedConfidentialKernelExpr.expectedRuntimeKernelSteps,
+            ImportedConfidentialKernelSlotExpr.expectedRuntimeKernelSteps,
+            importedConfidentialKernelExprToSlotExpr_expectedRuntimeKernelSteps base env base' hBase]
+  | .arrayIndex base index, env, slotExpr, h => by
+      cases hBase : importedConfidentialKernelExprToSlotExpr base env with
+      | error err =>
+          simp [importedConfidentialKernelExprToSlotExpr, hBase] at h
+          cases h
+      | ok base' =>
+          cases hIndex : importedConfidentialKernelExprToSlotExpr index env with
+          | error err =>
+              simp [importedConfidentialKernelExprToSlotExpr, hBase, hIndex] at h
+              cases h
+          | ok index' =>
+              simp [importedConfidentialKernelExprToSlotExpr, hBase, hIndex] at h
+              cases h
+              simp [ImportedConfidentialKernelExpr.expectedRuntimeKernelSteps,
+                ImportedConfidentialKernelSlotExpr.expectedRuntimeKernelSteps,
+                importedConfidentialKernelExprToSlotExpr_expectedRuntimeKernelSteps base env base' hBase,
+                importedConfidentialKernelExprToSlotExpr_expectedRuntimeKernelSteps index env index' hIndex]
   | .keccak256 parts, env, slotExpr, h => by
       cases hParts : importedConfidentialKernelExprsToSlotExprs parts env with
       | error err =>
@@ -3028,6 +3296,37 @@ theorem importedConfidentialKernelPureExprToSlotPureExpr_expectedRuntimeKernelSt
                       whenTrue env whenTrue' hWhenTrue,
                     importedConfidentialKernelPureExprToSlotPureExpr_expectedRuntimeKernelSteps
                       whenFalse env whenFalse' hWhenFalse]
+  | .structField base field, env, slotExpr, h => by
+      cases hBase : importedConfidentialKernelPureExprToSlotPureExpr base env with
+      | error err =>
+          simp [importedConfidentialKernelPureExprToSlotPureExpr, hBase] at h
+          cases h
+      | ok base' =>
+          simp [importedConfidentialKernelPureExprToSlotPureExpr, hBase] at h
+          cases h
+          simp [ImportedConfidentialKernelPureExpr.expectedRuntimeKernelSteps,
+            ImportedConfidentialKernelSlotPureExpr.expectedRuntimeKernelSteps,
+            importedConfidentialKernelPureExprToSlotPureExpr_expectedRuntimeKernelSteps
+              base env base' hBase]
+  | .arrayIndex base index, env, slotExpr, h => by
+      cases hBase : importedConfidentialKernelPureExprToSlotPureExpr base env with
+      | error err =>
+          simp [importedConfidentialKernelPureExprToSlotPureExpr, hBase] at h
+          cases h
+      | ok base' =>
+          cases hIndex : importedConfidentialKernelPureExprToSlotPureExpr index env with
+          | error err =>
+              simp [importedConfidentialKernelPureExprToSlotPureExpr, hBase, hIndex] at h
+              cases h
+          | ok index' =>
+              simp [importedConfidentialKernelPureExprToSlotPureExpr, hBase, hIndex] at h
+              cases h
+              simp [ImportedConfidentialKernelPureExpr.expectedRuntimeKernelSteps,
+                ImportedConfidentialKernelSlotPureExpr.expectedRuntimeKernelSteps,
+                importedConfidentialKernelPureExprToSlotPureExpr_expectedRuntimeKernelSteps
+                  base env base' hBase,
+                importedConfidentialKernelPureExprToSlotPureExpr_expectedRuntimeKernelSteps
+                  index env index' hIndex]
   | .keccak256 parts, env, slotExpr, h => by
       cases hParts : importedConfidentialKernelPureExprsToSlotPureExprs parts env with
       | error err =>
@@ -3529,6 +3828,17 @@ theorem importedConfidentialKernelSlotExpr_expectedRuntimeKernelSteps_toRuntime 
         ImportedConfidentialKernelSlotExpr.toConfidentialKernelSlotExpr,
         ConfidentialKernelSlotExpr.expectedRuntimeKernelSteps,
         importedConfidentialKernelSlotExpr_expectedRuntimeKernelSteps_toRuntime key]
+  | .structField base field => by
+      simp [ImportedConfidentialKernelSlotExpr.expectedRuntimeKernelSteps,
+        ImportedConfidentialKernelSlotExpr.toConfidentialKernelSlotExpr,
+        ConfidentialKernelSlotExpr.expectedRuntimeKernelSteps,
+        importedConfidentialKernelSlotExpr_expectedRuntimeKernelSteps_toRuntime base]
+  | .arrayIndex base index => by
+      simp [ImportedConfidentialKernelSlotExpr.expectedRuntimeKernelSteps,
+        ImportedConfidentialKernelSlotExpr.toConfidentialKernelSlotExpr,
+        ConfidentialKernelSlotExpr.expectedRuntimeKernelSteps,
+        importedConfidentialKernelSlotExpr_expectedRuntimeKernelSteps_toRuntime base,
+        importedConfidentialKernelSlotExpr_expectedRuntimeKernelSteps_toRuntime index]
   | .keccak256 parts => by
       simpa [ImportedConfidentialKernelSlotExpr.expectedRuntimeKernelSteps,
         ImportedConfidentialKernelSlotExpr.toConfidentialKernelSlotExpr,
@@ -3566,6 +3876,17 @@ theorem importedConfidentialKernelSlotPureExpr_expectedRuntimeKernelSteps_toRunt
         importedConfidentialKernelSlotPureExpr_expectedRuntimeKernelSteps_toRuntime cond,
         importedConfidentialKernelSlotPureExpr_expectedRuntimeKernelSteps_toRuntime whenTrue,
         importedConfidentialKernelSlotPureExpr_expectedRuntimeKernelSteps_toRuntime whenFalse]
+  | .structField base field => by
+      simp [ImportedConfidentialKernelSlotPureExpr.expectedRuntimeKernelSteps,
+        ImportedConfidentialKernelSlotPureExpr.toConfidentialKernelSlotPureExpr,
+        ConfidentialKernelSlotPureExpr.expectedRuntimeKernelSteps,
+        importedConfidentialKernelSlotPureExpr_expectedRuntimeKernelSteps_toRuntime base]
+  | .arrayIndex base index => by
+      simp [ImportedConfidentialKernelSlotPureExpr.expectedRuntimeKernelSteps,
+        ImportedConfidentialKernelSlotPureExpr.toConfidentialKernelSlotPureExpr,
+        ConfidentialKernelSlotPureExpr.expectedRuntimeKernelSteps,
+        importedConfidentialKernelSlotPureExpr_expectedRuntimeKernelSteps_toRuntime base,
+        importedConfidentialKernelSlotPureExpr_expectedRuntimeKernelSteps_toRuntime index]
   | .keccak256 parts => by
       simpa [ImportedConfidentialKernelSlotPureExpr.expectedRuntimeKernelSteps,
         ImportedConfidentialKernelSlotPureExpr.toConfidentialKernelSlotPureExpr,

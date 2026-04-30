@@ -84,7 +84,7 @@ pub const CONFIDENTIAL_KERNEL_STATEMENT_PROFILES: [ConfidentialKernelStatementPr
     },
 ];
 
-pub const CONFIDENTIAL_KERNEL_SLOT_EXPR_PROFILES: [ConfidentialKernelSlotExprProfile; 9] = [
+pub const CONFIDENTIAL_KERNEL_SLOT_EXPR_PROFILES: [ConfidentialKernelSlotExprProfile; 11] = [
     ConfidentialKernelSlotExprProfile {
         kind: ConfidentialKernelSlotExprKind::Literal,
         evaluated_operands: &[],
@@ -126,13 +126,23 @@ pub const CONFIDENTIAL_KERNEL_SLOT_EXPR_PROFILES: [ConfidentialKernelSlotExprPro
         tail_opcode: Some(UoOpcode::MapGet),
     },
     ConfidentialKernelSlotExprProfile {
+        kind: ConfidentialKernelSlotExprKind::StructField,
+        evaluated_operands: &["base"],
+        tail_opcode: None,
+    },
+    ConfidentialKernelSlotExprProfile {
+        kind: ConfidentialKernelSlotExprKind::ArrayIndex,
+        evaluated_operands: &["base", "index"],
+        tail_opcode: None,
+    },
+    ConfidentialKernelSlotExprProfile {
         kind: ConfidentialKernelSlotExprKind::Keccak256,
         evaluated_operands: &["parts"],
         tail_opcode: None,
     },
 ];
 
-pub const CONFIDENTIAL_KERNEL_SLOT_PURE_EXPR_PROFILES: [ConfidentialKernelSlotPureExprProfile; 6] = [
+pub const CONFIDENTIAL_KERNEL_SLOT_PURE_EXPR_PROFILES: [ConfidentialKernelSlotPureExprProfile; 8] = [
     ConfidentialKernelSlotPureExprProfile {
         kind: ConfidentialKernelSlotPureExprKind::Literal,
         evaluated_operands: &[],
@@ -154,12 +164,20 @@ pub const CONFIDENTIAL_KERNEL_SLOT_PURE_EXPR_PROFILES: [ConfidentialKernelSlotPu
         evaluated_operands: &["cond", "when_true", "when_false"],
     },
     ConfidentialKernelSlotPureExprProfile {
+        kind: ConfidentialKernelSlotPureExprKind::StructField,
+        evaluated_operands: &["base"],
+    },
+    ConfidentialKernelSlotPureExprProfile {
+        kind: ConfidentialKernelSlotPureExprKind::ArrayIndex,
+        evaluated_operands: &["base", "index"],
+    },
+    ConfidentialKernelSlotPureExprProfile {
         kind: ConfidentialKernelSlotPureExprKind::Keccak256,
         evaluated_operands: &["parts"],
     },
 ];
 
-pub const CONFIDENTIAL_KERNEL_EXPR_PROFILES: [ConfidentialKernelExprProfile; 9] = [
+pub const CONFIDENTIAL_KERNEL_EXPR_PROFILES: [ConfidentialKernelExprProfile; 11] = [
     ConfidentialKernelExprProfile {
         kind: ConfidentialKernelExprKind::Literal,
         evaluated_operands: &[],
@@ -201,13 +219,23 @@ pub const CONFIDENTIAL_KERNEL_EXPR_PROFILES: [ConfidentialKernelExprProfile; 9] 
         tail_opcode: Some(UoOpcode::MapGet),
     },
     ConfidentialKernelExprProfile {
+        kind: ConfidentialKernelExprKind::StructField,
+        evaluated_operands: &["base"],
+        tail_opcode: None,
+    },
+    ConfidentialKernelExprProfile {
+        kind: ConfidentialKernelExprKind::ArrayIndex,
+        evaluated_operands: &["base", "index"],
+        tail_opcode: None,
+    },
+    ConfidentialKernelExprProfile {
         kind: ConfidentialKernelExprKind::Keccak256,
         evaluated_operands: &["parts"],
         tail_opcode: None,
     },
 ];
 
-pub const CONFIDENTIAL_KERNEL_PURE_EXPR_PROFILES: [ConfidentialKernelPureExprProfile; 6] = [
+pub const CONFIDENTIAL_KERNEL_PURE_EXPR_PROFILES: [ConfidentialKernelPureExprProfile; 8] = [
     ConfidentialKernelPureExprProfile {
         kind: ConfidentialKernelPureExprKind::Literal,
         evaluated_operands: &[],
@@ -227,6 +255,14 @@ pub const CONFIDENTIAL_KERNEL_PURE_EXPR_PROFILES: [ConfidentialKernelPureExprPro
     ConfidentialKernelPureExprProfile {
         kind: ConfidentialKernelPureExprKind::Select,
         evaluated_operands: &["cond", "when_true", "when_false"],
+    },
+    ConfidentialKernelPureExprProfile {
+        kind: ConfidentialKernelPureExprKind::StructField,
+        evaluated_operands: &["base"],
+    },
+    ConfidentialKernelPureExprProfile {
+        kind: ConfidentialKernelPureExprKind::ArrayIndex,
+        evaluated_operands: &["base", "index"],
     },
     ConfidentialKernelPureExprProfile {
         kind: ConfidentialKernelPureExprKind::Keccak256,
@@ -438,6 +474,31 @@ fn eval_confidential_kernel_binary_generated(
     }
 }
 
+fn eval_confidential_kernel_struct_field_generated(base: Value, field: &str) -> Result<Value> {
+    match &base {
+        Value::Struct(fields) => fields
+            .iter()
+            .find(|(name, _)| name == field)
+            .map(|(_, value)| value.clone())
+            .ok_or_else(|| anyhow!("unknown struct field {field}")),
+        _ => bail!("struct field access requires struct value"),
+    }
+}
+
+fn eval_confidential_kernel_array_index_generated(base: Value, index: Value) -> Result<Value> {
+    let index = index
+        .as_uint()
+        .ok_or_else(|| anyhow!("array index must be uint"))?
+        .to_usize_saturating();
+    match &base {
+        Value::Array(values) => values
+            .get(index)
+            .cloned()
+            .ok_or_else(|| anyhow!("array literal index out of bounds")),
+        _ => bail!("array indexing requires an array value"),
+    }
+}
+
 pub(super) fn eval_optional_confidential_kernel_predicate_generated<
     R: ConfidentialKernelSlotRuntime,
 >(
@@ -502,6 +563,15 @@ pub(super) fn eval_confidential_kernel_slot_expr_generated<R: ConfidentialKernel
             note_abort_generated(state, overflowed);
             Ok(value)
         }
+        ConfidentialKernelSlotExpr::StructField { base, field } => {
+            let base = eval_confidential_kernel_slot_expr_generated(runtime, base, state)?;
+            eval_confidential_kernel_struct_field_generated(base, field)
+        }
+        ConfidentialKernelSlotExpr::ArrayIndex { base, index } => {
+            let base = eval_confidential_kernel_slot_expr_generated(runtime, base, state)?;
+            let index = eval_confidential_kernel_slot_expr_generated(runtime, index, state)?;
+            eval_confidential_kernel_array_index_generated(base, index)
+        }
         ConfidentialKernelSlotExpr::Keccak256 { parts } => {
             let values = collect_confidential_hash_parts(
                 parts.len(),
@@ -544,6 +614,15 @@ pub(super) fn eval_confidential_kernel_slot_pure_expr_generated<
             let when_false =
                 eval_confidential_kernel_slot_pure_expr_generated(runtime, when_false)?;
             Value::confidential_select(cond, when_true, when_false)
+        }
+        ConfidentialKernelSlotPureExpr::StructField { base, field } => {
+            let base = eval_confidential_kernel_slot_pure_expr_generated(runtime, base)?;
+            eval_confidential_kernel_struct_field_generated(base, field)
+        }
+        ConfidentialKernelSlotPureExpr::ArrayIndex { base, index } => {
+            let base = eval_confidential_kernel_slot_pure_expr_generated(runtime, base)?;
+            let index = eval_confidential_kernel_slot_pure_expr_generated(runtime, index)?;
+            eval_confidential_kernel_array_index_generated(base, index)
         }
         ConfidentialKernelSlotPureExpr::Keccak256 { parts } => {
             let values = collect_confidential_hash_parts(

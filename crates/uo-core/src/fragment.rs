@@ -29,9 +29,7 @@ pub struct ConfidentialFragmentWitness {
 
 impl ConfidentialFragmentEntrypointWitness {
     pub fn valid(&self) -> bool {
-        self.struct_field_count == 0
-            && self.array_index_count == 0
-            && self.non_branchless_select_arm_count == 0
+        self.non_branchless_select_arm_count == 0
     }
 }
 
@@ -287,7 +285,7 @@ mod tests {
     }
 
     #[test]
-    fn witness_rejects_struct_and_array_projection_forms() {
+    fn witness_tracks_struct_and_array_projection_forms_without_rejecting_them() {
         let artifact = sample_artifact(vec![CompiledFunction {
             signature: "bad()".into(),
             params: vec![],
@@ -322,8 +320,8 @@ mod tests {
         let entrypoint = witness.entrypoint("bad()").unwrap();
         assert_eq!(entrypoint.struct_field_count, 1);
         assert_eq!(entrypoint.array_index_count, 1);
-        assert!(!entrypoint.valid());
-        assert!(!witness.valid());
+        assert!(entrypoint.valid());
+        assert!(witness.valid());
     }
 
     #[test]

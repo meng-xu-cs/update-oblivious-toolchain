@@ -143,6 +143,8 @@
     "",
     "index",
     "key",
+    "base",
+    "base,index",
     "parts"
   ],
   "lean_confidential_kernel_expr_kind_names": [
@@ -154,6 +156,8 @@
     "cell_get",
     "array_get",
     "map_get",
+    "struct_field",
+    "array_index",
     "keccak256"
   ],
   "lean_confidential_kernel_expr_profile_tables_present": true,
@@ -166,6 +170,8 @@
     "CellGet",
     "ArrayGet",
     "MapGet",
+    "",
+    "",
     ""
   ],
   "lean_confidential_kernel_param_field_names": [
@@ -185,6 +191,8 @@
     "expr",
     "lhs,rhs",
     "cond,when_true,when_false",
+    "base",
+    "base,index",
     "parts"
   ],
   "lean_confidential_kernel_pure_expr_kind_names": [
@@ -193,6 +201,8 @@
     "unary",
     "binary",
     "select",
+    "struct_field",
+    "array_index",
     "keccak256"
   ],
   "lean_confidential_kernel_pure_expr_profile_tables_present": true,
@@ -205,6 +215,8 @@
     "",
     "index",
     "key",
+    "base",
+    "base,index",
     "parts"
   ],
   "lean_confidential_kernel_slot_expr_kind_names": [
@@ -216,6 +228,8 @@
     "cell_get",
     "array_get",
     "map_get",
+    "struct_field",
+    "array_index",
     "keccak256"
   ],
   "lean_confidential_kernel_slot_expr_profile_tables_present": true,
@@ -228,6 +242,8 @@
     "CellGet",
     "ArrayGet",
     "MapGet",
+    "",
+    "",
     ""
   ],
   "lean_confidential_kernel_slot_program_field_names": [
@@ -244,6 +260,8 @@
     "expr",
     "lhs,rhs",
     "cond,when_true,when_false",
+    "base",
+    "base,index",
     "parts"
   ],
   "lean_confidential_kernel_slot_pure_expr_kind_names": [
@@ -252,6 +270,8 @@
     "unary",
     "binary",
     "select",
+    "struct_field",
+    "array_index",
     "keccak256"
   ],
   "lean_confidential_kernel_slot_pure_expr_profile_tables_present": true,
@@ -1170,6 +1190,8 @@
     "",
     "index",
     "key",
+    "base",
+    "base,index",
     "parts"
   ],
   "rust_confidential_kernel_expr_kind_names": [
@@ -1181,6 +1203,8 @@
     "cell_get",
     "array_get",
     "map_get",
+    "struct_field",
+    "array_index",
     "keccak256"
   ],
   "rust_confidential_kernel_expr_profiles": [
@@ -1237,6 +1261,21 @@
     },
     {
       "evaluated_operands": [
+        "base"
+      ],
+      "kind": "struct_field",
+      "tail_opcode": ""
+    },
+    {
+      "evaluated_operands": [
+        "base",
+        "index"
+      ],
+      "kind": "array_index",
+      "tail_opcode": ""
+    },
+    {
+      "evaluated_operands": [
         "parts"
       ],
       "kind": "keccak256",
@@ -1252,6 +1291,8 @@
     "CellGet",
     "ArrayGet",
     "MapGet",
+    "",
+    "",
     ""
   ],
   "rust_confidential_kernel_param_field_names": [
@@ -1271,6 +1312,8 @@
     "expr",
     "lhs,rhs",
     "cond,when_true,when_false",
+    "base",
+    "base,index",
     "parts"
   ],
   "rust_confidential_kernel_pure_expr_kind_names": [
@@ -1279,6 +1322,8 @@
     "unary",
     "binary",
     "select",
+    "struct_field",
+    "array_index",
     "keccak256"
   ],
   "rust_confidential_kernel_pure_expr_profiles": [
@@ -1313,6 +1358,19 @@
     },
     {
       "evaluated_operands": [
+        "base"
+      ],
+      "kind": "struct_field"
+    },
+    {
+      "evaluated_operands": [
+        "base",
+        "index"
+      ],
+      "kind": "array_index"
+    },
+    {
+      "evaluated_operands": [
         "parts"
       ],
       "kind": "keccak256"
@@ -1327,6 +1385,8 @@
     "",
     "index",
     "key",
+    "base",
+    "base,index",
     "parts"
   ],
   "rust_confidential_kernel_slot_expr_kind_names": [
@@ -1338,6 +1398,8 @@
     "cell_get",
     "array_get",
     "map_get",
+    "struct_field",
+    "array_index",
     "keccak256"
   ],
   "rust_confidential_kernel_slot_expr_profiles": [
@@ -1394,6 +1456,21 @@
     },
     {
       "evaluated_operands": [
+        "base"
+      ],
+      "kind": "struct_field",
+      "tail_opcode": ""
+    },
+    {
+      "evaluated_operands": [
+        "base",
+        "index"
+      ],
+      "kind": "array_index",
+      "tail_opcode": ""
+    },
+    {
+      "evaluated_operands": [
         "parts"
       ],
       "kind": "keccak256",
@@ -1409,6 +1486,8 @@
     "CellGet",
     "ArrayGet",
     "MapGet",
+    "",
+    "",
     ""
   ],
   "rust_confidential_kernel_slot_program_field_names": [
@@ -1425,6 +1504,8 @@
     "expr",
     "lhs,rhs",
     "cond,when_true,when_false",
+    "base",
+    "base,index",
     "parts"
   ],
   "rust_confidential_kernel_slot_pure_expr_kind_names": [
@@ -1433,6 +1514,8 @@
     "unary",
     "binary",
     "select",
+    "struct_field",
+    "array_index",
     "keccak256"
   ],
   "rust_confidential_kernel_slot_pure_expr_profiles": [
@@ -1464,6 +1547,19 @@
         "when_false"
       ],
       "kind": "select"
+    },
+    {
+      "evaluated_operands": [
+        "base"
+      ],
+      "kind": "struct_field"
+    },
+    {
+      "evaluated_operands": [
+        "base",
+        "index"
+      ],
+      "kind": "array_index"
     },
     {
       "evaluated_operands": [

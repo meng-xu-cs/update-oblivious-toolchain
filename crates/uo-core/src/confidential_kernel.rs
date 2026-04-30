@@ -1,6 +1,6 @@
 use crate::fixed_buffer;
 use crate::ir::{BinaryOp, CompiledFunction, Expr, StateObject, Statement, UnaryOp};
-use crate::types::{FixedBoxBuilder, Type, Value};
+use crate::types::{FixedBoxBuilder, StructField, Type, Value};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -207,6 +207,8 @@ pub enum ConfidentialKernelSlotExprKind {
     CellGet,
     ArrayGet,
     MapGet,
+    StructField,
+    ArrayIndex,
     Keccak256,
 }
 
@@ -228,6 +230,8 @@ impl ConfidentialKernelSlotExprKind {
             Self::CellGet => "cell_get",
             Self::ArrayGet => "array_get",
             Self::MapGet => "map_get",
+            Self::StructField => "struct_field",
+            Self::ArrayIndex => "array_index",
             Self::Keccak256 => "keccak256",
         }
     }
@@ -242,11 +246,13 @@ impl ConfidentialKernelSlotExprKind {
             Self::CellGet => CONFIDENTIAL_KERNEL_SLOT_EXPR_PROFILES[5],
             Self::ArrayGet => CONFIDENTIAL_KERNEL_SLOT_EXPR_PROFILES[6],
             Self::MapGet => CONFIDENTIAL_KERNEL_SLOT_EXPR_PROFILES[7],
-            Self::Keccak256 => CONFIDENTIAL_KERNEL_SLOT_EXPR_PROFILES[8],
+            Self::StructField => CONFIDENTIAL_KERNEL_SLOT_EXPR_PROFILES[8],
+            Self::ArrayIndex => CONFIDENTIAL_KERNEL_SLOT_EXPR_PROFILES[9],
+            Self::Keccak256 => CONFIDENTIAL_KERNEL_SLOT_EXPR_PROFILES[10],
         }
     }
 
-    pub const fn all_profiles() -> &'static [ConfidentialKernelSlotExprProfile; 9] {
+    pub const fn all_profiles() -> &'static [ConfidentialKernelSlotExprProfile; 11] {
         &CONFIDENTIAL_KERNEL_SLOT_EXPR_PROFILES
     }
 }
@@ -258,6 +264,8 @@ pub enum ConfidentialKernelSlotPureExprKind {
     Unary,
     Binary,
     Select,
+    StructField,
+    ArrayIndex,
     Keccak256,
 }
 
@@ -275,6 +283,8 @@ impl ConfidentialKernelSlotPureExprKind {
             Self::Unary => "unary",
             Self::Binary => "binary",
             Self::Select => "select",
+            Self::StructField => "struct_field",
+            Self::ArrayIndex => "array_index",
             Self::Keccak256 => "keccak256",
         }
     }
@@ -286,11 +296,13 @@ impl ConfidentialKernelSlotPureExprKind {
             Self::Unary => CONFIDENTIAL_KERNEL_SLOT_PURE_EXPR_PROFILES[2],
             Self::Binary => CONFIDENTIAL_KERNEL_SLOT_PURE_EXPR_PROFILES[3],
             Self::Select => CONFIDENTIAL_KERNEL_SLOT_PURE_EXPR_PROFILES[4],
-            Self::Keccak256 => CONFIDENTIAL_KERNEL_SLOT_PURE_EXPR_PROFILES[5],
+            Self::StructField => CONFIDENTIAL_KERNEL_SLOT_PURE_EXPR_PROFILES[5],
+            Self::ArrayIndex => CONFIDENTIAL_KERNEL_SLOT_PURE_EXPR_PROFILES[6],
+            Self::Keccak256 => CONFIDENTIAL_KERNEL_SLOT_PURE_EXPR_PROFILES[7],
         }
     }
 
-    pub const fn all_profiles() -> &'static [ConfidentialKernelSlotPureExprProfile; 6] {
+    pub const fn all_profiles() -> &'static [ConfidentialKernelSlotPureExprProfile; 8] {
         &CONFIDENTIAL_KERNEL_SLOT_PURE_EXPR_PROFILES
     }
 }
@@ -305,6 +317,8 @@ pub enum ConfidentialKernelExprKind {
     CellGet,
     ArrayGet,
     MapGet,
+    StructField,
+    ArrayIndex,
     Keccak256,
 }
 
@@ -326,6 +340,8 @@ impl ConfidentialKernelExprKind {
             Self::CellGet => "cell_get",
             Self::ArrayGet => "array_get",
             Self::MapGet => "map_get",
+            Self::StructField => "struct_field",
+            Self::ArrayIndex => "array_index",
             Self::Keccak256 => "keccak256",
         }
     }
@@ -340,11 +356,13 @@ impl ConfidentialKernelExprKind {
             Self::CellGet => CONFIDENTIAL_KERNEL_EXPR_PROFILES[5],
             Self::ArrayGet => CONFIDENTIAL_KERNEL_EXPR_PROFILES[6],
             Self::MapGet => CONFIDENTIAL_KERNEL_EXPR_PROFILES[7],
-            Self::Keccak256 => CONFIDENTIAL_KERNEL_EXPR_PROFILES[8],
+            Self::StructField => CONFIDENTIAL_KERNEL_EXPR_PROFILES[8],
+            Self::ArrayIndex => CONFIDENTIAL_KERNEL_EXPR_PROFILES[9],
+            Self::Keccak256 => CONFIDENTIAL_KERNEL_EXPR_PROFILES[10],
         }
     }
 
-    pub const fn all_profiles() -> &'static [ConfidentialKernelExprProfile; 9] {
+    pub const fn all_profiles() -> &'static [ConfidentialKernelExprProfile; 11] {
         &CONFIDENTIAL_KERNEL_EXPR_PROFILES
     }
 }
@@ -356,6 +374,8 @@ pub enum ConfidentialKernelPureExprKind {
     Unary,
     Binary,
     Select,
+    StructField,
+    ArrayIndex,
     Keccak256,
 }
 
@@ -373,6 +393,8 @@ impl ConfidentialKernelPureExprKind {
             Self::Unary => "unary",
             Self::Binary => "binary",
             Self::Select => "select",
+            Self::StructField => "struct_field",
+            Self::ArrayIndex => "array_index",
             Self::Keccak256 => "keccak256",
         }
     }
@@ -384,11 +406,13 @@ impl ConfidentialKernelPureExprKind {
             Self::Unary => CONFIDENTIAL_KERNEL_PURE_EXPR_PROFILES[2],
             Self::Binary => CONFIDENTIAL_KERNEL_PURE_EXPR_PROFILES[3],
             Self::Select => CONFIDENTIAL_KERNEL_PURE_EXPR_PROFILES[4],
-            Self::Keccak256 => CONFIDENTIAL_KERNEL_PURE_EXPR_PROFILES[5],
+            Self::StructField => CONFIDENTIAL_KERNEL_PURE_EXPR_PROFILES[5],
+            Self::ArrayIndex => CONFIDENTIAL_KERNEL_PURE_EXPR_PROFILES[6],
+            Self::Keccak256 => CONFIDENTIAL_KERNEL_PURE_EXPR_PROFILES[7],
         }
     }
 
-    pub const fn all_profiles() -> &'static [ConfidentialKernelPureExprProfile; 6] {
+    pub const fn all_profiles() -> &'static [ConfidentialKernelPureExprProfile; 8] {
         &CONFIDENTIAL_KERNEL_PURE_EXPR_PROFILES
     }
 }
@@ -426,6 +450,14 @@ pub enum ConfidentialKernelExpr {
     MapGet {
         object_id: u32,
         key: Box<ConfidentialKernelExpr>,
+    },
+    StructField {
+        base: Box<ConfidentialKernelExpr>,
+        field: String,
+    },
+    ArrayIndex {
+        base: Box<ConfidentialKernelExpr>,
+        index: Box<ConfidentialKernelExpr>,
     },
     Keccak256 {
         parts: Box<[ConfidentialKernelExpr]>,
@@ -466,6 +498,14 @@ pub enum ConfidentialKernelSlotExpr {
         object_id: u32,
         key: Box<ConfidentialKernelSlotExpr>,
     },
+    StructField {
+        base: Box<ConfidentialKernelSlotExpr>,
+        field: String,
+    },
+    ArrayIndex {
+        base: Box<ConfidentialKernelSlotExpr>,
+        index: Box<ConfidentialKernelSlotExpr>,
+    },
     Keccak256 {
         parts: Box<[ConfidentialKernelSlotExpr]>,
     },
@@ -494,6 +534,14 @@ pub enum ConfidentialKernelPureExpr {
         when_true: Box<ConfidentialKernelPureExpr>,
         when_false: Box<ConfidentialKernelPureExpr>,
     },
+    StructField {
+        base: Box<ConfidentialKernelPureExpr>,
+        field: String,
+    },
+    ArrayIndex {
+        base: Box<ConfidentialKernelPureExpr>,
+        index: Box<ConfidentialKernelPureExpr>,
+    },
     Keccak256 {
         parts: Box<[ConfidentialKernelPureExpr]>,
     },
@@ -521,6 +569,14 @@ pub enum ConfidentialKernelSlotPureExpr {
         cond: Box<ConfidentialKernelSlotPureExpr>,
         when_true: Box<ConfidentialKernelSlotPureExpr>,
         when_false: Box<ConfidentialKernelSlotPureExpr>,
+    },
+    StructField {
+        base: Box<ConfidentialKernelSlotPureExpr>,
+        field: String,
+    },
+    ArrayIndex {
+        base: Box<ConfidentialKernelSlotPureExpr>,
+        index: Box<ConfidentialKernelSlotPureExpr>,
     },
     Keccak256 {
         parts: Box<[ConfidentialKernelSlotPureExpr]>,
@@ -570,14 +626,6 @@ pub enum ConfidentialKernelLoweringError {
     )]
     SelectArmOutsideBranchlessFragment { entrypoint: String },
     #[error(
-        "confidential entrypoint {entrypoint} contains unsupported struct-field projection in the confidential fragment"
-    )]
-    ConfidentialStructField { entrypoint: String },
-    #[error(
-        "confidential entrypoint {entrypoint} contains unsupported array indexing in the confidential fragment"
-    )]
-    ConfidentialArrayIndex { entrypoint: String },
-    #[error(
         "confidential entrypoint {entrypoint} contains statement {index} after a return; returns must be final in the admitted public schedule"
     )]
     NonFinalReturn { entrypoint: String, index: usize },
@@ -607,6 +655,14 @@ pub enum ConfidentialKernelHashShapeError {
     UnknownVariable { entrypoint: String, name: String },
     #[error("entrypoint {entrypoint} references unknown state object id {object_id}")]
     UnknownObjectId { entrypoint: String, object_id: u32 },
+    #[error("entrypoint {entrypoint} projects unknown struct field '{field}'")]
+    UnknownStructField { entrypoint: String, field: String },
+    #[error("entrypoint {entrypoint} projects field '{field}' from a non-struct expression")]
+    NonStructFieldBase { entrypoint: String, field: String },
+    #[error("entrypoint {entrypoint} indexes a non-array expression")]
+    NonArrayIndexBase { entrypoint: String },
+    #[error("entrypoint {entrypoint} cannot infer a proof-grade type for a literal aggregate")]
+    UnknownLiteralType { entrypoint: String },
     #[error(
         "entrypoint {entrypoint} keccak select arms disagree on canonical length: {when_true} != {when_false}"
     )]
@@ -615,6 +671,8 @@ pub enum ConfidentialKernelHashShapeError {
         when_true: usize,
         when_false: usize,
     },
+    #[error("entrypoint {entrypoint} select arms do not have the same structural type")]
+    SelectArmTypeMismatch { entrypoint: String },
 }
 
 pub trait ConfidentialKernelSlotRuntime {
@@ -698,6 +756,37 @@ fn collect_confidential_hash_parts(
         values.push(part?)?;
     }
     values.finish()
+}
+
+fn infer_literal_value_type(value: &Value) -> Option<Type> {
+    match value {
+        Value::Bool(_) => Some(Type::Scalar(crate::types::ScalarType::Bool)),
+        Value::Uint(_) => Some(Type::Scalar(crate::types::ScalarType::Uint(256))),
+        Value::Bytes32(_) => Some(Type::Scalar(crate::types::ScalarType::Bytes32)),
+        Value::Address(_) => Some(Type::Scalar(crate::types::ScalarType::Address)),
+        Value::Struct(fields) => {
+            let mut inferred = Vec::with_capacity(fields.len());
+            for (name, value) in fields.iter() {
+                inferred.push(StructField {
+                    name: name.clone(),
+                    ty: infer_literal_value_type(value)?,
+                });
+            }
+            Some(Type::Struct(inferred))
+        }
+        Value::Array(values) => {
+            let (first, rest) = values.split_first()?;
+            let element = infer_literal_value_type(first)?;
+            if rest
+                .iter()
+                .all(|value| infer_literal_value_type(value).as_ref() == Some(&element))
+            {
+                Some(Type::Array(Box::new(element), values.len()))
+            } else {
+                None
+            }
+        }
+    }
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -834,21 +923,21 @@ impl ConfidentialKernelProgram {
         &self,
         state: &[StateObject],
     ) -> Result<usize, ConfidentialKernelHashShapeError> {
-        let object_value_lens = state
+        let object_value_types = state
             .iter()
-            .map(|object| (object.id, object.value_type.canonical_len()))
+            .map(|object| (object.id, object.value_type.clone()))
             .collect::<BTreeMap<_, _>>();
         let mut env = self
             .params
             .iter()
-            .map(|param| (param.name.clone(), param.ty.canonical_len()))
+            .map(|param| (param.name.clone(), param.ty.clone()))
             .collect::<BTreeMap<_, _>>();
         let mut max_len = 0;
         for statement in &self.body {
             max_len = max_len.max(statement.max_keccak_part_canonical_len(
                 self.entrypoint_id.as_str(),
                 &mut env,
-                &object_value_lens,
+                &object_value_types,
             )?);
         }
         Ok(max_len)
@@ -1224,6 +1313,8 @@ impl ConfidentialKernelExpr {
             Self::CellGet { .. } => ConfidentialKernelExprKind::CellGet,
             Self::ArrayGet { .. } => ConfidentialKernelExprKind::ArrayGet,
             Self::MapGet { .. } => ConfidentialKernelExprKind::MapGet,
+            Self::StructField { .. } => ConfidentialKernelExprKind::StructField,
+            Self::ArrayIndex { .. } => ConfidentialKernelExprKind::ArrayIndex,
             Self::Keccak256 { .. } => ConfidentialKernelExprKind::Keccak256,
         }
     }
@@ -1247,6 +1338,10 @@ impl ConfidentialKernelExpr {
             Self::CellGet { .. } => 0,
             Self::ArrayGet { index, .. } => index.kernel_step_count(),
             Self::MapGet { key, .. } => key.kernel_step_count(),
+            Self::StructField { base, .. } => base.kernel_step_count(),
+            Self::ArrayIndex { base, index } => {
+                base.kernel_step_count() + index.kernel_step_count()
+            }
             Self::Keccak256 { parts } => parts
                 .iter()
                 .map(ConfidentialKernelExpr::kernel_step_count)
@@ -1269,6 +1364,8 @@ impl ConfidentialKernelExpr {
             | Self::Unary { .. }
             | Self::Binary { .. }
             | Self::Select { .. }
+            | Self::StructField { .. }
+            | Self::ArrayIndex { .. }
             | Self::Keccak256 { .. } => None,
         }
     }
@@ -1288,6 +1385,13 @@ impl ConfidentialKernelExpr {
             }
             Self::MapGet { key, .. } => {
                 key.collect_kernel_steps(steps);
+            }
+            Self::StructField { base, .. } => {
+                base.collect_kernel_steps(steps);
+            }
+            Self::ArrayIndex { base, index } => {
+                base.collect_kernel_steps(steps);
+                index.collect_kernel_steps(steps);
             }
             Self::Keccak256 { parts } => {
                 for part in parts {
@@ -1315,6 +1419,8 @@ impl ConfidentialKernelSlotExpr {
             Self::CellGet { .. } => ConfidentialKernelSlotExprKind::CellGet,
             Self::ArrayGet { .. } => ConfidentialKernelSlotExprKind::ArrayGet,
             Self::MapGet { .. } => ConfidentialKernelSlotExprKind::MapGet,
+            Self::StructField { .. } => ConfidentialKernelSlotExprKind::StructField,
+            Self::ArrayIndex { .. } => ConfidentialKernelSlotExprKind::ArrayIndex,
             Self::Keccak256 { .. } => ConfidentialKernelSlotExprKind::Keccak256,
         }
     }
@@ -1338,6 +1444,10 @@ impl ConfidentialKernelSlotExpr {
             Self::CellGet { .. } => 0,
             Self::ArrayGet { index, .. } => index.kernel_step_count(),
             Self::MapGet { key, .. } => key.kernel_step_count(),
+            Self::StructField { base, .. } => base.kernel_step_count(),
+            Self::ArrayIndex { base, index } => {
+                base.kernel_step_count() + index.kernel_step_count()
+            }
             Self::Keccak256 { parts } => parts
                 .iter()
                 .map(ConfidentialKernelSlotExpr::kernel_step_count)
@@ -1360,6 +1470,8 @@ impl ConfidentialKernelSlotExpr {
             | Self::Unary { .. }
             | Self::Binary { .. }
             | Self::Select { .. }
+            | Self::StructField { .. }
+            | Self::ArrayIndex { .. }
             | Self::Keccak256 { .. } => None,
         }
     }
@@ -1379,6 +1491,13 @@ impl ConfidentialKernelSlotExpr {
             }
             Self::MapGet { key, .. } => {
                 key.collect_kernel_steps(steps);
+            }
+            Self::StructField { base, .. } => {
+                base.collect_kernel_steps(steps);
+            }
+            Self::ArrayIndex { base, index } => {
+                base.collect_kernel_steps(steps);
+                index.collect_kernel_steps(steps);
             }
             Self::Keccak256 { parts } => {
                 for part in parts {
@@ -1403,6 +1522,8 @@ impl ConfidentialKernelSlotPureExpr {
             Self::Unary { .. } => ConfidentialKernelSlotPureExprKind::Unary,
             Self::Binary { .. } => ConfidentialKernelSlotPureExprKind::Binary,
             Self::Select { .. } => ConfidentialKernelSlotPureExprKind::Select,
+            Self::StructField { .. } => ConfidentialKernelSlotPureExprKind::StructField,
+            Self::ArrayIndex { .. } => ConfidentialKernelSlotPureExprKind::ArrayIndex,
             Self::Keccak256 { .. } => ConfidentialKernelSlotPureExprKind::Keccak256,
         }
     }
@@ -1416,29 +1537,29 @@ impl ConfidentialKernelStatement {
     fn max_keccak_part_canonical_len(
         &self,
         entrypoint: &str,
-        env: &mut BTreeMap<String, usize>,
-        object_value_lens: &BTreeMap<u32, usize>,
+        env: &mut BTreeMap<String, Type>,
+        object_value_types: &BTreeMap<u32, Type>,
     ) -> Result<usize, ConfidentialKernelHashShapeError> {
         match self {
             Self::Declare { name, ty, value } => {
-                env.insert(name.clone(), ty.canonical_len());
-                value.max_keccak_part_canonical_len(entrypoint, env, object_value_lens)
+                env.insert(name.clone(), ty.clone());
+                value.max_keccak_part_canonical_len(entrypoint, env, object_value_types)
             }
             Self::Assign { value, .. }
             | Self::Require { cond: value }
             | Self::AbortIf { cond: value } => {
-                value.max_keccak_part_canonical_len(entrypoint, env, object_value_lens)
+                value.max_keccak_part_canonical_len(entrypoint, env, object_value_types)
             }
             Self::CellSet {
                 value, predicate, ..
             } => {
                 let mut max_len =
-                    value.max_keccak_part_canonical_len(entrypoint, env, object_value_lens)?;
+                    value.max_keccak_part_canonical_len(entrypoint, env, object_value_types)?;
                 if let Some(predicate) = predicate {
                     max_len = max_len.max(predicate.max_keccak_part_canonical_len(
                         entrypoint,
                         env,
-                        object_value_lens,
+                        object_value_types,
                     )?);
                 }
                 Ok(max_len)
@@ -1456,17 +1577,17 @@ impl ConfidentialKernelStatement {
                 ..
             } => {
                 let mut max_len =
-                    index.max_keccak_part_canonical_len(entrypoint, env, object_value_lens)?;
+                    index.max_keccak_part_canonical_len(entrypoint, env, object_value_types)?;
                 max_len = max_len.max(value.max_keccak_part_canonical_len(
                     entrypoint,
                     env,
-                    object_value_lens,
+                    object_value_types,
                 )?);
                 if let Some(predicate) = predicate {
                     max_len = max_len.max(predicate.max_keccak_part_canonical_len(
                         entrypoint,
                         env,
-                        object_value_lens,
+                        object_value_types,
                     )?);
                 }
                 Ok(max_len)
@@ -1474,7 +1595,7 @@ impl ConfidentialKernelStatement {
             Self::Return { value } => value
                 .as_ref()
                 .map(|value| {
-                    value.max_keccak_part_canonical_len(entrypoint, env, object_value_lens)
+                    value.max_keccak_part_canonical_len(entrypoint, env, object_value_types)
                 })
                 .transpose()
                 .map(|value| value.unwrap_or(0)),
@@ -1486,40 +1607,46 @@ impl ConfidentialKernelExpr {
     fn max_keccak_part_canonical_len(
         &self,
         entrypoint: &str,
-        env: &BTreeMap<String, usize>,
-        object_value_lens: &BTreeMap<u32, usize>,
+        env: &BTreeMap<String, Type>,
+        object_value_types: &BTreeMap<u32, Type>,
     ) -> Result<usize, ConfidentialKernelHashShapeError> {
         match self {
             Self::Literal { .. } | Self::Var { .. } | Self::CellGet { .. } => Ok(0),
             Self::Unary { expr, .. } => {
-                expr.max_keccak_part_canonical_len(entrypoint, env, object_value_lens)
+                expr.max_keccak_part_canonical_len(entrypoint, env, object_value_types)
             }
             Self::Binary { lhs, rhs, .. } => Ok(lhs
-                .max_keccak_part_canonical_len(entrypoint, env, object_value_lens)?
-                .max(rhs.max_keccak_part_canonical_len(entrypoint, env, object_value_lens)?)),
+                .max_keccak_part_canonical_len(entrypoint, env, object_value_types)?
+                .max(rhs.max_keccak_part_canonical_len(entrypoint, env, object_value_types)?)),
             Self::Select {
                 cond,
                 when_true,
                 when_false,
             } => Ok(cond
-                .max_keccak_part_canonical_len(entrypoint, env, object_value_lens)?
+                .max_keccak_part_canonical_len(entrypoint, env, object_value_types)?
                 .max(when_true.max_keccak_part_canonical_len(entrypoint, env)?)
                 .max(when_false.max_keccak_part_canonical_len(entrypoint, env)?)),
             Self::ArrayGet { index, .. } => {
-                index.max_keccak_part_canonical_len(entrypoint, env, object_value_lens)
+                index.max_keccak_part_canonical_len(entrypoint, env, object_value_types)
             }
             Self::MapGet { key, .. } => {
-                key.max_keccak_part_canonical_len(entrypoint, env, object_value_lens)
+                key.max_keccak_part_canonical_len(entrypoint, env, object_value_types)
             }
+            Self::StructField { base, .. } => {
+                base.max_keccak_part_canonical_len(entrypoint, env, object_value_types)
+            }
+            Self::ArrayIndex { base, index } => Ok(base
+                .max_keccak_part_canonical_len(entrypoint, env, object_value_types)?
+                .max(index.max_keccak_part_canonical_len(entrypoint, env, object_value_types)?)),
             Self::Keccak256 { parts } => {
                 let mut max_len = 0;
                 for part in parts {
                     max_len =
-                        max_len.max(part.canonical_len(entrypoint, env, object_value_lens)?);
+                        max_len.max(part.canonical_len(entrypoint, env, object_value_types)?);
                     max_len = max_len.max(part.max_keccak_part_canonical_len(
                         entrypoint,
                         env,
-                        object_value_lens,
+                        object_value_types,
                     )?);
                 }
                 Ok(max_len)
@@ -1530,41 +1657,11 @@ impl ConfidentialKernelExpr {
     fn canonical_len(
         &self,
         entrypoint: &str,
-        env: &BTreeMap<String, usize>,
-        object_value_lens: &BTreeMap<u32, usize>,
+        env: &BTreeMap<String, Type>,
+        object_value_types: &BTreeMap<u32, Type>,
     ) -> Result<usize, ConfidentialKernelHashShapeError> {
-        match self {
-            Self::Literal { value } => Ok(value.canonical_len()),
-            Self::Var { name } => env.get(name).copied().ok_or_else(|| {
-                ConfidentialKernelHashShapeError::UnknownVariable {
-                    entrypoint: entrypoint.into(),
-                    name: name.clone(),
-                }
-            }),
-            Self::Unary { op, .. } => Ok(match op {
-                UnaryOp::Not => Type::Scalar(crate::types::ScalarType::Bool).canonical_len(),
-                UnaryOp::Neg => Type::Scalar(crate::types::ScalarType::Uint(256)).canonical_len(),
-            }),
-            Self::Binary { op, .. } => Ok(match op {
-                BinaryOp::Eq
-                | BinaryOp::Neq
-                | BinaryOp::Lt
-                | BinaryOp::Lte
-                | BinaryOp::Gt
-                | BinaryOp::Gte
-                | BinaryOp::And
-                | BinaryOp::Or => Type::Scalar(crate::types::ScalarType::Bool).canonical_len(),
-                BinaryOp::Add
-                | BinaryOp::Sub
-                | BinaryOp::Mul
-                | BinaryOp::Div
-                | BinaryOp::Mod
-                | BinaryOp::BitAnd
-                | BinaryOp::BitOr
-                | BinaryOp::BitXor => {
-                    Type::Scalar(crate::types::ScalarType::Uint(256)).canonical_len()
-                }
-            }),
+        Ok(match self {
+            Self::Literal { value } => value.canonical_len(),
             Self::Select {
                 when_true,
                 when_false,
@@ -1579,20 +1676,101 @@ impl ConfidentialKernelExpr {
                         when_false: when_false_len,
                     });
                 }
-                Ok(when_true_len)
+                when_true_len
+            }
+            _ => self
+                .result_type(entrypoint, env, object_value_types)?
+                .canonical_len(),
+        })
+    }
+
+    fn result_type(
+        &self,
+        entrypoint: &str,
+        env: &BTreeMap<String, Type>,
+        object_value_types: &BTreeMap<u32, Type>,
+    ) -> Result<Type, ConfidentialKernelHashShapeError> {
+        match self {
+            Self::Literal { value } => infer_literal_value_type(value).ok_or_else(|| {
+                ConfidentialKernelHashShapeError::UnknownLiteralType {
+                    entrypoint: entrypoint.into(),
+                }
+            }),
+            Self::Var { name } => env.get(name).cloned().ok_or_else(|| {
+                ConfidentialKernelHashShapeError::UnknownVariable {
+                    entrypoint: entrypoint.into(),
+                    name: name.clone(),
+                }
+            }),
+            Self::Unary { op, .. } => Ok(match op {
+                UnaryOp::Not => Type::Scalar(crate::types::ScalarType::Bool),
+                UnaryOp::Neg => Type::Scalar(crate::types::ScalarType::Uint(256)),
+            }),
+            Self::Binary { op, .. } => Ok(match op {
+                BinaryOp::Eq
+                | BinaryOp::Neq
+                | BinaryOp::Lt
+                | BinaryOp::Lte
+                | BinaryOp::Gt
+                | BinaryOp::Gte
+                | BinaryOp::And
+                | BinaryOp::Or => Type::Scalar(crate::types::ScalarType::Bool),
+                BinaryOp::Add
+                | BinaryOp::Sub
+                | BinaryOp::Mul
+                | BinaryOp::Div
+                | BinaryOp::Mod
+                | BinaryOp::BitAnd
+                | BinaryOp::BitOr
+                | BinaryOp::BitXor => Type::Scalar(crate::types::ScalarType::Uint(256)),
+            }),
+            Self::Select {
+                when_true,
+                when_false,
+                ..
+            } => {
+                let when_true_type = when_true.result_type(entrypoint, env)?;
+                let when_false_type = when_false.result_type(entrypoint, env)?;
+                if when_true_type != when_false_type {
+                    return Err(ConfidentialKernelHashShapeError::SelectArmTypeMismatch {
+                        entrypoint: entrypoint.into(),
+                    });
+                }
+                Ok(when_true_type)
             }
             Self::CellGet { object_id }
             | Self::ArrayGet { object_id, .. }
-            | Self::MapGet { object_id, .. } => object_value_lens
+            | Self::MapGet { object_id, .. } => object_value_types
                 .get(object_id)
-                .copied()
+                .cloned()
                 .ok_or_else(|| ConfidentialKernelHashShapeError::UnknownObjectId {
                     entrypoint: entrypoint.into(),
                     object_id: *object_id,
                 }),
-            Self::Keccak256 { .. } => {
-                Ok(Type::Scalar(crate::types::ScalarType::Bytes32).canonical_len())
+            Self::StructField { base, field } => {
+                let base_ty = base.result_type(entrypoint, env, object_value_types)?;
+                match base_ty {
+                    Type::Struct(_) => base_ty.struct_field_type(field).cloned().ok_or_else(|| {
+                        ConfidentialKernelHashShapeError::UnknownStructField {
+                            entrypoint: entrypoint.into(),
+                            field: field.clone(),
+                        }
+                    }),
+                    _ => Err(ConfidentialKernelHashShapeError::NonStructFieldBase {
+                        entrypoint: entrypoint.into(),
+                        field: field.clone(),
+                    }),
+                }
             }
+            Self::ArrayIndex { base, .. } => {
+                let base_ty = base.result_type(entrypoint, env, object_value_types)?;
+                base_ty.array_element_type().cloned().ok_or_else(|| {
+                    ConfidentialKernelHashShapeError::NonArrayIndexBase {
+                        entrypoint: entrypoint.into(),
+                    }
+                })
+            }
+            Self::Keccak256 { .. } => Ok(Type::Scalar(crate::types::ScalarType::Bytes32)),
         }
     }
 }
@@ -1605,6 +1783,8 @@ impl ConfidentialKernelPureExpr {
             Self::Unary { .. } => ConfidentialKernelPureExprKind::Unary,
             Self::Binary { .. } => ConfidentialKernelPureExprKind::Binary,
             Self::Select { .. } => ConfidentialKernelPureExprKind::Select,
+            Self::StructField { .. } => ConfidentialKernelPureExprKind::StructField,
+            Self::ArrayIndex { .. } => ConfidentialKernelPureExprKind::ArrayIndex,
             Self::Keccak256 { .. } => ConfidentialKernelPureExprKind::Keccak256,
         }
     }
@@ -1616,7 +1796,7 @@ impl ConfidentialKernelPureExpr {
     fn max_keccak_part_canonical_len(
         &self,
         entrypoint: &str,
-        env: &BTreeMap<String, usize>,
+        env: &BTreeMap<String, Type>,
     ) -> Result<usize, ConfidentialKernelHashShapeError> {
         match self {
             Self::Literal { .. } | Self::Var { .. } => Ok(0),
@@ -1632,6 +1812,10 @@ impl ConfidentialKernelPureExpr {
                 .max_keccak_part_canonical_len(entrypoint, env)?
                 .max(when_true.max_keccak_part_canonical_len(entrypoint, env)?)
                 .max(when_false.max_keccak_part_canonical_len(entrypoint, env)?)),
+            Self::StructField { base, .. } => base.max_keccak_part_canonical_len(entrypoint, env),
+            Self::ArrayIndex { base, index } => Ok(base
+                .max_keccak_part_canonical_len(entrypoint, env)?
+                .max(index.max_keccak_part_canonical_len(entrypoint, env)?)),
             Self::Keccak256 { parts } => {
                 let mut max_len = 0;
                 for part in parts {
@@ -1646,40 +1830,10 @@ impl ConfidentialKernelPureExpr {
     fn canonical_len(
         &self,
         entrypoint: &str,
-        env: &BTreeMap<String, usize>,
+        env: &BTreeMap<String, Type>,
     ) -> Result<usize, ConfidentialKernelHashShapeError> {
-        match self {
-            Self::Literal { value } => Ok(value.canonical_len()),
-            Self::Var { name } => env.get(name).copied().ok_or_else(|| {
-                ConfidentialKernelHashShapeError::UnknownVariable {
-                    entrypoint: entrypoint.into(),
-                    name: name.clone(),
-                }
-            }),
-            Self::Unary { op, .. } => Ok(match op {
-                UnaryOp::Not => Type::Scalar(crate::types::ScalarType::Bool).canonical_len(),
-                UnaryOp::Neg => Type::Scalar(crate::types::ScalarType::Uint(256)).canonical_len(),
-            }),
-            Self::Binary { op, .. } => Ok(match op {
-                BinaryOp::Eq
-                | BinaryOp::Neq
-                | BinaryOp::Lt
-                | BinaryOp::Lte
-                | BinaryOp::Gt
-                | BinaryOp::Gte
-                | BinaryOp::And
-                | BinaryOp::Or => Type::Scalar(crate::types::ScalarType::Bool).canonical_len(),
-                BinaryOp::Add
-                | BinaryOp::Sub
-                | BinaryOp::Mul
-                | BinaryOp::Div
-                | BinaryOp::Mod
-                | BinaryOp::BitAnd
-                | BinaryOp::BitOr
-                | BinaryOp::BitXor => {
-                    Type::Scalar(crate::types::ScalarType::Uint(256)).canonical_len()
-                }
-            }),
+        Ok(match self {
+            Self::Literal { value } => value.canonical_len(),
             Self::Select {
                 when_true,
                 when_false,
@@ -1694,11 +1848,89 @@ impl ConfidentialKernelPureExpr {
                         when_false: when_false_len,
                     });
                 }
-                Ok(when_true_len)
+                when_true_len
             }
-            Self::Keccak256 { .. } => {
-                Ok(Type::Scalar(crate::types::ScalarType::Bytes32).canonical_len())
+            _ => self.result_type(entrypoint, env)?.canonical_len(),
+        })
+    }
+
+    fn result_type(
+        &self,
+        entrypoint: &str,
+        env: &BTreeMap<String, Type>,
+    ) -> Result<Type, ConfidentialKernelHashShapeError> {
+        match self {
+            Self::Literal { value } => infer_literal_value_type(value).ok_or_else(|| {
+                ConfidentialKernelHashShapeError::UnknownLiteralType {
+                    entrypoint: entrypoint.into(),
+                }
+            }),
+            Self::Var { name } => env.get(name).cloned().ok_or_else(|| {
+                ConfidentialKernelHashShapeError::UnknownVariable {
+                    entrypoint: entrypoint.into(),
+                    name: name.clone(),
+                }
+            }),
+            Self::Unary { op, .. } => Ok(match op {
+                UnaryOp::Not => Type::Scalar(crate::types::ScalarType::Bool),
+                UnaryOp::Neg => Type::Scalar(crate::types::ScalarType::Uint(256)),
+            }),
+            Self::Binary { op, .. } => Ok(match op {
+                BinaryOp::Eq
+                | BinaryOp::Neq
+                | BinaryOp::Lt
+                | BinaryOp::Lte
+                | BinaryOp::Gt
+                | BinaryOp::Gte
+                | BinaryOp::And
+                | BinaryOp::Or => Type::Scalar(crate::types::ScalarType::Bool),
+                BinaryOp::Add
+                | BinaryOp::Sub
+                | BinaryOp::Mul
+                | BinaryOp::Div
+                | BinaryOp::Mod
+                | BinaryOp::BitAnd
+                | BinaryOp::BitOr
+                | BinaryOp::BitXor => Type::Scalar(crate::types::ScalarType::Uint(256)),
+            }),
+            Self::Select {
+                when_true,
+                when_false,
+                ..
+            } => {
+                let when_true_type = when_true.result_type(entrypoint, env)?;
+                let when_false_type = when_false.result_type(entrypoint, env)?;
+                if when_true_type != when_false_type {
+                    return Err(ConfidentialKernelHashShapeError::SelectArmTypeMismatch {
+                        entrypoint: entrypoint.into(),
+                    });
+                }
+                Ok(when_true_type)
             }
+            Self::StructField { base, field } => {
+                let base_ty = base.result_type(entrypoint, env)?;
+                match base_ty {
+                    Type::Struct(_) => base_ty.struct_field_type(field).cloned().ok_or_else(|| {
+                        ConfidentialKernelHashShapeError::UnknownStructField {
+                            entrypoint: entrypoint.into(),
+                            field: field.clone(),
+                        }
+                    }),
+                    _ => Err(ConfidentialKernelHashShapeError::NonStructFieldBase {
+                        entrypoint: entrypoint.into(),
+                        field: field.clone(),
+                    }),
+                }
+            }
+            Self::ArrayIndex { base, .. } => {
+                let base_ty = base.result_type(entrypoint, env)?;
+                base_ty.array_element_type().cloned().ok_or_else(|| {
+                    ConfidentialKernelHashShapeError::NonArrayIndexBase {
+                        entrypoint: entrypoint.into(),
+                    }
+                })
+            }
+            Self::Keccak256 { .. } => Ok(Type::Scalar(crate::types::ScalarType::Bytes32)),
         }
     }
 }
@@ -1864,6 +2096,14 @@ impl ConfidentialKernelExpr {
                 object_id: *object_id,
                 key: Box::new(key.to_slot_expr(layout)?),
             }),
+            Self::StructField { base, field } => Ok(ConfidentialKernelSlotExpr::StructField {
+                base: Box::new(base.to_slot_expr(layout)?),
+                field: field.clone(),
+            }),
+            Self::ArrayIndex { base, index } => Ok(ConfidentialKernelSlotExpr::ArrayIndex {
+                base: Box::new(base.to_slot_expr(layout)?),
+                index: Box::new(index.to_slot_expr(layout)?),
+            }),
             Self::Keccak256 { parts } => {
                 let mut lowered = FixedBoxBuilder::new(parts.len());
                 for part in parts.iter() {
@@ -1916,6 +2156,14 @@ impl ConfidentialKernelPureExpr {
                 cond: Box::new(cond.to_slot_pure_expr(layout)?),
                 when_true: Box::new(when_true.to_slot_pure_expr(layout)?),
                 when_false: Box::new(when_false.to_slot_pure_expr(layout)?),
+            }),
+            Self::StructField { base, field } => Ok(ConfidentialKernelSlotPureExpr::StructField {
+                base: Box::new(base.to_slot_pure_expr(layout)?),
+                field: field.clone(),
+            }),
+            Self::ArrayIndex { base, index } => Ok(ConfidentialKernelSlotPureExpr::ArrayIndex {
+                base: Box::new(base.to_slot_pure_expr(layout)?),
+                index: Box::new(index.to_slot_pure_expr(layout)?),
             }),
             Self::Keccak256 { parts } => {
                 let mut lowered = FixedBoxBuilder::new(parts.len());
@@ -2034,11 +2282,13 @@ pub fn lower_confidential_kernel_expr(
             object_id: *object_id,
             key: Box::new(lower_confidential_kernel_expr(key, entrypoint)?),
         }),
-        Expr::StructField { .. } => Err(ConfidentialKernelLoweringError::ConfidentialStructField {
-            entrypoint: entrypoint.into(),
+        Expr::StructField { base, field } => Ok(ConfidentialKernelExpr::StructField {
+            base: Box::new(lower_confidential_kernel_expr(base, entrypoint)?),
+            field: field.clone(),
         }),
-        Expr::ArrayIndex { .. } => Err(ConfidentialKernelLoweringError::ConfidentialArrayIndex {
-            entrypoint: entrypoint.into(),
+        Expr::ArrayIndex { base, index } => Ok(ConfidentialKernelExpr::ArrayIndex {
+            base: Box::new(lower_confidential_kernel_expr(base, entrypoint)?),
+            index: Box::new(lower_confidential_kernel_expr(index, entrypoint)?),
         }),
         Expr::Keccak256 { parts } => {
             let mut lowered = FixedBoxBuilder::new(parts.len());
@@ -2112,11 +2362,13 @@ pub fn lower_confidential_kernel_pure_expr(
                 })?,
             })
         }
-        Expr::StructField { .. } => Err(ConfidentialKernelLoweringError::ConfidentialStructField {
-            entrypoint: entrypoint.into(),
+        Expr::StructField { base, field } => Ok(ConfidentialKernelPureExpr::StructField {
+            base: Box::new(lower_confidential_kernel_pure_expr(base, entrypoint)?),
+            field: field.clone(),
         }),
-        Expr::ArrayIndex { .. } => Err(ConfidentialKernelLoweringError::ConfidentialArrayIndex {
-            entrypoint: entrypoint.into(),
+        Expr::ArrayIndex { base, index } => Ok(ConfidentialKernelPureExpr::ArrayIndex {
+            base: Box::new(lower_confidential_kernel_pure_expr(base, entrypoint)?),
+            index: Box::new(lower_confidential_kernel_pure_expr(index, entrypoint)?),
         }),
         Expr::CellGet { .. } | Expr::ArrayGet { .. } | Expr::MapGet { .. } => Err(
             ConfidentialKernelLoweringError::SelectArmOutsideBranchlessFragment {
@@ -2239,7 +2491,7 @@ mod tests {
     };
     use crate::{
         ir::StateObject, BackendKind, BinaryOp, CompiledFunction, ContainerKind, Expr, ScalarType,
-        Statement, Type, Uint256, UnaryOp, Value,
+        Statement, StructField, Type, Uint256, UnaryOp, Value,
     };
     use anyhow::{anyhow, Result};
     use uo_precompiles::UoOpcode;
@@ -2627,6 +2879,84 @@ mod tests {
         assert_eq!(runtime.load_slot(1).unwrap(), Value::uint(7));
         assert_eq!(runtime.cell_sets, vec![(7, Value::uint(7), Some(true))]);
         assert_eq!(runtime.statements, vec!["declare", "cell_set", "return"]);
+    }
+
+    #[test]
+    fn shared_slot_interpreter_executes_local_struct_field_and_array_index() {
+        let function = CompiledFunction {
+            signature: "project()".into(),
+            params: vec![],
+            public_env: vec![],
+            return_type: Some(uint_type()),
+            body: vec![
+                Statement::Declare {
+                    name: "pair".into(),
+                    ty: Type::Struct(vec![
+                        StructField {
+                            name: "flag".into(),
+                            ty: Type::Scalar(ScalarType::Bool),
+                        },
+                        StructField {
+                            name: "n".into(),
+                            ty: uint_type(),
+                        },
+                    ]),
+                    value: Expr::Literal(Value::Struct(
+                        vec![
+                            ("flag".into(), Value::Bool(true)),
+                            ("n".into(), Value::uint(4)),
+                        ]
+                        .into_boxed_slice(),
+                    )),
+                },
+                Statement::Declare {
+                    name: "items".into(),
+                    ty: Type::Array(Box::new(uint_type()), 2),
+                    value: Expr::Literal(Value::Array(
+                        vec![Value::uint(6), Value::uint(9)].into_boxed_slice(),
+                    )),
+                },
+                Statement::Return {
+                    value: Some(Expr::Binary {
+                        op: BinaryOp::Add,
+                        lhs: Box::new(Expr::StructField {
+                            base: Box::new(Expr::Var("pair".into())),
+                            field: "n".into(),
+                        }),
+                        rhs: Box::new(Expr::ArrayIndex {
+                            base: Box::new(Expr::Var("items".into())),
+                            index: Box::new(Expr::Literal(Value::uint(1))),
+                        }),
+                    }),
+                },
+            ],
+            secret_args: vec![],
+            confidential: true,
+            confidential_program: None,
+            confidential_slot_program: None,
+        };
+        let named = function.confidential_kernel_program().unwrap();
+        let slot = named.to_slot_program().unwrap();
+        assert_eq!(
+            named
+                .expected_runtime_steps()
+                .iter()
+                .map(|step| step.opcode)
+                .collect::<Vec<_>>(),
+            vec![UoOpcode::Begin, UoOpcode::Commit, UoOpcode::Wipe]
+        );
+
+        let mut runtime = MockRuntime::with_slot_count(slot.slot_count);
+        let outcome = execute_confidential_kernel_slot_program(&mut runtime, &slot).unwrap();
+
+        assert_eq!(
+            outcome,
+            ConfidentialKernelExecutionOutcome {
+                aborted: false,
+                return_value: Some(Value::uint(13)),
+            }
+        );
+        assert_eq!(runtime.statements, vec!["declare", "declare", "return"]);
     }
 
     #[test]

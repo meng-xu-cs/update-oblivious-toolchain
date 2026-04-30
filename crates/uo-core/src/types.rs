@@ -523,6 +523,23 @@ impl<T> FixedBoxBuilder<T> {
 }
 
 impl Type {
+    pub fn struct_field_type(&self, field: &str) -> Option<&Type> {
+        match self {
+            Type::Struct(fields) => fields
+                .iter()
+                .find(|candidate| candidate.name == field)
+                .map(|candidate| &candidate.ty),
+            _ => None,
+        }
+    }
+
+    pub fn array_element_type(&self) -> Option<&Type> {
+        match self {
+            Type::Array(element, _) => Some(element.as_ref()),
+            _ => None,
+        }
+    }
+
     pub fn canonical_len(&self) -> usize {
         match self {
             Type::Scalar(ScalarType::Bool) => 1,

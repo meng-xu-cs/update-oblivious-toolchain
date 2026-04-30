@@ -1248,12 +1248,6 @@ pub enum KernelWitnessError {
     SelectArmOutsideBranchlessFragment {
         entrypoint: String,
     },
-    ConfidentialStructField {
-        entrypoint: String,
-    },
-    ConfidentialArrayIndex {
-        entrypoint: String,
-    },
     NonFinalReturn {
         entrypoint: String,
         index: usize,
@@ -1389,12 +1383,6 @@ impl From<ConfidentialKernelLoweringError> for KernelWitnessError {
             }
             ConfidentialKernelLoweringError::SelectArmOutsideBranchlessFragment { entrypoint } => {
                 Self::SelectArmOutsideBranchlessFragment { entrypoint }
-            }
-            ConfidentialKernelLoweringError::ConfidentialStructField { entrypoint } => {
-                Self::ConfidentialStructField { entrypoint }
-            }
-            ConfidentialKernelLoweringError::ConfidentialArrayIndex { entrypoint } => {
-                Self::ConfidentialArrayIndex { entrypoint }
             }
             ConfidentialKernelLoweringError::NonFinalReturn { entrypoint, index } => {
                 Self::NonFinalReturn { entrypoint, index }
@@ -1898,16 +1886,6 @@ impl fmt::Display for KernelWitnessError {
             Self::SelectArmOutsideBranchlessFragment { entrypoint } => write!(
                 f,
                 "confidential entrypoint {} contains a select arm outside the branchless pure fragment admitted by the confidential runtime",
-                entrypoint
-            ),
-            Self::ConfidentialStructField { entrypoint } => write!(
-                f,
-                "confidential entrypoint {} contains unsupported struct-field projection in the confidential fragment",
-                entrypoint
-            ),
-            Self::ConfidentialArrayIndex { entrypoint } => write!(
-                f,
-                "confidential entrypoint {} contains unsupported array indexing in the confidential fragment",
                 entrypoint
             ),
             Self::NonFinalReturn { entrypoint, index } => write!(
@@ -8838,61 +8816,46 @@ mod tests {
     }
 
     #[test]
-    fn kernel_witness_validation_rejects_select_arm_outside_branchless_fragment() {
+    fn kernel_witness_validation_rejects_select_arm_kernel_access() {
         let expr = Expr::Select {
             cond: Box::new(Expr::Var("cond".into())),
-            when_true: Box::new(Expr::ArrayIndex {
-                base: Box::new(Expr::Literal(Value::Array(
-                    vec![Value::uint(1)].into_boxed_slice(),
-                ))),
-                index: Box::new(Expr::Literal(Value::uint(0))),
-            }),
+            when_true: Box::new(Expr::CellGet { object_id: 7 }),
             when_false: Box::new(Expr::Literal(Value::uint(0))),
         };
         let err =
             collect_kernel_steps_from_expr(&expr, "auth(bytes32)", &mut Vec::new()).unwrap_err();
         assert_eq!(
             err,
-            KernelWitnessError::SelectArmOutsideBranchlessFragment {
+            KernelWitnessError::SelectContainsKernelAccess {
                 entrypoint: "auth(bytes32)".into()
             }
         );
     }
 
     #[test]
-    fn kernel_witness_validation_rejects_confidential_array_index() {
+    fn kernel_witness_validation_accepts_confidential_array_index() {
         let expr = Expr::ArrayIndex {
             base: Box::new(Expr::Literal(Value::Array(
                 vec![Value::uint(1)].into_boxed_slice(),
             ))),
             index: Box::new(Expr::Literal(Value::uint(0))),
         };
-        let err =
-            collect_kernel_steps_from_expr(&expr, "auth(bytes32)", &mut Vec::new()).unwrap_err();
-        assert_eq!(
-            err,
-            KernelWitnessError::ConfidentialArrayIndex {
-                entrypoint: "auth(bytes32)".into()
-            }
-        );
+        let mut steps = Vec::new();
+        collect_kernel_steps_from_expr(&expr, "auth(bytes32)", &mut steps).unwrap();
+        assert!(steps.is_empty());
     }
 
     #[test]
-    fn kernel_witness_validation_rejects_confidential_struct_field() {
+    fn kernel_witness_validation_accepts_confidential_struct_field() {
         let expr = Expr::StructField {
             base: Box::new(Expr::Literal(Value::Struct(
                 vec![("flag".into(), Value::Bool(true))].into_boxed_slice(),
             ))),
             field: "flag".into(),
         };
-        let err =
-            collect_kernel_steps_from_expr(&expr, "auth(bytes32)", &mut Vec::new()).unwrap_err();
-        assert_eq!(
-            err,
-            KernelWitnessError::ConfidentialStructField {
-                entrypoint: "auth(bytes32)".into()
-            }
-        );
+        let mut steps = Vec::new();
+        collect_kernel_steps_from_expr(&expr, "auth(bytes32)", &mut steps).unwrap();
+        assert!(steps.is_empty());
     }
 
     fn sample_public_outcome(gas_used: u64) -> PublicOutcomeTrace {

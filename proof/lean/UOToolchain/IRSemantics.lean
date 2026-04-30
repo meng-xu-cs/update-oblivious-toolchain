@@ -678,6 +678,22 @@ def Value.zeroStructFields : List (String × Ty) → List (String × Value)
 
 end
 
+def Value.structField?
+  (fields : List (String × Value)) (field : String) : Option Value :=
+  match fields.find? (fun entry => entry.fst = field) with
+  | some (_, value) => some value
+  | none => none
+
+def Value.arrayIndex? (values : List Value) (index : Nat) : Option Value :=
+  values[index]?
+
+theorem Value.arrayIndex?_oob_returns_none
+  {values : List Value} {index : Nat}
+  (hOob : values.length ≤ index) :
+  Value.arrayIndex? values index = none := by
+  unfold Value.arrayIndex?
+  exact List.getElem?_eq_none_iff.mpr hOob
+
 /-! ## Store ownership helpers
 
 Storage reads and writes are resolved through the declared object map. Unknown
@@ -1069,13 +1085,26 @@ def evalExpr (cfg : OperationalConfig) (env : LocalEnv) :
                     .status (.evalError s!"mapGet on non-map object {objectId}")
           | none =>
               .status (.evalError s!"mapGet on unknown object {objectId}")
-  | .structField _ _ =>
-      -- `Expr.structField` is forbidden by `Expr.fragmentValid`; keeping it
-      -- `unsupported` matches the W4.3 admission.
-      .status (.unsupported "Expr.structField")
-  | .arrayIndex _ _ =>
-      -- `Expr.arrayIndex` is forbidden by `Expr.fragmentValid`.
-      .status (.unsupported "Expr.arrayIndex")
+  | .structField base field =>
+      match evalExpr cfg env base with
+      | .status s => .status s
+      | .value (.structValue fields) =>
+          match Value.structField? fields field with
+          | some value => .value value
+          | none => .status (.evalError s!"unknown struct field {field}")
+      | .value _ => .status (.evalError "structField base not struct")
+  | .arrayIndex base indexExpr =>
+      match evalExpr cfg env base with
+      | .status s => .status s
+      | .value (.array values) =>
+          match evalExpr cfg env indexExpr with
+          | .status s => .status s
+          | .value (.uint idx) =>
+              match Value.arrayIndex? values idx with
+              | some value => .value value
+              | none => .status (.evalError "arrayIndex out of bounds")
+          | .value _ => .status (.evalError "arrayIndex index not uint")
+      | .value _ => .status (.evalError "arrayIndex base not array")
   | .keccak256 parts =>
       -- Each sub-expression is evaluated in order via the mutual companion
       -- `evalExprList`; the Lean source/IR/kernel preservation chain uses the

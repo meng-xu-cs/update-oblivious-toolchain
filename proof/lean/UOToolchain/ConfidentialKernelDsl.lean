@@ -43,6 +43,8 @@ inductive ConfidentialKernelExpr where
   | cellGet (objectId : Nat)
   | arrayGet (objectId : Nat) (index : ConfidentialKernelExpr)
   | mapGet (objectId : Nat) (key : ConfidentialKernelExpr)
+  | structField (base : ConfidentialKernelExpr) (field : String)
+  | arrayIndex (base : ConfidentialKernelExpr) (index : ConfidentialKernelExpr)
   | keccak256 (parts : List ConfidentialKernelExpr)
 
 inductive ConfidentialKernelPureExpr where
@@ -53,6 +55,8 @@ inductive ConfidentialKernelPureExpr where
   | select
       (cond : ConfidentialKernelPureExpr)
       (whenTrue whenFalse : ConfidentialKernelPureExpr)
+  | structField (base : ConfidentialKernelPureExpr) (field : String)
+  | arrayIndex (base : ConfidentialKernelPureExpr) (index : ConfidentialKernelPureExpr)
   | keccak256 (parts : List ConfidentialKernelPureExpr)
 
 end
@@ -118,6 +122,9 @@ def ConfidentialKernelExpr.expectedRuntimeKernelSteps :
   | .mapGet objectId key =>
       key.expectedRuntimeKernelSteps ++
         [confidentialKernelRuntimeKernelStep "MapGet" (some objectId)]
+  | .structField base _ => base.expectedRuntimeKernelSteps
+  | .arrayIndex base index =>
+      base.expectedRuntimeKernelSteps ++ index.expectedRuntimeKernelSteps
   | .keccak256 parts =>
       confidentialKernelExprListExpectedRuntimeKernelSteps parts
 
@@ -131,6 +138,9 @@ def ConfidentialKernelPureExpr.expectedRuntimeKernelSteps :
       cond.expectedRuntimeKernelSteps ++
         whenTrue.expectedRuntimeKernelSteps ++
         whenFalse.expectedRuntimeKernelSteps
+  | .structField base _ => base.expectedRuntimeKernelSteps
+  | .arrayIndex base index =>
+      base.expectedRuntimeKernelSteps ++ index.expectedRuntimeKernelSteps
   | .keccak256 parts =>
       confidentialKernelPureExprListExpectedRuntimeKernelSteps parts
 
@@ -206,6 +216,8 @@ inductive ConfidentialKernelSlotExpr where
   | cellGet (objectId : Nat)
   | arrayGet (objectId : Nat) (index : ConfidentialKernelSlotExpr)
   | mapGet (objectId : Nat) (key : ConfidentialKernelSlotExpr)
+  | structField (base : ConfidentialKernelSlotExpr) (field : String)
+  | arrayIndex (base : ConfidentialKernelSlotExpr) (index : ConfidentialKernelSlotExpr)
   | keccak256 (parts : List ConfidentialKernelSlotExpr)
 
 inductive ConfidentialKernelSlotPureExpr where
@@ -216,6 +228,8 @@ inductive ConfidentialKernelSlotPureExpr where
   | select
       (cond : ConfidentialKernelSlotPureExpr)
       (whenTrue whenFalse : ConfidentialKernelSlotPureExpr)
+  | structField (base : ConfidentialKernelSlotPureExpr) (field : String)
+  | arrayIndex (base : ConfidentialKernelSlotPureExpr) (index : ConfidentialKernelSlotPureExpr)
   | keccak256 (parts : List ConfidentialKernelSlotPureExpr)
 
 end
@@ -289,13 +303,13 @@ def confidentialKernelStatementTailOpcodes : List String :=
   ["", "", "", "", "CellSet", "ArraySet", "MapPut", ""]
 
 def confidentialKernelExprEvaluatedOperands : List String :=
-  ["", "", "expr", "lhs,rhs", "cond", "", "index", "key", "parts"]
+  ["", "", "expr", "lhs,rhs", "cond", "", "index", "key", "base", "base,index", "parts"]
 
 def confidentialKernelExprTailOpcodes : List String :=
-  ["", "", "", "", "", "CellGet", "ArrayGet", "MapGet", ""]
+  ["", "", "", "", "", "CellGet", "ArrayGet", "MapGet", "", "", ""]
 
 def confidentialKernelPureExprEvaluatedOperands : List String :=
-  ["", "", "expr", "lhs,rhs", "cond,when_true,when_false", "parts"]
+  ["", "", "expr", "lhs,rhs", "cond,when_true,when_false", "base", "base,index", "parts"]
 
 def confidentialKernelSlotStatementTraceNames : List String :=
   confidentialKernelStatementTraceNames
@@ -313,13 +327,13 @@ def confidentialKernelSlotStatementTailOpcodes : List String :=
   confidentialKernelStatementTailOpcodes
 
 def confidentialKernelSlotExprEvaluatedOperands : List String :=
-  ["", "", "expr", "lhs,rhs", "cond", "", "index", "key", "parts"]
+  ["", "", "expr", "lhs,rhs", "cond", "", "index", "key", "base", "base,index", "parts"]
 
 def confidentialKernelSlotExprTailOpcodes : List String :=
-  ["", "", "", "", "", "CellGet", "ArrayGet", "MapGet", ""]
+  ["", "", "", "", "", "CellGet", "ArrayGet", "MapGet", "", "", ""]
 
 def confidentialKernelSlotPureExprEvaluatedOperands : List String :=
-  ["", "", "expr", "lhs,rhs", "cond,when_true,when_false", "parts"]
+  ["", "", "expr", "lhs,rhs", "cond,when_true,when_false", "base", "base,index", "parts"]
 
 def ConfidentialKernelSlotStatement.traceName :
   ConfidentialKernelSlotStatement → String
@@ -377,6 +391,9 @@ def ConfidentialKernelSlotExpr.expectedRuntimeKernelSteps :
   | .mapGet objectId key =>
       key.expectedRuntimeKernelSteps ++
         [confidentialKernelRuntimeKernelStep "MapGet" (some objectId)]
+  | .structField base _ => base.expectedRuntimeKernelSteps
+  | .arrayIndex base index =>
+      base.expectedRuntimeKernelSteps ++ index.expectedRuntimeKernelSteps
   | .keccak256 parts =>
       confidentialKernelSlotExprListExpectedRuntimeKernelSteps parts
 
@@ -390,6 +407,9 @@ def ConfidentialKernelSlotPureExpr.expectedRuntimeKernelSteps :
       cond.expectedRuntimeKernelSteps ++
         whenTrue.expectedRuntimeKernelSteps ++
         whenFalse.expectedRuntimeKernelSteps
+  | .structField base _ => base.expectedRuntimeKernelSteps
+  | .arrayIndex base index =>
+      base.expectedRuntimeKernelSteps ++ index.expectedRuntimeKernelSteps
   | .keccak256 parts =>
       confidentialKernelSlotPureExprListExpectedRuntimeKernelSteps parts
 
@@ -515,6 +535,12 @@ def confidentialKernelExprToSlotExpr :
       pure <| .arrayGet objectId (← confidentialKernelExprToSlotExpr index env)
   | .mapGet objectId key, env => do
       pure <| .mapGet objectId (← confidentialKernelExprToSlotExpr key env)
+  | .structField base field, env => do
+      pure <| .structField (← confidentialKernelExprToSlotExpr base env) field
+  | .arrayIndex base index, env => do
+      pure <| .arrayIndex
+        (← confidentialKernelExprToSlotExpr base env)
+        (← confidentialKernelExprToSlotExpr index env)
   | .keccak256 parts, env => do
       pure <| .keccak256 (← confidentialKernelExprsToSlotExprs parts env)
 termination_by expr _ => sizeOf expr
@@ -536,6 +562,12 @@ def confidentialKernelPureExprToSlotPureExpr :
         (← confidentialKernelPureExprToSlotPureExpr cond env)
         (← confidentialKernelPureExprToSlotPureExpr whenTrue env)
         (← confidentialKernelPureExprToSlotPureExpr whenFalse env)
+  | .structField base field, env => do
+      pure <| .structField (← confidentialKernelPureExprToSlotPureExpr base env) field
+  | .arrayIndex base index, env => do
+      pure <| .arrayIndex
+        (← confidentialKernelPureExprToSlotPureExpr base env)
+        (← confidentialKernelPureExprToSlotPureExpr index env)
   | .keccak256 parts, env => do
       pure <| .keccak256 (← confidentialKernelPureExprsToSlotPureExprs parts env)
 termination_by expr _ => sizeOf expr
@@ -1084,8 +1116,36 @@ theorem confidentialKernelExprToSlotExpr_expectedRuntimeKernelSteps
           simp [ConfidentialKernelExpr.expectedRuntimeKernelSteps,
             ConfidentialKernelSlotExpr.expectedRuntimeKernelSteps,
             confidentialKernelExprToSlotExpr_expectedRuntimeKernelSteps key env key' hKey]
-  | .keccak256 parts, env, slotExpr, h => by
-      cases hParts : confidentialKernelExprsToSlotExprs parts env with
+  | .structField base field, env, slotExpr, h => by
+      cases hBase : confidentialKernelExprToSlotExpr base env with
+      | error err =>
+          simp [confidentialKernelExprToSlotExpr, hBase] at h
+          cases h
+      | ok base' =>
+          simp [confidentialKernelExprToSlotExpr, hBase] at h
+          cases h
+          simp [ConfidentialKernelExpr.expectedRuntimeKernelSteps,
+            ConfidentialKernelSlotExpr.expectedRuntimeKernelSteps,
+            confidentialKernelExprToSlotExpr_expectedRuntimeKernelSteps base env base' hBase]
+  | .arrayIndex base index, env, slotExpr, h => by
+      cases hBase : confidentialKernelExprToSlotExpr base env with
+      | error err =>
+          simp [confidentialKernelExprToSlotExpr, hBase] at h
+          cases h
+      | ok base' =>
+          cases hIndex : confidentialKernelExprToSlotExpr index env with
+          | error err =>
+              simp [confidentialKernelExprToSlotExpr, hBase, hIndex] at h
+              cases h
+          | ok index' =>
+              simp [confidentialKernelExprToSlotExpr, hBase, hIndex] at h
+              cases h
+              simp [ConfidentialKernelExpr.expectedRuntimeKernelSteps,
+                ConfidentialKernelSlotExpr.expectedRuntimeKernelSteps,
+                confidentialKernelExprToSlotExpr_expectedRuntimeKernelSteps base env base' hBase,
+                confidentialKernelExprToSlotExpr_expectedRuntimeKernelSteps index env index' hIndex]
+    | .keccak256 parts, env, slotExpr, h => by
+        cases hParts : confidentialKernelExprsToSlotExprs parts env with
       | error err =>
           simp [confidentialKernelExprToSlotExpr, hParts] at h
           cases h
@@ -1170,6 +1230,37 @@ theorem confidentialKernelPureExprToSlotPureExpr_expectedRuntimeKernelSteps
                       whenTrue env whenTrue' hWhenTrue,
                     confidentialKernelPureExprToSlotPureExpr_expectedRuntimeKernelSteps
                       whenFalse env whenFalse' hWhenFalse]
+  | .structField base field, env, slotExpr, h => by
+      cases hBase : confidentialKernelPureExprToSlotPureExpr base env with
+      | error err =>
+          simp [confidentialKernelPureExprToSlotPureExpr, hBase] at h
+          cases h
+      | ok base' =>
+          simp [confidentialKernelPureExprToSlotPureExpr, hBase] at h
+          cases h
+          simp [ConfidentialKernelPureExpr.expectedRuntimeKernelSteps,
+            ConfidentialKernelSlotPureExpr.expectedRuntimeKernelSteps,
+            confidentialKernelPureExprToSlotPureExpr_expectedRuntimeKernelSteps
+              base env base' hBase]
+  | .arrayIndex base index, env, slotExpr, h => by
+      cases hBase : confidentialKernelPureExprToSlotPureExpr base env with
+      | error err =>
+          simp [confidentialKernelPureExprToSlotPureExpr, hBase] at h
+          cases h
+      | ok base' =>
+          cases hIndex : confidentialKernelPureExprToSlotPureExpr index env with
+          | error err =>
+              simp [confidentialKernelPureExprToSlotPureExpr, hBase, hIndex] at h
+              cases h
+          | ok index' =>
+              simp [confidentialKernelPureExprToSlotPureExpr, hBase, hIndex] at h
+              cases h
+              simp [ConfidentialKernelPureExpr.expectedRuntimeKernelSteps,
+                ConfidentialKernelSlotPureExpr.expectedRuntimeKernelSteps,
+                confidentialKernelPureExprToSlotPureExpr_expectedRuntimeKernelSteps
+                  base env base' hBase,
+                confidentialKernelPureExprToSlotPureExpr_expectedRuntimeKernelSteps
+                  index env index' hIndex]
   | .keccak256 parts, env, slotExpr, h => by
       cases hParts : confidentialKernelPureExprsToSlotPureExprs parts env with
       | error err =>

@@ -2782,27 +2782,27 @@ def parseFunctionConfidentialSlotProgram
   | none => pure none
   | some json => some <$> fromJson? (← parseJsonString json)
 
-private abbrev ImportedKernelLenEnv := List (String × Nat)
+private abbrev ImportedKernelLenEnv := List (String × Json)
 
 private def importedKernelLenEnvResolve
   (env : ImportedKernelLenEnv)
-  (name : String) : Except String Nat :=
+  (name : String) : Except String Json :=
   match env with
   | [] => throw s!"unknown confidential kernel variable '{name}'"
-  | (entryName, len) :: rest =>
+  | (entryName, ty) :: rest =>
       if entryName = name then
-        pure len
+        pure ty
       else
         importedKernelLenEnvResolve rest name
 
 private def importedKernelLenEnvDeclare
   (env : ImportedKernelLenEnv)
   (name : String)
-  (len : Nat) : Except String ImportedKernelLenEnv := do
+  (ty : Json) : Except String ImportedKernelLenEnv := do
   if env.any (fun entry => entry.fst = name) then
     throw s!"duplicate confidential kernel variable '{name}'"
   else
-    pure ((name, len) :: env)
+    pure ((name, ty) :: env)
 
 private def stateObjectValueCanonicalLen
   (state : List ImportedProofRelevantStateObjectView)
@@ -2810,6 +2810,80 @@ private def stateObjectValueCanonicalLen
   match state.find? (fun object => object.id == objectId) with
   | some object => typeCanonicalLenFromRawString object.value_type
   | none => throw s!"unknown state object id {objectId}"
+
+private def stateObjectValueTypeJson
+  (state : List ImportedProofRelevantStateObjectView)
+  (objectId : Nat) : Except String Json := do
+  match state.find? (fun object => object.id == objectId) with
+  | some object => parseJsonString object.value_type
+  | none => throw s!"unknown state object id {objectId}"
+
+private def scalarTypeJson (payload : Json) : Json :=
+  Json.mkObj [("Scalar", payload)]
+
+private def uint256TypeJson : Json :=
+  scalarTypeJson (Json.mkObj [("Uint", toJson (256 : Nat))])
+
+private partial def valueTypeFromJson (json : Json) : Except String Json := do
+  if taggedPayload? json "Bool" |>.isSome then
+    pure (scalarTypeJson (Json.str "Bool"))
+  else if taggedPayload? json "Uint" |>.isSome then
+    pure uint256TypeJson
+  else if taggedPayload? json "Bytes32" |>.isSome then
+    pure (scalarTypeJson (Json.str "Bytes32"))
+  else if taggedPayload? json "Address" |>.isSome then
+    pure (scalarTypeJson (Json.str "Address"))
+  else if let some payload := taggedPayload? json "Struct" then
+    let fields ← expectJsonArray payload
+    let fieldTypes ← fields.mapM fun fieldJson => do
+      let items ← expectJsonArray fieldJson
+      match items with
+      | [Json.str name, valueJson] =>
+          pure (Json.mkObj [("name", Json.str name), ("ty", ← valueTypeFromJson valueJson)])
+      | _ =>
+          throw "unsupported struct value encoding"
+    pure (Json.mkObj [("Struct", toJson fieldTypes)])
+  else if let some payload := taggedPayload? json "Array" then
+    let items ← expectJsonArray payload
+    match items with
+    | [] =>
+        throw "cannot infer empty array literal type"
+    | first :: rest =>
+        let elementTy ← valueTypeFromJson first
+        for item in rest do
+          let itemTy ← valueTypeFromJson item
+          if itemTy == elementTy then
+            pure ()
+          else
+            throw "array literal has heterogeneous element types"
+        pure (Json.mkObj [("Array", toJson [elementTy, toJson items.length])])
+  else
+    throw "unsupported value encoding"
+
+private partial def structFieldTypeFromJson
+  (ty : Json)
+  (field : String) : Except String Json := do
+  if let some payload := taggedPayload? ty "Struct" then
+    let fields ← expectJsonArray payload
+    match fields.find? (fun fieldJson =>
+        match lookupFieldAs fieldJson "name" with
+        | .ok name => name == field
+        | .error _ => false) with
+    | some fieldJson =>
+        lookupFieldJson fieldJson "ty"
+    | none =>
+        throw s!"unknown struct field {field}"
+  else
+    throw "struct field canonical length requires struct type"
+
+private def arrayElementTypeFromJson (ty : Json) : Except String Json := do
+  if let some payload := taggedPayload? ty "Array" then
+    let items ← expectJsonArray payload
+    match items with
+    | [elementJson, _] => pure elementJson
+    | _ => throw "unsupported array type encoding"
+  else
+    throw "array index canonical length requires array type"
 
 private partial def valueCanonicalLenFromJson (json : Json) : Except String Nat := do
   if taggedPayload? json "Bool" |>.isSome then
@@ -2864,6 +2938,109 @@ private def binaryOpCanonicalLen (op : Json) : Except String Nat :=
 
 mutual
 
+private partial def importedConfidentialKernelExprType
+  (state : List ImportedProofRelevantStateObjectView)
+  (env : ImportedKernelLenEnv)
+  (expr : ImportedConfidentialKernelExpr) : Except String Json := do
+  match expr with
+  | .literal value =>
+      valueTypeFromJson value
+  | .var name =>
+      importedKernelLenEnvResolve env name
+  | .unary op _ =>
+      match op with
+      | Json.str "Not" => pure (scalarTypeJson (Json.str "Bool"))
+      | Json.str "Neg" => pure uint256TypeJson
+      | _ => throw "unsupported unary operator encoding"
+  | .binary op _ _ =>
+      match op with
+      | Json.str "Eq"
+      | Json.str "Neq"
+      | Json.str "Lt"
+      | Json.str "Lte"
+      | Json.str "Gt"
+      | Json.str "Gte"
+      | Json.str "And"
+      | Json.str "Or" => pure (scalarTypeJson (Json.str "Bool"))
+      | Json.str "Add"
+      | Json.str "Sub"
+      | Json.str "Mul"
+      | Json.str "Div"
+      | Json.str "Mod"
+      | Json.str "BitAnd"
+      | Json.str "BitOr"
+      | Json.str "BitXor" => pure uint256TypeJson
+      | _ => throw "unsupported binary operator encoding"
+  | .select _ whenTrue whenFalse => do
+      let whenTrueTy ← importedConfidentialKernelPureExprType env whenTrue
+      let whenFalseTy ← importedConfidentialKernelPureExprType env whenFalse
+      if whenTrueTy == whenFalseTy then
+        pure whenTrueTy
+      else
+        throw "confidential select arms disagree on result type"
+  | .cellGet objectId =>
+      stateObjectValueTypeJson state objectId
+  | .arrayGet objectId _ =>
+      stateObjectValueTypeJson state objectId
+  | .mapGet objectId _ =>
+      stateObjectValueTypeJson state objectId
+  | .structField base field => do
+      structFieldTypeFromJson (← importedConfidentialKernelExprType state env base) field
+  | .arrayIndex base _ => do
+      arrayElementTypeFromJson (← importedConfidentialKernelExprType state env base)
+  | .keccak256 _ =>
+      pure (scalarTypeJson (Json.str "Bytes32"))
+
+private partial def importedConfidentialKernelPureExprType
+  (env : ImportedKernelLenEnv)
+  (expr : ImportedConfidentialKernelPureExpr) : Except String Json := do
+  match expr with
+  | .literal value =>
+      valueTypeFromJson value
+  | .var name =>
+      importedKernelLenEnvResolve env name
+  | .unary op _ =>
+      match op with
+      | Json.str "Not" => pure (scalarTypeJson (Json.str "Bool"))
+      | Json.str "Neg" => pure uint256TypeJson
+      | _ => throw "unsupported unary operator encoding"
+  | .binary op _ _ =>
+      match op with
+      | Json.str "Eq"
+      | Json.str "Neq"
+      | Json.str "Lt"
+      | Json.str "Lte"
+      | Json.str "Gt"
+      | Json.str "Gte"
+      | Json.str "And"
+      | Json.str "Or" => pure (scalarTypeJson (Json.str "Bool"))
+      | Json.str "Add"
+      | Json.str "Sub"
+      | Json.str "Mul"
+      | Json.str "Div"
+      | Json.str "Mod"
+      | Json.str "BitAnd"
+      | Json.str "BitOr"
+      | Json.str "BitXor" => pure uint256TypeJson
+      | _ => throw "unsupported binary operator encoding"
+  | .select _ whenTrue whenFalse => do
+      let whenTrueTy ← importedConfidentialKernelPureExprType env whenTrue
+      let whenFalseTy ← importedConfidentialKernelPureExprType env whenFalse
+      if whenTrueTy == whenFalseTy then
+        pure whenTrueTy
+      else
+        throw "confidential select arms disagree on result type"
+  | .structField base field => do
+      structFieldTypeFromJson (← importedConfidentialKernelPureExprType env base) field
+  | .arrayIndex base _ => do
+      arrayElementTypeFromJson (← importedConfidentialKernelPureExprType env base)
+  | .keccak256 _ =>
+      pure (scalarTypeJson (Json.str "Bytes32"))
+
+end
+
+mutual
+
 private partial def importedConfidentialKernelExprCanonicalLen
   (state : List ImportedProofRelevantStateObjectView)
   (env : ImportedKernelLenEnv)
@@ -2872,7 +3049,7 @@ private partial def importedConfidentialKernelExprCanonicalLen
   | .literal value =>
       valueCanonicalLenFromJson value
   | .var name =>
-      importedKernelLenEnvResolve env name
+      typeCanonicalLenFromJson (← importedKernelLenEnvResolve env name)
   | .unary op _ =>
       unaryOpCanonicalLen op
   | .binary op _ _ =>
@@ -2890,6 +3067,12 @@ private partial def importedConfidentialKernelExprCanonicalLen
       stateObjectValueCanonicalLen state objectId
   | .mapGet objectId _ =>
       stateObjectValueCanonicalLen state objectId
+  | .structField base field => do
+      typeCanonicalLenFromJson
+        (← structFieldTypeFromJson (← importedConfidentialKernelExprType state env base) field)
+  | .arrayIndex base _ => do
+      typeCanonicalLenFromJson
+        (← arrayElementTypeFromJson (← importedConfidentialKernelExprType state env base))
   | .keccak256 _ =>
       pure 32
 
@@ -2900,7 +3083,7 @@ private partial def importedConfidentialKernelPureExprCanonicalLen
   | .literal value =>
       valueCanonicalLenFromJson value
   | .var name =>
-      importedKernelLenEnvResolve env name
+      typeCanonicalLenFromJson (← importedKernelLenEnvResolve env name)
   | .unary op _ =>
       unaryOpCanonicalLen op
   | .binary op _ _ =>
@@ -2912,6 +3095,12 @@ private partial def importedConfidentialKernelPureExprCanonicalLen
         pure whenTrueLen
       else
         throw s!"confidential select arms disagree on canonical length: {whenTrueLen} != {whenFalseLen}"
+  | .structField base field => do
+      typeCanonicalLenFromJson
+        (← structFieldTypeFromJson (← importedConfidentialKernelPureExprType env base) field)
+  | .arrayIndex base _ => do
+      typeCanonicalLenFromJson
+        (← arrayElementTypeFromJson (← importedConfidentialKernelPureExprType env base))
   | .keccak256 _ =>
       pure 32
 
@@ -2938,6 +3127,12 @@ private partial def importedConfidentialKernelExprMaxHashPartBytes
       importedConfidentialKernelExprMaxHashPartBytes state env index
   | .mapGet _ key =>
       importedConfidentialKernelExprMaxHashPartBytes state env key
+  | .structField base _ =>
+      importedConfidentialKernelExprMaxHashPartBytes state env base
+  | .arrayIndex base index => do
+      pure <| Nat.max
+        (← importedConfidentialKernelExprMaxHashPartBytes state env base)
+        (← importedConfidentialKernelExprMaxHashPartBytes state env index)
   | .keccak256 parts =>
       parts.foldlM (init := 0) fun acc part => do
         let partLen ← importedConfidentialKernelExprCanonicalLen state env part
@@ -2962,6 +3157,12 @@ private partial def importedConfidentialKernelPureExprMaxHashPartBytes
         (Nat.max
           (← importedConfidentialKernelPureExprMaxHashPartBytes env whenTrue)
           (← importedConfidentialKernelPureExprMaxHashPartBytes env whenFalse))
+  | .structField base _ =>
+      importedConfidentialKernelPureExprMaxHashPartBytes env base
+  | .arrayIndex base index => do
+      pure <| Nat.max
+        (← importedConfidentialKernelPureExprMaxHashPartBytes env base)
+        (← importedConfidentialKernelPureExprMaxHashPartBytes env index)
   | .keccak256 parts =>
       parts.foldlM (init := 0) fun acc part => do
         let partLen ← importedConfidentialKernelPureExprCanonicalLen env part
@@ -2977,8 +3178,7 @@ private def importedConfidentialKernelStatementMaxHashPartBytes
   Except String (Nat × ImportedKernelLenEnv) := do
   match stmt with
   | .declare name ty value => do
-      let len ← typeCanonicalLenFromJson ty
-      let env' ← importedKernelLenEnvDeclare env name len
+      let env' ← importedKernelLenEnvDeclare env name ty
       pure (← importedConfidentialKernelExprMaxHashPartBytes state env' value, env')
   | .assign _ value =>
       pure (← importedConfidentialKernelExprMaxHashPartBytes state env value, env)
@@ -3030,8 +3230,7 @@ def importedConfidentialKernelProgramMaxHashPartBytes
   (state : List ImportedProofRelevantStateObjectView)
   (program : ImportedConfidentialKernelProgram) : Except String Nat := do
   let env ← program.params.foldlM (init := ([] : ImportedKernelLenEnv)) fun env param => do
-    let len ← typeCanonicalLenFromJson param.ty
-    importedKernelLenEnvDeclare env param.name len
+    importedKernelLenEnvDeclare env param.name param.ty
   let (maxLen, _) ← program.body.foldlM (init := (0, env)) fun accEnv stmt => do
     let (acc, env) := accEnv
     let (stmtMax, env') ← importedConfidentialKernelStatementMaxHashPartBytes state env stmt

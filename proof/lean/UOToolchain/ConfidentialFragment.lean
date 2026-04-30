@@ -12,21 +12,17 @@ deriving Repr, DecidableEq
 
 def ConfidentialFragmentEntrypointWitness.Valid
   (witness : ConfidentialFragmentEntrypointWitness) : Prop :=
-  witness.structFieldCount = 0 ∧
-    witness.arrayIndexCount = 0 ∧
-    witness.nonBranchlessSelectArmCount = 0
+  witness.nonBranchlessSelectArmCount = 0
 
 def ConfidentialFragmentEntrypointWitness.checkValid
   (witness : ConfidentialFragmentEntrypointWitness) : Bool :=
-  decide (witness.structFieldCount = 0) &&
-    decide (witness.arrayIndexCount = 0) &&
-    decide (witness.nonBranchlessSelectArmCount = 0)
+  decide (witness.nonBranchlessSelectArmCount = 0)
 
 @[simp] theorem confidentialFragmentEntrypointWitness_checkValid_eq_true_iff
   (witness : ConfidentialFragmentEntrypointWitness) :
   witness.checkValid = true ↔ witness.Valid := by
   simp [ConfidentialFragmentEntrypointWitness.checkValid,
-    ConfidentialFragmentEntrypointWitness.Valid, and_assoc]
+    ConfidentialFragmentEntrypointWitness.Valid]
 
 structure ConfidentialFragmentWitness where
   contract : String
@@ -99,15 +95,15 @@ This section adds a structured-IR companion to the count-based
 `ConfidentialFragmentEntrypointWitness`:
 
 * `IR.branchlessPureExpr` characterises the kernel-DSL branchless-pure
-  fragment: literals, vars, `unary`, `binary`, `select`, and
-  `keccak256` whose subterms are all branchless-pure. Cell, array,
-  and map reads, struct-field navigation, and array-index navigation
-  are all rejected. This mirrors the kernel-DSL pure expression
-  surface in `crates/uo-core/src/confidential_kernel.rs`.
+  fragment: literals, vars, `unary`, `binary`, `select`, local
+  struct-field navigation, local fixed-array indexing, and `keccak256`
+  whose subterms are all branchless-pure. Cell, array, and map storage
+  reads are rejected. This mirrors the kernel-DSL pure expression surface
+  in `crates/uo-core/src/confidential_kernel.rs`.
 * `IR.Expr.fragmentValid` and `IR.Statement.fragmentValid` decide
-  the structural validity of an expression / statement: no
-  `Expr.structField` anywhere, no `Expr.arrayIndex` anywhere, and
-  every `Expr.select` whose arms are not branchless-pure.
+  the structural validity of an expression / statement: every
+  `Expr.select` must have branchless-pure arms; local struct projections
+  and local fixed-array indexing are valid when their subexpressions are.
 * `IR.confidentialFragmentEntrypointWitnessOf` is a Lean-side
   classifier that produces the count-based witness directly from a
   structured `IR.CompiledFunction`. It mirrors the Rust classifier
@@ -141,8 +137,8 @@ def branchlessPureExpr : Expr → Bool
   | .cellGet _ => false
   | .arrayGet _ _ => false
   | .mapGet _ _ => false
-  | .structField _ _ => false
-  | .arrayIndex _ _ => false
+  | .structField base _ => branchlessPureExpr base
+  | .arrayIndex base index => branchlessPureExpr base && branchlessPureExpr index
   | .keccak256 parts => branchlessPureExprList parts
 
 def branchlessPureExprList : List Expr → Bool
@@ -153,11 +149,10 @@ end
 
 mutual
 
-/-- An expression is *fragment-valid* when it contains no
-`Expr.structField` anywhere, no `Expr.arrayIndex` anywhere, and every
-`Expr.select` has both arms branchless-pure. This is the structural
-counterpart to "the count-based witness reports zero forbidden
-constructs." -/
+/-- An expression is *fragment-valid* when every `Expr.select` has both arms
+branchless-pure. Local struct projections and local fixed-array indexing are
+admitted when their subexpressions are admitted; storage access remains limited
+to the explicit `cellGet` / `arrayGet` / `mapGet` constructors. -/
 def Expr.fragmentValid : Expr → Bool
   | .literal _ => true
   | .var _ => true
@@ -170,8 +165,8 @@ def Expr.fragmentValid : Expr → Bool
   | .cellGet _ => true
   | .arrayGet _ index => Expr.fragmentValid index
   | .mapGet _ key => Expr.fragmentValid key
-  | .structField _ _ => false
-  | .arrayIndex _ _ => false
+  | .structField base _ => Expr.fragmentValid base
+  | .arrayIndex base index => Expr.fragmentValid base && Expr.fragmentValid index
   | .keccak256 parts => Expr.fragmentValidList parts
 
 def Expr.fragmentValidList : List Expr → Bool
@@ -369,9 +364,11 @@ companions) because Lean 4.30's `induction` tactic does not handle
 nested-inductive `Expr` / `Statement` types directly.
 -/
 
-/-- The three forbidden-construct counts are all zero. -/
+/-- The forbidden structural count is zero. Struct projection and local
+fixed-array indexing remain counted for auditability, but are admitted by
+the proof-grade fragment when their subexpressions are admitted. -/
 def FragmentStats.forbidden_zero (s : FragmentStats) : Prop :=
-  s.structFieldCount = 0 ∧ s.arrayIndexCount = 0 ∧ s.nonBranchlessSelectArmCount = 0
+  s.nonBranchlessSelectArmCount = 0
 
 @[simp] theorem FragmentStats.forbidden_zero_empty :
     FragmentStats.empty.forbidden_zero := by
@@ -383,23 +380,19 @@ def FragmentStats.forbidden_zero (s : FragmentStats) : Prop :=
     (lhs.add rhs).forbidden_zero ↔ lhs.forbidden_zero ∧ rhs.forbidden_zero := by
   simp only [FragmentStats.forbidden_zero, FragmentStats.add]
   constructor
-  · rintro ⟨hSF, hAI, hNB⟩
-    refine ⟨⟨?_, ?_, ?_⟩, ?_, ?_, ?_⟩ <;> omega
-  · rintro ⟨⟨hLSF, hLAI, hLNB⟩, hRSF, hRAI, hRNB⟩
-    refine ⟨?_, ?_, ?_⟩ <;> omega
+  · intro h
+    omega
+  · rintro ⟨hLNB, hRNB⟩
+    omega
 
-/-- The forbidden-construct counts on a sum split additively (long
-form). Retained for backwards compatibility with the W4.3 definitions
-commit; new lemmas should prefer `forbidden_zero_add`. -/
+/-- The forbidden structural count on a sum splits additively (long form).
+Retained for backwards compatibility with the W4.3 definitions commit;
+new lemmas should prefer `forbidden_zero_add`. -/
 @[simp] theorem FragmentStats.add_zero_forbidden_iff
     {lhs rhs : FragmentStats} :
-    (lhs.add rhs).structFieldCount = 0 ∧
-        (lhs.add rhs).arrayIndexCount = 0 ∧
-        (lhs.add rhs).nonBranchlessSelectArmCount = 0 ↔
-      (lhs.structFieldCount = 0 ∧ lhs.arrayIndexCount = 0 ∧
-          lhs.nonBranchlessSelectArmCount = 0) ∧
-        (rhs.structFieldCount = 0 ∧ rhs.arrayIndexCount = 0 ∧
-          rhs.nonBranchlessSelectArmCount = 0) := by
+    (lhs.add rhs).nonBranchlessSelectArmCount = 0 ↔
+      lhs.nonBranchlessSelectArmCount = 0 ∧
+        rhs.nonBranchlessSelectArmCount = 0 := by
   have h := @FragmentStats.forbidden_zero_add lhs rhs
   simpa [FragmentStats.forbidden_zero] using h
 
@@ -426,7 +419,6 @@ theorem Expr.fragmentStats_valid_iff :
       have ihC := Expr.fragmentStats_valid_iff condE
       have ihT := Expr.fragmentStats_valid_iff wt
       have ihF := Expr.fragmentStats_valid_iff wf
-      -- Case-split on the branchless-pure boolean to eliminate the `cond` cleanly.
       cases hAnd : branchlessPureExpr wt && branchlessPureExpr wf with
       | true =>
         have hBPwt : branchlessPureExpr wt = true := by
@@ -439,37 +431,30 @@ theorem Expr.fragmentStats_valid_iff :
           · rfl
         constructor
         · intro hForbidden
-          -- LHS unfolded: forbidden_zero of the modified inner stats.
-          -- Build each subexpression's validity from hForbidden + IH.
-          -- Use `show` to make the structural-side goal explicit.
-          show Expr.fragmentValid (Expr.select condE wt wf) = true
-          rw [show Expr.fragmentValid (Expr.select condE wt wf) =
-              (Expr.fragmentValid condE && Expr.fragmentValid wt
-                && Expr.fragmentValid wf
-                && branchlessPureExpr wt && branchlessPureExpr wf) from rfl]
           have hCv : Expr.fragmentValid condE = true := by
             apply ihC.mp
             simp only [Expr.fragmentStats, FragmentStats.forbidden_zero,
               FragmentStats.add, hAnd, _root_.cond] at hForbidden
-            refine ⟨?_, ?_, ?_⟩ <;> omega
+            simp only [Nat.add_eq_zero_iff] at hForbidden
+            simpa [FragmentStats.forbidden_zero] using hForbidden.1.1.1
           have hTv : Expr.fragmentValid wt = true := by
             apply ihT.mp
             simp only [Expr.fragmentStats, FragmentStats.forbidden_zero,
               FragmentStats.add, hAnd, _root_.cond] at hForbidden
-            refine ⟨?_, ?_, ?_⟩ <;> omega
+            simp only [Nat.add_eq_zero_iff] at hForbidden
+            simpa [FragmentStats.forbidden_zero] using hForbidden.1.1.2
           have hFv : Expr.fragmentValid wf = true := by
             apply ihF.mp
             simp only [Expr.fragmentStats, FragmentStats.forbidden_zero,
               FragmentStats.add, hAnd, _root_.cond] at hForbidden
-            refine ⟨?_, ?_, ?_⟩ <;> omega
-          rw [hCv, hTv, hFv, hBPwt, hBPwf]; rfl
+            simp only [Nat.add_eq_zero_iff] at hForbidden
+            simpa [FragmentStats.forbidden_zero] using hForbidden.1.2
+          simp [Expr.fragmentValid, hCv, hTv, hFv, hBPwt, hBPwf]
         · intro hValid
-          show ((Expr.select condE wt wf).fragmentStats).forbidden_zero
           have hValidUnfold :
               Expr.fragmentValid condE = true ∧
               Expr.fragmentValid wt = true ∧
               Expr.fragmentValid wf = true := by
-            -- hValid : (... && ... && ... && bpWt && bpWf) = true, with bpWt = bpWf = true
             cases hC : Expr.fragmentValid condE <;>
               cases hT : Expr.fragmentValid wt <;>
               cases hF : Expr.fragmentValid wf <;>
@@ -479,33 +464,23 @@ theorem Expr.fragmentStats_valid_iff :
           have hC := ihC.mpr hCv
           have hT := ihT.mpr hTv
           have hF := ihF.mpr hFv
-          rcases hC with ⟨hCsf, hCai, hCarm⟩
-          rcases hT with ⟨hTsf, hTai, hTarm⟩
-          rcases hF with ⟨hFsf, hFai, hFarm⟩
           simp only [Expr.fragmentStats, FragmentStats.forbidden_zero,
             FragmentStats.add, hAnd, _root_.cond]
-          refine ⟨?_, ?_, ?_⟩ <;> omega
+          simp only [FragmentStats.forbidden_zero] at hC hT hF
+          simp [hC, hT, hF]
       | false =>
-        -- armPenalty = 1, so arm count is positive ⇒ forbidden_zero is false.
-        -- And on the structural side, fragmentValid requires bp(wt) = true ∧
-        -- bp(wf) = true, which contradicts hAnd : ... = false.
         simp only [Expr.fragmentStats, Expr.fragmentValid,
           FragmentStats.forbidden_zero, FragmentStats.add,
           hAnd, _root_.cond]
         constructor
-        · rintro ⟨_, _, hArm⟩
-          exfalso; omega
-        · -- The `fragmentValid` branch implies bp(wt) && bp(wf) = true; case-split
-          -- on each Bool to get a direct contradiction with hAnd.
-          intro hValid
+        · intro hArm
+          simp at hArm
+        · intro hValid
           cases hWt : branchlessPureExpr wt
-          · -- bpWt = false ⇒ hValid (which contains bpWt) is false
-            simp [hWt] at hValid
+          · simp [hWt] at hValid
           · cases hWf : branchlessPureExpr wf
-            · -- bpWf = false ⇒ hValid (which contains bpWf) is false
-              simp [hWt, hWf] at hValid
-            · -- bpWt = bpWf = true ⇒ hAnd contradicts (true && true ≠ false)
-              simp [hWt, hWf] at hAnd
+            · simp [hWt, hWf] at hValid
+            · simp [hWt, hWf] at hAnd
   | .cellGet _ => by
       simp [Expr.fragmentStats, Expr.fragmentValid]
   | .arrayGet _ index => by
@@ -516,15 +491,22 @@ theorem Expr.fragmentStats_valid_iff :
       exact Expr.fragmentStats_valid_iff key
   | .structField base _ => by
       simp only [Expr.fragmentStats, Expr.fragmentValid, FragmentStats.forbidden_zero]
-      constructor
-      · rintro ⟨hSF, _, _⟩; omega
-      · intro h; exact (Bool.false_ne_true h).elim
+      exact Expr.fragmentStats_valid_iff base
   | .arrayIndex base index => by
+      have ihB := Expr.fragmentStats_valid_iff base
+      have ihI := Expr.fragmentStats_valid_iff index
       simp only [Expr.fragmentStats, Expr.fragmentValid, FragmentStats.forbidden_zero,
-        FragmentStats.add]
+        FragmentStats.add, Bool.and_eq_true]
       constructor
-      · rintro ⟨_, hAI, _⟩; omega
-      · intro h; exact (Bool.false_ne_true h).elim
+      · intro h
+        have hParts := Nat.add_eq_zero_iff.mp h
+        exact ⟨ihB.mp (by simpa [FragmentStats.forbidden_zero] using hParts.1),
+          ihI.mp (by simpa [FragmentStats.forbidden_zero] using hParts.2)⟩
+      · rintro ⟨hB, hI⟩
+        have hBz := ihB.mpr hB
+        have hIz := ihI.mpr hI
+        simp only [FragmentStats.forbidden_zero] at hBz hIz
+        simp [hBz, hIz]
   | .keccak256 parts => by
       simp only [Expr.fragmentStats, Expr.fragmentValid]
       exact Expr.fragmentStatsList_valid_iff parts
