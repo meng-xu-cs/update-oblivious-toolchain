@@ -673,6 +673,7 @@
   "oram_runtime_uses_shared_boxed_seal_helper": true,
   "oram_runtime_uses_shared_open_decode_helper": true,
   "path_oram_deployed_stash_parameters_pinned": true,
+  "private_posmap_paper_main_route_present": true,
   "proof_interface_bundle_literal_checks": [
     {
       "expected_files": [
@@ -2148,8 +2149,10 @@
   "shell_boundary_slot_lowering_bridge_surface_restricted": true,
   "shell_boundary_slot_lowering_uses_manifest_programs": true,
   "sources": {
+    "lean_accepted_package_capstone": "proof/lean/UOToolchain/AcceptedPackageCapstone.lean",
     "lean_confidential_kernel_dsl": "proof/lean/UOToolchain/ConfidentialKernelDsl.lean",
     "lean_confidential_kernel_rust_generator": "proof/lean/.lake/build/bin/generateConfidentialKernelRust",
+    "lean_path_oram_private_posmap": "proof/lean/UOToolchain/PathOramPrivatePosmapV1.lean",
     "lean_runtime_array_access_model": "proof/lean/UOToolchain/RuntimeArrayAccessDiscipline.lean",
     "lean_runtime_coins_json": "proof/lean/UOToolchain/RuntimeCoinsJson.lean",
     "lean_runtime_confidential_core": "proof/lean/UOToolchain/RuntimeConfidentialCoreAssuranceJson.lean",
@@ -2177,6 +2180,7 @@
     "lean_runtime_store_surface_rust_generator": "proof/lean/.lake/build/bin/generateRuntimeStoreSurfaceRust",
     "lean_runtime_trusted_kernel": "proof/lean/UOToolchain/RuntimeTrustedKernelJson.lean",
     "lean_runtime_value_ops_semantics": "proof/lean/UOToolchain/RuntimeValueOpsSemantics.lean",
+    "lean_scalable_path_oram_evidence": "proof/lean/UOToolchain/ScalablePathOramEvidence.lean",
     "lean_toolchain": "proof/lean/lean-toolchain",
     "rust_confidential_core": "crates/uo-core/src/confidential_core.rs",
     "rust_confidential_kernel": "crates/uo-core/src/confidential_kernel.rs",

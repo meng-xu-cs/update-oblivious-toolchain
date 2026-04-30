@@ -111,6 +111,25 @@ for the computational Path ORAM claim. Any proof obligation introduced by
 private position metadata must be proved and included in the certificate
 checker.
 
+Status: Fixed. `PathOramPrivatePosmapV1.lean` now defines the distinct
+private-posmap security interface, compact certificate validator, recursive
+private position-map semantics, and private-posmap leakage projection. A
+validated `PathOramPrivatePosmapV1BundleCertificate` now implies
+`ComputationalUOWith` for the private-posmap interface without adding new
+crypto/stash assumptions beyond the existing standard Path ORAM assumption
+bundle. The module also provides
+`paperMain_pathOramPrivatePosmapV1_noninterference` and the seeded runtime
+paper-main theorem. `AcceptedPackageCapstone.lean` now has an accepted-package
+private-posmap capstone that requires both proof-grade translation validation
+and `PrivatePosmapCertificatesValidated` before exposing the noninterference
+conclusion. The kernel-model probe gates acceptance on
+`private_posmap_paper_main_route_present`. Verified with `cd proof/lean && lake
+build UOToolchain.PathOramPrivatePosmapV1`, `cd proof/lean && lake build
+UOToolchain.AcceptedPackageCapstone`, `cd proof/lean && lake build
+UOToolchain.ProofGradeRoot`, `cargo check -p mplus-probe`, and
+`cargo run -q -p mplus-probe -- --only kernel-model-alignment-validation
+--out-dir results`.
+
 ## F4. Lean argument binding uses `publicArgs ++ secretArgs` while runtime uses declared order
 
 Review grouping: `F4`, `T1.4`, `O2.4`.

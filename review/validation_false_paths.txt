@@ -105,6 +105,7 @@ top_level_booleans:
   oram_runtime_uses_shared_boxed_seal_helper: true
   oram_runtime_uses_shared_open_decode_helper: true
   path_oram_deployed_stash_parameters_pinned: true
+  private_posmap_paper_main_route_present: true
   proof_interface_bundle_literal_surface_restricted: true
   refinement_event_kind_names_match: true
   refinement_event_kind_serde_snake_case: true

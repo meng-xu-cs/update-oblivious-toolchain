@@ -25511,6 +25511,12 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         repo_root().join("proof/lean/UOToolchain/RuntimeAuditSurfaces.lean");
     let lean_runtime_boundary_schema_path =
         repo_root().join("proof/lean/UOToolchain/RuntimeBoundarySchema.lean");
+    let lean_scalable_path_oram_evidence_path =
+        repo_root().join("proof/lean/UOToolchain/ScalablePathOramEvidence.lean");
+    let lean_path_oram_private_posmap_path =
+        repo_root().join("proof/lean/UOToolchain/PathOramPrivatePosmapV1.lean");
+    let lean_accepted_package_capstone_path =
+        repo_root().join("proof/lean/UOToolchain/AcceptedPackageCapstone.lean");
     let lean_toolchain_path = repo_root().join("proof/lean/lean-toolchain");
     let lean_proofgrade_root_path = repo_root().join("proof/lean/UOToolchain/ProofGradeRoot.lean");
     let lean_runtime_implementation_interface_checker_path =
@@ -25797,6 +25803,27 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             format!(
                 "reading {}",
                 display_report_path(&lean_runtime_boundary_schema_path)
+            )
+        })?;
+    let lean_scalable_path_oram_evidence_source =
+        fs::read_to_string(&lean_scalable_path_oram_evidence_path).with_context(|| {
+            format!(
+                "reading {}",
+                display_report_path(&lean_scalable_path_oram_evidence_path)
+            )
+        })?;
+    let lean_path_oram_private_posmap_source =
+        fs::read_to_string(&lean_path_oram_private_posmap_path).with_context(|| {
+            format!(
+                "reading {}",
+                display_report_path(&lean_path_oram_private_posmap_path)
+            )
+        })?;
+    let lean_accepted_package_capstone_source =
+        fs::read_to_string(&lean_accepted_package_capstone_path).with_context(|| {
+            format!(
+                "reading {}",
+                display_report_path(&lean_accepted_package_capstone_path)
             )
         })?;
     let lean_toolchain_pin = fs::read_to_string(&lean_toolchain_path)
@@ -28873,6 +28900,35 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             .contains("theorem runtimeBoundaryObligationIds_nodup")
         && lean_runtime_boundary_schema_source
             .contains("theorem runtimeBoundarySchema_allProofCriticalMechanized");
+    let private_posmap_paper_main_route_present = lean_proofgrade_root_source
+        .contains("import UOToolchain.PathOramPrivatePosmapV1")
+        && lean_scalable_path_oram_evidence_source
+            .contains("structure ScalablePathOramCertificate")
+        && lean_scalable_path_oram_evidence_source
+            .contains("def symbolicPrivatePosmapCertificate")
+        && lean_path_oram_private_posmap_source
+            .contains("structure PathOramPrivatePosmapV1SecurityAssumptions")
+        && lean_path_oram_private_posmap_source
+            .contains("def ScalablePathOramCertificate.PrivatePosmapV1Valid")
+        && lean_path_oram_private_posmap_source
+            .contains("def privatePosmapCertificateForImportedManifestObject?")
+        && lean_path_oram_private_posmap_source
+            .contains("structure PrivatePosmapRecursiveSemantics")
+        && lean_path_oram_private_posmap_source.contains("def privatePosmapLeakage")
+        && lean_path_oram_private_posmap_source.contains(
+            "theorem SeededRuntimePathOramProofBundle.pathOramPrivatePosmapV1_computationalUOWith",
+        )
+        && lean_path_oram_private_posmap_source
+            .contains("theorem paperMain_pathOramPrivatePosmapV1_noninterference")
+        && lean_path_oram_private_posmap_source.contains(
+            "theorem SeededRuntimePaperMainBundle.pathOramPrivatePosmapV1_paperMain_noninterference",
+        )
+        && lean_path_oram_private_posmap_source
+            .contains("ImportedProofRelevantTranslationBundle.PrivatePosmapCertificatesValidated")
+        && lean_accepted_package_capstone_source
+            .contains("AcceptedPrivatePosmapPathOramPackageCapstoneEvidence")
+        && lean_accepted_package_capstone_source
+            .contains("acceptedPrivatePosmapPathOramPackageCapstone_noninterference");
     let mut theorem_adjacent_unsafe_surface_files =
         collect_production_pattern_hits(&crates_src, "unsafe {")?;
     theorem_adjacent_unsafe_surface_files
@@ -35156,6 +35212,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && host_visible_outcome_taxonomy_audit_present
         && runtime_freshness_discipline_audit_present
         && runtime_boundary_schema_mechanized
+        && private_posmap_paper_main_route_present
         && theorem_adjacent_unsafe_isolated_to_fixed_buffer
         && lean_toolchain_exact_release_pinned
         && lean_lake_versions_recorded_in_manifest
@@ -35487,6 +35544,12 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
                 display_report_path(&lean_runtime_store_helper_semantics_path),
             "lean_runtime_value_ops_semantics":
                 display_report_path(&lean_runtime_value_ops_semantics_path),
+            "lean_scalable_path_oram_evidence":
+                display_report_path(&lean_scalable_path_oram_evidence_path),
+            "lean_path_oram_private_posmap":
+                display_report_path(&lean_path_oram_private_posmap_path),
+            "lean_accepted_package_capstone":
+                display_report_path(&lean_accepted_package_capstone_path),
             "lean_toolchain": display_report_path(&lean_toolchain_path),
             "lean_runtime_coins_json": display_report_path(&lean_runtime_coins_json_path),
             "lean_runtime_confidential_core":
@@ -35841,6 +35904,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             runtime_boundary_schema_rust_lean_ids_match,
         "runtime_boundary_schema_mechanized":
             runtime_boundary_schema_mechanized,
+        "private_posmap_paper_main_route_present":
+            private_posmap_paper_main_route_present,
         "theorem_adjacent_unsafe_surface_files":
             theorem_adjacent_unsafe_surface_files,
         "expected_theorem_adjacent_unsafe_surface_files":

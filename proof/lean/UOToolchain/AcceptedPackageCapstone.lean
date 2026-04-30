@@ -1,6 +1,7 @@
 import UOToolchain.DeploymentAcceptance
 import UOToolchain.ObserverCoverage
 import UOToolchain.PaperMainTheorem
+import UOToolchain.PathOramPrivatePosmapV1
 import UOToolchain.RuntimeRefinement
 import UOToolchain.RuntimeAuditSurfaces
 import UOToolchain.TranslationValidationJson
@@ -338,6 +339,113 @@ theorem acceptedPathOramPackageCapstone_noninterference
       accepted.finalPublicStateSafe
       accepted.releaseFunctionsSafe
     hPublic
+
+structure AcceptedPrivatePosmapPathOramPackageCapstoneEvidence
+  {modelTags : SGXModelTags}
+  (translation : ImportedProofRelevantTranslationBundle)
+  (policy : DeploymentRuntimePolicy)
+  (profile : DeploymentBuildProfileEvidence)
+  (deploymentState : DeploymentRuntimeState)
+  (deploymentEvidence : DeploymentCallEvidence)
+  (bundle : SeededRuntimePaperMainBundle modelTags)
+  (cert : ScalablePathOramCertificate)
+  (finalPublicStateRollback :
+    OramConfig → PaperMainFinalPublicStateRollback)
+  (releaseFunctions :
+    OramConfig → PaperMainDeclaredReleaseFunctions) : Prop where
+  translationProofGrade : translation.ProofGradeValid
+  privatePosmapCertificatesValidated :
+    translation.PrivatePosmapCertificatesValidated
+  deploymentAccepted :
+    DeploymentCallAccepted policy profile deploymentState deploymentEvidence
+  privatePosmapCertificate :
+    PathOramPrivatePosmapV1BundleCertificate
+      cert
+      bundle.toSeededRuntimePathOramProofBundle
+  finalPublicStateSafe :
+    PaperMainPublicFieldSafe sameOramPublicProjection finalPublicStateRollback
+  releaseFunctionsSafe :
+    PaperMainPublicFieldSafe sameOramPublicProjection releaseFunctions
+
+theorem acceptedPrivatePosmapPathOramPackageCapstoneEvidence_closes_public_surface
+  {modelTags : SGXModelTags}
+  {translation : ImportedProofRelevantTranslationBundle}
+  {policy : DeploymentRuntimePolicy}
+  {profile : DeploymentBuildProfileEvidence}
+  {deploymentState : DeploymentRuntimeState}
+  {deploymentEvidence : DeploymentCallEvidence}
+  {bundle : SeededRuntimePaperMainBundle modelTags}
+  {cert : ScalablePathOramCertificate}
+  {finalPublicStateRollback :
+    OramConfig → PaperMainFinalPublicStateRollback}
+  {releaseFunctions :
+    OramConfig → PaperMainDeclaredReleaseFunctions}
+  (accepted :
+    AcceptedPrivatePosmapPathOramPackageCapstoneEvidence
+      translation policy profile deploymentState deploymentEvidence
+      bundle cert finalPublicStateRollback releaseFunctions) :
+    translation.ProofGradeValid ∧
+    translation.PrivatePosmapCertificatesValidated ∧
+    DeploymentCallAccepted policy profile deploymentState deploymentEvidence ∧
+    (forall entry, entry ∈ observerFieldCoverage -> entry.closed = true) ∧
+    (forall entry, entry ∈ runtimeHostVisibleOutcomeTaxonomy -> entry.closed = true) ∧
+    OramPublicOutcomeSafe bundle.publicOutcome ∧
+    OramPublicBoundarySafe bundle.boundarySchedule ∧
+    PaperMainPublicFieldSafe sameOramPublicProjection finalPublicStateRollback ∧
+    PaperMainPublicFieldSafe sameOramPublicProjection releaseFunctions := by
+  exact
+    ⟨ accepted.translationProofGrade
+    , accepted.privatePosmapCertificatesValidated
+    , accepted.deploymentAccepted
+    , observerCoverage_allClosed
+    , runtimeHostVisibleOutcomeTaxonomy_allClosed
+    , bundle.publicOutcomeSafe
+    , bundle.boundarySafe
+    , accepted.finalPublicStateSafe
+    , accepted.releaseFunctionsSafe
+    ⟩
+
+theorem acceptedPrivatePosmapPathOramPackageCapstone_noninterference
+  {modelTags : SGXModelTags}
+  {translation : ImportedProofRelevantTranslationBundle}
+  {policy : DeploymentRuntimePolicy}
+  {profile : DeploymentBuildProfileEvidence}
+  {deploymentState : DeploymentRuntimeState}
+  {deploymentEvidence : DeploymentCallEvidence}
+  {bundle : SeededRuntimePaperMainBundle modelTags}
+  {cert : ScalablePathOramCertificate}
+  {finalPublicStateRollback :
+    OramConfig → PaperMainFinalPublicStateRollback}
+  {releaseFunctions :
+    OramConfig → PaperMainDeclaredReleaseFunctions}
+  (assumptions : PathOramPrivatePosmapV1SecurityAssumptions)
+  (accepted :
+    AcceptedPrivatePosmapPathOramPackageCapstoneEvidence
+      translation policy profile deploymentState deploymentEvidence
+      bundle cert finalPublicStateRollback releaseFunctions)
+  {cfg₁ cfg₂ : OramConfig}
+  (hPublic :
+    PaperMainPathOramSameAdmittedPackagePublicInputsAndState cfg₁ cfg₂) :
+  PaperMainPathOramPrivatePosmapV1NoninterferenceConclusion
+    assumptions
+    (oramToSGXSemantics
+      bundle.toSeededRuntimePathOramProofBundle.run
+      bundle.publicOutcome
+      bundle.boundarySchedule
+      oramControllerMicroTrace)
+    executionLeakage
+    (oramMicroLeakage bundle.publicOutcome modelTags)
+    finalPublicStateRollback
+    releaseFunctions
+    cfg₁
+    cfg₂ := by
+  exact
+    bundle.pathOramPrivatePosmapV1_paperMain_noninterference
+      assumptions
+      accepted.privatePosmapCertificate
+      accepted.finalPublicStateSafe
+      accepted.releaseFunctionsSafe
+      hPublic
 
 theorem acceptedPathOramPackageCapstone_publicOutcomeFields_closed
   {modelTags : SGXModelTags}
