@@ -498,6 +498,14 @@ impl CommittedRuntimeState {
                         object_id
                     );
                 }
+                if !object.is_confidential() {
+                    bail!(
+                        "confidential kernel program {} targets non-confidential object {} ({})",
+                        program.entrypoint_id,
+                        object.name(),
+                        object_id
+                    );
+                }
             }
             Ok(())
         }

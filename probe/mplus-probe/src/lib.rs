@@ -4534,6 +4534,41 @@ fn run_pathoram_hidden_validation() -> Result<JsonValue> {
     }))
 }
 
+fn runtime_confidential_public_uo_target_scenario(
+    artifact: &CompiledArtifact,
+    target: &CallSpec,
+) -> Result<JsonValue> {
+    let mut tampered = artifact.clone();
+    let object = tampered
+        .contract
+        .state
+        .iter_mut()
+        .find(|object| object.confidential && object.backend != BackendKind::Raw)
+        .ok_or_else(|| anyhow!("tamper scenario needs a confidential UO object"))?;
+    let object_name = object.name.clone();
+    object.confidential = false;
+    let outcome = ContractInstance::deploy_with_seed(tampered, 7)
+        .and_then(|mut instance| instance.call(target.entrypoint, target.args.clone()));
+    let error = match &outcome {
+        Ok(_) => {
+            "unexpectedly accepted confidential program targeting a public UO object".to_string()
+        }
+        Err(err) => err.to_string(),
+    };
+    let rejected = error.contains("targets non-confidential object");
+    Ok(json!({
+        "scenario": "runtime/confidential_public_uo_target",
+        "artifact_kind": "runtime_confidential_admission",
+        "benchmark": "SingleAccessMap/pathoram/put",
+        "entrypoint": target.entrypoint,
+        "object": object_name,
+        "mutation": "flip a confidential UO target object to public (confidential:false) while keeping the UO backend",
+        "accepted": outcome.is_ok(),
+        "rejected": rejected,
+        "error": error,
+    }))
+}
+
 fn run_tamper_validation() -> Result<JsonValue> {
     let source_path = "benches/raw/SingleAccessMap.sol";
     let metadata_path = "benches/raw/SingleAccessMap.pathoram.yaml";
@@ -4801,6 +4836,13 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "object_id": raw_target_object_id,
             "mutation": "make the confidential kernel step target a public raw backend in both source and artifact projections",
         }),
+    )?);
+
+    // Runtime admission: flipping a confidential UO target to public while
+    // leaving a UO backend is rejected before execution by the runtime (Issue
+    // 08), independent of the compiler/Lean confidential-object checks.
+    scenarios.push(runtime_confidential_public_uo_target_scenario(
+        &artifact, &target,
     )?);
 
     let mut tampered_controller_certificate = serde_json::to_value(&controller_certificate)?;

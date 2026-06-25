@@ -1556,6 +1556,59 @@ bounds:
         assert_eq!(read.return_value, Some(Value::uint(0)));
     }
 
+    #[test]
+    fn confidential_kernel_targeting_public_uo_object_is_rejected() {
+        let source = write_temp(
+            "confidential-target",
+            r#"
+            contract C {
+                uint256 private secret;
+                function setSecret(uint256 amount) public { secret = amount; }
+            }
+            "#,
+        );
+        let metadata = r#"
+contract: C
+entrypoints:
+  setSecret(uint256):
+    confidential: true
+    secret_args: [amount]
+    returns: forbidden
+    status: public
+state:
+  secret:
+    kind: cell
+    value: uint256
+    backend: full_scan
+    confidential: true
+bounds:
+  loops: {}
+"#;
+        let mut artifact = compile_bench(source.to_str().unwrap(), metadata, ProgramMode::Uo);
+        // The well-formed confidential artifact runs.
+        {
+            let mut ok = ContractInstance::deploy_with_seed(artifact.clone(), 7).unwrap();
+            ok.call("setSecret(uint256)", vec![Value::uint(9)]).unwrap();
+        }
+        // Tamper: flip the target object to public while keeping the UO backend.
+        let secret = artifact
+            .contract
+            .state
+            .iter_mut()
+            .find(|object| object.name == "secret")
+            .expect("secret object");
+        assert!(secret.confidential);
+        secret.confidential = false;
+        let mut instance = ContractInstance::deploy_with_seed(artifact, 7).unwrap();
+        let err = instance
+            .call("setSecret(uint256)", vec![Value::uint(9)])
+            .unwrap_err();
+        assert!(
+            err.to_string().contains("targets non-confidential object"),
+            "unexpected error: {err}"
+        );
+    }
+
     #[cfg(not(feature = "diagnostics"))]
     #[test]
     fn production_proof_bundle_failure_rolls_back_and_preserves_freshness() {

@@ -14,8 +14,8 @@
   "files": [
     {
       "path": "acceptance.json",
-      "bytes": 138797,
-      "sha256": "f9643801bb8c32bcd57e92198f868975e44f91a4d25eb327730da5726240846a"
+      "bytes": 138831,
+      "sha256": "86f397101c9a0f6c16fbb3bd35c8cace3a4aa359abaf9f9932abed2727ea6e56"
     },
     {
       "path": "artifact_configuration.json",
@@ -384,8 +384,8 @@
     },
     {
       "path": "tamper_validation.json",
-      "bytes": 672270,
-      "sha256": "a477c0b26ec7899b374d06938cafb08e537f0bbae07a620abe14885802894be7"
+      "bytes": 672798,
+      "sha256": "8e9a45ce0867b90cc90977cba464d3cc19ec96e6e47b001a17cec681c3bdbc19"
     },
     {
       "path": "targeted-tamper/tamper_validation.json",

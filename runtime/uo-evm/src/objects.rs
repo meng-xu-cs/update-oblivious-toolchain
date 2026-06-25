@@ -678,6 +678,19 @@ impl RuntimeObject {
         )
     }
 
+    /// Whether the object's declared spec marks it `confidential: true`. A
+    /// confidential kernel may target only confidential objects, independent of
+    /// the backend (a UO-but-public object is not a valid confidential target).
+    pub(in crate::runtime) fn is_confidential(&self) -> bool {
+        match self {
+            Self::RawCell(object) | Self::UoCell(object) => object.spec.confidential,
+            Self::RawArray(object) | Self::UoArray(object) => object.spec.confidential,
+            Self::RawMap(object) => object.spec.confidential,
+            Self::UoSmallMap(object) => object.spec.confidential,
+            Self::UoOramMap(object) => object.spec.confidential,
+        }
+    }
+
     pub(in crate::runtime) fn path_oram_access_counter_witness(
         &self,
     ) -> Option<RuntimeOramAccessCounterWitness> {
@@ -703,14 +716,7 @@ impl RuntimeObject {
         &self,
         allocator: &mut AllocatorSession,
     ) -> Result<Option<serde_json::Value>> {
-        let is_confidential = match self {
-            Self::RawCell(object) | Self::UoCell(object) => object.spec.confidential,
-            Self::RawArray(object) | Self::UoArray(object) => object.spec.confidential,
-            Self::RawMap(object) => object.spec.confidential,
-            Self::UoSmallMap(object) => object.spec.confidential,
-            Self::UoOramMap(object) => object.spec.confidential,
-        };
-        if is_confidential {
+        if self.is_confidential() {
             return Ok(None);
         }
         Ok(Some(match self {
