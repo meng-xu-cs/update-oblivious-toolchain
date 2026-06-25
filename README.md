@@ -45,6 +45,34 @@ The canonical theorem statement, observer, TCB, assumptions, and non-claims are
 in [`docs/claim-boundary.md`](docs/claim-boundary.md). The complete
 documentation index is [`docs/README.md`](docs/README.md).
 
+## Reproducible Environment
+
+A scientific claim should not depend on an unrecorded local setup. The pinned
+environment is defined by `rust-toolchain.toml` (Rust channel/components) and
+`proof/lean/lean-toolchain` (Lean/Lake/Elan release). Two reproducible paths
+materialize them:
+
+- One-command local baseline:
+
+  ```bash
+  scripts/baseline.sh --focused   # fmt + probe check + Lean proof root + workspace tests
+  scripts/baseline.sh             # full gate: also all-features tests + full validation
+  ```
+
+  Either invocation records the exact tool versions and content hashes used into
+  `results/local-baseline/manifest.json` (git-ignored; it is machine-specific).
+
+- Containerized environment that pins Rust, Lean/Lake/Elan, and system deps:
+
+  ```bash
+  docker build -f Dockerfile.validation -t uo-validation .
+  docker run --rm -it uo-validation scripts/baseline.sh --focused
+  ```
+
+CI (`.github/workflows/ci.yml`) runs the focused baseline (formatting, Rust
+tests, Lean proof root, focused probe validation) on every push/PR, and the full
+validation as a manual (`workflow_dispatch`) or nightly (scheduled) job.
+
 ## Commands
 
 Full validation:

@@ -1,0 +1,96 @@
+name: ci
+
+# Focused baseline runs on every push / PR. Full validation is available as a
+# manual (workflow_dispatch) or scheduled (nightly) job because it regenerates
+# the complete results/ bundle and is expensive.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * *"
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # rustup honors rust-toolchain.toml, installing the pinned channel.
+      - run: rustup show
+      - run: cargo fmt --all --check
+
+  rust-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup show
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check -p mplus-probe
+      - run: cargo test --workspace
+      - run: cargo test --workspace --all-features
+
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup show
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+  lean-proof-root:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install elan (pinned Lean toolchain)
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf \
+            https://raw.githubusercontent.com/leanprover/elan/v3.1.1/elan-init.sh \
+            | sh -s -- -y --default-toolchain "$(cat proof/lean/lean-toolchain)"
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: lake build proof-grade root
+        working-directory: proof/lean
+        run: lake build UOToolchain.ProofGradeRoot
+
+  probe-validation:
+    # Focused probe validation gate: fast, runs on every PR.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup show
+      - uses: Swatinem/rust-cache@v2
+      - name: static checks probe report
+        run: cargo run -q -p mplus-probe -- --only static-checks --out-dir results
+
+  full-validation:
+    # Heavy end-to-end validation. Manual or nightly only.
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup show
+      - uses: Swatinem/rust-cache@v2
+      - name: Install elan (pinned Lean toolchain)
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf \
+            https://raw.githubusercontent.com/leanprover/elan/v3.1.1/elan-init.sh \
+            | sh -s -- -y --default-toolchain "$(cat proof/lean/lean-toolchain)"
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+      - name: full baseline gate
+        run: scripts/baseline.sh --full
+      - name: upload results bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: results-bundle
+          path: results/

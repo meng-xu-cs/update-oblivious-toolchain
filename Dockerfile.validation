@@ -1,0 +1,53 @@
+# Reproducible validation environment for the UO toolchain.
+#
+# Pins Rust (via rust-toolchain.toml), Lean/Lake/Elan (via proof/lean/lean-toolchain),
+# and the system dependencies needed to run the documented baseline gate:
+#
+#   docker build -f Dockerfile.validation -t uo-validation .
+#   docker run --rm -it uo-validation scripts/baseline.sh --focused
+#   docker run --rm -it uo-validation scripts/baseline.sh            # full gate
+#
+# The Rust channel is taken from rust-toolchain.toml and the Lean toolchain
+# from proof/lean/lean-toolchain; both are copied in before the toolchains are
+# materialized so the image fails closed if either pin is missing.
+FROM debian:bookworm-20240926-slim
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    RUSTUP_HOME=/usr/local/rustup \
+    CARGO_HOME=/usr/local/cargo \
+    ELAN_HOME=/usr/local/elan \
+    PATH=/usr/local/cargo/bin:/usr/local/elan/bin:/usr/local/bin:/usr/bin:/bin
+
+# System dependencies pinned to the bookworm release line above.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        ca-certificates \
+        curl \
+        git \
+        jq \
+        python3 \
+        xz-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /work
+
+# Materialize the pinned Rust toolchain. rustup reads rust-toolchain.toml so the
+# channel/components match the repository pin exactly.
+COPY rust-toolchain.toml ./rust-toolchain.toml
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+        | sh -s -- -y --no-modify-path --default-toolchain none \
+    && rustup show active-toolchain || rustup toolchain install \
+    && rustc --version && cargo --version
+
+# Materialize the pinned Lean toolchain via elan. The lean-toolchain pin drives
+# the exact Lean/Lake release fetched on the first `lake build`.
+COPY proof/lean/lean-toolchain ./proof/lean/lean-toolchain
+RUN curl --proto '=https' --tlsv1.2 -sSf \
+        https://raw.githubusercontent.com/leanprover/elan/v3.1.1/elan-init.sh \
+        | sh -s -- -y --default-toolchain "$(cat proof/lean/lean-toolchain)" \
+    && lake --version
+
+# Copy the rest of the repository.
+COPY . .
+
+CMD ["scripts/baseline.sh", "--focused"]
