@@ -479,7 +479,11 @@ fn lower_function(
     let confidential = matches!(mode, ProgramMode::Uo) && entrypoint_confidential;
     if confidential {
         ensure_confidential_return_shape(&lowered, &signature)?;
-        lowered = linearize_statements(&lowered, &Expr::Literal(Value::Bool(true)))?;
+        lowered = linearize_statements(
+            &lowered,
+            &Expr::Literal(Value::Bool(true)),
+            &BTreeMap::new(),
+        )?;
     }
     let secret_args = entry_meta
         .secret_args
@@ -1503,10 +1507,10 @@ fn validate_static_loop_bounds(
                 end,
                 body,
             } => {
-                let start = eval_loop_bound(start, loop_env).ok_or_else(|| {
+                let start = compile_time_loop_bound(start, loop_env).ok_or_else(|| {
                     anyhow!("loop {} start bound must be compile-time exact", loop_id)
                 })?;
-                let end = eval_loop_bound(end, loop_env).ok_or_else(|| {
+                let end = compile_time_loop_bound(end, loop_env).ok_or_else(|| {
                     anyhow!("loop {} end bound must be compile-time exact", loop_id)
                 })?;
                 for index in start..end {
@@ -1581,8 +1585,8 @@ fn count_body_with_env(
             } => {
                 count_expr(start, &mut counts);
                 count_expr(end, &mut counts);
-                let start = eval_loop_bound(start, loop_env);
-                let end = eval_loop_bound(end, loop_env);
+                let start = compile_time_loop_bound(start, loop_env);
+                let end = compile_time_loop_bound(end, loop_env);
                 match (start, end) {
                     (Some(start), Some(end)) => {
                         for index in start..end {
@@ -1750,8 +1754,8 @@ fn collect_oram_statement_accesses(
         } => {
             collect_oram_expr_accesses(start, frontend, counts)?;
             collect_oram_expr_accesses(end, frontend, counts)?;
-            let start = eval_loop_bound(start, loop_env);
-            let end = eval_loop_bound(end, loop_env);
+            let start = compile_time_loop_bound(start, loop_env);
+            let end = compile_time_loop_bound(end, loop_env);
             match (start, end) {
                 (Some(start), Some(end)) => {
                     for index in start..end {
@@ -1828,11 +1832,14 @@ fn body_contains_oram_accesses(statements: &[Statement], frontend: &Frontend) ->
     Ok(false)
 }
 
-fn eval_loop_bound(expr: &Expr, loop_env: &BTreeMap<String, usize>) -> Option<usize> {
-    eval_loop_bound_uint(expr, loop_env)?.checked_to_usize()
+fn compile_time_loop_bound(expr: &Expr, loop_env: &BTreeMap<String, usize>) -> Option<usize> {
+    compile_time_loop_bound_uint(expr, loop_env)?.checked_to_usize()
 }
 
-fn eval_loop_bound_uint(expr: &Expr, loop_env: &BTreeMap<String, usize>) -> Option<Uint256> {
+fn compile_time_loop_bound_uint(
+    expr: &Expr,
+    loop_env: &BTreeMap<String, usize>,
+) -> Option<Uint256> {
     match expr {
         Expr::Literal(Value::Uint(value)) => Some(*value),
         Expr::Literal(Value::Bool(value)) => Some(Uint256::from_bool(*value)),
@@ -1840,14 +1847,15 @@ fn eval_loop_bound_uint(expr: &Expr, loop_env: &BTreeMap<String, usize>) -> Opti
         Expr::Unary {
             op: UnaryOp::Neg,
             expr,
-        } => eval_loop_bound_uint(expr, loop_env).map(Uint256::wrapping_neg),
+        } => compile_time_loop_bound_uint(expr, loop_env).map(Uint256::wrapping_neg),
         Expr::Unary {
             op: UnaryOp::Not,
             expr,
-        } => eval_loop_bound_uint(expr, loop_env).map(|value| Uint256::from_bool(value.is_zero())),
+        } => compile_time_loop_bound_uint(expr, loop_env)
+            .map(|value| Uint256::from_bool(value.is_zero())),
         Expr::Binary { op, lhs, rhs } => {
-            let lhs = eval_loop_bound_uint(lhs, loop_env)?;
-            let rhs = eval_loop_bound_uint(rhs, loop_env)?;
+            let lhs = compile_time_loop_bound_uint(lhs, loop_env)?;
+            let rhs = compile_time_loop_bound_uint(rhs, loop_env)?;
             match op {
                 BinaryOp::Add => Some(lhs.wrapping_add(rhs)),
                 BinaryOp::Sub => Some(lhs.wrapping_sub(rhs)),
@@ -1880,11 +1888,11 @@ fn eval_loop_bound_uint(expr: &Expr, loop_env: &BTreeMap<String, usize>) -> Opti
             when_true,
             when_false,
         } => {
-            let cond = eval_loop_bound_uint(cond, loop_env)?;
+            let cond = compile_time_loop_bound_uint(cond, loop_env)?;
             if cond.as_bool() {
-                eval_loop_bound_uint(when_true, loop_env)
+                compile_time_loop_bound_uint(when_true, loop_env)
             } else {
-                eval_loop_bound_uint(when_false, loop_env)
+                compile_time_loop_bound_uint(when_false, loop_env)
             }
         }
         Expr::CellGet { .. }
@@ -2604,15 +2612,23 @@ fn ensure_confidential_return_shape(body: &[Statement], signature: &str) -> Resu
     Ok(())
 }
 
-fn linearize_statements(statements: &[Statement], predicate: &Expr) -> Result<Vec<Statement>> {
+fn linearize_statements(
+    statements: &[Statement],
+    predicate: &Expr,
+    loop_env: &BTreeMap<String, usize>,
+) -> Result<Vec<Statement>> {
     let mut out = Vec::new();
     for statement in statements {
-        out.extend(linearize_statement(statement, predicate)?);
+        out.extend(linearize_statement(statement, predicate, loop_env)?);
     }
     Ok(out)
 }
 
-fn linearize_statement(statement: &Statement, predicate: &Expr) -> Result<Vec<Statement>> {
+fn linearize_statement(
+    statement: &Statement,
+    predicate: &Expr,
+    loop_env: &BTreeMap<String, usize>,
+) -> Result<Vec<Statement>> {
     match statement {
         Statement::Declare { name, ty, value } => Ok(vec![Statement::Declare {
             name: name.clone(),
@@ -2642,27 +2658,40 @@ fn linearize_statement(statement: &Statement, predicate: &Expr) -> Result<Vec<St
             out.extend(linearize_statements(
                 then_body,
                 &and_expr(predicate.clone(), cond.clone()),
+                loop_env,
             )?);
             out.extend(linearize_statements(
                 else_body,
                 &and_expr(predicate.clone(), not_expr(cond.clone())),
+                loop_env,
             )?);
             Ok(out)
         }
         Statement::For {
+            loop_id,
+            index_var,
             start,
             end,
             body,
-            index_var,
-            ..
         } => {
-            let start = const_expr_usize(start)?;
-            let end = const_expr_usize(end)?;
+            // Evaluate the unroll bounds with the shared compile-time evaluator
+            // and the loop environment, so validation, statement counting, and
+            // linearization agree on the iteration count. `substitute_block`
+            // materializes the index into the emitted leaf statements, while
+            // `nested_env` keeps nested-loop bound evaluation aligned with
+            // `validate_static_loop_bounds` and `count_body_with_env`.
+            let start = compile_time_loop_bound(start, loop_env).ok_or_else(|| {
+                anyhow!("loop {} start bound must be compile-time exact", loop_id)
+            })?;
+            let end = compile_time_loop_bound(end, loop_env)
+                .ok_or_else(|| anyhow!("loop {} end bound must be compile-time exact", loop_id))?;
             let mut out = Vec::new();
             for index in start..end {
+                let mut nested_env = loop_env.clone();
+                nested_env.insert(index_var.clone(), index);
                 let substituted =
                     substitute_block(body, index_var, &Expr::Literal(Value::uint(index)))?;
-                out.extend(linearize_statements(&substituted, predicate)?);
+                out.extend(linearize_statements(&substituted, predicate, &nested_env)?);
             }
             Ok(out)
         }
@@ -2896,15 +2925,6 @@ fn not_expr(expr: Expr) -> Expr {
     Expr::Unary {
         op: UnaryOp::Not,
         expr: Box::new(expr),
-    }
-}
-
-fn const_expr_usize(expr: &Expr) -> Result<usize> {
-    match expr {
-        Expr::Literal(Value::Uint(value)) => value
-            .checked_to_usize()
-            .ok_or_else(|| anyhow!("loop bound exceeds host usize range")),
-        _ => bail!("loop bounds must be compile-time constants"),
     }
 }
 
@@ -5176,6 +5196,230 @@ bounds:
                 .total_commit_ops()
                 * 2
         );
+    }
+
+    #[test]
+    fn unrolls_loop_with_expression_bound() {
+        // `2 + 2` reaches the compiler as a non-literal Binary expression. Before
+        // the loop-bound normalization, validation accepted it (eval_loop_bound)
+        // but linearization rejected it (const_expr_usize, literals only). With
+        // the shared compile_time_loop_bound helper, validation, counting, and
+        // linearization all unroll four iterations and agree on the access count.
+        let source = write_temp(
+            "loop-expression-bound",
+            r#"
+            contract LoopExpr {
+                mapping(uint256 => uint256) private balances;
+
+                function fill(uint256 value) public {
+                    for (uint256 i = 0; i < 2 + 2; i++) {
+                        balances[i] = value;
+                    }
+                }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: LoopExpr
+entrypoints:
+  fill(uint256):
+    confidential: true
+    secret_args: [value]
+    returns: forbidden
+    status: public
+state:
+  balances:
+    kind: map
+    key: uint256
+    value: uint256
+    capacity: 8
+    backend: oram
+    oram_scheme: path_oram_local_posmap_v1
+    confidential: true
+bounds:
+  loops: {}
+"#,
+        );
+        let artifact = compile(source.to_str().unwrap(), &meta, ProgramMode::Uo).unwrap();
+        let entry = artifact
+            .contract
+            .manifest
+            .entrypoints
+            .get("fill(uint256)")
+            .unwrap();
+        let object = artifact
+            .contract
+            .state
+            .iter()
+            .find(|object| object.name == "balances")
+            .unwrap();
+        // Counting and linearization agree on four unrolled accesses.
+        assert_eq!(entry.oram_accesses.get(&object.id), Some(&4));
+        assert_eq!(
+            entry.max_commit_ops,
+            uo_core::OramManifest::for_object(object)
+                .unwrap()
+                .total_commit_ops()
+                * 4
+        );
+    }
+
+    #[test]
+    fn unrolls_nested_loop_with_outer_index_bound() {
+        // The inner bound depends on the outer index; substitution literalizes it
+        // per outer iteration and compile_time_loop_bound evaluates it, so the
+        // nested loop compiles deterministically to 0 + 1 + 2 = 3 accesses.
+        let source = write_temp(
+            "loop-nested-outer-index",
+            r#"
+            contract NestedLoop {
+                mapping(uint256 => uint256) private balances;
+
+                function fill(uint256 value) public {
+                    for (uint256 i = 0; i < 3; i++) {
+                        for (uint256 j = 0; j < i; j++) {
+                            balances[j] = value;
+                        }
+                    }
+                }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: NestedLoop
+entrypoints:
+  fill(uint256):
+    confidential: true
+    secret_args: [value]
+    returns: forbidden
+    status: public
+state:
+  balances:
+    kind: map
+    key: uint256
+    value: uint256
+    capacity: 8
+    backend: oram
+    oram_scheme: path_oram_local_posmap_v1
+    confidential: true
+bounds:
+  loops: {}
+"#,
+        );
+        let artifact = compile(source.to_str().unwrap(), &meta, ProgramMode::Uo).unwrap();
+        let entry = artifact
+            .contract
+            .manifest
+            .entrypoints
+            .get("fill(uint256)")
+            .unwrap();
+        let object = artifact
+            .contract
+            .state
+            .iter()
+            .find(|object| object.name == "balances")
+            .unwrap();
+        assert_eq!(entry.oram_accesses.get(&object.id), Some(&3));
+    }
+
+    #[test]
+    fn rejects_secret_dependent_loop_bound() {
+        // Validation runs before linearization and rejects a secret-derived bound
+        // (the secret argument is not in the loop environment).
+        let source = write_temp(
+            "loop-secret-bound",
+            r#"
+            contract SecretLoop {
+                mapping(uint256 => uint256) private balances;
+
+                function fill(uint256 secret, uint256 value) public {
+                    for (uint256 i = 0; i < secret; i++) {
+                        balances[i] = value;
+                    }
+                }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: SecretLoop
+entrypoints:
+  fill(uint256,uint256):
+    confidential: true
+    secret_args: [secret, value]
+    returns: forbidden
+    status: public
+state:
+  balances:
+    kind: map
+    key: uint256
+    value: uint256
+    capacity: 8
+    backend: oram
+    oram_scheme: path_oram_local_posmap_v1
+    confidential: true
+bounds:
+  loops: {}
+"#,
+        );
+        let err = compile(source.to_str().unwrap(), &meta, ProgramMode::Uo).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("loop loop_0 end bound must be compile-time exact"));
+    }
+
+    #[test]
+    fn rejects_state_dependent_loop_bound() {
+        // A loop bound that reads public state is not compile-time exact and is
+        // rejected during validation, before linearization.
+        let source = write_temp(
+            "loop-state-bound",
+            r#"
+            contract StateLoop {
+                uint256 private size;
+                mapping(uint256 => uint256) private balances;
+
+                function fill(uint256 value) public {
+                    for (uint256 i = 0; i < size; i++) {
+                        balances[i] = value;
+                    }
+                }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: StateLoop
+entrypoints:
+  fill(uint256):
+    confidential: true
+    secret_args: [value]
+    returns: forbidden
+    status: public
+state:
+  size:
+    kind: cell
+    value: uint256
+    backend: raw
+    confidential: false
+  balances:
+    kind: map
+    key: uint256
+    value: uint256
+    capacity: 8
+    backend: oram
+    oram_scheme: path_oram_local_posmap_v1
+    confidential: true
+bounds:
+  loops: {}
+"#,
+        );
+        let err = compile(source.to_str().unwrap(), &meta, ProgramMode::Uo).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("loop loop_0 end bound must be compile-time exact"));
     }
 
     #[test]
