@@ -23,12 +23,18 @@ not full Solidity 0.8 semantics. Parser-level preprocessing remains trusted
 until a raw-source-to-post-resolution witness relation is mechanized.
 
 The artifact-level admitted-package hash is a canonical SHA-256 binding over
-the source-language tag (`uo-solidity-like-dsl-v1`), source bytes, canonical
-sidecar metadata JSON, compilation mode, compiler version, toolchain manifest
-digest, and package schema tag. It is checked for equality by the proof-grade
-translation bundle. It is not by itself a deployment attestation hash; the
-production deployment theorem binds it to the runtime binary hash, proof-root
-hash, SGX quote, return-channel session transcript, and freshness counters.
+the source-language tag (`uo-solidity-like-dsl-v1`), the executable-semantics
+profile tag (`uo-evm-modular256-v1`), source bytes, canonical sidecar metadata
+JSON, compilation mode, compiler version, toolchain manifest digest, and package
+schema tag. The semantics profile pins the executable divergences from Solidity
+0.8 — wrapping arithmetic, division/modulo-by-zero returning zero, canonical
+fixed-size ABI encoding, `require`/abort rollback, admitted-only context
+variables, and the mock-hash preservation route paired with the real-Keccak
+runtime primitive — and the proof-grade checker rejects an unknown or divergent
+profile. It is checked for equality by the proof-grade translation bundle. It is
+not by itself a deployment attestation hash; the production deployment theorem
+binds it to the runtime binary hash, proof-root hash, SGX quote, return-channel
+session transcript, and freshness counters.
 
 ## Deployment Theorem
 

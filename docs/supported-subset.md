@@ -78,10 +78,10 @@ Sidecar metadata requirements:
   naming the limitation
 - gas budgets may be supplied explicitly and are otherwise derived into the emitted manifest
 - generated artifacts carry an admitted-package hash over the source-language
-  tag, source bytes, canonical sidecar metadata JSON, compilation mode,
-  compiler version, toolchain manifest digest, and package schema tag; the
-  proof-grade translation bundle requires the source and artifact package
-  identities to match
+  tag, the executable-semantics profile tag, source bytes, canonical sidecar
+  metadata JSON, compilation mode, compiler version, toolchain manifest digest,
+  and package schema tag; the proof-grade translation bundle requires the source
+  and artifact package identities to match
 
 Execution-model notes:
 
@@ -91,6 +91,17 @@ Execution-model notes:
   or modulo by zero returning zero. This deliberately differs from Solidity
   0.8 checked arithmetic and division/modulo-by-zero revert behavior until a
   versioned Solidity semantics bridge is proved.
+- every generated artifact declares an executable-semantics profile tag
+  (`uo-evm-modular256-v1`) bound into the admitted-package hash. The tag pins
+  the executable divergences from Solidity 0.8 named in these notes: wrapping
+  modulo-`2^256` arithmetic, division/modulo-by-zero returning zero, canonical
+  fixed-size ABI byte encoding, `require`/abort with rollback, no Solidity
+  context variables beyond the admitted public-environment fields, and the
+  mock-hash preservation route paired with the real-Keccak runtime primitive.
+  The proof-grade checker rejects an artifact whose profile tag is unknown or
+  divergent (Rust `AdmittedPackageIdentity::validate_current_toolchain`, Lean
+  `ImportedAdmittedPackageIdentity.checkWellFormed`); the structured profile
+  model is `uoSolidityLikeDslV1Profile` in `SolidityDialectBoundary.lean`.
 - `keccak256(abi.encodePacked(...))` is supported by the runtime with real
   Keccak over canonical fixed-size bytes, but the current Lean source/IR/kernel
   preservation proofs use a deterministic mock hash. They prove preservation

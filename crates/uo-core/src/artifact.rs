@@ -6,6 +6,18 @@ use sha2::{Digest, Sha256};
 
 pub const ADMITTED_PACKAGE_SCHEMA: &str = "uo-admitted-package-v5";
 pub const SOURCE_LANGUAGE: &str = "uo-solidity-like-dsl-v1";
+/// Versioned tag for the executable Solidity-like semantics the artifact is
+/// compiled and proved under: wrapping modulo-2^256 arithmetic, division and
+/// modulo by zero returning zero, canonical fixed-size ABI byte encoding,
+/// `require`/abort with rollback, no Solidity context variables beyond the
+/// admitted public-environment fields, and the mock-hash preservation route
+/// paired with the real-Keccak runtime primitive assumption. It is bound into
+/// the admitted-package hash so the proof-grade checker can reject artifacts
+/// compiled under an unknown or divergent semantics profile. The Lean mirror is
+/// `admittedPackageSemanticsProfile` in `TranslationValidationJson.lean`, and
+/// the structured model is `uoSolidityLikeDslV1Profile` in
+/// `SolidityDialectBoundary.lean`.
+pub const SEMANTICS_PROFILE: &str = "uo-evm-modular256-v1";
 pub const TOOLCHAIN_MANIFEST_SCHEMA: &str = "uo-toolchain-manifest-v1";
 pub const RAW_METADATA_CANONICALIZATION_SCHEMA: &str = "uo-raw-metadata-canonicalization-v1";
 pub const RAW_METADATA_CANONICALIZATION_PARSER: &str = "serde-yaml-contract-metadata-v1";
@@ -45,6 +57,7 @@ pub struct CompiledArtifact {
 pub struct AdmittedPackageIdentity {
     pub schema: String,
     pub source_language: String,
+    pub semantics_profile: String,
     pub source_sha256: String,
     pub metadata_sha256: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -109,6 +122,7 @@ impl AdmittedPackageIdentity {
         let package_input = AdmittedPackageHashInput {
             schema: ADMITTED_PACKAGE_SCHEMA,
             source_language: SOURCE_LANGUAGE,
+            semantics_profile: SEMANTICS_PROFILE,
             source_sha256: &source_sha256,
             metadata_sha256: &metadata_sha256,
             raw_metadata_sha256: raw_metadata_sha256.as_deref(),
@@ -121,6 +135,7 @@ impl AdmittedPackageIdentity {
         Ok(Self {
             schema: ADMITTED_PACKAGE_SCHEMA.into(),
             source_language: SOURCE_LANGUAGE.into(),
+            semantics_profile: SEMANTICS_PROFILE.into(),
             source_sha256,
             metadata_sha256,
             raw_metadata_sha256,
@@ -145,6 +160,13 @@ impl AdmittedPackageIdentity {
                 "admitted package source_language mismatch: {} != {}",
                 self.source_language,
                 SOURCE_LANGUAGE
+            );
+        }
+        if self.semantics_profile != SEMANTICS_PROFILE {
+            bail!(
+                "admitted package semantics_profile mismatch: {} != {}",
+                self.semantics_profile,
+                SEMANTICS_PROFILE
             );
         }
         let expected_toolchain_sha256 =
@@ -183,6 +205,7 @@ impl AdmittedPackageIdentity {
         let package_input = AdmittedPackageHashInput {
             schema: ADMITTED_PACKAGE_SCHEMA,
             source_language: &self.source_language,
+            semantics_profile: &self.semantics_profile,
             source_sha256: &self.source_sha256,
             metadata_sha256: &self.metadata_sha256,
             raw_metadata_sha256: self.raw_metadata_sha256.as_deref(),
@@ -254,6 +277,7 @@ impl ToolchainManifest {
 struct AdmittedPackageHashInput<'a> {
     schema: &'static str,
     source_language: &'a str,
+    semantics_profile: &'a str,
     source_sha256: &'a str,
     metadata_sha256: &'a str,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -325,7 +349,8 @@ fn sha256_hex(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        AdmittedPackageIdentity, ToolchainManifest, ADMITTED_PACKAGE_SCHEMA, SOURCE_LANGUAGE,
+        AdmittedPackageIdentity, ToolchainManifest, ADMITTED_PACKAGE_SCHEMA, SEMANTICS_PROFILE,
+        SOURCE_LANGUAGE,
     };
     use serde::Serialize;
 
@@ -455,6 +480,38 @@ mod tests {
                 .unwrap();
         let mut tampered = identity.clone();
         tampered.source_language = "solidity-0.8".into();
+        assert_ne!(
+            identity.package_sha256,
+            tampered.recomputed_package_sha256().unwrap()
+        );
+    }
+
+    #[test]
+    fn admitted_package_identity_declares_semantics_profile() {
+        let identity =
+            AdmittedPackageIdentity::new("contract C {}", &MetadataA { z: 2, a: 1 }, "uo", "test")
+                .unwrap();
+        assert_eq!(identity.semantics_profile, SEMANTICS_PROFILE);
+        identity.validate_current_toolchain().unwrap();
+    }
+
+    #[test]
+    fn admitted_package_identity_rejects_semantics_profile_tamper() {
+        let mut identity =
+            AdmittedPackageIdentity::new("contract C {}", &MetadataA { z: 2, a: 1 }, "uo", "test")
+                .unwrap();
+        identity.semantics_profile = "solidity-0.8-checked".into();
+        let err = identity.validate_current_toolchain().unwrap_err();
+        assert!(err.to_string().contains("semantics_profile mismatch"));
+    }
+
+    #[test]
+    fn admitted_package_identity_package_hash_covers_semantics_profile() {
+        let identity =
+            AdmittedPackageIdentity::new("contract C {}", &MetadataA { z: 2, a: 1 }, "uo", "test")
+                .unwrap();
+        let mut tampered = identity.clone();
+        tampered.semantics_profile = "solidity-0.8-checked".into();
         assert_ne!(
             identity.package_sha256,
             tampered.recomputed_package_sha256().unwrap()

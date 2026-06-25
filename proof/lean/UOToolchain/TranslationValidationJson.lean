@@ -120,6 +120,7 @@ deriving Repr, DecidableEq, FromJson, ToJson
 structure ImportedAdmittedPackageIdentity where
   schema : String
   source_language : String
+  semantics_profile : String
   source_sha256 : String
   metadata_sha256 : String
   raw_metadata_sha256 : String
@@ -132,11 +133,13 @@ deriving Repr, DecidableEq, FromJson, ToJson
 
 private def admittedPackageSchema : String := "uo-admitted-package-v5"
 private def admittedPackageSourceLanguage : String := "uo-solidity-like-dsl-v1"
+private def admittedPackageSemanticsProfile : String := "uo-evm-modular256-v1"
 
 def ImportedAdmittedPackageIdentity.WellFormed
   (identity : ImportedAdmittedPackageIdentity) : Prop :=
   identity.schema = admittedPackageSchema ∧
     identity.source_language = admittedPackageSourceLanguage ∧
+    identity.semantics_profile = admittedPackageSemanticsProfile ∧
     identity.raw_metadata_sha256.length = 64 ∧
     identity.metadata_canonicalization_sha256.length = 64 ∧
     identity.toolchain_manifest_sha256.length = 64
@@ -150,6 +153,7 @@ def ImportedAdmittedPackageIdentity.checkWellFormed
   (identity : ImportedAdmittedPackageIdentity) : Bool :=
   (identity.schema == admittedPackageSchema) &&
     (identity.source_language == admittedPackageSourceLanguage) &&
+    (identity.semantics_profile == admittedPackageSemanticsProfile) &&
     (identity.raw_metadata_sha256.length == 64) &&
     (identity.metadata_canonicalization_sha256.length == 64) &&
     (identity.toolchain_manifest_sha256.length == 64)

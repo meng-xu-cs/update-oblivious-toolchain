@@ -491,6 +491,7 @@ const ADMITTED_PACKAGE_FIELDS: &[&str] = &[
     "package_sha256",
     "raw_metadata_sha256",
     "schema",
+    "semantics_profile",
     "source_language",
     "source_sha256",
     "toolchain_manifest_sha256",
