@@ -48977,7 +48977,45 @@ fn run_overheads(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<JsonV
         },
         "cases": cases,
         "matrix": matrix,
+        "rejected_oram_cases": collect_rejected_oram_cases(),
     }))
+}
+
+/// Explicit data for ORAM configurations rejected by the access-shape policy,
+/// so overheads records rejected cases rather than omitting them. The scalable
+/// `path_oram_private_posmap_v1` route admits only one logical access per map
+/// per entrypoint, and ERC20Lite touches the balances map several times.
+fn collect_rejected_oram_cases() -> Vec<JsonValue> {
+    let scenario = "ERC20Lite/private_posmap_multi_access";
+    let source = workspace_path("benches/raw/ERC20Lite.sol");
+    match load_metadata("benches/raw/ERC20Lite.private-posmap.yaml") {
+        Ok(metadata) => {
+            let result = uo_solc::compile(source.to_str().unwrap(), &metadata, ProgramMode::Uo);
+            vec![match result {
+                Ok(_) => json!({
+                    "scenario": scenario,
+                    "scheme": "path_oram_private_posmap_v1",
+                    "map": "balances",
+                    "capacity": 256,
+                    "rejected": false,
+                    "reason": "unexpectedly compiled; private-posmap multi-access must be rejected",
+                }),
+                Err(err) => json!({
+                    "scenario": scenario,
+                    "scheme": "path_oram_private_posmap_v1",
+                    "map": "balances",
+                    "capacity": 256,
+                    "rejected": true,
+                    "reason": err.to_string(),
+                }),
+            }]
+        }
+        Err(err) => vec![json!({
+            "scenario": scenario,
+            "rejected": true,
+            "reason": format!("metadata load failed: {err}"),
+        })],
+    }
 }
 
 fn append_overhead_workload(

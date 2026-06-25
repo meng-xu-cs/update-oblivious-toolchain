@@ -309,6 +309,12 @@ impl OramManifest {
         }
     }
 
+    /// Whether the scheme admits more than one logical access to the same map
+    /// within a single entrypoint. Only the bounded local-position-map route
+    /// (`path_oram_local_posmap_v1`, capacity <= 128) supports multi-access;
+    /// the scalable private-position-map route is single-access per map per
+    /// entrypoint, because multi-access composition (fresh coins, recursive
+    /// position-map traces, stash bounds) is not yet proved for it.
     pub fn supports_multi_access_per_entrypoint(&self) -> bool {
         self.scheme == PATH_ORAM_SCHEME
     }
@@ -443,12 +449,13 @@ pub fn validate_oram_access_shape(
             })?;
         if *accesses > 1 && !manifest.supports_multi_access_per_entrypoint() {
             bail!(
-                "entrypoint {} performs {} ORAM accesses to {} but scheme {} only supports one access per entrypoint; use {} for multi-access workloads",
+                "entrypoint {} performs {} ORAM accesses to {} but scheme {} supports only one logical access per map per entrypoint; multi-access maps must use {} with capacity <= {}",
                 signature,
                 accesses,
                 object.name,
                 manifest.scheme,
-                PATH_ORAM_SCHEME
+                PATH_ORAM_SCHEME,
+                PATH_ORAM_LOCAL_POSMAP_MAX_CAPACITY
             );
         }
     }
@@ -479,8 +486,8 @@ fn state_object_by_id(state: &[StateObject], object_id: u32) -> Result<&StateObj
 #[cfg(test)]
 mod tests {
     use super::{
-        EntrypointManifest, OramManifest, RuntimeKernelStepManifest, RuntimeManifest,
-        StateObjectManifest, PATH_ORAM_SCHEME,
+        validate_oram_access_shape, EntrypointManifest, OramManifest, RuntimeKernelStepManifest,
+        RuntimeManifest, StateObjectManifest, PATH_ORAM_PRIVATE_POSMAP_SCHEME, PATH_ORAM_SCHEME,
     };
     use crate::confidential_kernel::ConfidentialKernelSlotProgram;
     use crate::ir::{BackendKind, ContainerKind, StateObject};
@@ -532,6 +539,60 @@ mod tests {
         let err = OramManifest::for_object(&object)
             .expect_err("oversized local-posmap path ORAM capacity must be rejected");
         assert!(err.to_string().contains("supports capacities up to 128"));
+    }
+
+    fn private_posmap_object(capacity: usize) -> StateObject {
+        StateObject {
+            id: 7,
+            name: "balances".into(),
+            kind: ContainerKind::Map,
+            backend: BackendKind::Oram,
+            oram_scheme: PATH_ORAM_PRIVATE_POSMAP_SCHEME.into(),
+            value_type: Type::Scalar(ScalarType::Uint(256)),
+            key_type: Some(Type::Scalar(ScalarType::Bytes32)),
+            capacity: Some(capacity),
+            confidential: true,
+        }
+    }
+
+    #[test]
+    fn private_posmap_rejects_multi_access_with_documented_diagnostic() {
+        // path_oram_private_posmap_v1 is single-access per map per entrypoint.
+        let object = private_posmap_object(256);
+        let mut accesses = BTreeMap::new();
+        accesses.insert(7u32, 2usize);
+        let err = validate_oram_access_shape(
+            "transfer(address,address,uint256)",
+            &accesses,
+            std::slice::from_ref(&object),
+        )
+        .expect_err("private-posmap multi-access must be rejected");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("only one logical access per map per entrypoint"),
+            "unexpected diagnostic: {msg}"
+        );
+        assert!(
+            msg.contains("path_oram_local_posmap_v1"),
+            "unexpected diagnostic: {msg}"
+        );
+        assert!(
+            msg.contains("capacity <= 128"),
+            "unexpected diagnostic: {msg}"
+        );
+    }
+
+    #[test]
+    fn local_posmap_admits_multi_access_per_entrypoint() {
+        let object = path_oram_object(64);
+        let mut accesses = BTreeMap::new();
+        accesses.insert(7u32, 4usize);
+        validate_oram_access_shape(
+            "transfer(address,address,uint256)",
+            &accesses,
+            std::slice::from_ref(&object),
+        )
+        .expect("local-posmap multi-access is supported");
     }
 
     #[test]

@@ -63,6 +63,15 @@ symbolic evidence rather than enumerating large seed/family spaces. The Rust
 and validation-step bound below the represented capacity for representative
 large maps.
 
+The private-position-map route admits only one logical access per map per
+entrypoint. Multi-access composition for it — fresh coins, recursive
+position-map traces, and stash bounds across several accesses — is not yet
+proved, so `supports_multi_access_per_entrypoint()` is true only for the
+bounded `path_oram_local_posmap_v1` route (capacity `128`). A multi-access
+`path_oram_private_posmap_v1` entrypoint is rejected at compile time with a
+diagnostic that names the limitation and points to the local-posmap route for
+multi-access maps.
+
 ## Assumption Provenance
 
 | Assumption | Provenance |

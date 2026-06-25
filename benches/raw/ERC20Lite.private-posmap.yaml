@@ -1,0 +1,61 @@
+contract: ERC20Lite
+# Evaluation-only metadata that intentionally puts the multi-access balances map
+# on the scalable private-position-map route above the local cap. Because
+# path_oram_private_posmap_v1 admits only one logical access per map per
+# entrypoint and transfer/transferFrom touch balances several times, this is
+# rejected at compile time. The probe records the rejection as explicit data in
+# results/overheads.json (see run_overheads).
+entrypoints:
+  mint(address,uint256):
+    confidential: true
+    returns: forbidden
+    status: public
+  approve(address,address,uint256):
+    secret_args: [owner, spender, amount]
+    confidential: true
+    public_gas_budget: 14336
+    returns: forbidden
+    status: public
+  transfer(address,address,uint256):
+    secret_args: [from, to, amount]
+    confidential: true
+    public_gas_budget: 14336
+    returns: declassified
+    status: declassified
+    declassifies: [return, success]
+  transferFrom(address,address,address,uint256):
+    secret_args: [owner, spender, to, amount]
+    confidential: true
+    public_gas_budget: 16384
+    returns: declassified
+    status: declassified
+    declassifies: [return, success]
+  balanceOf(address):
+    confidential: true
+    returns: declassified
+    status: public
+    declassifies: [return]
+  allowanceOf(address,address):
+    confidential: true
+    returns: declassified
+    status: public
+    declassifies: [return]
+state:
+  balances:
+    kind: map
+    key: address
+    value: uint256
+    capacity: 256
+    backend: oram
+    oram_scheme: path_oram_private_posmap_v1
+    confidential: true
+  allowances:
+    kind: map
+    key: bytes32
+    value: uint256
+    capacity: 128
+    backend: oram
+    oram_scheme: path_oram_local_posmap_v1
+    confidential: true
+bounds:
+  loops: {}

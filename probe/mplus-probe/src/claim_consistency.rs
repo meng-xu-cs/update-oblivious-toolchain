@@ -59,13 +59,16 @@ fn demotes_private_scheme(doc: &str) -> Option<String> {
             continue;
         }
         let lowered = line.to_lowercase();
+        // Phrases that demote the *scheme* below theorem-facing. Deliberately
+        // narrow: a per-case limitation ("multi-access ... is rejected at
+        // compile time") is a documented scope bound, not a scheme demotion.
         for marker in [
             "experimental",
             "evaluation-only",
             "evaluation only",
             "non-proof-grade",
             "not theorem-facing",
-            "rejected",
+            "not proof-grade",
         ] {
             if lowered.contains(marker) {
                 return Some(format!("line marks {PRIVATE_SCHEME} as `{marker}`: {line}"));
@@ -183,6 +186,15 @@ mod tests {
         assert!(demotes_private_scheme(&doc).is_some());
         let ok = format!("The {PRIVATE_SCHEME} route is theorem-facing for scalable maps.");
         assert!(demotes_private_scheme(&ok).is_none());
+    }
+
+    #[test]
+    fn per_case_rejection_is_not_a_scheme_demotion() {
+        // A documented scope limitation (multi-access rejected) must not be
+        // read as demoting the scheme below theorem-facing.
+        let doc =
+            format!("A multi-access {PRIVATE_SCHEME} entrypoint is rejected at compile time.");
+        assert!(demotes_private_scheme(&doc).is_none());
     }
 
     #[test]

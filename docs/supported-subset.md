@@ -68,7 +68,12 @@ Sidecar metadata requirements:
 - `oram_scheme` must be set explicitly when a proof-grade ORAM path is
   intended; `path_oram_local_posmap_v1` remains capped at capacity `128`,
   while larger theorem-facing maps use `path_oram_private_posmap_v1` with
-  compact symbolic position-map evidence
+  compact symbolic position-map evidence. Multi-access entrypoints (the same
+  map touched more than once per call) are supported only by the bounded
+  `path_oram_local_posmap_v1` route (capacity `128`); `path_oram_private_posmap_v1`
+  admits only one logical access per map per entrypoint, and a multi-access
+  private-posmap entrypoint is rejected at compile time with a diagnostic
+  naming the limitation
 - gas budgets may be supplied explicitly and are otherwise derived into the emitted manifest
 - generated artifacts carry an admitted-package hash over the source-language
   tag, source bytes, canonical sidecar metadata JSON, compilation mode,
