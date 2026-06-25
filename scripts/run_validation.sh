@@ -42,6 +42,14 @@ cd "$ROOT"
 )
 cargo test
 cargo run -q -p mplus-probe -- "${PROBE_ARGS[@]}"
+# Executable insecure baselines (Issue 16): regenerate overheads + leakage with
+# the insecure-eval-raw feature so every benchmark carries an executable raw
+# insecure-baseline row and a positive-control leakage measurement. This build
+# bypasses the confidential-object targeting restriction and is evaluation-only;
+# the proof-grade reports above and the acceptance gate below use the strict
+# default build, and production/proof-grade translation reject these artifacts.
+cargo run -q -p mplus-probe --features insecure-eval-raw -- --only overheads "${PROBE_ARGS[@]}"
+cargo run -q -p mplus-probe --features insecure-eval-raw -- --only leakage-auc "${PROBE_ARGS[@]}"
 # Fail-closed proof-grade acceptance aggregate over the generated reports.
 cargo run -q -p mplus-probe -- --only acceptance-check "${PROBE_ARGS[@]}"
 # Fail-closed Path ORAM claim-consistency check (README/docs/proof/code agree).

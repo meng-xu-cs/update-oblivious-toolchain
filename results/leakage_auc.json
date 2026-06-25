@@ -2,10 +2,25 @@
   "reports": [
     {
       "benchmark": "FixedSlotClassifier",
-      "error": "leakage_auc/FixedSlotClassifier/raw",
-      "executable": false,
-      "mode": "raw",
-      "rejected": true
+      "executable": true,
+      "metric_auc": {
+        "backend_reads": 0.5,
+        "backend_writes": 0.5,
+        "boundary_events": 0.5,
+        "bytes_read": 0.5,
+        "bytes_written": 0.5,
+        "clear_writes": 0.5,
+        "controller_phase_count": 0.5,
+        "gas_used": 0.5,
+        "normalized_page_events": 0.5,
+        "same_writes": 0.0,
+        "set_writes": 1.0,
+        "update_only_fraction": 0.5,
+        "update_writes": 0.5,
+        "zero_writes": 0.0
+      },
+      "mode": "raw_insecure_eval",
+      "rejected": false
     },
     {
       "benchmark": "FixedSlotClassifier",
@@ -31,10 +46,25 @@
     },
     {
       "benchmark": "AuthScan",
-      "error": "leakage_auc/AuthScan/raw",
-      "executable": false,
-      "mode": "raw",
-      "rejected": true
+      "executable": true,
+      "metric_auc": {
+        "backend_reads": 0.5,
+        "backend_writes": 0.5,
+        "boundary_events": 0.5,
+        "bytes_read": 0.5,
+        "bytes_written": 0.5,
+        "clear_writes": 0.5,
+        "controller_phase_count": 0.5,
+        "gas_used": 0.5,
+        "normalized_page_events": 0.5,
+        "same_writes": 0.0,
+        "set_writes": 1.0,
+        "update_only_fraction": 0.5,
+        "update_writes": 0.5,
+        "zero_writes": 0.0
+      },
+      "mode": "raw_insecure_eval",
+      "rejected": false
     },
     {
       "benchmark": "AuthScan",
@@ -60,10 +90,25 @@
     },
     {
       "benchmark": "RegistryCRUD",
-      "error": "leakage_auc/RegistryCRUD/raw",
-      "executable": false,
-      "mode": "raw",
-      "rejected": true
+      "executable": true,
+      "metric_auc": {
+        "backend_reads": 0.5,
+        "backend_writes": 0.5,
+        "boundary_events": 0.5,
+        "bytes_read": 0.5,
+        "bytes_written": 0.5,
+        "clear_writes": 0.5,
+        "controller_phase_count": 0.5,
+        "gas_used": 0.5,
+        "normalized_page_events": 0.5,
+        "same_writes": 0.0,
+        "set_writes": 1.0,
+        "update_only_fraction": 0.5,
+        "update_writes": 0.5,
+        "zero_writes": 0.0
+      },
+      "mode": "raw_insecure_eval",
+      "rejected": false
     },
     {
       "benchmark": "RegistryCRUD",
@@ -89,10 +134,25 @@
     },
     {
       "benchmark": "ConfidentialMixer",
-      "error": "leakage_auc/ConfidentialMixer/raw",
-      "executable": false,
-      "mode": "raw",
-      "rejected": true
+      "executable": true,
+      "metric_auc": {
+        "backend_reads": 0.5,
+        "backend_writes": 0.5,
+        "boundary_events": 0.5,
+        "bytes_read": 0.5,
+        "bytes_written": 0.5,
+        "clear_writes": 0.5,
+        "controller_phase_count": 0.5,
+        "gas_used": 0.5,
+        "normalized_page_events": 0.5,
+        "same_writes": 0.0,
+        "set_writes": 1.0,
+        "update_only_fraction": 0.5,
+        "update_writes": 0.5,
+        "zero_writes": 0.0
+      },
+      "mode": "raw_insecure_eval",
+      "rejected": false
     },
     {
       "benchmark": "ConfidentialMixer",
@@ -140,10 +200,25 @@
     },
     {
       "benchmark": "ERC20Lite",
-      "error": "leakage_auc/ERC20Lite/raw",
-      "executable": false,
-      "mode": "raw",
-      "rejected": true
+      "executable": true,
+      "metric_auc": {
+        "backend_reads": 0.5,
+        "backend_writes": 0.5,
+        "boundary_events": 0.5,
+        "bytes_read": 0.5,
+        "bytes_written": 0.5,
+        "clear_writes": 0.5,
+        "controller_phase_count": 0.5,
+        "gas_used": 0.5,
+        "normalized_page_events": 0.5,
+        "same_writes": 0.0,
+        "set_writes": 1.0,
+        "update_only_fraction": 0.5,
+        "update_writes": 0.5,
+        "zero_writes": 0.0
+      },
+      "mode": "raw_insecure_eval",
+      "rejected": false
     },
     {
       "benchmark": "ERC20Lite",
@@ -187,6 +262,116 @@
         "zero_writes": 0.5
       },
       "mode": "oram",
+      "rejected": false
+    },
+    {
+      "benchmark": "FixedSlotClassifier",
+      "executable": true,
+      "metric_auc": {
+        "backend_reads": 0.5,
+        "backend_writes": 0.5,
+        "boundary_events": 0.5,
+        "bytes_read": 0.5,
+        "bytes_written": 0.5,
+        "clear_writes": 0.5,
+        "controller_phase_count": 0.5,
+        "gas_used": 0.5,
+        "normalized_page_events": 0.5,
+        "same_writes": 0.0,
+        "set_writes": 1.0,
+        "update_only_fraction": 0.5,
+        "update_writes": 0.5,
+        "zero_writes": 0.0
+      },
+      "mode": "ct_gas_only",
+      "rejected": false
+    },
+    {
+      "benchmark": "AuthScan",
+      "executable": true,
+      "metric_auc": {
+        "backend_reads": 0.5,
+        "backend_writes": 0.5,
+        "boundary_events": 0.5,
+        "bytes_read": 0.5,
+        "bytes_written": 0.5,
+        "clear_writes": 0.5,
+        "controller_phase_count": 0.5,
+        "gas_used": 0.5,
+        "normalized_page_events": 0.5,
+        "same_writes": 0.0,
+        "set_writes": 1.0,
+        "update_only_fraction": 0.5,
+        "update_writes": 0.5,
+        "zero_writes": 0.0
+      },
+      "mode": "ct_gas_only",
+      "rejected": false
+    },
+    {
+      "benchmark": "RegistryCRUD",
+      "executable": true,
+      "metric_auc": {
+        "backend_reads": 0.5,
+        "backend_writes": 0.5,
+        "boundary_events": 0.5,
+        "bytes_read": 0.5,
+        "bytes_written": 0.5,
+        "clear_writes": 0.5,
+        "controller_phase_count": 0.5,
+        "gas_used": 0.5,
+        "normalized_page_events": 0.5,
+        "same_writes": 0.0,
+        "set_writes": 1.0,
+        "update_only_fraction": 0.5,
+        "update_writes": 0.5,
+        "zero_writes": 0.0
+      },
+      "mode": "ct_gas_only",
+      "rejected": false
+    },
+    {
+      "benchmark": "ConfidentialMixer",
+      "executable": true,
+      "metric_auc": {
+        "backend_reads": 0.5,
+        "backend_writes": 0.5,
+        "boundary_events": 0.5,
+        "bytes_read": 0.5,
+        "bytes_written": 0.5,
+        "clear_writes": 0.5,
+        "controller_phase_count": 0.5,
+        "gas_used": 0.5,
+        "normalized_page_events": 0.5,
+        "same_writes": 0.0,
+        "set_writes": 1.0,
+        "update_only_fraction": 0.5,
+        "update_writes": 0.5,
+        "zero_writes": 0.0
+      },
+      "mode": "ct_gas_only",
+      "rejected": false
+    },
+    {
+      "benchmark": "ERC20Lite",
+      "executable": true,
+      "metric_auc": {
+        "backend_reads": 0.5,
+        "backend_writes": 0.5,
+        "boundary_events": 0.5,
+        "bytes_read": 0.5,
+        "bytes_written": 0.5,
+        "clear_writes": 0.5,
+        "controller_phase_count": 0.5,
+        "gas_used": 0.5,
+        "normalized_page_events": 0.5,
+        "same_writes": 0.0,
+        "set_writes": 1.0,
+        "update_only_fraction": 0.5,
+        "update_writes": 0.5,
+        "zero_writes": 0.0
+      },
+      "mode": "ct_gas_only",
       "rejected": false
     }
   ]

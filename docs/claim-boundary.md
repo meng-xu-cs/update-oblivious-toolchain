@@ -64,6 +64,14 @@ field bindings required by `DeploymentCallAccepted`.
   `path_oram_private_posmap_v1` for scalable private position metadata.
 - Legacy/surrogate ORAM paths remain available for benchmarking and historical
   comparison, not for the strengthened proof-grade claim.
+- Executable insecure raw baselines (the `insecure-eval-raw` evaluation feature,
+  reported as the `raw_insecure_eval`/`ct_gas_only` rows in `results/overheads.json`
+  and the `positive_control` in `results/leakage_auc.json`) run confidential work
+  on raw backends to measure overhead and leakage against the UO route. They
+  bypass the confidential-object targeting restriction, are evaluation-only, and
+  are never admitted by the proof-grade translation bundle or the production
+  deployment path; their result labels are distinct from the proof-grade rows so
+  they cannot be confused with proof-grade artifacts.
 
 ## Observer
 

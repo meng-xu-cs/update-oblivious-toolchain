@@ -13,6 +13,16 @@
           "manifest_public_gas_budget": 4096
         }
       ],
+      "ct_gas_only": {
+        "bytes_read": 32.0,
+        "bytes_written": 32.0,
+        "executable": true,
+        "gas_used": 4096,
+        "physical_reads": 1,
+        "physical_writes": 1,
+        "rejected": false,
+        "trace_json_bytes": 8650
+      },
       "entrypoint": "classify(uint256)",
       "full_scan": {
         "bytes_read": 124.0,
@@ -25,9 +35,19 @@
         "trace_json_bytes": 9533
       },
       "raw": {
-        "error": "confidential object last uses raw backend",
+        "error": "raw confidential backends are rejected in proof-grade builds; this feature build emits the executable raw_insecure_eval control separately",
         "executable": false,
         "rejected": true
+      },
+      "raw_insecure_eval": {
+        "bytes_read": 32.0,
+        "bytes_written": 32.0,
+        "executable": true,
+        "gas_used": 22,
+        "physical_reads": 1,
+        "physical_writes": 1,
+        "rejected": false,
+        "trace_json_bytes": 8822
       },
       "variants": [
         {
@@ -41,7 +61,7 @@
             "oram_bounds": [],
             "signature": "classify(uint256)"
           },
-          "error": "confidential object last uses raw backend",
+          "error": "raw confidential backends are rejected in proof-grade builds; this feature build emits the executable raw_insecure_eval control separately",
           "executable": false,
           "rejected": true,
           "state_objects": [
@@ -53,6 +73,64 @@
               "name": "last"
             }
           ]
+        },
+        {
+          "artifact_json_bytes": 3907,
+          "backend": "raw_insecure_eval",
+          "benchmark": "FixedSlotClassifier/classify",
+          "bytes_read": 32.0,
+          "bytes_written": 32.0,
+          "capacity": null,
+          "entrypoint": "classify(uint256)",
+          "entrypoint_resource_bounds": {
+            "max_commit_ops": 1,
+            "oram_bounds": [],
+            "signature": "classify(uint256)"
+          },
+          "executable": true,
+          "gas_used": 22,
+          "physical_reads": 1,
+          "physical_writes": 1,
+          "rejected": false,
+          "state_objects": [
+            {
+              "backend": "raw",
+              "capacity": null,
+              "confidential": true,
+              "kind": "Cell",
+              "name": "last"
+            }
+          ],
+          "trace_json_bytes": 8822
+        },
+        {
+          "artifact_json_bytes": 8413,
+          "backend": "ct_gas_only",
+          "benchmark": "FixedSlotClassifier/classify",
+          "bytes_read": 32.0,
+          "bytes_written": 32.0,
+          "capacity": null,
+          "entrypoint": "classify(uint256)",
+          "entrypoint_resource_bounds": {
+            "max_commit_ops": 1,
+            "oram_bounds": [],
+            "signature": "classify(uint256)"
+          },
+          "executable": true,
+          "gas_used": 4096,
+          "physical_reads": 1,
+          "physical_writes": 1,
+          "rejected": false,
+          "state_objects": [
+            {
+              "backend": "raw",
+              "capacity": null,
+              "confidential": true,
+              "kind": "Cell",
+              "name": "last"
+            }
+          ],
+          "trace_json_bytes": 8650
         },
         {
           "artifact_json_bytes": 8794,
@@ -98,6 +176,16 @@
           "manifest_public_gas_budget": 8192
         }
       ],
+      "ct_gas_only": {
+        "bytes_read": 160.0,
+        "bytes_written": 32.0,
+        "executable": true,
+        "gas_used": 8192,
+        "physical_reads": 5,
+        "physical_writes": 1,
+        "rejected": false,
+        "trace_json_bytes": 13829
+      },
       "entrypoint": "auth(bytes32)",
       "full_scan": {
         "bytes_read": 2108.0,
@@ -110,9 +198,19 @@
         "trace_json_bytes": 20107
       },
       "raw": {
-        "error": "confidential object TOKENS uses raw backend",
+        "error": "raw confidential backends are rejected in proof-grade builds; this feature build emits the executable raw_insecure_eval control separately",
         "executable": false,
         "rejected": true
+      },
+      "raw_insecure_eval": {
+        "bytes_read": 160.0,
+        "bytes_written": 32.0,
+        "executable": true,
+        "gas_used": 34,
+        "physical_reads": 5,
+        "physical_writes": 1,
+        "rejected": false,
+        "trace_json_bytes": 13747
       },
       "variants": [
         {
@@ -126,7 +224,7 @@
             "oram_bounds": [],
             "signature": "auth(bytes32)"
           },
-          "error": "confidential object TOKENS uses raw backend",
+          "error": "raw confidential backends are rejected in proof-grade builds; this feature build emits the executable raw_insecure_eval control separately",
           "executable": false,
           "rejected": true,
           "state_objects": [
@@ -145,6 +243,78 @@
               "name": "lastAuth"
             }
           ]
+        },
+        {
+          "artifact_json_bytes": 4607,
+          "backend": "raw_insecure_eval",
+          "benchmark": "AuthScan/auth",
+          "bytes_read": 160.0,
+          "bytes_written": 32.0,
+          "capacity": "4",
+          "entrypoint": "auth(bytes32)",
+          "entrypoint_resource_bounds": {
+            "max_commit_ops": 5,
+            "oram_bounds": [],
+            "signature": "auth(bytes32)"
+          },
+          "executable": true,
+          "gas_used": 34,
+          "physical_reads": 5,
+          "physical_writes": 1,
+          "rejected": false,
+          "state_objects": [
+            {
+              "backend": "raw",
+              "capacity": 4,
+              "confidential": true,
+              "kind": "Array",
+              "name": "TOKENS"
+            },
+            {
+              "backend": "raw",
+              "capacity": null,
+              "confidential": true,
+              "kind": "Cell",
+              "name": "lastAuth"
+            }
+          ],
+          "trace_json_bytes": 13747
+        },
+        {
+          "artifact_json_bytes": 13126,
+          "backend": "ct_gas_only",
+          "benchmark": "AuthScan/auth",
+          "bytes_read": 160.0,
+          "bytes_written": 32.0,
+          "capacity": "4",
+          "entrypoint": "auth(bytes32)",
+          "entrypoint_resource_bounds": {
+            "max_commit_ops": 5,
+            "oram_bounds": [],
+            "signature": "auth(bytes32)"
+          },
+          "executable": true,
+          "gas_used": 8192,
+          "physical_reads": 5,
+          "physical_writes": 1,
+          "rejected": false,
+          "state_objects": [
+            {
+              "backend": "raw",
+              "capacity": 4,
+              "confidential": true,
+              "kind": "Array",
+              "name": "TOKENS"
+            },
+            {
+              "backend": "raw",
+              "capacity": null,
+              "confidential": true,
+              "kind": "Cell",
+              "name": "lastAuth"
+            }
+          ],
+          "trace_json_bytes": 13829
         },
         {
           "artifact_json_bytes": 13518,
@@ -215,6 +385,16 @@
           "manifest_public_gas_budget": 12288
         }
       ],
+      "ct_gas_only": {
+        "bytes_read": 96.0,
+        "bytes_written": 64.0,
+        "executable": true,
+        "gas_used": 16384,
+        "physical_reads": 3,
+        "physical_writes": 2,
+        "rejected": false,
+        "trace_json_bytes": 12144
+      },
       "entrypoint": "deposit(bytes32,uint256)",
       "full_scan": {
         "bytes_read": 3288.0,
@@ -259,9 +439,19 @@
       "oram_improves_physical_writes": true,
       "oram_improves_physical_writes_baseline": "full_scan_64",
       "raw": {
-        "error": "confidential object balances uses raw backend",
+        "error": "raw confidential backends are rejected in proof-grade builds; this feature build emits the executable raw_insecure_eval control separately",
         "executable": false,
         "rejected": true
+      },
+      "raw_insecure_eval": {
+        "bytes_read": 96.0,
+        "bytes_written": 64.0,
+        "executable": true,
+        "gas_used": 50,
+        "physical_reads": 3,
+        "physical_writes": 2,
+        "rejected": false,
+        "trace_json_bytes": 12183
       },
       "variants": [
         {
@@ -275,7 +465,7 @@
             "oram_bounds": [],
             "signature": "deposit(bytes32,uint256)"
           },
-          "error": "confidential object balances uses raw backend",
+          "error": "raw confidential backends are rejected in proof-grade builds; this feature build emits the executable raw_insecure_eval control separately",
           "executable": false,
           "rejected": true,
           "state_objects": [
@@ -294,6 +484,78 @@
               "name": "total"
             }
           ]
+        },
+        {
+          "artifact_json_bytes": 6388,
+          "backend": "raw_insecure_eval",
+          "benchmark": "ConfidentialMixer/deposit",
+          "bytes_read": 96.0,
+          "bytes_written": 64.0,
+          "capacity": "8",
+          "entrypoint": "deposit(bytes32,uint256)",
+          "entrypoint_resource_bounds": {
+            "max_commit_ops": 9,
+            "oram_bounds": [],
+            "signature": "deposit(bytes32,uint256)"
+          },
+          "executable": true,
+          "gas_used": 50,
+          "physical_reads": 3,
+          "physical_writes": 2,
+          "rejected": false,
+          "state_objects": [
+            {
+              "backend": "raw",
+              "capacity": 8,
+              "confidential": true,
+              "kind": "Map",
+              "name": "balances"
+            },
+            {
+              "backend": "raw",
+              "capacity": null,
+              "confidential": true,
+              "kind": "Cell",
+              "name": "total"
+            }
+          ],
+          "trace_json_bytes": 12183
+        },
+        {
+          "artifact_json_bytes": 15734,
+          "backend": "ct_gas_only",
+          "benchmark": "ConfidentialMixer/deposit",
+          "bytes_read": 96.0,
+          "bytes_written": 64.0,
+          "capacity": "8",
+          "entrypoint": "deposit(bytes32,uint256)",
+          "entrypoint_resource_bounds": {
+            "max_commit_ops": 9,
+            "oram_bounds": [],
+            "signature": "deposit(bytes32,uint256)"
+          },
+          "executable": true,
+          "gas_used": 16384,
+          "physical_reads": 3,
+          "physical_writes": 2,
+          "rejected": false,
+          "state_objects": [
+            {
+              "backend": "raw",
+              "capacity": 8,
+              "confidential": true,
+              "kind": "Map",
+              "name": "balances"
+            },
+            {
+              "backend": "raw",
+              "capacity": null,
+              "confidential": true,
+              "kind": "Cell",
+              "name": "total"
+            }
+          ],
+          "trace_json_bytes": 12144
         },
         {
           "artifact_json_bytes": 16126,
@@ -447,6 +709,16 @@
           "manifest_public_gas_budget": 12288
         }
       ],
+      "ct_gas_only": {
+        "bytes_read": 96.0,
+        "bytes_written": 64.0,
+        "executable": true,
+        "gas_used": 16384,
+        "physical_reads": 3,
+        "physical_writes": 2,
+        "rejected": false,
+        "trace_json_bytes": 12259
+      },
       "entrypoint": "withdraw(bytes32,uint256)",
       "full_scan": {
         "bytes_read": 3288.0,
@@ -491,9 +763,19 @@
       "oram_improves_physical_writes": true,
       "oram_improves_physical_writes_baseline": "full_scan_64",
       "raw": {
-        "error": "confidential object balances uses raw backend",
+        "error": "raw confidential backends are rejected in proof-grade builds; this feature build emits the executable raw_insecure_eval control separately",
         "executable": false,
         "rejected": true
+      },
+      "raw_insecure_eval": {
+        "bytes_read": 96.0,
+        "bytes_written": 64.0,
+        "executable": true,
+        "gas_used": 50,
+        "physical_reads": 3,
+        "physical_writes": 2,
+        "rejected": false,
+        "trace_json_bytes": 12296
       },
       "variants": [
         {
@@ -507,7 +789,7 @@
             "oram_bounds": [],
             "signature": "withdraw(bytes32,uint256)"
           },
-          "error": "confidential object balances uses raw backend",
+          "error": "raw confidential backends are rejected in proof-grade builds; this feature build emits the executable raw_insecure_eval control separately",
           "executable": false,
           "rejected": true,
           "state_objects": [
@@ -526,6 +808,78 @@
               "name": "total"
             }
           ]
+        },
+        {
+          "artifact_json_bytes": 6388,
+          "backend": "raw_insecure_eval",
+          "benchmark": "ConfidentialMixer/withdraw",
+          "bytes_read": 96.0,
+          "bytes_written": 64.0,
+          "capacity": "8",
+          "entrypoint": "withdraw(bytes32,uint256)",
+          "entrypoint_resource_bounds": {
+            "max_commit_ops": 9,
+            "oram_bounds": [],
+            "signature": "withdraw(bytes32,uint256)"
+          },
+          "executable": true,
+          "gas_used": 50,
+          "physical_reads": 3,
+          "physical_writes": 2,
+          "rejected": false,
+          "state_objects": [
+            {
+              "backend": "raw",
+              "capacity": 8,
+              "confidential": true,
+              "kind": "Map",
+              "name": "balances"
+            },
+            {
+              "backend": "raw",
+              "capacity": null,
+              "confidential": true,
+              "kind": "Cell",
+              "name": "total"
+            }
+          ],
+          "trace_json_bytes": 12296
+        },
+        {
+          "artifact_json_bytes": 15734,
+          "backend": "ct_gas_only",
+          "benchmark": "ConfidentialMixer/withdraw",
+          "bytes_read": 96.0,
+          "bytes_written": 64.0,
+          "capacity": "8",
+          "entrypoint": "withdraw(bytes32,uint256)",
+          "entrypoint_resource_bounds": {
+            "max_commit_ops": 9,
+            "oram_bounds": [],
+            "signature": "withdraw(bytes32,uint256)"
+          },
+          "executable": true,
+          "gas_used": 16384,
+          "physical_reads": 3,
+          "physical_writes": 2,
+          "rejected": false,
+          "state_objects": [
+            {
+              "backend": "raw",
+              "capacity": 8,
+              "confidential": true,
+              "kind": "Map",
+              "name": "balances"
+            },
+            {
+              "backend": "raw",
+              "capacity": null,
+              "confidential": true,
+              "kind": "Cell",
+              "name": "total"
+            }
+          ],
+          "trace_json_bytes": 12259
         },
         {
           "artifact_json_bytes": 16126,
@@ -670,6 +1024,16 @@
           "manifest_public_gas_budget": 16384
         }
       ],
+      "ct_gas_only": {
+        "bytes_read": 96.0,
+        "bytes_written": 96.0,
+        "executable": true,
+        "gas_used": 24576,
+        "physical_reads": 3,
+        "physical_writes": 3,
+        "rejected": false,
+        "trace_json_bytes": 16839
+      },
       "entrypoint": "transferFrom(address,address,address,uint256)",
       "full_scan": {
         "bytes_read": 11392.0,
@@ -694,9 +1058,19 @@
       "oram_improves_physical_writes": false,
       "oram_improves_physical_writes_baseline": "full_scan",
       "raw": {
-        "error": "confidential object allowances uses raw backend",
+        "error": "raw confidential backends are rejected in proof-grade builds; this feature build emits the executable raw_insecure_eval control separately",
         "executable": false,
         "rejected": true
+      },
+      "raw_insecure_eval": {
+        "bytes_read": 96.0,
+        "bytes_written": 96.0,
+        "executable": true,
+        "gas_used": 75,
+        "physical_reads": 3,
+        "physical_writes": 3,
+        "rejected": false,
+        "trace_json_bytes": 17036
       },
       "variants": [
         {
@@ -710,7 +1084,7 @@
             "oram_bounds": [],
             "signature": "transferFrom(address,address,address,uint256)"
           },
-          "error": "confidential object allowances uses raw backend",
+          "error": "raw confidential backends are rejected in proof-grade builds; this feature build emits the executable raw_insecure_eval control separately",
           "executable": false,
           "rejected": true,
           "state_objects": [
@@ -729,6 +1103,78 @@
               "name": "balances"
             }
           ]
+        },
+        {
+          "artifact_json_bytes": 10392,
+          "backend": "raw_insecure_eval",
+          "benchmark": "ERC20Lite/transferFrom",
+          "bytes_read": 96.0,
+          "bytes_written": 96.0,
+          "capacity": "8+16",
+          "entrypoint": "transferFrom(address,address,address,uint256)",
+          "entrypoint_resource_bounds": {
+            "max_commit_ops": 24,
+            "oram_bounds": [],
+            "signature": "transferFrom(address,address,address,uint256)"
+          },
+          "executable": true,
+          "gas_used": 75,
+          "physical_reads": 3,
+          "physical_writes": 3,
+          "rejected": false,
+          "state_objects": [
+            {
+              "backend": "raw",
+              "capacity": 16,
+              "confidential": true,
+              "kind": "Map",
+              "name": "allowances"
+            },
+            {
+              "backend": "raw",
+              "capacity": 8,
+              "confidential": true,
+              "kind": "Map",
+              "name": "balances"
+            }
+          ],
+          "trace_json_bytes": 17036
+        },
+        {
+          "artifact_json_bytes": 29468,
+          "backend": "ct_gas_only",
+          "benchmark": "ERC20Lite/transferFrom",
+          "bytes_read": 96.0,
+          "bytes_written": 96.0,
+          "capacity": "8+16",
+          "entrypoint": "transferFrom(address,address,address,uint256)",
+          "entrypoint_resource_bounds": {
+            "max_commit_ops": 24,
+            "oram_bounds": [],
+            "signature": "transferFrom(address,address,address,uint256)"
+          },
+          "executable": true,
+          "gas_used": 24576,
+          "physical_reads": 3,
+          "physical_writes": 3,
+          "rejected": false,
+          "state_objects": [
+            {
+              "backend": "raw",
+              "capacity": 16,
+              "confidential": true,
+              "kind": "Map",
+              "name": "allowances"
+            },
+            {
+              "backend": "raw",
+              "capacity": 8,
+              "confidential": true,
+              "kind": "Map",
+              "name": "balances"
+            }
+          ],
+          "trace_json_bytes": 16839
         },
         {
           "artifact_json_bytes": 29860,
@@ -838,6 +1284,16 @@
           "manifest_public_gas_budget": 12288
         }
       ],
+      "ct_gas_only": {
+        "bytes_read": 32.0,
+        "bytes_written": 32.0,
+        "executable": true,
+        "gas_used": 12288,
+        "physical_reads": 1,
+        "physical_writes": 1,
+        "rejected": false,
+        "trace_json_bytes": 10616
+      },
       "entrypoint": "clearIfMatch(bytes32,uint256)",
       "full_scan": {
         "bytes_read": 3040.0,
@@ -850,9 +1306,19 @@
         "trace_json_bytes": 21526
       },
       "raw": {
-        "error": "confidential object records uses raw backend",
+        "error": "raw confidential backends are rejected in proof-grade builds; this feature build emits the executable raw_insecure_eval control separately",
         "executable": false,
         "rejected": true
+      },
+      "raw_insecure_eval": {
+        "bytes_read": 32.0,
+        "bytes_written": 32.0,
+        "executable": true,
+        "gas_used": 25,
+        "physical_reads": 1,
+        "physical_writes": 1,
+        "rejected": false,
+        "trace_json_bytes": 10875
       },
       "variants": [
         {
@@ -866,7 +1332,7 @@
             "oram_bounds": [],
             "signature": "clearIfMatch(bytes32,uint256)"
           },
-          "error": "confidential object records uses raw backend",
+          "error": "raw confidential backends are rejected in proof-grade builds; this feature build emits the executable raw_insecure_eval control separately",
           "executable": false,
           "rejected": true,
           "state_objects": [
@@ -878,6 +1344,64 @@
               "name": "records"
             }
           ]
+        },
+        {
+          "artifact_json_bytes": 5302,
+          "backend": "raw_insecure_eval",
+          "benchmark": "RegistryCRUD/clearIfMatch",
+          "bytes_read": 32.0,
+          "bytes_written": 32.0,
+          "capacity": "8",
+          "entrypoint": "clearIfMatch(bytes32,uint256)",
+          "entrypoint_resource_bounds": {
+            "max_commit_ops": 8,
+            "oram_bounds": [],
+            "signature": "clearIfMatch(bytes32,uint256)"
+          },
+          "executable": true,
+          "gas_used": 25,
+          "physical_reads": 1,
+          "physical_writes": 1,
+          "rejected": false,
+          "state_objects": [
+            {
+              "backend": "raw",
+              "capacity": 8,
+              "confidential": true,
+              "kind": "Map",
+              "name": "records"
+            }
+          ],
+          "trace_json_bytes": 10875
+        },
+        {
+          "artifact_json_bytes": 13171,
+          "backend": "ct_gas_only",
+          "benchmark": "RegistryCRUD/clearIfMatch",
+          "bytes_read": 32.0,
+          "bytes_written": 32.0,
+          "capacity": "8",
+          "entrypoint": "clearIfMatch(bytes32,uint256)",
+          "entrypoint_resource_bounds": {
+            "max_commit_ops": 8,
+            "oram_bounds": [],
+            "signature": "clearIfMatch(bytes32,uint256)"
+          },
+          "executable": true,
+          "gas_used": 12288,
+          "physical_reads": 1,
+          "physical_writes": 1,
+          "rejected": false,
+          "state_objects": [
+            {
+              "backend": "raw",
+              "capacity": 8,
+              "confidential": true,
+              "kind": "Map",
+              "name": "records"
+            }
+          ],
+          "trace_json_bytes": 10616
         },
         {
           "artifact_json_bytes": 13552,
@@ -922,7 +1446,7 @@
     "public_runtime_formula": "logical_reads*3 + logical_writes*5 + physical_writes*17"
   },
   "coverage": {
-    "matrix_row_count": 17,
+    "matrix_row_count": 29,
     "metrics": [
       "gas_used",
       "physical_reads",
@@ -947,7 +1471,7 @@
         "oram_bounds": [],
         "signature": "classify(uint256)"
       },
-      "error": "confidential object last uses raw backend",
+      "error": "raw confidential backends are rejected in proof-grade builds; this feature build emits the executable raw_insecure_eval control separately",
       "executable": false,
       "rejected": true,
       "state_objects": [
@@ -959,6 +1483,64 @@
           "name": "last"
         }
       ]
+    },
+    {
+      "artifact_json_bytes": 3907,
+      "backend": "raw_insecure_eval",
+      "benchmark": "FixedSlotClassifier/classify",
+      "bytes_read": 32.0,
+      "bytes_written": 32.0,
+      "capacity": null,
+      "entrypoint": "classify(uint256)",
+      "entrypoint_resource_bounds": {
+        "max_commit_ops": 1,
+        "oram_bounds": [],
+        "signature": "classify(uint256)"
+      },
+      "executable": true,
+      "gas_used": 22,
+      "physical_reads": 1,
+      "physical_writes": 1,
+      "rejected": false,
+      "state_objects": [
+        {
+          "backend": "raw",
+          "capacity": null,
+          "confidential": true,
+          "kind": "Cell",
+          "name": "last"
+        }
+      ],
+      "trace_json_bytes": 8822
+    },
+    {
+      "artifact_json_bytes": 8413,
+      "backend": "ct_gas_only",
+      "benchmark": "FixedSlotClassifier/classify",
+      "bytes_read": 32.0,
+      "bytes_written": 32.0,
+      "capacity": null,
+      "entrypoint": "classify(uint256)",
+      "entrypoint_resource_bounds": {
+        "max_commit_ops": 1,
+        "oram_bounds": [],
+        "signature": "classify(uint256)"
+      },
+      "executable": true,
+      "gas_used": 4096,
+      "physical_reads": 1,
+      "physical_writes": 1,
+      "rejected": false,
+      "state_objects": [
+        {
+          "backend": "raw",
+          "capacity": null,
+          "confidential": true,
+          "kind": "Cell",
+          "name": "last"
+        }
+      ],
+      "trace_json_bytes": 8650
     },
     {
       "artifact_json_bytes": 8794,
@@ -1000,7 +1582,7 @@
         "oram_bounds": [],
         "signature": "auth(bytes32)"
       },
-      "error": "confidential object TOKENS uses raw backend",
+      "error": "raw confidential backends are rejected in proof-grade builds; this feature build emits the executable raw_insecure_eval control separately",
       "executable": false,
       "rejected": true,
       "state_objects": [
@@ -1019,6 +1601,78 @@
           "name": "lastAuth"
         }
       ]
+    },
+    {
+      "artifact_json_bytes": 4607,
+      "backend": "raw_insecure_eval",
+      "benchmark": "AuthScan/auth",
+      "bytes_read": 160.0,
+      "bytes_written": 32.0,
+      "capacity": "4",
+      "entrypoint": "auth(bytes32)",
+      "entrypoint_resource_bounds": {
+        "max_commit_ops": 5,
+        "oram_bounds": [],
+        "signature": "auth(bytes32)"
+      },
+      "executable": true,
+      "gas_used": 34,
+      "physical_reads": 5,
+      "physical_writes": 1,
+      "rejected": false,
+      "state_objects": [
+        {
+          "backend": "raw",
+          "capacity": 4,
+          "confidential": true,
+          "kind": "Array",
+          "name": "TOKENS"
+        },
+        {
+          "backend": "raw",
+          "capacity": null,
+          "confidential": true,
+          "kind": "Cell",
+          "name": "lastAuth"
+        }
+      ],
+      "trace_json_bytes": 13747
+    },
+    {
+      "artifact_json_bytes": 13126,
+      "backend": "ct_gas_only",
+      "benchmark": "AuthScan/auth",
+      "bytes_read": 160.0,
+      "bytes_written": 32.0,
+      "capacity": "4",
+      "entrypoint": "auth(bytes32)",
+      "entrypoint_resource_bounds": {
+        "max_commit_ops": 5,
+        "oram_bounds": [],
+        "signature": "auth(bytes32)"
+      },
+      "executable": true,
+      "gas_used": 8192,
+      "physical_reads": 5,
+      "physical_writes": 1,
+      "rejected": false,
+      "state_objects": [
+        {
+          "backend": "raw",
+          "capacity": 4,
+          "confidential": true,
+          "kind": "Array",
+          "name": "TOKENS"
+        },
+        {
+          "backend": "raw",
+          "capacity": null,
+          "confidential": true,
+          "kind": "Cell",
+          "name": "lastAuth"
+        }
+      ],
+      "trace_json_bytes": 13829
     },
     {
       "artifact_json_bytes": 13518,
@@ -1067,7 +1721,7 @@
         "oram_bounds": [],
         "signature": "deposit(bytes32,uint256)"
       },
-      "error": "confidential object balances uses raw backend",
+      "error": "raw confidential backends are rejected in proof-grade builds; this feature build emits the executable raw_insecure_eval control separately",
       "executable": false,
       "rejected": true,
       "state_objects": [
@@ -1086,6 +1740,78 @@
           "name": "total"
         }
       ]
+    },
+    {
+      "artifact_json_bytes": 6388,
+      "backend": "raw_insecure_eval",
+      "benchmark": "ConfidentialMixer/deposit",
+      "bytes_read": 96.0,
+      "bytes_written": 64.0,
+      "capacity": "8",
+      "entrypoint": "deposit(bytes32,uint256)",
+      "entrypoint_resource_bounds": {
+        "max_commit_ops": 9,
+        "oram_bounds": [],
+        "signature": "deposit(bytes32,uint256)"
+      },
+      "executable": true,
+      "gas_used": 50,
+      "physical_reads": 3,
+      "physical_writes": 2,
+      "rejected": false,
+      "state_objects": [
+        {
+          "backend": "raw",
+          "capacity": 8,
+          "confidential": true,
+          "kind": "Map",
+          "name": "balances"
+        },
+        {
+          "backend": "raw",
+          "capacity": null,
+          "confidential": true,
+          "kind": "Cell",
+          "name": "total"
+        }
+      ],
+      "trace_json_bytes": 12183
+    },
+    {
+      "artifact_json_bytes": 15734,
+      "backend": "ct_gas_only",
+      "benchmark": "ConfidentialMixer/deposit",
+      "bytes_read": 96.0,
+      "bytes_written": 64.0,
+      "capacity": "8",
+      "entrypoint": "deposit(bytes32,uint256)",
+      "entrypoint_resource_bounds": {
+        "max_commit_ops": 9,
+        "oram_bounds": [],
+        "signature": "deposit(bytes32,uint256)"
+      },
+      "executable": true,
+      "gas_used": 16384,
+      "physical_reads": 3,
+      "physical_writes": 2,
+      "rejected": false,
+      "state_objects": [
+        {
+          "backend": "raw",
+          "capacity": 8,
+          "confidential": true,
+          "kind": "Map",
+          "name": "balances"
+        },
+        {
+          "backend": "raw",
+          "capacity": null,
+          "confidential": true,
+          "kind": "Cell",
+          "name": "total"
+        }
+      ],
+      "trace_json_bytes": 12144
     },
     {
       "artifact_json_bytes": 16126,
@@ -1217,7 +1943,7 @@
         "oram_bounds": [],
         "signature": "withdraw(bytes32,uint256)"
       },
-      "error": "confidential object balances uses raw backend",
+      "error": "raw confidential backends are rejected in proof-grade builds; this feature build emits the executable raw_insecure_eval control separately",
       "executable": false,
       "rejected": true,
       "state_objects": [
@@ -1236,6 +1962,78 @@
           "name": "total"
         }
       ]
+    },
+    {
+      "artifact_json_bytes": 6388,
+      "backend": "raw_insecure_eval",
+      "benchmark": "ConfidentialMixer/withdraw",
+      "bytes_read": 96.0,
+      "bytes_written": 64.0,
+      "capacity": "8",
+      "entrypoint": "withdraw(bytes32,uint256)",
+      "entrypoint_resource_bounds": {
+        "max_commit_ops": 9,
+        "oram_bounds": [],
+        "signature": "withdraw(bytes32,uint256)"
+      },
+      "executable": true,
+      "gas_used": 50,
+      "physical_reads": 3,
+      "physical_writes": 2,
+      "rejected": false,
+      "state_objects": [
+        {
+          "backend": "raw",
+          "capacity": 8,
+          "confidential": true,
+          "kind": "Map",
+          "name": "balances"
+        },
+        {
+          "backend": "raw",
+          "capacity": null,
+          "confidential": true,
+          "kind": "Cell",
+          "name": "total"
+        }
+      ],
+      "trace_json_bytes": 12296
+    },
+    {
+      "artifact_json_bytes": 15734,
+      "backend": "ct_gas_only",
+      "benchmark": "ConfidentialMixer/withdraw",
+      "bytes_read": 96.0,
+      "bytes_written": 64.0,
+      "capacity": "8",
+      "entrypoint": "withdraw(bytes32,uint256)",
+      "entrypoint_resource_bounds": {
+        "max_commit_ops": 9,
+        "oram_bounds": [],
+        "signature": "withdraw(bytes32,uint256)"
+      },
+      "executable": true,
+      "gas_used": 16384,
+      "physical_reads": 3,
+      "physical_writes": 2,
+      "rejected": false,
+      "state_objects": [
+        {
+          "backend": "raw",
+          "capacity": 8,
+          "confidential": true,
+          "kind": "Map",
+          "name": "balances"
+        },
+        {
+          "backend": "raw",
+          "capacity": null,
+          "confidential": true,
+          "kind": "Cell",
+          "name": "total"
+        }
+      ],
+      "trace_json_bytes": 12259
     },
     {
       "artifact_json_bytes": 16126,
@@ -1367,7 +2165,7 @@
         "oram_bounds": [],
         "signature": "transferFrom(address,address,address,uint256)"
       },
-      "error": "confidential object allowances uses raw backend",
+      "error": "raw confidential backends are rejected in proof-grade builds; this feature build emits the executable raw_insecure_eval control separately",
       "executable": false,
       "rejected": true,
       "state_objects": [
@@ -1386,6 +2184,78 @@
           "name": "balances"
         }
       ]
+    },
+    {
+      "artifact_json_bytes": 10392,
+      "backend": "raw_insecure_eval",
+      "benchmark": "ERC20Lite/transferFrom",
+      "bytes_read": 96.0,
+      "bytes_written": 96.0,
+      "capacity": "8+16",
+      "entrypoint": "transferFrom(address,address,address,uint256)",
+      "entrypoint_resource_bounds": {
+        "max_commit_ops": 24,
+        "oram_bounds": [],
+        "signature": "transferFrom(address,address,address,uint256)"
+      },
+      "executable": true,
+      "gas_used": 75,
+      "physical_reads": 3,
+      "physical_writes": 3,
+      "rejected": false,
+      "state_objects": [
+        {
+          "backend": "raw",
+          "capacity": 16,
+          "confidential": true,
+          "kind": "Map",
+          "name": "allowances"
+        },
+        {
+          "backend": "raw",
+          "capacity": 8,
+          "confidential": true,
+          "kind": "Map",
+          "name": "balances"
+        }
+      ],
+      "trace_json_bytes": 17036
+    },
+    {
+      "artifact_json_bytes": 29468,
+      "backend": "ct_gas_only",
+      "benchmark": "ERC20Lite/transferFrom",
+      "bytes_read": 96.0,
+      "bytes_written": 96.0,
+      "capacity": "8+16",
+      "entrypoint": "transferFrom(address,address,address,uint256)",
+      "entrypoint_resource_bounds": {
+        "max_commit_ops": 24,
+        "oram_bounds": [],
+        "signature": "transferFrom(address,address,address,uint256)"
+      },
+      "executable": true,
+      "gas_used": 24576,
+      "physical_reads": 3,
+      "physical_writes": 3,
+      "rejected": false,
+      "state_objects": [
+        {
+          "backend": "raw",
+          "capacity": 16,
+          "confidential": true,
+          "kind": "Map",
+          "name": "allowances"
+        },
+        {
+          "backend": "raw",
+          "capacity": 8,
+          "confidential": true,
+          "kind": "Map",
+          "name": "balances"
+        }
+      ],
+      "trace_json_bytes": 16839
     },
     {
       "artifact_json_bytes": 29860,
@@ -1491,7 +2361,7 @@
         "oram_bounds": [],
         "signature": "clearIfMatch(bytes32,uint256)"
       },
-      "error": "confidential object records uses raw backend",
+      "error": "raw confidential backends are rejected in proof-grade builds; this feature build emits the executable raw_insecure_eval control separately",
       "executable": false,
       "rejected": true,
       "state_objects": [
@@ -1503,6 +2373,64 @@
           "name": "records"
         }
       ]
+    },
+    {
+      "artifact_json_bytes": 5302,
+      "backend": "raw_insecure_eval",
+      "benchmark": "RegistryCRUD/clearIfMatch",
+      "bytes_read": 32.0,
+      "bytes_written": 32.0,
+      "capacity": "8",
+      "entrypoint": "clearIfMatch(bytes32,uint256)",
+      "entrypoint_resource_bounds": {
+        "max_commit_ops": 8,
+        "oram_bounds": [],
+        "signature": "clearIfMatch(bytes32,uint256)"
+      },
+      "executable": true,
+      "gas_used": 25,
+      "physical_reads": 1,
+      "physical_writes": 1,
+      "rejected": false,
+      "state_objects": [
+        {
+          "backend": "raw",
+          "capacity": 8,
+          "confidential": true,
+          "kind": "Map",
+          "name": "records"
+        }
+      ],
+      "trace_json_bytes": 10875
+    },
+    {
+      "artifact_json_bytes": 13171,
+      "backend": "ct_gas_only",
+      "benchmark": "RegistryCRUD/clearIfMatch",
+      "bytes_read": 32.0,
+      "bytes_written": 32.0,
+      "capacity": "8",
+      "entrypoint": "clearIfMatch(bytes32,uint256)",
+      "entrypoint_resource_bounds": {
+        "max_commit_ops": 8,
+        "oram_bounds": [],
+        "signature": "clearIfMatch(bytes32,uint256)"
+      },
+      "executable": true,
+      "gas_used": 12288,
+      "physical_reads": 1,
+      "physical_writes": 1,
+      "rejected": false,
+      "state_objects": [
+        {
+          "backend": "raw",
+          "capacity": 8,
+          "confidential": true,
+          "kind": "Map",
+          "name": "records"
+        }
+      ],
+      "trace_json_bytes": 10616
     },
     {
       "artifact_json_bytes": 13552,
