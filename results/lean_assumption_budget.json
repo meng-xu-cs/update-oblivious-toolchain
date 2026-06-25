@@ -1,0 +1,56 @@
+{
+  "schema": "uo.lean_assumption_budget.v1",
+  "proof_grade_root": "UOToolchain.ProofGradeRoot",
+  "active_assumptions": [
+    {
+      "id": "bucketEncryptionINDCPA",
+      "role": "hides Path ORAM bucket/path ciphertext contents",
+      "consumer": "PathOramLocalPosmapV1SecurityAssumptions",
+      "declared_present": true,
+      "consumer_present": true
+    },
+    {
+      "id": "metadataEncryptionINDCPA",
+      "role": "hides encrypted position-map metadata pages",
+      "consumer": "PathOramLocalPosmapV1SecurityAssumptions",
+      "declared_present": true,
+      "consumer_present": true
+    },
+    {
+      "id": "stashOverflowBounded",
+      "role": "bounds Path ORAM stash overflow at deployed parameters",
+      "consumer": "PathOramLocalPosmapV1SecurityAssumptions",
+      "declared_present": true,
+      "consumer_present": true
+    },
+    {
+      "id": "SgxDeploymentAssumptions",
+      "role": "TEE confidentiality/integrity/attestation/rollback/freshness",
+      "consumer": "DeploymentAcceptance",
+      "declared_present": true,
+      "consumer_present": true
+    }
+  ],
+  "legacy_axioms": [
+    {
+      "id": "legacyOramLocalTheorem",
+      "module": "UOToolchain.OramGame",
+      "declared_present": true,
+      "excluded_from_proof_grade_root": true
+    },
+    {
+      "id": "legacySgxMicroLocalTheorem",
+      "module": "UOToolchain.SgxMicroGame",
+      "declared_present": true,
+      "excluded_from_proof_grade_root": true
+    }
+  ],
+  "scanned": {
+    "axiom_declaration_count": 2,
+    "sorry_count": 0
+  },
+  "unexpected_axioms_outside_allowlist": [],
+  "proof_grade_root_excludes_legacy_axiom_modules": true,
+  "all_active_assumptions_grounded_in_lean": true,
+  "accepted": true
+}

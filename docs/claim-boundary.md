@@ -110,6 +110,14 @@ The fresh-leaf remapping bridge is not a separate backend assumption. The
 canonical fresh-coin runtime-family and hidden-leaf coverage checkers discharge
 that leaf-seed-space interface directly.
 
+`scripts/lean_assumption_budget.sh` emits `results/lean_assumption_budget.json`,
+which grounds each active assumption above in the Lean source, lists its
+consumer, and pins the only two `axiom` declarations
+(`legacyOramLocalTheorem`, `legacySgxMicroLocalTheorem`) to legacy demonstration
+modules that `UOToolchain.ProofGradeRoot` excludes. There are no `sorry`s. The
+budget fails closed (and CI rejects the change) if any new `axiom`/`sorry`
+appears outside that allowlist or a documented assumption stops being grounded.
+
 ## TCB
 
 | Component | Current role |

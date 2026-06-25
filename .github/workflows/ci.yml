@@ -66,8 +66,12 @@ jobs:
       - uses: actions/checkout@v4
       - run: rustup show
       - uses: Swatinem/rust-cache@v2
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
       - name: static checks probe report
         run: cargo run -q -p mplus-probe -- --only static-checks --out-dir results
+      - name: Lean assumption and axiom budget
+        run: scripts/lean_assumption_budget.sh
       - name: fail-closed acceptance aggregate
         run: cargo run -q -p mplus-probe -- --only acceptance-check --out-dir results
       - name: Path ORAM claim-consistency
