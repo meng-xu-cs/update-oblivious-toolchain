@@ -47519,6 +47519,80 @@ fn run_trace_equivalence(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Resu
     }))
 }
 
+fn leakage_max_auc(report: &JsonValue) -> Option<f64> {
+    report
+        .get("metric_auc")
+        .and_then(|metrics| metrics.as_object())
+        .map(|metrics| {
+            metrics
+                .values()
+                .filter_map(|value| value.as_f64())
+                .fold(0.0_f64, f64::max)
+        })
+}
+
+/// Positive/negative/computational leakage controls (Issue 18). Insecure raw and
+/// ct-gas-only baselines are positive controls that must leak above threshold;
+/// exact UO backends are negative controls that must stay at/below the silent
+/// threshold; ORAM backends are labeled computational (related only
+/// computationally, so a silent observer AUC is expected, not an exact-equality
+/// claim). The aggregate fails closed if a positive control does not leak or a
+/// negative/computational control leaks above threshold.
+fn leakage_controls(reports: &[JsonValue]) -> JsonValue {
+    const LEAK_THRESHOLD: f64 = 0.9;
+    const SILENT_THRESHOLD: f64 = 0.6;
+    let mut positive = Vec::new();
+    let mut negative = Vec::new();
+    let mut computational = Vec::new();
+    for report in reports {
+        let Some(mode) = report.get("mode").and_then(|mode| mode.as_str()) else {
+            continue;
+        };
+        let Some(max_auc) = leakage_max_auc(report) else {
+            continue;
+        };
+        let benchmark = report
+            .get("benchmark")
+            .and_then(|benchmark| benchmark.as_str())
+            .unwrap_or("");
+        let entry = json!({ "benchmark": benchmark, "mode": mode, "max_auc": max_auc });
+        match mode {
+            "raw_insecure_eval" | "ct_gas_only" => positive.push(entry),
+            "uo" => negative.push(entry),
+            "oram" => computational.push(entry),
+            _ => {}
+        }
+    }
+    let max_auc_of = |entry: &JsonValue| {
+        entry
+            .get("max_auc")
+            .and_then(|value| value.as_f64())
+            .unwrap_or(0.0)
+    };
+    let positive_controls_leak = positive
+        .iter()
+        .all(|entry| max_auc_of(entry) > LEAK_THRESHOLD);
+    let negative_controls_silent = negative
+        .iter()
+        .all(|entry| max_auc_of(entry) <= SILENT_THRESHOLD);
+    let computational_controls_silent = computational
+        .iter()
+        .all(|entry| max_auc_of(entry) <= SILENT_THRESHOLD);
+    json!({
+        "leak_threshold": LEAK_THRESHOLD,
+        "silent_threshold": SILENT_THRESHOLD,
+        "positive_controls": positive,
+        "negative_controls": negative,
+        "computational_controls": computational,
+        "positive_controls_leak": positive_controls_leak,
+        "negative_controls_silent": negative_controls_silent,
+        "computational_controls_silent": computational_controls_silent,
+        "accepted": positive_controls_leak
+            && negative_controls_silent
+            && computational_controls_silent,
+    })
+}
+
 fn run_auc_reports(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<JsonValue> {
     let reports = vec![
         experiment_metric_summary(
@@ -47683,7 +47757,8 @@ fn run_auc_reports(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<Jso
             .collect::<Result<Vec<_>>>()?,
         );
     }
-    Ok(json!({ "reports": reports }))
+    let controls = leakage_controls(&reports);
+    Ok(json!({ "reports": reports, "controls": controls }))
 }
 
 fn run_mutual_information_reports(

@@ -1,4 +1,103 @@
 {
+  "controls": {
+    "accepted": true,
+    "computational_controls": [
+      {
+        "benchmark": "ConfidentialMixer",
+        "max_auc": 0.5,
+        "mode": "oram"
+      },
+      {
+        "benchmark": "ERC20Lite",
+        "max_auc": 0.5,
+        "mode": "oram"
+      }
+    ],
+    "computational_controls_silent": true,
+    "leak_threshold": 0.9,
+    "negative_controls": [
+      {
+        "benchmark": "FixedSlotClassifier",
+        "max_auc": 0.5,
+        "mode": "uo"
+      },
+      {
+        "benchmark": "AuthScan",
+        "max_auc": 0.5,
+        "mode": "uo"
+      },
+      {
+        "benchmark": "RegistryCRUD",
+        "max_auc": 0.5,
+        "mode": "uo"
+      },
+      {
+        "benchmark": "ConfidentialMixer",
+        "max_auc": 0.5,
+        "mode": "uo"
+      },
+      {
+        "benchmark": "ERC20Lite",
+        "max_auc": 0.5,
+        "mode": "uo"
+      }
+    ],
+    "negative_controls_silent": true,
+    "positive_controls": [
+      {
+        "benchmark": "FixedSlotClassifier",
+        "max_auc": 1.0,
+        "mode": "raw_insecure_eval"
+      },
+      {
+        "benchmark": "AuthScan",
+        "max_auc": 1.0,
+        "mode": "raw_insecure_eval"
+      },
+      {
+        "benchmark": "RegistryCRUD",
+        "max_auc": 1.0,
+        "mode": "raw_insecure_eval"
+      },
+      {
+        "benchmark": "ConfidentialMixer",
+        "max_auc": 1.0,
+        "mode": "raw_insecure_eval"
+      },
+      {
+        "benchmark": "ERC20Lite",
+        "max_auc": 1.0,
+        "mode": "raw_insecure_eval"
+      },
+      {
+        "benchmark": "FixedSlotClassifier",
+        "max_auc": 1.0,
+        "mode": "ct_gas_only"
+      },
+      {
+        "benchmark": "AuthScan",
+        "max_auc": 1.0,
+        "mode": "ct_gas_only"
+      },
+      {
+        "benchmark": "RegistryCRUD",
+        "max_auc": 1.0,
+        "mode": "ct_gas_only"
+      },
+      {
+        "benchmark": "ConfidentialMixer",
+        "max_auc": 1.0,
+        "mode": "ct_gas_only"
+      },
+      {
+        "benchmark": "ERC20Lite",
+        "max_auc": 1.0,
+        "mode": "ct_gas_only"
+      }
+    ],
+    "positive_controls_leak": true,
+    "silent_threshold": 0.6
+  },
   "reports": [
     {
       "benchmark": "FixedSlotClassifier",
