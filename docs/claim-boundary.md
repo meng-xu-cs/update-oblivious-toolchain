@@ -117,7 +117,7 @@ that leaf-seed-space interface directly.
 | Lean kernel plus Lean theorem/checker development | trusted proof checker and theorem body |
 | Explicit backend/crypto/deployment assumptions | trusted assumptions |
 | Rust runtime kernel plus witness/certificate/bundle extraction and serialization | trusted implementation-side extraction surface; replay and reconstruction reduce but do not eliminate this trust |
-| Source-backed runtime implementation boundaries | source-frozen/static-drift evidence, not full Rust semantic refinement |
+| Source-backed runtime implementation boundaries | source-frozen/static-drift evidence, not full Rust semantic refinement. The runtime-to-Lean boundary obligations are classified by evidence kind in `runtime_boundary_validation.json` (`runtime_boundary_obligation_classification`): proof-critical obligations carry a Lean-theorem, generated-schema, executable-semantic-refinement, or source-frozen Rust-visibility kind, while the source-drift regression inventory is regression-only and backs no proof-critical claim. `validate_runtime_boundary_schema` rejects any proof-critical obligation backed only by source regression, so no proof-critical claim rests solely on a Rust source substring outside this source-frozen surface |
 | Rust code outside the tiny confidential kernel | not part of the confidential-work TCB when pinned to public-only or generated-helper routes |
 | Fixed-capacity Rust buffer helpers | safe `Vec`-backed wrappers; no production `unsafe` or `MaybeUninit` surface remains in `fixed_buffer` |
 | `uo-solc` | not trusted as a proof oracle for accepted artifacts; parser/preprocessing remains trusted |

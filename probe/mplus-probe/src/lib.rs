@@ -26,7 +26,7 @@ use uo_core::{
     validate_runtime_boundary_schema, BackendKind, BoundaryEvent,
     CanonicalFreshCoinRuntimePathOramTheoremInput, CanonicalFreshCoinRuntimePathOramWitnessFamily,
     CompiledArtifact, ConfidentialKernelSlotProgram, ContainerKind, ContractMetadata, LogicalEvent,
-    NormalizedMicroTrace, ProgramMode, PublicOutcomeTrace,
+    NormalizedMicroTrace, ProgramMode, PublicOutcomeTrace, RuntimeBoundaryEvidenceKind,
     RuntimeConfidentialCoreKernelFinishSlotBundle, RuntimeKernelInterfaceBundle,
     RuntimeKernelMachineFinishWitness, RuntimeKernelRefinementWitness, RuntimeKernelWitness,
     RuntimeOramLeafScaffoldWitness, RuntimeOramObjectWitness, RuntimePathOramTransitionKind,
@@ -35,7 +35,8 @@ use uo_core::{
     SeededRuntimePathOramWitnessFamily, SgxControllerShapeTrace, Type, Value, WriteClass,
     CONFIDENTIAL_KERNEL_EXPR_PROFILES, CONFIDENTIAL_KERNEL_PURE_EXPR_PROFILES,
     CONFIDENTIAL_KERNEL_SLOT_EXPR_PROFILES, CONFIDENTIAL_KERNEL_SLOT_PURE_EXPR_PROFILES,
-    CONFIDENTIAL_KERNEL_STATEMENT_PROFILES, RUNTIME_BOUNDARY_SCHEMA_VERSION,
+    CONFIDENTIAL_KERNEL_STATEMENT_PROFILES, RUNTIME_BOUNDARY_OBLIGATIONS,
+    RUNTIME_BOUNDARY_SCHEMA_VERSION,
 };
 use uo_evm::{CallResult, ContractInstance, DiagnosticCallResult, PathOramFreshCoinPlan};
 
@@ -45797,6 +45798,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "runtime_secret_state_inventory": runtime_secret_state_inventory,
         "runtime_secret_state_inventory_complete":
             runtime_secret_state_inventory_complete,
+        "runtime_boundary_obligation_classification":
+            runtime_boundary_obligation_classification_json(),
         "accepted": engine_forbidden_helpers_absent
             && engine_uses_opaque_committed_state
             && engine_uses_runtime_public_object_universe
@@ -50356,6 +50359,55 @@ fn scenario_cost_formula(
         "gas_used": gas_used,
         "manifest_public_gas_budget": manifest_public_gas_budget,
         "formula_exact": formula_exact,
+    })
+}
+
+fn evidence_kind_label(kind: RuntimeBoundaryEvidenceKind) -> &'static str {
+    match kind {
+        RuntimeBoundaryEvidenceKind::RustVisibility => "rust_visibility",
+        RuntimeBoundaryEvidenceKind::GeneratedSchema => "generated_schema",
+        RuntimeBoundaryEvidenceKind::LeanTheorem => "lean_theorem",
+        RuntimeBoundaryEvidenceKind::ExecutableSemanticRefinement => {
+            "executable_semantic_refinement"
+        }
+        RuntimeBoundaryEvidenceKind::SourceRegression => "source_regression",
+    }
+}
+
+/// Separation of the runtime-to-Lean boundary obligations into proof-critical
+/// and regression-only groups (Issue 14). A proof-critical obligation carries a
+/// Lean theorem, generated-schema, executable-refinement, or Rust-visibility
+/// (TCB-listed source-frozen) evidence kind; a regression-only obligation is a
+/// source-drift regression that backs no proof-critical claim.
+/// `validate_runtime_boundary_schema` rejects any proof-critical obligation
+/// backed only by source regression, so no proof-critical claim rests solely on
+/// a Rust source substring outside the source-frozen TCB surface.
+fn runtime_boundary_obligation_classification_json() -> JsonValue {
+    let describe = |obligation: &uo_core::RuntimeBoundaryObligation| {
+        json!({
+            "id": obligation.id,
+            "surface": obligation.surface,
+            "evidence_kind": evidence_kind_label(obligation.evidence_kind),
+            "rust_anchor": obligation.rust_anchor,
+            "lean_anchor": obligation.lean_anchor,
+            "executable_check": obligation.executable_check,
+        })
+    };
+    let proof_critical = RUNTIME_BOUNDARY_OBLIGATIONS
+        .iter()
+        .filter(|obligation| obligation.proof_critical)
+        .map(describe)
+        .collect::<Vec<_>>();
+    let regression_only = RUNTIME_BOUNDARY_OBLIGATIONS
+        .iter()
+        .filter(|obligation| !obligation.proof_critical)
+        .map(describe)
+        .collect::<Vec<_>>();
+    json!({
+        "proof_critical_count": proof_critical.len(),
+        "regression_only_count": regression_only.len(),
+        "proof_critical": proof_critical,
+        "regression_only": regression_only,
     })
 }
 

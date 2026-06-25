@@ -1321,6 +1321,94 @@
       "signature": "pub(in crate::runtime) fn ensure_path_oram_leaf_coins_consumed"
     }
   ],
+  "runtime_boundary_obligation_classification": {
+    "proof_critical": [
+      {
+        "evidence_kind": "rust_visibility",
+        "executable_check": "cargo test -p uo-evm",
+        "id": "runtime_public_bridge_export_surface",
+        "lean_anchor": "RuntimeImplementationInterface.PublicBridgeBoundary",
+        "rust_anchor": "runtime/uo-evm/src/lib.rs",
+        "surface": "uo-evm public bridge entrypoints"
+      },
+      {
+        "evidence_kind": "rust_visibility",
+        "executable_check": "cargo test -p uo-core runtime_refinement_witness_validate_accepts_sample",
+        "id": "runtime_kernel_refinement_witness_export_surface",
+        "lean_anchor": "RuntimeShellBoundary.RuntimeKernelRefinementWitness.Valid",
+        "rust_anchor": "crates/uo-core/src/trace.rs::RuntimeKernelRefinementWitness",
+        "surface": "uo-core runtime refinement witness API"
+      },
+      {
+        "evidence_kind": "executable_semantic_refinement",
+        "executable_check": "cargo test -p uo-core generated_value_ops",
+        "id": "generated_value_ops_semantics",
+        "lean_anchor": "RuntimeValueOpsSemantics",
+        "rust_anchor": "crates/uo-core/src/generated_value_ops.rs",
+        "surface": "canonical Value byte encoding and equality operations"
+      },
+      {
+        "evidence_kind": "executable_semantic_refinement",
+        "executable_check": "cargo test -p uo-core fixed_prefix_buffer_rejects_overflow_and_moves_prefix",
+        "id": "fixed_buffer_capacity_semantics",
+        "lean_anchor": "RuntimeValueOpsSemantics.FixedByteBufferState",
+        "rust_anchor": "crates/uo-core/src/fixed_buffer.rs",
+        "surface": "fixed-capacity boxed buffer construction"
+      },
+      {
+        "evidence_kind": "generated_schema",
+        "executable_check": "cargo test -p uo-evm runtime::objects",
+        "id": "generated_object_helper_semantics",
+        "lean_anchor": "RuntimeObjectHelpersGeneratedRust + RuntimeArrayAccessDiscipline + RuntimeSmallMapLookupDiscipline",
+        "rust_anchor": "runtime/uo-evm/src/generated_object_helpers.rs",
+        "surface": "UO object helper scans, commits, and reset/open helpers"
+      },
+      {
+        "evidence_kind": "generated_schema",
+        "executable_check": "cargo test -p uo-evm oram::tests",
+        "id": "generated_oram_codec_semantics",
+        "lean_anchor": "RuntimeOramCodecsGeneratedRust + RuntimeOramCodecSemantics + RuntimeOramWriteLogDiscipline",
+        "rust_anchor": "runtime/uo-evm/src/generated_oram_codecs.rs",
+        "surface": "Path ORAM block/bucket codec and write-log helpers"
+      },
+      {
+        "evidence_kind": "executable_semantic_refinement",
+        "executable_check": "cargo test -p uo-core confidential_kernel",
+        "id": "confidential_kernel_slot_semantics",
+        "lean_anchor": "ConfidentialKernelDsl + ConfidentialKernelGeneratedRust + RuntimeKernelSlotSupport",
+        "rust_anchor": "crates/uo-core/src/confidential_kernel.rs",
+        "surface": "confidential kernel interpreter and slot lowering"
+      },
+      {
+        "evidence_kind": "generated_schema",
+        "executable_check": "cargo test -p uo-store",
+        "id": "store_codec_semantics",
+        "lean_anchor": "RuntimeStoreCodecGeneratedRust + RuntimeStoreCodecSemantics",
+        "rust_anchor": "runtime/uo-store/src/generated_codec.rs",
+        "surface": "sealed store transport codec and zeroization helpers"
+      },
+      {
+        "evidence_kind": "lean_theorem",
+        "executable_check": "cargo test -p uo-core trace::tests",
+        "id": "primitive_transcript_semantics",
+        "lean_anchor": "RuntimeRefinementJson + RuntimeShellBoundaryJson",
+        "rust_anchor": "crates/uo-core/src/trace.rs::RuntimePrimitiveEvent",
+        "surface": "append-only primitive runtime transcript"
+      }
+    ],
+    "proof_critical_count": 9,
+    "regression_only": [
+      {
+        "evidence_kind": "source_regression",
+        "executable_check": "cargo run -q -p mplus-probe -- --only static-checks",
+        "id": "static_drift_regression_inventory",
+        "lean_anchor": "RuntimeImplementationInterface source predicates",
+        "rust_anchor": "probe/mplus-probe/src/lib.rs::static_drift_check_inventory",
+        "surface": "legacy source-drift regression probes"
+      }
+    ],
+    "regression_only_count": 1
+  },
   "runtime_call_outcome_api_is_explicit": true,
   "runtime_call_outcome_constructor_surface_files": [
     "crates/uo-core/src/trace.rs",

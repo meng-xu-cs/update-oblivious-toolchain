@@ -254,8 +254,8 @@
     },
     {
       "path": "runtime_boundary_validation.json",
-      "bytes": 84021,
-      "sha256": "222baa3067f4e69a92086f35f7bcdf27cbb0bc2b5a4628bfc96d5fa319776d62"
+      "bytes": 88350,
+      "sha256": "1e8ac10ba24d40faf70718c0c50135f995c8148780c4ba2aca4f4595e64f660c"
     },
     {
       "path": "runtime_confidential_statement_trace_bridge_boundary_validation.json",
