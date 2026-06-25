@@ -51,6 +51,26 @@ struct StagedCall {
     initialized: bool,
 }
 
+/// Preflight the return-channel/session policy for an entrypoint before any
+/// execution: `encrypted_to_client` returns require a session, and every other
+/// return policy must not be given one. Trace finalization keeps the same
+/// checks as defensive assertions.
+fn ensure_return_channel_policy(
+    entrypoint: &str,
+    returns: ReturnPolicy,
+    return_channel: Option<&ReturnChannelSession>,
+) -> Result<()> {
+    match (returns, return_channel) {
+        (ReturnPolicy::EncryptedToClient, None) => bail!(
+            "entrypoint {entrypoint} with encrypted_to_client return requires a return channel session"
+        ),
+        (policy, Some(_)) if policy != ReturnPolicy::EncryptedToClient => bail!(
+            "entrypoint {entrypoint} has a non-encrypted return policy but a return channel session was supplied"
+        ),
+        _ => Ok(()),
+    }
+}
+
 #[derive(Debug)]
 pub struct ProductionContractInstance {
     inner: ContractInstance,
@@ -271,7 +291,7 @@ impl ContractInstance {
             .find(|function| function.signature == entrypoint)
             .cloned()
             .ok_or_else(|| anyhow!("unknown entrypoint: {entrypoint}"))?;
-        let (initializer, requires_initialized) = {
+        let (initializer, requires_initialized, returns) = {
             let manifest_entry = self
                 .artifact
                 .contract
@@ -285,8 +305,12 @@ impl ContractInstance {
             (
                 manifest_entry.initializer,
                 manifest_entry.requires_initialized,
+                manifest_entry.returns,
             )
         };
+        // Preflight the return-channel/session policy before any execution, so a
+        // policy violation never creates a trace or touches state/freshness.
+        ensure_return_channel_policy(entrypoint, returns, return_channel)?;
         if requires_initialized && !self.initialized {
             bail!("entrypoint {entrypoint} requires initialized contract state");
         }
@@ -1440,6 +1464,96 @@ bounds:
             .expect("expected one UO ORAM map object");
         assert_objects_are_cold(&instance);
         assert_eq!(committed_map.path_oram_access_counter_for_test(), Some(0));
+    }
+
+    #[test]
+    fn return_channel_policy_preflight_rejects_invalid_pairs() {
+        // Encrypted-return entrypoint: a session is required.
+        let enc_source = write_temp(
+            "return-channel-encrypted",
+            r#"
+            contract Enc {
+                function f(uint256 secret) public returns (uint256) { return secret; }
+            }
+            "#,
+        );
+        let enc_metadata = r#"
+contract: Enc
+entrypoints:
+  f(uint256):
+    secret_args: [secret]
+    confidential: true
+    returns: encrypted_to_client
+    status: public
+state: {}
+bounds:
+  loops: {}
+"#;
+        let enc_artifact =
+            compile_bench(enc_source.to_str().unwrap(), enc_metadata, ProgramMode::Uo);
+        let mut enc = ContractInstance::deploy_with_seed(enc_artifact, 17).unwrap();
+        let before = enc.freshness.snapshot();
+        let err = enc.call("f(uint256)", vec![Value::uint(7)]).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("requires a return channel session"));
+        assert_eq!(
+            enc.freshness.snapshot(),
+            before,
+            "preflight reject must not advance freshness"
+        );
+        // Valid pair: encrypted return with a session.
+        let session = return_channel_session();
+        enc.call_with_return_channel("f(uint256)", vec![Value::uint(7)], &session)
+            .unwrap();
+
+        // Non-encrypted return: a supplied session is rejected before execution.
+        let pub_source = write_temp(
+            "return-channel-public",
+            r#"
+            contract Pub {
+                uint256 private x;
+                function setX(uint256 v) public { x = v; }
+                function read() public returns (uint256) { return x; }
+            }
+            "#,
+        );
+        let pub_metadata = r#"
+contract: Pub
+entrypoints:
+  setX(uint256):
+    confidential: false
+    returns: forbidden
+    status: public
+  read():
+    confidential: false
+    returns: public
+    status: public
+state:
+  x:
+    kind: cell
+    value: uint256
+    backend: raw
+    confidential: false
+bounds:
+  loops: {}
+"#;
+        let pub_artifact =
+            compile_bench(pub_source.to_str().unwrap(), pub_metadata, ProgramMode::Raw);
+        let mut pub_inst = ContractInstance::deploy_with_seed(pub_artifact, 5).unwrap();
+        let before_pub = pub_inst.freshness.snapshot();
+        let err = pub_inst
+            .call_with_return_channel("read()", vec![], &session)
+            .unwrap_err();
+        assert!(err.to_string().contains("non-encrypted return policy"));
+        assert_eq!(
+            pub_inst.freshness.snapshot(),
+            before_pub,
+            "preflight reject must not advance freshness"
+        );
+        // Valid pair: non-encrypted return without a session.
+        let read = pub_inst.call("read()", vec![]).unwrap();
+        assert_eq!(read.return_value, Some(Value::uint(0)));
     }
 
     #[cfg(not(feature = "diagnostics"))]
