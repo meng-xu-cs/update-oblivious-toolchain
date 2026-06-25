@@ -83,7 +83,8 @@ The components are interpreted as follows:
   status, declared status policy, return shape, return policy, any public or
   declassified return payload, encrypted-return ciphertext evidence,
   declassification labels, public-state declassification labels, and modeled
-  public gas.
+  public gas (cost model `uo-modeled-resource-cost-v1`: a modeled resource cost,
+  not stock EVM gas; there is no EVM gas schedule or bytecode backend).
 - `boundary_schedule` is the exact enclave boundary sequence.
 - `storage_trace` is exact for exact backends and related through the
   proof-grade Path ORAM route.

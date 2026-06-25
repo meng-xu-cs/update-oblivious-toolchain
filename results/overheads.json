@@ -2,6 +2,17 @@
   "cases": [
     {
       "benchmark": "FixedSlotClassifier/classify",
+      "cost_formula": [
+        {
+          "backend": "full_scan",
+          "cost_formula": "modeled_static_budget",
+          "cost_model": "uo-modeled-resource-cost-v1",
+          "entrypoint": "classify(uint256)",
+          "formula_exact": true,
+          "gas_used": 4096,
+          "manifest_public_gas_budget": 4096
+        }
+      ],
       "entrypoint": "classify(uint256)",
       "full_scan": {
         "bytes_read": 124.0,
@@ -76,6 +87,17 @@
     },
     {
       "benchmark": "AuthScan/auth",
+      "cost_formula": [
+        {
+          "backend": "full_scan",
+          "cost_formula": "modeled_static_budget",
+          "cost_model": "uo-modeled-resource-cost-v1",
+          "entrypoint": "auth(bytes32)",
+          "formula_exact": true,
+          "gas_used": 8192,
+          "manifest_public_gas_budget": 8192
+        }
+      ],
       "entrypoint": "auth(bytes32)",
       "full_scan": {
         "bytes_read": 2108.0,
@@ -164,6 +186,35 @@
     },
     {
       "benchmark": "ConfidentialMixer/deposit",
+      "cost_formula": [
+        {
+          "backend": "full_scan",
+          "cost_formula": "modeled_static_budget",
+          "cost_model": "uo-modeled-resource-cost-v1",
+          "entrypoint": "deposit(bytes32,uint256)",
+          "formula_exact": true,
+          "gas_used": 16384,
+          "manifest_public_gas_budget": 16384
+        },
+        {
+          "backend": "full_scan_64",
+          "cost_formula": "modeled_static_budget",
+          "cost_model": "uo-modeled-resource-cost-v1",
+          "entrypoint": "deposit(bytes32,uint256)",
+          "formula_exact": true,
+          "gas_used": 32768,
+          "manifest_public_gas_budget": 32768
+        },
+        {
+          "backend": "full_scan+oram",
+          "cost_formula": "modeled_static_budget",
+          "cost_model": "uo-modeled-resource-cost-v1",
+          "entrypoint": "deposit(bytes32,uint256)",
+          "formula_exact": true,
+          "gas_used": 12288,
+          "manifest_public_gas_budget": 12288
+        }
+      ],
       "entrypoint": "deposit(bytes32,uint256)",
       "full_scan": {
         "bytes_read": 3288.0,
@@ -367,6 +418,35 @@
     },
     {
       "benchmark": "ConfidentialMixer/withdraw",
+      "cost_formula": [
+        {
+          "backend": "full_scan",
+          "cost_formula": "modeled_static_budget",
+          "cost_model": "uo-modeled-resource-cost-v1",
+          "entrypoint": "withdraw(bytes32,uint256)",
+          "formula_exact": true,
+          "gas_used": 16384,
+          "manifest_public_gas_budget": 16384
+        },
+        {
+          "backend": "full_scan_64",
+          "cost_formula": "modeled_static_budget",
+          "cost_model": "uo-modeled-resource-cost-v1",
+          "entrypoint": "withdraw(bytes32,uint256)",
+          "formula_exact": true,
+          "gas_used": 32768,
+          "manifest_public_gas_budget": 32768
+        },
+        {
+          "backend": "full_scan+oram",
+          "cost_formula": "modeled_static_budget",
+          "cost_model": "uo-modeled-resource-cost-v1",
+          "entrypoint": "withdraw(bytes32,uint256)",
+          "formula_exact": true,
+          "gas_used": 12288,
+          "manifest_public_gas_budget": 12288
+        }
+      ],
       "entrypoint": "withdraw(bytes32,uint256)",
       "full_scan": {
         "bytes_read": 3288.0,
@@ -570,6 +650,26 @@
     },
     {
       "benchmark": "ERC20Lite/transferFrom",
+      "cost_formula": [
+        {
+          "backend": "full_scan",
+          "cost_formula": "modeled_static_budget",
+          "cost_model": "uo-modeled-resource-cost-v1",
+          "entrypoint": "transferFrom(address,address,address,uint256)",
+          "formula_exact": true,
+          "gas_used": 24576,
+          "manifest_public_gas_budget": 24576
+        },
+        {
+          "backend": "oram",
+          "cost_formula": "modeled_static_budget",
+          "cost_model": "uo-modeled-resource-cost-v1",
+          "entrypoint": "transferFrom(address,address,address,uint256)",
+          "formula_exact": true,
+          "gas_used": 16384,
+          "manifest_public_gas_budget": 16384
+        }
+      ],
       "entrypoint": "transferFrom(address,address,address,uint256)",
       "full_scan": {
         "bytes_read": 11392.0,
@@ -727,6 +827,17 @@
     },
     {
       "benchmark": "RegistryCRUD/clearIfMatch",
+      "cost_formula": [
+        {
+          "backend": "full_scan",
+          "cost_formula": "modeled_static_budget",
+          "cost_model": "uo-modeled-resource-cost-v1",
+          "entrypoint": "clearIfMatch(bytes32,uint256)",
+          "formula_exact": true,
+          "gas_used": 12288,
+          "manifest_public_gas_budget": 12288
+        }
+      ],
       "entrypoint": "clearIfMatch(bytes32,uint256)",
       "full_scan": {
         "bytes_read": 3040.0,
@@ -800,6 +911,16 @@
       ]
     }
   ],
+  "cost_formula_exact": true,
+  "cost_model": {
+    "confidential_formula": "modeled_public_gas = 2000 + statements*11 + expressions*7 + commit_ops*29",
+    "excludes_evm_bytecode_backend": true,
+    "excludes_evm_gas_schedule": true,
+    "excludes_stock_evm_gas": true,
+    "id": "uo-modeled-resource-cost-v1",
+    "kind": "modeled-resource-units",
+    "public_runtime_formula": "logical_reads*3 + logical_writes*5 + physical_writes*17"
+  },
   "coverage": {
     "matrix_row_count": 17,
     "metrics": [

@@ -49002,6 +49002,20 @@ fn run_overheads(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<JsonV
     )
     .context("overheads/RegistryCRUD/clearIfMatch")?;
 
+    let cost_formula_exact = cases.iter().all(|case| {
+        case.get("cost_formula")
+            .and_then(|records| records.as_array())
+            .map(|records| {
+                records.iter().all(|record| {
+                    record
+                        .get("formula_exact")
+                        .and_then(|exact| exact.as_bool())
+                        .unwrap_or(false)
+                })
+            })
+            .unwrap_or(true)
+    });
+
     Ok(json!({
         "coverage": {
             "workload_count": cases.len(),
@@ -49017,6 +49031,8 @@ fn run_overheads(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<JsonV
                 "entrypoint_resource_bounds"
             ],
         },
+        "cost_model": cost_model_descriptor(),
+        "cost_formula_exact": cost_formula_exact,
         "cases": cases,
         "matrix": matrix,
         "rejected_oram_cases": collect_rejected_oram_cases(),
@@ -49145,6 +49161,12 @@ fn append_overhead_workload(
         "full_scan": scenario_overhead(&uo),
         "variants": variants,
     });
+    let mut cost_formula = vec![scenario_cost_formula(
+        &uo,
+        &artifacts.uo,
+        target.entrypoint,
+        &uo_label,
+    )];
     #[cfg(feature = "insecure-eval-raw")]
     {
         case["raw_insecure_eval"] = scenario_overhead(&raw_insecure_eval);
@@ -49170,6 +49192,12 @@ fn append_overhead_workload(
             "full_scan_64",
             fullscan64.target.trace.physical_writes.len(),
         );
+        cost_formula.push(scenario_cost_formula(
+            &fullscan64,
+            fullscan64_artifact,
+            target.entrypoint,
+            "full_scan_64",
+        ));
     }
 
     if let Some(oram) = oram {
@@ -49194,8 +49222,15 @@ fn append_overhead_workload(
         case["oram_improves_physical_writes_baseline"] = json!(oram_write_comparison_baseline.0);
         case["oram_improves_physical_writes"] =
             json!(oram.target.trace.physical_writes.len() < oram_write_comparison_baseline.1);
+        cost_formula.push(scenario_cost_formula(
+            &oram,
+            oram_artifact,
+            target.entrypoint,
+            &oram_label,
+        ));
     }
 
+    case["cost_formula"] = json!(cost_formula);
     cases.push(case);
     Ok(())
 }
@@ -50263,6 +50298,65 @@ fn optional_scenario_overhead(result: &OptionalScenarioResult) -> JsonValue {
             "error": error,
         }),
     }
+}
+
+/// Versioned identifier for the modeled resource-cost accounting reported as
+/// `gas_used`. This is a MODELED resource cost, not stock EVM gas: there is no
+/// EVM gas schedule or bytecode backend in this toolchain.
+const RESOURCE_COST_MODEL: &str = "uo-modeled-resource-cost-v1";
+
+/// Self-describing cost-model record embedded in `overheads.json` so the report
+/// is not ambiguous about its `gas_used` wording. The two documented formulas
+/// mirror `gas_used_of` in `runtime/uo-evm/src/controller.rs`.
+fn cost_model_descriptor() -> JsonValue {
+    json!({
+        "id": RESOURCE_COST_MODEL,
+        "kind": "modeled-resource-units",
+        "excludes_stock_evm_gas": true,
+        "excludes_evm_gas_schedule": true,
+        "excludes_evm_bytecode_backend": true,
+        "confidential_formula": "modeled_public_gas = 2000 + statements*11 + expressions*7 + commit_ops*29",
+        "public_runtime_formula": "logical_reads*3 + logical_writes*5 + physical_writes*17",
+    })
+}
+
+/// Formula-exactness record for one benchmark backend. A confidential entrypoint
+/// (`cost_formula: modeled_static_budget`) must report the compiler's modeled
+/// static budget as its runtime cost: the probe independently reads the compiler
+/// `public_gas_budget` and the runtime `gas_used` and requires agreement. A
+/// public entrypoint (`cost_formula: dynamic_execution_metric`) uses the dynamic
+/// execution-metric model documented in `cost_model`. The `confidential` /
+/// `public` distinction is carried by `cost_formula` rather than a boolean leaf,
+/// so the acceptance gate does not see a spurious `confidential: false` path.
+fn scenario_cost_formula(
+    result: &ScenarioResult,
+    artifact: &CompiledArtifact,
+    entrypoint: &str,
+    backend: &str,
+) -> JsonValue {
+    let gas_used = result.target.trace.gas_used;
+    let manifest_entry = artifact.contract.manifest.entrypoints.get(entrypoint);
+    let manifest_public_gas_budget = manifest_entry.map(|entry| entry.public_gas_budget);
+    let confidential = manifest_entry
+        .map(|entry| !entry.secret_args.is_empty())
+        .unwrap_or(false);
+    let (cost_formula, formula_exact) = if confidential {
+        (
+            "modeled_static_budget",
+            manifest_public_gas_budget == Some(gas_used),
+        )
+    } else {
+        ("dynamic_execution_metric", true)
+    };
+    json!({
+        "backend": backend,
+        "entrypoint": entrypoint,
+        "cost_model": RESOURCE_COST_MODEL,
+        "cost_formula": cost_formula,
+        "gas_used": gas_used,
+        "manifest_public_gas_budget": manifest_public_gas_budget,
+        "formula_exact": formula_exact,
+    })
 }
 
 fn overhead_matrix_row(

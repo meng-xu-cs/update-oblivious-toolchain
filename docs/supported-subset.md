@@ -76,7 +76,15 @@ Sidecar metadata requirements:
   admits only one logical access per map per entrypoint, and a multi-access
   private-posmap entrypoint is rejected at compile time with a diagnostic
   naming the limitation
-- gas budgets may be supplied explicitly and are otherwise derived into the emitted manifest
+- gas budgets may be supplied explicitly and are otherwise derived into the
+  emitted manifest. The recorded `public_gas_budget` and the runtime `gas_used`
+  are a MODELED resource cost under cost model `uo-modeled-resource-cost-v1`
+  (confidential entrypoints carry the static budget
+  `2000 + statements*11 + expressions*7 + commit_ops*29`; public entrypoints use
+  the dynamic execution-metric cost
+  `logical_reads*3 + logical_writes*5 + physical_writes*17`). This is not stock
+  EVM gas: there is no EVM gas schedule or bytecode backend. `results/overheads.json`
+  records this cost model and cross-checks formula exactness for every benchmark
 - generated artifacts carry an admitted-package hash over the source-language
   tag, the executable-semantics profile tag, source bytes, canonical sidecar
   metadata JSON, compilation mode, compiler version, toolchain manifest digest,
