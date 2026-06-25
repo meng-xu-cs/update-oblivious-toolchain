@@ -75,12 +75,13 @@ const ADVISORY_FIELDS: &[&str] = &[
     "estimated",
     "aborted",
     "executable",
+    // A trace-equivalence row in the computational/ORAM class declares
+    // `equality_is_obligation: false`; that is descriptive, not a failure.
+    "equality_is_obligation",
     // False means a representative large map carries a symbolic/sub-enumerative
     // certificate instead of a full seed-space enumeration, which is expected.
-    // `coverage_complete` is the legacy (misleading) name; Issue 03 renames it
-    // to `seed_space_fully_enumerated`. Both are accepted here so the rename can
-    // land without a transient gate failure.
-    "coverage_complete",
+    // (Renamed from the misleading `coverage_complete`, which read like a
+    // coverage failure.)
     "seed_space_fully_enumerated",
 ];
 
@@ -240,6 +241,77 @@ fn empty_class_counts() -> BTreeMap<String, usize> {
         .collect()
 }
 
+/// Per-report classification verdict.
+struct ReportVerdict {
+    entry: JsonValue,
+    accepted: bool,
+    required: bool,
+    class_counts: BTreeMap<String, usize>,
+    unclassified: Vec<String>,
+    required_failures: Vec<String>,
+}
+
+fn classify_report(report: &str, root: &JsonValue) -> ReportVerdict {
+    let mut class_counts = empty_class_counts();
+    let mut unclassified = Vec::new();
+    let mut required_failures = Vec::new();
+    let mut expected_false_paths = Vec::new();
+    let mut advisory_false_paths = Vec::new();
+    let mut false_total = 0usize;
+    {
+        let mut path_buf = Vec::new();
+        walk(root, &mut path_buf, None, &mut |segments, parent| {
+            let class = classify(report, segments, parent);
+            let joined = segments.join(".");
+            false_total += 1;
+            *class_counts.get_mut(class).expect("known class") += 1;
+            match class {
+                CLASS_UNCLASSIFIED => unclassified.push(joined),
+                CLASS_REQUIRED_FAILURE => required_failures.push(joined),
+                CLASS_ADVISORY_NONCLAIM => advisory_false_paths.push(joined),
+                CLASS_EXPECTED_NEGATIVE
+                | CLASS_EXPECTED_COMPUTATIONAL_DIFFERENCE
+                | CLASS_DEPRECATED_REPORT => expected_false_paths.push(joined),
+                _ => {}
+            }
+        });
+    }
+    let mode = report_mode(report);
+    let required = mode == "proof_grade";
+    let accepted = unclassified.is_empty() && required_failures.is_empty();
+    let declared_accepted = root.get("accepted").and_then(JsonValue::as_bool);
+    let entry = json!({
+        "schema": "uo.acceptance.report.v1",
+        "report": report,
+        "mode": mode,
+        "required": required,
+        "declared_accepted": declared_accepted,
+        "accepted": accepted,
+        "false_count": false_total,
+        "class_counts": class_counts.clone(),
+        "false_paths": false_total,
+        "expected_false_paths": expected_false_paths,
+        "advisory_false_paths": advisory_false_paths,
+        "required_failures": required_failures.clone(),
+        "unclassified_false_paths": unclassified.clone(),
+    });
+    ReportVerdict {
+        entry,
+        accepted,
+        required,
+        class_counts,
+        unclassified,
+        required_failures,
+    }
+}
+
+/// Public per-report verdict: classify a single report's false leaves and
+/// return its acceptance entry. Used to give `bridge_validation` a clear
+/// proof-grade verdict at generation time.
+pub fn report_verdict(report: &str, root: &JsonValue) -> JsonValue {
+    classify_report(report, root).entry
+}
+
 /// Build the aggregate acceptance report from the generated reports in
 /// `out_dir`. Does not write anything.
 pub fn run_acceptance_check_report(out_dir: &str) -> Result<JsonValue> {
@@ -277,63 +349,20 @@ pub fn run_acceptance_check_report(out_dir: &str) -> Result<JsonValue> {
         let root: JsonValue = serde_json::from_slice(&bytes)
             .map_err(|err| anyhow!("acceptance-check cannot parse {}: {err}", path.display()))?;
 
-        let mut class_counts = empty_class_counts();
-        let mut report_unclassified = Vec::new();
-        let mut report_required = Vec::new();
-        let mut expected_false_paths = Vec::new();
-        let mut advisory_false_paths = Vec::new();
-        let mut false_total = 0usize;
-
-        {
-            let mut path_buf = Vec::new();
-            walk(&root, &mut path_buf, None, &mut |segments, parent| {
-                let class = classify(report, segments, parent);
-                let joined = segments.join(".");
-                false_total += 1;
-                *class_counts.get_mut(class).expect("known class") += 1;
-                *total_counts.get_mut(class).expect("known class") += 1;
-                match class {
-                    CLASS_UNCLASSIFIED => {
-                        report_unclassified.push(joined.clone());
-                        unclassified_paths.push(json!({"report": report, "path": joined}));
-                    }
-                    CLASS_REQUIRED_FAILURE => {
-                        report_required.push(joined.clone());
-                        required_failure_paths.push(json!({"report": report, "path": joined}));
-                    }
-                    CLASS_ADVISORY_NONCLAIM => advisory_false_paths.push(joined),
-                    CLASS_EXPECTED_NEGATIVE
-                    | CLASS_EXPECTED_COMPUTATIONAL_DIFFERENCE
-                    | CLASS_DEPRECATED_REPORT => expected_false_paths.push(joined),
-                    _ => {}
-                }
-            });
+        let verdict = classify_report(report, &root);
+        for class in ALL_CLASSES {
+            *total_counts.get_mut(*class).expect("known class") += verdict.class_counts[*class];
         }
-
-        let mode = report_mode(report);
-        let required = mode == "proof_grade";
-        let report_accepted = report_unclassified.is_empty() && report_required.is_empty();
-        if required && !report_accepted {
+        for unclassified in &verdict.unclassified {
+            unclassified_paths.push(json!({"report": report, "path": unclassified}));
+        }
+        for required in &verdict.required_failures {
+            required_failure_paths.push(json!({"report": report, "path": required}));
+        }
+        if verdict.required && !verdict.accepted {
             all_proof_grade_accepted = false;
         }
-        // Surface any explicit top-level `accepted` the report already carries.
-        let declared_accepted = root.get("accepted").and_then(JsonValue::as_bool);
-
-        report_entries.push(json!({
-            "schema": "uo.acceptance.report.v1",
-            "report": report,
-            "mode": mode,
-            "required": required,
-            "declared_accepted": declared_accepted,
-            "accepted": report_accepted,
-            "false_count": false_total,
-            "class_counts": class_counts,
-            "false_paths": false_total,
-            "expected_false_paths": expected_false_paths,
-            "advisory_false_paths": advisory_false_paths,
-            "required_failures": report_required,
-            "unclassified_false_paths": report_unclassified,
-        }));
+        report_entries.push(verdict.entry);
     }
 
     let accepted = unclassified_paths.is_empty()
@@ -507,6 +536,35 @@ mod tests {
         assert_eq!(
             report["class_counts"]["expected_computational_difference"],
             json!(2)
+        );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn renamed_and_relabeled_fields_are_classified() {
+        // Issue 03: the renamed seed-space field and the computational-row
+        // `equality_is_obligation: false` are advisory, not unclassified.
+        let dir = temp_results_dir("issue03");
+        write(
+            &dir,
+            "fresh_coin_validation.json",
+            json!({"scenarios": [{"seed_space_fully_enumerated": false}]}),
+        );
+        write(
+            &dir,
+            "trace_equivalence.json",
+            json!({
+                "computational_uo": [
+                    {"comparison_class": "computational_oram", "equality_is_obligation": false,
+                     "physical_trace_equal": false}
+                ]
+            }),
+        );
+        let report = run_acceptance_check_report(dir.to_str().unwrap()).unwrap();
+        assert_eq!(report["accepted"], json!(true));
+        assert_eq!(
+            report["unclassified_false_paths"].as_array().unwrap().len(),
+            0
         );
         let _ = fs::remove_dir_all(&dir);
     }

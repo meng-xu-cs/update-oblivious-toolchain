@@ -1,6 +1,6 @@
 {
   "format_version": 3,
-  "file_count": 77,
+  "file_count": 78,
   "lean_toolchain": "leanprover/lean4:v4.30.0-rc2",
   "lean_toolchain_exact_release": true,
   "lean_version": "Lean (version 4.30.0-rc2, x86_64-unknown-linux-gnu, commit 3dc1a088b6d2d8eafe25a7cd7ec7b58d731bd7cc, Release)",
@@ -13,6 +13,11 @@
   "cargo_lock_sha256": "8a1217a0d2fd7e3102c2622e750783d3c14bf2b8912c90712763bbf3065b7f8b",
   "files": [
     {
+      "path": "acceptance.json",
+      "bytes": 138151,
+      "sha256": "495b8f0d058e747a94acdb54630fd1ad11a646bbcfefab9ced7c9347bfe07a2b"
+    },
+    {
       "path": "artifact_configuration.json",
       "bytes": 155,
       "sha256": "32336e1dbc9dcd81ce2ec975d131cd45bae5cc351adb8c4d1cc87af0d33de91b"
@@ -24,8 +29,8 @@
     },
     {
       "path": "bridge_validation.json",
-      "bytes": 25603823,
-      "sha256": "c98cc7709e43e352ccdcfb5efa1bd0dcc8cd3dd78cde174eb394f0b8790b6e72"
+      "bytes": 25604186,
+      "sha256": "888e9202c192d058a466c4c34d5759e6234e00e253604de108011dfc2e0b2f59"
     },
     {
       "path": "canonical_pathoram_pair_validation.json",
@@ -129,8 +134,8 @@
     },
     {
       "path": "fresh_coin_validation.json",
-      "bytes": 5989,
-      "sha256": "6793c0a669c81802a68686e1e0862a34c6aebfc784b510fe4fd6dd322a943694"
+      "bytes": 6029,
+      "sha256": "67a7bf89150ccd4bfa125f45d8ddc50f93ba5e61f2f4d01bc5c251f143f25f39"
     },
     {
       "path": "kernel_confinement_boundary_validation.json",
@@ -384,8 +389,8 @@
     },
     {
       "path": "trace_equivalence.json",
-      "bytes": 2069,
-      "sha256": "57b2c47e1de83afd033012e66ef66b4ec4d047a572f2a7484b90b161f5c57aaa"
+      "bytes": 2642,
+      "sha256": "82cdfea8ae3f624c6bf622d4b245d71d6e676b1e67c45bb128fdf5863f132204"
     },
     {
       "path": "trusted_kernel_validation.json",

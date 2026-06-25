@@ -101,6 +101,7 @@ enum ReportKind {
     FreshCoinValidation,
     ReviewerSummary,
     AcceptanceCheck,
+    BridgeVerdict,
 }
 
 #[derive(Debug, Parser)]
@@ -905,6 +906,35 @@ fn main() -> Result<()> {
                     cli.out_dir
                 );
             }
+        }
+        Some(ReportKind::BridgeVerdict) => {
+            // Stamp the proof-grade verdict onto an already-generated
+            // bridge_validation.json without re-running the (~45 min) bridge
+            // sub-report suite. The verdict is a pure function of the existing
+            // bridge content via the same report_verdict used at generation, so
+            // this is equivalent to regeneration whenever the sub-reports are
+            // unchanged.
+            let path = Path::new(&cli.out_dir).join("bridge_validation.json");
+            let mut bridge: JsonValue = serde_json::from_slice(&fs::read(&path)?)?;
+            let verdict = mplus_probe::report_verdict("bridge_validation", &bridge);
+            if let Some(object) = bridge.as_object_mut() {
+                object.insert(
+                    "proof_grade_verdict".to_string(),
+                    json!({
+                        "accepted": verdict["accepted"],
+                        "required": verdict["required"],
+                        "class_counts": verdict["class_counts"],
+                        "required_failures": verdict["required_failures"],
+                        "unclassified_false_paths": verdict["unclassified_false_paths"],
+                    }),
+                );
+            }
+            fs::write(&path, serde_json::to_vec_pretty(&bridge)?)?;
+            mplus_probe::write_reproducibility_manifest(&cli.out_dir)?;
+            println!(
+                "stamped bridge_validation proof_grade_verdict (accepted={})",
+                verdict["accepted"]
+            );
         }
         None => {
             let report = mplus_probe::run_probe_with_options(&options)?;

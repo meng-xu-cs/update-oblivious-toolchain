@@ -41,7 +41,8 @@ use uo_evm::{CallResult, ContractInstance, DiagnosticCallResult, PathOramFreshCo
 
 mod acceptance;
 pub use acceptance::{
-    run_acceptance_check_fail_closed, run_acceptance_check_report, ACCEPTANCE_SCHEMA,
+    report_verdict, run_acceptance_check_fail_closed, run_acceptance_check_report,
+    ACCEPTANCE_SCHEMA,
 };
 
 const PROBE_DEPLOY_SEED: u64 = 0x5052_4f42_455f_0001;
@@ -877,7 +878,7 @@ pub fn run_probe_with_options(options: &ProbeRunOptions) -> Result<JsonValue> {
             run_canonical_pathoram_pair_validation(options)
                 .context("running canonical_pathoram_pair_validation report")
         })?;
-    let bridge_validation = json!({
+    let mut bridge_validation = json!({
         "static_checks": static_checks,
         "controller_observer_validation": controller_observer_validation,
         "pathoram_hidden_validation": pathoram_hidden_validation,
@@ -976,6 +977,21 @@ pub fn run_probe_with_options(options: &ProbeRunOptions) -> Result<JsonValue> {
         "paper_main_family_boundary_validation": paper_main_family_boundary_validation,
         "paper_main_slot_boundary_validation": paper_main_slot_boundary_validation,
     });
+    // Issue 03: clear proof-grade verdict over the embedded sub-reports.
+    let bridge_proof_grade_verdict =
+        acceptance::report_verdict("bridge_validation", &bridge_validation);
+    if let Some(object) = bridge_validation.as_object_mut() {
+        object.insert(
+            "proof_grade_verdict".to_string(),
+            json!({
+                "accepted": bridge_proof_grade_verdict["accepted"],
+                "required": bridge_proof_grade_verdict["required"],
+                "class_counts": bridge_proof_grade_verdict["class_counts"],
+                "required_failures": bridge_proof_grade_verdict["required_failures"],
+                "unclassified_false_paths": bridge_proof_grade_verdict["unclassified_false_paths"],
+            }),
+        );
+    }
     let reviewer_summary = build_reviewer_summary(
         &correctness,
         &static_checks,
@@ -1457,7 +1473,7 @@ pub fn run_bridge_validation_report() -> Result<JsonValue> {
         "paper_main_slot_boundary_accepted",
         "paper_main_slot_lean_checker_input",
     )?;
-    Ok(json!({
+    let mut bridge_validation = json!({
         "static_checks": static_checks,
         "controller_observer_validation": controller_observer_validation,
         "pathoram_hidden_validation": pathoram_hidden_validation,
@@ -1555,7 +1571,25 @@ pub fn run_bridge_validation_report() -> Result<JsonValue> {
         "seeded_witness_validation": seeded_witness_validation,
         "paper_main_family_boundary_validation": paper_main_family_boundary_validation,
         "paper_main_slot_boundary_validation": paper_main_slot_boundary_validation,
-    }))
+    });
+    // Issue 03: a single, clear proof-grade verdict over the embedded
+    // sub-reports — proof-grade obligations accepted, tamper scenarios rejected
+    // as expected negatives, computational-ORAM differences classified, and no
+    // unclassified false bit remaining.
+    let verdict = acceptance::report_verdict("bridge_validation", &bridge_validation);
+    if let Some(object) = bridge_validation.as_object_mut() {
+        object.insert(
+            "proof_grade_verdict".to_string(),
+            json!({
+                "accepted": verdict["accepted"],
+                "required": verdict["required"],
+                "class_counts": verdict["class_counts"],
+                "required_failures": verdict["required_failures"],
+                "unclassified_false_paths": verdict["unclassified_false_paths"],
+            }),
+        );
+    }
+    Ok(bridge_validation)
 }
 
 pub fn run_kernel_validation_report() -> Result<JsonValue> {
@@ -24191,7 +24225,7 @@ fn validate_fresh_coin_family_case(
         "seed_count": family.seed_count(),
         "distinct_canonical_seeds_found": family.seed_count(),
         "coverage_fraction": 1.0,
-        "coverage_complete": true,
+        "seed_space_fully_enumerated": true,
         "gas_uniform": gas_uniform,
         "boundary_uniform": boundary_uniform,
         "controller_phase_uniform": controller_phase_uniform,
@@ -24301,7 +24335,7 @@ fn validate_fresh_coin_theorem_input_case(
         "representative_witness_count": 1,
         "seed_count": theorem_input.seed_count(),
         "symbolic_seed_space_instantiated": true,
-        "coverage_complete": false,
+        "seed_space_fully_enumerated": false,
         "public_leaf_scaffold_steps": theorem_input.public_leaf_scaffold().len(),
         "public_fresh_coin_scaffold_steps": theorem_input.public_fresh_coin_scaffold().len(),
         "canonical_fresh_coin_seed_space_size": Some(theorem_input.seed_count()),
@@ -25022,7 +25056,7 @@ fn validate_fresh_coin_heavy_case(
         "seed_count": summary.seed_count,
         "distinct_canonical_seeds_found": summary.seed_count,
         "coverage_fraction": 1.0,
-        "coverage_complete": true,
+        "seed_space_fully_enumerated": true,
         "gas_uniform": summary.gas_uniform,
         "boundary_uniform": summary.boundary_uniform,
         "controller_phase_uniform": summary.controller_phase_uniform,
@@ -49900,9 +49934,15 @@ where
 }
 
 fn trace_summary(benchmark: &str, mode: &str, outcome: &ExperimentOutcome) -> JsonValue {
+    // Exact backends (uo) owe exact physical-trace equality; the ORAM route is
+    // related only computationally, so a physical-trace inequality there is an
+    // expected computational difference, not a failed obligation.
+    let computational = mode == "oram";
     json!({
         "benchmark": benchmark,
         "mode": mode,
+        "comparison_class": if computational { "computational_oram" } else { "exact_backend" },
+        "equality_is_obligation": !computational,
         "opcode_equal": outcome.opcode_equal,
         "logical_access_equal": outcome.logical_equal,
         "logical_write_equal": outcome.logical_write_equal,

@@ -535343,6 +535343,20 @@
       }
     ]
   },
+  "proof_grade_verdict": {
+    "accepted": true,
+    "class_counts": {
+      "advisory_nonclaim": 162,
+      "deprecated_report": 0,
+      "expected_computational_difference": 48,
+      "expected_negative": 384,
+      "required_failure": 0,
+      "unclassified": 0
+    },
+    "required": true,
+    "required_failures": [],
+    "unclassified_false_paths": []
+  },
   "runtime_boundary_validation": {
     "accepted": true,
     "all_kernel_restricted_signatures_present": true,

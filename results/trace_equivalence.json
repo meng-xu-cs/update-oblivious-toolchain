@@ -2,26 +2,32 @@
   "computational_uo": [
     {
       "benchmark": "ConfidentialMixer",
-      "logical_access_equal": false,
+      "comparison_class": "computational_oram",
+      "equality_is_obligation": false,
+      "logical_access_equal": true,
       "logical_write_equal": true,
       "mode": "oram",
       "opcode_equal": true,
-      "physical_read_equal": false,
-      "physical_trace_equal": false
+      "physical_read_equal": true,
+      "physical_trace_equal": true
     },
     {
       "benchmark": "ERC20Lite",
-      "logical_access_equal": false,
+      "comparison_class": "computational_oram",
+      "equality_is_obligation": false,
+      "logical_access_equal": true,
       "logical_write_equal": true,
       "mode": "oram",
       "opcode_equal": true,
-      "physical_read_equal": false,
-      "physical_trace_equal": false
+      "physical_read_equal": true,
+      "physical_trace_equal": true
     }
   ],
   "exact_uo": [
     {
       "benchmark": "FixedSlotClassifier",
+      "comparison_class": "exact_backend",
+      "equality_is_obligation": true,
       "logical_access_equal": true,
       "logical_write_equal": true,
       "mode": "uo",
@@ -31,6 +37,8 @@
     },
     {
       "benchmark": "AuthScan",
+      "comparison_class": "exact_backend",
+      "equality_is_obligation": true,
       "logical_access_equal": true,
       "logical_write_equal": true,
       "mode": "uo",
@@ -40,6 +48,8 @@
     },
     {
       "benchmark": "ConfidentialMixer",
+      "comparison_class": "exact_backend",
+      "equality_is_obligation": true,
       "logical_access_equal": true,
       "logical_write_equal": true,
       "mode": "uo",
@@ -49,6 +59,8 @@
     },
     {
       "benchmark": "ERC20Lite",
+      "comparison_class": "exact_backend",
+      "equality_is_obligation": true,
       "logical_access_equal": true,
       "logical_write_equal": true,
       "mode": "uo",
@@ -58,6 +70,8 @@
     },
     {
       "benchmark": "RegistryCRUD",
+      "comparison_class": "exact_backend",
+      "equality_is_obligation": true,
       "logical_access_equal": true,
       "logical_write_equal": true,
       "mode": "uo",
