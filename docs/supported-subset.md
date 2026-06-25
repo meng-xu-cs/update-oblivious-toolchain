@@ -59,9 +59,11 @@ Sidecar metadata requirements:
 - an entrypoint may set `initializer: true` to mark the one-time public setup
   phase; when a contract has an initializer, other entrypoints default to
   `requires_initialized: true` unless explicitly set otherwise
-- entrypoints that write data or predicates derived from confidential state or
-  secret arguments into public state must name those public objects in
-  `public_state_declassifies`
+- writing data or predicates derived from confidential state or secret
+  arguments into public state is not supported; confidential releases must use
+  the `returns`/`status` declassification or the `encrypted_to_client` channel.
+  The `public_state_declassifies` sidecar field is rejected (it conflicted with
+  the confidential-object targeting restriction)
 - every map must declare a public `capacity`
 - map and array capacities must be positive
 - confidential entrypoints must declare `secret_args`

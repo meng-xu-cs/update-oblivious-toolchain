@@ -393,7 +393,7 @@ fn parse_frontend(
         if let Some(entry_meta) = metadata.entrypoints.get(&signature) {
             entrypoint_metadata.insert(signature.clone(), entry_meta.clone());
             ensure_secret_args_exist(function, entry_meta)?;
-            validate_entrypoint_metadata_well_formed(&signature, entry_meta, &state_by_name)?;
+            validate_entrypoint_metadata_well_formed(&signature, entry_meta)?;
             if entry_meta.initializer {
                 if entry_meta.requires_initialized == Some(true) {
                     bail!(
@@ -2079,7 +2079,6 @@ fn collect_expr_objects(expr: &Expr, ids: &mut BTreeSet<u32>) {
 struct PolicySensitivity {
     return_sensitive: bool,
     status_sensitive: bool,
-    sensitive_public_writes: BTreeSet<String>,
     confidential_reads: BTreeSet<String>,
 }
 
@@ -2177,35 +2176,10 @@ fn validate_entrypoint_policy(
         );
     }
     validate_exact_declassification_labels(signature, entry_meta, returns, status)?;
-    let declared_public_state = entry_meta
-        .public_state_declassifies
-        .iter()
-        .collect::<BTreeSet<_>>();
-    let undeclared_public_writes = sensitivity
-        .sensitive_public_writes
-        .iter()
-        .filter(|name| !declared_public_state.contains(name))
-        .cloned()
-        .collect::<Vec<_>>();
-    if !undeclared_public_writes.is_empty() {
-        bail!(
-            "entrypoint {} writes data or predicates derived from confidential state or secret arguments to public state {}; declare public_state_declassifies for the target object(s)",
-            signature,
-            undeclared_public_writes.join(", ")
-        );
-    }
-    let unused_public_state_releases = declared_public_state
-        .iter()
-        .filter(|name| !sensitivity.sensitive_public_writes.contains(name.as_str()))
-        .map(|name| (*name).clone())
-        .collect::<Vec<_>>();
-    if !unused_public_state_releases.is_empty() {
-        bail!(
-            "entrypoint {} declares public_state_declassifies for non-sensitive public state {}; remove the unused release target(s)",
-            signature,
-            unused_public_state_releases.join(", ")
-        );
-    }
+    // Writing confidential-derived data into public state has no supported
+    // release sink: the public_state_declassifies field is rejected at metadata
+    // validation, and a confidential kernel that targets a public object is
+    // rejected by the confidential-object targeting check during lowering.
     Ok(())
 }
 
@@ -2395,7 +2369,7 @@ fn collect_policy_sensitivity(
                 collect_policy_sensitivity(body, frontend, tainted, sensitivity, loop_sensitive)?;
             }
             Statement::CellSet {
-                object_id,
+                object_id: _,
                 value,
                 predicate,
             } => {
@@ -2411,19 +2385,9 @@ fn collect_policy_sensitivity(
                         &mut sensitivity.confidential_reads,
                     )?;
                 }
-                record_sensitive_public_write(
-                    *object_id,
-                    control_sensitive
-                        || expr_is_policy_sensitive(value, frontend, tainted)
-                        || predicate
-                            .as_ref()
-                            .is_some_and(|expr| expr_is_policy_sensitive(expr, frontend, tainted)),
-                    frontend,
-                    sensitivity,
-                )?;
             }
             Statement::ArraySet {
-                object_id,
+                object_id: _,
                 index,
                 value,
                 predicate,
@@ -2445,20 +2409,9 @@ fn collect_policy_sensitivity(
                         &mut sensitivity.confidential_reads,
                     )?;
                 }
-                record_sensitive_public_write(
-                    *object_id,
-                    control_sensitive
-                        || expr_is_policy_sensitive(index, frontend, tainted)
-                        || expr_is_policy_sensitive(value, frontend, tainted)
-                        || predicate
-                            .as_ref()
-                            .is_some_and(|expr| expr_is_policy_sensitive(expr, frontend, tainted)),
-                    frontend,
-                    sensitivity,
-                )?;
             }
             Statement::MapPut {
-                object_id,
+                object_id: _,
                 key,
                 value,
                 predicate,
@@ -2480,17 +2433,6 @@ fn collect_policy_sensitivity(
                         &mut sensitivity.confidential_reads,
                     )?;
                 }
-                record_sensitive_public_write(
-                    *object_id,
-                    control_sensitive
-                        || expr_is_policy_sensitive(key, frontend, tainted)
-                        || expr_is_policy_sensitive(value, frontend, tainted)
-                        || predicate
-                            .as_ref()
-                            .is_some_and(|expr| expr_is_policy_sensitive(expr, frontend, tainted)),
-                    frontend,
-                    sensitivity,
-                )?;
             }
             Statement::Return { value } => {
                 if let Some(value) = value {
@@ -2562,24 +2504,6 @@ fn record_confidential_read(
     let object = state_object_by_id(frontend, object_id)?;
     if object.confidential {
         reads.insert(object.name.clone());
-    }
-    Ok(())
-}
-
-fn record_sensitive_public_write(
-    object_id: u32,
-    is_sensitive: bool,
-    frontend: &Frontend,
-    sensitivity: &mut PolicySensitivity,
-) -> Result<()> {
-    if !is_sensitive {
-        return Ok(());
-    }
-    let object = state_object_by_id(frontend, object_id)?;
-    if !object.confidential {
-        sensitivity
-            .sensitive_public_writes
-            .insert(object.name.clone());
     }
     Ok(())
 }
@@ -2996,7 +2920,6 @@ fn const_usize(expr: &pt::Expression) -> Result<usize> {
 fn validate_entrypoint_metadata_well_formed(
     signature: &str,
     entry_meta: &uo_core::EntrypointMetadata,
-    state_by_name: &BTreeMap<String, StateObject>,
 ) -> Result<()> {
     match entry_meta.confidential {
         Some(false) if !entry_meta.secret_args.is_empty() => bail!(
@@ -3025,29 +2948,13 @@ fn validate_entrypoint_metadata_well_formed(
             );
         }
     }
-    let mut seen = BTreeSet::new();
-    for object_name in &entry_meta.public_state_declassifies {
-        if !seen.insert(object_name) {
-            bail!(
-                "entrypoint {} repeats public_state_declassifies target {}",
-                signature,
-                object_name
-            );
-        }
-        let object = state_by_name.get(object_name).ok_or_else(|| {
-            anyhow!(
-                "entrypoint {} public_state_declassifies unknown state object {}",
-                signature,
-                object_name
-            )
-        })?;
-        if object.confidential {
-            bail!(
-                "entrypoint {} public_state_declassifies target {} is confidential; only public state can be declassified this way",
-                signature,
-                object_name
-            );
-        }
+    if !entry_meta.public_state_declassifies.is_empty() {
+        bail!(
+            "entrypoint {} declares public_state_declassifies {:?}, which is not supported; \
+             confidential releases must use the return, status, or encrypted-return channels",
+            signature,
+            entry_meta.public_state_declassifies
+        );
     }
     Ok(())
 }
@@ -4630,9 +4537,9 @@ bounds:
     }
 
     #[test]
-    fn rejects_unused_public_state_declassification_for_public_value() {
+    fn rejects_public_state_declassifies_as_unsupported() {
         let source = write_temp(
-            "public-state-declassified-public-value",
+            "public-state-declassifies-unsupported",
             r#"
             contract C {
                 uint256 private publicCell;
@@ -4660,9 +4567,12 @@ bounds:
 "#,
         );
         let err = validate_source(source.to_str().unwrap(), &meta).unwrap_err();
-        assert!(err.to_string().contains(
-            "declares public_state_declassifies for non-sensitive public state publicCell"
-        ));
+        let msg = err.to_string();
+        assert!(
+            msg.contains("public_state_declassifies"),
+            "unexpected: {msg}"
+        );
+        assert!(msg.contains("not supported"), "unexpected: {msg}");
     }
 
     #[test]
@@ -4756,9 +4666,12 @@ bounds:
 "#,
         );
         let err = validate_source(source.to_str().unwrap(), &meta).unwrap_err();
-        assert!(err.to_string().contains(
-            "declares public_state_declassifies for non-sensitive public state publicCell"
-        ));
+        let msg = err.to_string();
+        assert!(
+            msg.contains("public_state_declassifies"),
+            "unexpected: {msg}"
+        );
+        assert!(msg.contains("not supported"), "unexpected: {msg}");
     }
 
     #[test]
@@ -4967,9 +4880,12 @@ bounds:
 "#,
         );
         let err = validate_source(source.to_str().unwrap(), &meta).unwrap_err();
-        assert!(err
-            .to_string()
-            .contains("public_state_declassifies target x is confidential"));
+        let msg = err.to_string();
+        assert!(
+            msg.contains("public_state_declassifies"),
+            "unexpected: {msg}"
+        );
+        assert!(msg.contains("not supported"), "unexpected: {msg}");
     }
 
     #[test]
@@ -5106,7 +5022,6 @@ entrypoints:
     confidential: true
     returns: forbidden
     status: public
-    public_state_declassifies: [last]
 state:
   last:
     kind: cell
@@ -5143,7 +5058,6 @@ entrypoints:
     confidential: true
     returns: forbidden
     status: public
-    public_state_declassifies: [last]
 state:
   last:
     kind: cell
@@ -5304,7 +5218,7 @@ bounds:
         let err = compile(source.to_str().unwrap(), &meta, ProgramMode::Uo).unwrap_err();
         assert!(err
             .to_string()
-            .contains("only supports one access per entrypoint"));
+            .contains("supports only one logical access per map per entrypoint"));
     }
 
     #[test]
