@@ -24,6 +24,15 @@ impl From<ArtifactModeArg> for mplus_probe::ArtifactMaterializationMode {
 enum ReportKind {
     StaticChecks,
     Overheads,
+    Correctness,
+    TraceEquivalence,
+    LeakageAuc,
+    MutualInformation,
+    LatencyMemory,
+    StorageGrowth,
+    CapacitySweep,
+    AblationStudy,
+    EngineeringCost,
     BridgeValidation,
     KernelValidation,
     KernelRefinementValidation,
@@ -174,6 +183,77 @@ fn main() -> Result<()> {
         Some(ReportKind::Overheads) => {
             let report = mplus_probe::run_overheads_report()?;
             write_single_report(&cli.out_dir, "overheads.json", "overheads", &report)?;
+        }
+        Some(ReportKind::Correctness) => {
+            let report = mplus_probe::run_correctness_report()?;
+            write_single_report(&cli.out_dir, "correctness.json", "correctness", &report)?;
+        }
+        Some(ReportKind::TraceEquivalence) => {
+            let report = mplus_probe::run_trace_equivalence_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "trace_equivalence.json",
+                "trace_equivalence",
+                &report,
+            )?;
+        }
+        Some(ReportKind::LeakageAuc) => {
+            let report = mplus_probe::run_leakage_auc_report()?;
+            write_single_report(&cli.out_dir, "leakage_auc.json", "leakage_auc", &report)?;
+        }
+        Some(ReportKind::MutualInformation) => {
+            let report = mplus_probe::run_mutual_information_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "mutual_information.json",
+                "mutual_information",
+                &report,
+            )?;
+        }
+        Some(ReportKind::LatencyMemory) => {
+            let report = mplus_probe::run_latency_memory_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "latency_memory.json",
+                "latency_memory",
+                &report,
+            )?;
+        }
+        Some(ReportKind::StorageGrowth) => {
+            let report = mplus_probe::run_storage_growth_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "storage_growth.json",
+                "storage_growth",
+                &report,
+            )?;
+        }
+        Some(ReportKind::CapacitySweep) => {
+            let report = mplus_probe::run_capacity_sweep_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "capacity_sweep.json",
+                "capacity_sweep",
+                &report,
+            )?;
+        }
+        Some(ReportKind::AblationStudy) => {
+            let report = mplus_probe::run_ablation_study_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "ablation_study.json",
+                "ablation_study",
+                &report,
+            )?;
+        }
+        Some(ReportKind::EngineeringCost) => {
+            let report = mplus_probe::run_engineering_cost_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "engineering_cost.json",
+                "engineering_cost",
+                &report,
+            )?;
         }
         Some(ReportKind::BridgeValidation) => {
             let report = mplus_probe::run_bridge_validation_report()?;

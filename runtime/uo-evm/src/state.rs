@@ -437,27 +437,35 @@ impl CommittedRuntimeState {
         &self,
         program: &ConfidentialKernelSlotProgram,
     ) -> Result<()> {
-        for step in program.expected_runtime_steps().iter() {
-            let Some(object_id) = step.object_id else {
-                continue;
-            };
-            let object = self.objects.get(object_id).ok_or_else(|| {
-                anyhow!(
-                    "confidential kernel program {} references missing object {}",
-                    program.entrypoint_id,
-                    object_id
-                )
-            })?;
-            if !object.is_update_oblivious_backend() {
-                bail!(
-                    "confidential kernel program {} targets raw backend object {} ({})",
-                    program.entrypoint_id,
-                    object.name(),
-                    object_id
-                );
-            }
+        #[cfg(feature = "insecure-eval-raw")]
+        {
+            let _ = program;
+            Ok(())
         }
-        Ok(())
+        #[cfg(not(feature = "insecure-eval-raw"))]
+        {
+            for step in program.expected_runtime_steps().iter() {
+                let Some(object_id) = step.object_id else {
+                    continue;
+                };
+                let object = self.objects.get(object_id).ok_or_else(|| {
+                    anyhow!(
+                        "confidential kernel program {} references missing object {}",
+                        program.entrypoint_id,
+                        object_id
+                    )
+                })?;
+                if !object.is_update_oblivious_backend() {
+                    bail!(
+                        "confidential kernel program {} targets raw backend object {} ({})",
+                        program.entrypoint_id,
+                        object.name(),
+                        object_id
+                    );
+                }
+            }
+            Ok(())
+        }
     }
 
     fn witness_snapshot(&self) -> Result<CommittedRuntimeWitnessSnapshot> {

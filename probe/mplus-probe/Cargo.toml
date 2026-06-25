@@ -5,6 +5,9 @@ edition.workspace = true
 license.workspace = true
 default-run = "mplus-probe"
 
+[features]
+insecure-eval-raw = ["uo-evm/insecure-eval-raw"]
+
 [dependencies]
 anyhow.workspace = true
 clap.workspace = true

@@ -25,19 +25,21 @@ use uo_core::{
     runtime_boundary_obligation_ids, runtime_boundary_schema_is_mechanized_for_claim,
     validate_runtime_boundary_schema, BackendKind, BoundaryEvent,
     CanonicalFreshCoinRuntimePathOramTheoremInput, CanonicalFreshCoinRuntimePathOramWitnessFamily,
-    CompiledArtifact, ConfidentialKernelSlotProgram, ContractMetadata, LogicalEvent,
+    CompiledArtifact, ConfidentialKernelSlotProgram, ContainerKind, ContractMetadata, LogicalEvent,
     NormalizedMicroTrace, ProgramMode, PublicOutcomeTrace,
     RuntimeConfidentialCoreKernelFinishSlotBundle, RuntimeKernelInterfaceBundle,
     RuntimeKernelMachineFinishWitness, RuntimeKernelRefinementWitness, RuntimeKernelWitness,
     RuntimeOramLeafScaffoldWitness, RuntimeOramObjectWitness, RuntimePathOramTransitionKind,
     RuntimeRefinementWitness, RuntimeShellContract, RuntimeShellTrace,
     SeededRuntimePaperMainFamilyBundle, SeededRuntimePaperMainSlotFamilyBundle,
-    SeededRuntimePathOramWitnessFamily, SgxControllerShapeTrace, Value, WriteClass,
+    SeededRuntimePathOramWitnessFamily, SgxControllerShapeTrace, Type, Value, WriteClass,
     CONFIDENTIAL_KERNEL_EXPR_PROFILES, CONFIDENTIAL_KERNEL_PURE_EXPR_PROFILES,
     CONFIDENTIAL_KERNEL_SLOT_EXPR_PROFILES, CONFIDENTIAL_KERNEL_SLOT_PURE_EXPR_PROFILES,
     CONFIDENTIAL_KERNEL_STATEMENT_PROFILES, RUNTIME_BOUNDARY_SCHEMA_VERSION,
 };
 use uo_evm::{CallResult, ContractInstance, DiagnosticCallResult, PathOramFreshCoinPlan};
+
+const PROBE_DEPLOY_SEED: u64 = 0x5052_4f42_455f_0001;
 
 #[derive(Clone)]
 struct BenchArtifacts {
@@ -1285,6 +1287,50 @@ pub fn run_static_checks_report() -> Result<JsonValue> {
 pub fn run_overheads_report() -> Result<JsonValue> {
     let suite = compile_suite()?;
     run_overheads(&suite)
+}
+
+pub fn run_correctness_report() -> Result<JsonValue> {
+    let suite = compile_suite()?;
+    run_correctness(&suite)
+}
+
+pub fn run_trace_equivalence_report() -> Result<JsonValue> {
+    let suite = compile_suite()?;
+    run_trace_equivalence(&suite)
+}
+
+pub fn run_leakage_auc_report() -> Result<JsonValue> {
+    let suite = compile_suite()?;
+    run_auc_reports(&suite)
+}
+
+pub fn run_mutual_information_report() -> Result<JsonValue> {
+    let suite = compile_suite()?;
+    run_mutual_information_reports(&suite)
+}
+
+pub fn run_latency_memory_report() -> Result<JsonValue> {
+    let suite = compile_suite()?;
+    run_latency_memory(&suite)
+}
+
+pub fn run_storage_growth_report() -> Result<JsonValue> {
+    let suite = compile_suite()?;
+    run_storage_growth(&suite)
+}
+
+pub fn run_capacity_sweep_report() -> Result<JsonValue> {
+    run_capacity_sweep()
+}
+
+pub fn run_ablation_study_report() -> Result<JsonValue> {
+    let suite = compile_suite()?;
+    run_ablation_study(&suite)
+}
+
+pub fn run_engineering_cost_report() -> Result<JsonValue> {
+    let suite = compile_suite()?;
+    run_engineering_cost(&suite)
 }
 
 pub fn run_bridge_validation_report() -> Result<JsonValue> {
@@ -3690,6 +3736,15 @@ fn compile_artifact(source: &str, metadata: &str, mode: ProgramMode) -> Result<C
     let source_path = workspace_path(source);
     let metadata: ContractMetadata = serde_yaml::from_slice(&fs::read(&metadata_path)?)?;
     uo_solc::compile(source_path.to_str().unwrap(), &metadata, mode)
+}
+
+fn compile_artifact_from_metadata(
+    source: &str,
+    metadata: &ContractMetadata,
+    mode: ProgramMode,
+) -> Result<CompiledArtifact> {
+    let source_path = workspace_path(source);
+    uo_solc::compile(source_path.to_str().unwrap(), metadata, mode)
 }
 
 fn load_metadata(metadata_path: &str) -> Result<ContractMetadata> {
@@ -47192,7 +47247,7 @@ fn run_auc_reports(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<Jso
     let reports = vec![
         experiment_metric_summary(
             "FixedSlotClassifier",
-            "raw",
+            raw_eval_mode_label(),
             "metric_auc",
             run_fixed_classifier_experiment(&suite["FixedSlotClassifier"].raw)
                 .context("leakage_auc/FixedSlotClassifier/raw"),
@@ -47208,7 +47263,7 @@ fn run_auc_reports(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<Jso
         ),
         experiment_metric_summary(
             "AuthScan",
-            "raw",
+            raw_eval_mode_label(),
             "metric_auc",
             run_authscan_experiment(&suite["AuthScan"].raw).context("leakage_auc/AuthScan/raw"),
             auc_report,
@@ -47222,7 +47277,7 @@ fn run_auc_reports(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<Jso
         ),
         experiment_metric_summary(
             "RegistryCRUD",
-            "raw",
+            raw_eval_mode_label(),
             "metric_auc",
             run_registry_experiment(&suite["RegistryCRUD"].raw)
                 .context("leakage_auc/RegistryCRUD/raw"),
@@ -47238,7 +47293,7 @@ fn run_auc_reports(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<Jso
         ),
         experiment_metric_summary(
             "ConfidentialMixer",
-            "raw",
+            raw_eval_mode_label(),
             "metric_auc",
             run_mixer_experiment(&suite["ConfidentialMixer"].raw)
                 .context("leakage_auc/ConfidentialMixer/raw"),
@@ -47267,7 +47322,7 @@ fn run_auc_reports(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<Jso
         ),
         experiment_metric_summary(
             "ERC20Lite",
-            "raw",
+            raw_eval_mode_label(),
             "metric_auc",
             run_erc20_allowance_value_experiment(&suite["ERC20Lite"].raw)
                 .context("leakage_auc/ERC20Lite/raw"),
@@ -47297,6 +47352,61 @@ fn run_auc_reports(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<Jso
     ]
     .into_iter()
     .collect::<Result<Vec<_>>>()?;
+    #[cfg(feature = "insecure-eval-raw")]
+    let mut reports = reports;
+    #[cfg(feature = "insecure-eval-raw")]
+    {
+        reports.extend(
+            vec![
+                experiment_metric_summary(
+                    "FixedSlotClassifier",
+                    "ct_gas_only",
+                    "metric_auc",
+                    run_fixed_classifier_experiment(&ct_gas_only_artifact(
+                        &suite["FixedSlotClassifier"].uo,
+                    ))
+                    .context("leakage_auc/FixedSlotClassifier/ct_gas_only"),
+                    auc_report,
+                ),
+                experiment_metric_summary(
+                    "AuthScan",
+                    "ct_gas_only",
+                    "metric_auc",
+                    run_authscan_experiment(&ct_gas_only_artifact(&suite["AuthScan"].uo))
+                        .context("leakage_auc/AuthScan/ct_gas_only"),
+                    auc_report,
+                ),
+                experiment_metric_summary(
+                    "RegistryCRUD",
+                    "ct_gas_only",
+                    "metric_auc",
+                    run_registry_experiment(&ct_gas_only_artifact(&suite["RegistryCRUD"].uo))
+                        .context("leakage_auc/RegistryCRUD/ct_gas_only"),
+                    auc_report,
+                ),
+                experiment_metric_summary(
+                    "ConfidentialMixer",
+                    "ct_gas_only",
+                    "metric_auc",
+                    run_mixer_experiment(&ct_gas_only_artifact(&suite["ConfidentialMixer"].uo))
+                        .context("leakage_auc/ConfidentialMixer/ct_gas_only"),
+                    auc_report,
+                ),
+                experiment_metric_summary(
+                    "ERC20Lite",
+                    "ct_gas_only",
+                    "metric_auc",
+                    run_erc20_allowance_value_experiment(&ct_gas_only_artifact(
+                        &suite["ERC20Lite"].uo,
+                    ))
+                    .context("leakage_auc/ERC20Lite/ct_gas_only"),
+                    auc_report,
+                ),
+            ]
+            .into_iter()
+            .collect::<Result<Vec<_>>>()?,
+        );
+    }
     Ok(json!({ "reports": reports }))
 }
 
@@ -47306,7 +47416,7 @@ fn run_mutual_information_reports(
     let reports = vec![
         experiment_metric_summary(
             "FixedSlotClassifier",
-            "raw",
+            raw_eval_mode_label(),
             "metric_mi_bits",
             run_fixed_classifier_experiment(&suite["FixedSlotClassifier"].raw)
                 .context("mutual_information/FixedSlotClassifier/raw"),
@@ -47322,7 +47432,7 @@ fn run_mutual_information_reports(
         ),
         experiment_metric_summary(
             "AuthScan",
-            "raw",
+            raw_eval_mode_label(),
             "metric_mi_bits",
             run_authscan_experiment(&suite["AuthScan"].raw)
                 .context("mutual_information/AuthScan/raw"),
@@ -47338,7 +47448,7 @@ fn run_mutual_information_reports(
         ),
         experiment_metric_summary(
             "RegistryCRUD",
-            "raw",
+            raw_eval_mode_label(),
             "metric_mi_bits",
             run_registry_experiment(&suite["RegistryCRUD"].raw)
                 .context("mutual_information/RegistryCRUD/raw"),
@@ -47354,7 +47464,7 @@ fn run_mutual_information_reports(
         ),
         experiment_metric_summary(
             "ConfidentialMixer",
-            "raw",
+            raw_eval_mode_label(),
             "metric_mi_bits",
             run_mixer_experiment(&suite["ConfidentialMixer"].raw)
                 .context("mutual_information/ConfidentialMixer/raw"),
@@ -47383,7 +47493,7 @@ fn run_mutual_information_reports(
         ),
         experiment_metric_summary(
             "ERC20Lite",
-            "raw",
+            raw_eval_mode_label(),
             "metric_mi_bits",
             run_erc20_allowance_value_experiment(&suite["ERC20Lite"].raw)
                 .context("mutual_information/ERC20Lite/raw"),
@@ -47413,7 +47523,1251 @@ fn run_mutual_information_reports(
     ]
     .into_iter()
     .collect::<Result<Vec<_>>>()?;
+    #[cfg(feature = "insecure-eval-raw")]
+    let mut reports = reports;
+    #[cfg(feature = "insecure-eval-raw")]
+    {
+        reports.extend(
+            vec![
+                experiment_metric_summary(
+                    "FixedSlotClassifier",
+                    "ct_gas_only",
+                    "metric_mi_bits",
+                    run_fixed_classifier_experiment(&ct_gas_only_artifact(
+                        &suite["FixedSlotClassifier"].uo,
+                    ))
+                    .context("mutual_information/FixedSlotClassifier/ct_gas_only"),
+                    mi_report,
+                ),
+                experiment_metric_summary(
+                    "AuthScan",
+                    "ct_gas_only",
+                    "metric_mi_bits",
+                    run_authscan_experiment(&ct_gas_only_artifact(&suite["AuthScan"].uo))
+                        .context("mutual_information/AuthScan/ct_gas_only"),
+                    mi_report,
+                ),
+                experiment_metric_summary(
+                    "RegistryCRUD",
+                    "ct_gas_only",
+                    "metric_mi_bits",
+                    run_registry_experiment(&ct_gas_only_artifact(&suite["RegistryCRUD"].uo))
+                        .context("mutual_information/RegistryCRUD/ct_gas_only"),
+                    mi_report,
+                ),
+                experiment_metric_summary(
+                    "ConfidentialMixer",
+                    "ct_gas_only",
+                    "metric_mi_bits",
+                    run_mixer_experiment(&ct_gas_only_artifact(&suite["ConfidentialMixer"].uo))
+                        .context("mutual_information/ConfidentialMixer/ct_gas_only"),
+                    mi_report,
+                ),
+                experiment_metric_summary(
+                    "ERC20Lite",
+                    "ct_gas_only",
+                    "metric_mi_bits",
+                    run_erc20_allowance_value_experiment(&ct_gas_only_artifact(
+                        &suite["ERC20Lite"].uo,
+                    ))
+                    .context("mutual_information/ERC20Lite/ct_gas_only"),
+                    mi_report,
+                ),
+            ]
+            .into_iter()
+            .collect::<Result<Vec<_>>>()?,
+        );
+    }
     Ok(json!({ "reports": reports }))
+}
+
+struct WorkloadSpec<'a> {
+    benchmark: &'static str,
+    artifacts: &'a BenchArtifacts,
+    setup: Vec<CallSpec>,
+    target: CallSpec,
+}
+
+fn workload_specs<'a>(suite: &'a BTreeMap<&'static str, BenchArtifacts>) -> Vec<WorkloadSpec<'a>> {
+    let mixer_key = b32(7);
+    let registry_key = b32(4);
+    let alice = addr(0x11);
+    let bob = addr(0x22);
+    let carol = addr(0x33);
+    vec![
+        WorkloadSpec {
+            benchmark: "FixedSlotClassifier/classify",
+            artifacts: &suite["FixedSlotClassifier"],
+            setup: vec![],
+            target: CallSpec {
+                entrypoint: "classify(uint256)",
+                args: vec![Value::uint(1)],
+            },
+        },
+        WorkloadSpec {
+            benchmark: "AuthScan/auth",
+            artifacts: &suite["AuthScan"],
+            setup: vec![
+                CallSpec {
+                    entrypoint: "seed(uint256,bytes32)",
+                    args: vec![Value::uint(0), b32(1)],
+                },
+                CallSpec {
+                    entrypoint: "seed(uint256,bytes32)",
+                    args: vec![Value::uint(1), b32(2)],
+                },
+            ],
+            target: CallSpec {
+                entrypoint: "auth(bytes32)",
+                args: vec![b32(2)],
+            },
+        },
+        WorkloadSpec {
+            benchmark: "ConfidentialMixer/deposit",
+            artifacts: &suite["ConfidentialMixer"],
+            setup: vec![],
+            target: CallSpec {
+                entrypoint: "deposit(bytes32,uint256)",
+                args: vec![mixer_key.clone(), Value::uint(3)],
+            },
+        },
+        WorkloadSpec {
+            benchmark: "ConfidentialMixer/withdraw",
+            artifacts: &suite["ConfidentialMixer"],
+            setup: vec![CallSpec {
+                entrypoint: "deposit(bytes32,uint256)",
+                args: vec![mixer_key.clone(), Value::uint(5)],
+            }],
+            target: CallSpec {
+                entrypoint: "withdraw(bytes32,uint256)",
+                args: vec![mixer_key, Value::uint(2)],
+            },
+        },
+        WorkloadSpec {
+            benchmark: "ERC20Lite/transferFrom",
+            artifacts: &suite["ERC20Lite"],
+            setup: vec![
+                CallSpec {
+                    entrypoint: "mint(address,uint256)",
+                    args: vec![alice.clone(), Value::uint(10)],
+                },
+                CallSpec {
+                    entrypoint: "approve(address,address,uint256)",
+                    args: vec![alice.clone(), bob.clone(), Value::uint(4)],
+                },
+            ],
+            target: CallSpec {
+                entrypoint: "transferFrom(address,address,address,uint256)",
+                args: vec![alice.clone(), bob.clone(), carol.clone(), Value::uint(3)],
+            },
+        },
+        WorkloadSpec {
+            benchmark: "RegistryCRUD/clearIfMatch",
+            artifacts: &suite["RegistryCRUD"],
+            setup: vec![CallSpec {
+                entrypoint: "upsert(bytes32,uint256)",
+                args: vec![registry_key.clone(), Value::uint(9)],
+            }],
+            target: CallSpec {
+                entrypoint: "clearIfMatch(bytes32,uint256)",
+                args: vec![registry_key.clone(), Value::uint(9)],
+            },
+        },
+    ]
+}
+
+fn run_latency_memory(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<JsonValue> {
+    let warmups = env_usize("UO_LATENCY_WARMUPS", 30);
+    let trials = env_usize("UO_LATENCY_TRIALS", 200);
+    let ticks_per_second = clock_ticks_per_second();
+    let mut rows = Vec::new();
+    for workload in workload_specs(suite) {
+        let mut variants: Vec<(&str, CompiledArtifact)> = Vec::new();
+        #[cfg(feature = "insecure-eval-raw")]
+        {
+            variants.push(("raw_insecure_eval", workload.artifacts.raw.clone()));
+            variants.push(("ct_gas_only", ct_gas_only_artifact(&workload.artifacts.uo)));
+        }
+        variants.push((
+            artifact_backend_label(&workload.artifacts.uo).leak(),
+            workload.artifacts.uo.clone(),
+        ));
+        if let Some(artifact) = &workload.artifacts.fullscan64 {
+            variants.push(("full_scan_64", artifact.clone()));
+        }
+        if let Some(artifact) = &workload.artifacts.oram {
+            variants.push((artifact_backend_label(artifact).leak(), artifact.clone()));
+        }
+        for (variant, artifact) in variants {
+            for _ in 0..warmups {
+                let _ = run_latency_trial(
+                    &artifact,
+                    &workload.setup,
+                    &workload.target,
+                    ticks_per_second,
+                )?;
+            }
+            let mut samples = Vec::new();
+            for trial in 0..trials {
+                let row = run_latency_trial(
+                    &artifact,
+                    &workload.setup,
+                    &workload.target,
+                    ticks_per_second,
+                )?;
+                samples.push(row.latency_ns);
+                rows.push(json!({
+                    "benchmark": workload.benchmark,
+                    "variant": variant,
+                    "capacity": artifact_capacity_label(&artifact),
+                    "entrypoint": workload.target.entrypoint,
+                    "trial": trial,
+                    "latency_ns": row.latency_ns,
+                    "cpu_user_ms": row.cpu_user_ms,
+                    "cpu_sys_ms": row.cpu_sys_ms,
+                    "max_rss_kb": row.max_rss_kb,
+                    "gas": row.gas,
+                    "physical_reads": row.physical_reads,
+                    "physical_writes": row.physical_writes,
+                    "bytes_read": row.bytes_read,
+                    "bytes_written": row.bytes_written,
+                    "trace_json_bytes": row.trace_json_bytes,
+                    "artifact_json_bytes": serde_json::to_vec(&artifact)?.len(),
+                }));
+            }
+        }
+    }
+    Ok(json!({
+        "warmups": warmups,
+        "trials": trials,
+        "clock_ticks_per_second": ticks_per_second,
+        "rows": rows,
+        "summary": summarize_latency_rows(&rows),
+    }))
+}
+
+struct LatencyTrial {
+    latency_ns: u128,
+    cpu_user_ms: f64,
+    cpu_sys_ms: f64,
+    max_rss_kb: u64,
+    gas: u64,
+    physical_reads: usize,
+    physical_writes: usize,
+    bytes_read: usize,
+    bytes_written: usize,
+    trace_json_bytes: usize,
+}
+
+fn run_latency_trial(
+    artifact: &CompiledArtifact,
+    setup: &[CallSpec],
+    target: &CallSpec,
+    ticks_per_second: f64,
+) -> Result<LatencyTrial> {
+    let mut instance = ContractInstance::deploy_with_seed(artifact.clone(), PROBE_DEPLOY_SEED)?;
+    for call in setup {
+        instance.call(call.entrypoint, call.args.clone())?;
+    }
+    let cpu_before = read_process_cpu_ticks()?;
+    let started = Instant::now();
+    let result = instance.call_with_diagnostics(target.entrypoint, target.args.clone())?;
+    let elapsed = started.elapsed().as_nanos();
+    let cpu_after = read_process_cpu_ticks()?;
+    let trace = &result.call.trace;
+    Ok(LatencyTrial {
+        latency_ns: elapsed,
+        cpu_user_ms: ticks_to_ms(cpu_after.0.saturating_sub(cpu_before.0), ticks_per_second),
+        cpu_sys_ms: ticks_to_ms(cpu_after.1.saturating_sub(cpu_before.1), ticks_per_second),
+        max_rss_kb: read_max_rss_kb().unwrap_or_default(),
+        gas: trace.gas_used,
+        physical_reads: trace.physical_reads.len(),
+        physical_writes: trace.physical_writes.len(),
+        bytes_read: trace.physical_reads.iter().map(|event| event.len).sum(),
+        bytes_written: trace.physical_writes.iter().map(|event| event.len).sum(),
+        trace_json_bytes: serde_json::to_vec(trace)?.len(),
+    })
+}
+
+fn summarize_latency_rows(rows: &[JsonValue]) -> JsonValue {
+    let mut groups: BTreeMap<(String, String, String), Vec<u128>> = BTreeMap::new();
+    for row in rows {
+        let key = (
+            row["benchmark"].as_str().unwrap_or_default().to_string(),
+            row["variant"].as_str().unwrap_or_default().to_string(),
+            row["entrypoint"].as_str().unwrap_or_default().to_string(),
+        );
+        if let Some(latency) = row["latency_ns"].as_u64() {
+            groups.entry(key).or_default().push(latency as u128);
+        }
+    }
+    JsonValue::Array(
+        groups
+            .into_iter()
+            .map(|((benchmark, variant, entrypoint), mut samples)| {
+                samples.sort_unstable();
+                let (ci_low, ci_high) = confidence_interval_95(&samples);
+                json!({
+                    "benchmark": benchmark,
+                    "variant": variant,
+                    "entrypoint": entrypoint,
+                    "samples": samples.len(),
+                    "p50_latency_ns": percentile_sorted(&samples, 0.50),
+                    "p95_latency_ns": percentile_sorted(&samples, 0.95),
+                    "p99_latency_ns": percentile_sorted(&samples, 0.99),
+                    "mean_latency_ns": mean_u128(&samples),
+                    "ci95_low_latency_ns": ci_low,
+                    "ci95_high_latency_ns": ci_high,
+                })
+            })
+            .collect(),
+    )
+}
+
+fn run_storage_growth(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<JsonValue> {
+    let lengths = env_usize_list("UO_STORAGE_LENGTHS", &[1, 10, 100, 1000, 10000]);
+    let mut rows = Vec::new();
+    let mut plans: Vec<(&str, &CompiledArtifact, fn(usize) -> CallSpec)> = vec![
+        (
+            "FixedSlotClassifier",
+            &suite["FixedSlotClassifier"].uo,
+            fixed_storage_call,
+        ),
+        (
+            "RegistryCRUD",
+            &suite["RegistryCRUD"].uo,
+            registry_storage_call,
+        ),
+        (
+            "ConfidentialMixer",
+            &suite["ConfidentialMixer"].uo,
+            mixer_storage_call,
+        ),
+        ("ERC20Lite", &suite["ERC20Lite"].uo, erc20_storage_call),
+    ];
+    if let Some(artifact) = &suite["ConfidentialMixer"].oram {
+        plans.push(("ConfidentialMixer/oram", artifact, mixer_storage_call));
+    }
+    if let Some(artifact) = &suite["ERC20Lite"].oram {
+        plans.push(("ERC20Lite/oram", artifact, erc20_storage_call));
+    }
+    let single_access = compile_artifact(
+        "benches/raw/SingleAccessMap.sol",
+        "benches/raw/SingleAccessMap.pathoram.yaml",
+        ProgramMode::Uo,
+    )?;
+    plans.push((
+        "SingleAccessMap/oram",
+        &single_access,
+        single_access_storage_call,
+    ));
+    for (program, artifact, make_call) in plans {
+        for length in &lengths {
+            let mut instance =
+                ContractInstance::deploy_with_seed(artifact.clone(), PROBE_DEPLOY_SEED)?;
+            let mut per_call_bytes = Vec::new();
+            let mut error = None;
+            for index in 0..*length {
+                let call = make_call(index);
+                let result = match instance.call(call.entrypoint, call.args) {
+                    Ok(result) => result,
+                    Err(err) => {
+                        error = Some(format!("call {index}: {err:#}"));
+                        break;
+                    }
+                };
+                let bytes = result
+                    .trace
+                    .physical_reads
+                    .iter()
+                    .map(|event| event.len)
+                    .sum::<usize>()
+                    + result
+                        .trace
+                        .physical_writes
+                        .iter()
+                        .map(|event| event.len)
+                        .sum::<usize>();
+                per_call_bytes.push(bytes as u64);
+            }
+            let storage = static_storage_summary(artifact)?;
+            rows.push(json!({
+                "program": program,
+                "backend": artifact_backend_label(artifact),
+                "capacity": artifact_capacity_label(artifact),
+                "sequence_length": length,
+                "completed_calls": per_call_bytes.len(),
+                "status": if error.is_some() { "error" } else { "ok" },
+                "error": error,
+                "logical_state_bytes": storage["logical_state_bytes"],
+                "physical_state_bytes": storage["physical_state_bytes"],
+                "journal_bytes": 0,
+                "oram_bucket_bytes": storage["oram_bucket_bytes"],
+                "position_map_bytes": storage["position_map_bytes"],
+                "stash_bytes": storage["stash_bytes"],
+                "retired_object_bytes": 0,
+                "compaction_count": 0,
+                "compaction_bytes": 0,
+                "average_bytes_per_call": mean_u64(&per_call_bytes),
+                "max_bytes_per_call": per_call_bytes.iter().copied().max().unwrap_or_default(),
+            }));
+        }
+    }
+    Ok(json!({
+        "lengths": lengths,
+        "compaction_or_gc": "not implemented as a separate policy; current backends use fixed public-capacity storage and no append-only journal in the in-process runtime",
+        "rows": rows,
+    }))
+}
+
+fn run_capacity_sweep() -> Result<JsonValue> {
+    let capacities = env_usize_list(
+        "UO_SWEEP_CAPACITIES",
+        &[1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096],
+    );
+    let read_fractions = env_f64_list("UO_SWEEP_READ_FRACTIONS", &[0.0, 0.1, 0.5, 0.9, 1.0]);
+    let warmups = env_usize("UO_SWEEP_WARMUPS", 3);
+    let trials = env_usize("UO_SWEEP_TRIALS", 30);
+    let mut rows = Vec::new();
+    for capacity in capacities {
+        for backend in ["full_scan", "oram"] {
+            let validation_started = Instant::now();
+            let artifact = match single_access_map_artifact(capacity, backend) {
+                Ok(artifact) => artifact,
+                Err(err) => {
+                    let validation_time_ms = validation_started.elapsed().as_millis();
+                    for read_fraction in &read_fractions {
+                        rows.push(json!({
+                            "capacity": capacity,
+                            "backend": backend,
+                            "read_fraction": read_fraction,
+                            "status": "error",
+                            "error": format!("{err:#}"),
+                            "completed_trials": 0,
+                            "validation_time_ms": validation_time_ms,
+                        }));
+                    }
+                    continue;
+                }
+            };
+            let validation_time_ms = validation_started.elapsed().as_millis();
+            for read_fraction in &read_fractions {
+                for _ in 0..warmups {
+                    let _ = run_capacity_trial(&artifact, *read_fraction, 0)?;
+                }
+                let mut samples = Vec::new();
+                let mut error = None;
+                for trial in 0..trials {
+                    match run_capacity_trial(&artifact, *read_fraction, trial) {
+                        Ok(sample) => samples.push(sample),
+                        Err(err) => {
+                            error = Some(format!("trial {trial}: {err:#}"));
+                            break;
+                        }
+                    }
+                }
+                if let Some(error) = error {
+                    rows.push(json!({
+                        "capacity": capacity,
+                        "backend": backend,
+                        "read_fraction": read_fraction,
+                        "status": "error",
+                        "error": error,
+                        "completed_trials": samples.len(),
+                        "validation_time_ms": validation_time_ms,
+                    }));
+                    continue;
+                }
+                let mut latencies = samples
+                    .iter()
+                    .map(|sample| sample.latency_ns)
+                    .collect::<Vec<_>>();
+                latencies.sort_unstable();
+                let first = samples
+                    .first()
+                    .ok_or_else(|| anyhow!("capacity sweep produced no samples"))?;
+                rows.push(json!({
+                    "capacity": capacity,
+                    "backend": backend,
+                    "read_fraction": read_fraction,
+                    "status": "ok",
+                    "error": null,
+                    "completed_trials": samples.len(),
+                    "gas": median_u64(samples.iter().map(|sample| sample.gas).collect()),
+                    "p50_latency": percentile_sorted(&latencies, 0.50),
+                    "p95_latency": percentile_sorted(&latencies, 0.95),
+                    "physical_reads": median_usize(samples.iter().map(|sample| sample.physical_reads).collect()),
+                    "physical_writes": median_usize(samples.iter().map(|sample| sample.physical_writes).collect()),
+                    "bytes_read": median_usize(samples.iter().map(|sample| sample.bytes_read).collect()),
+                    "bytes_written": median_usize(samples.iter().map(|sample| sample.bytes_written).collect()),
+                    "trace_json_bytes": median_usize(samples.iter().map(|sample| sample.trace_json_bytes).collect()),
+                    "artifact_json_bytes": serde_json::to_vec(&artifact)?.len(),
+                    "proof_object_bytes": serde_json::to_vec(&artifact.contract.manifest.entrypoint_resource_bounds(first.entrypoint)?)?.len(),
+                    "stash_bound": max_stash_bound(&artifact),
+                    "validation_time_ms": validation_time_ms,
+                }));
+            }
+        }
+    }
+    let break_even = break_even_summary(&rows);
+    Ok(json!({
+        "warmups": warmups,
+        "trials": trials,
+        "rows": rows,
+        "break_even": break_even,
+    }))
+}
+
+fn run_ablation_study(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<JsonValue> {
+    #[cfg(not(feature = "insecure-eval-raw"))]
+    {
+        let _ = suite;
+        return Ok(json!({
+            "requires_feature": "insecure-eval-raw",
+            "status": "not_run",
+            "reason": "ablation controls intentionally require executable insecure raw backends",
+        }));
+    }
+    #[cfg(feature = "insecure-eval-raw")]
+    {
+        let fixed_raw = &suite["FixedSlotClassifier"].raw;
+        let fixed_ct = ct_gas_only_artifact(&suite["FixedSlotClassifier"].uo);
+        let registry_raw = &suite["RegistryCRUD"].raw;
+        let registry_ct = ct_gas_only_artifact(&suite["RegistryCRUD"].uo);
+        let mixer_raw = &suite["ConfidentialMixer"].raw;
+        let mixer_ct = ct_gas_only_artifact(&suite["ConfidentialMixer"].uo);
+        let cases = vec![
+            ablation_row(
+                "No marker elimination",
+                "SET/CLEAR reappears",
+                "raw_insecure_eval",
+                run_fixed_classifier_experiment(fixed_raw)?,
+                run_classifier_same_same(fixed_raw)?,
+                run_fixed_classifier_experiment(&suite["FixedSlotClassifier"].uo)?,
+            ),
+            ablation_row(
+                "No fresh writes/rerandomization",
+                "SAME/UPDATE reappears",
+                "raw_insecure_eval",
+                run_mixer_experiment(mixer_raw)?,
+                run_classifier_same_same(fixed_raw)?,
+                run_mixer_experiment(&suite["ConfidentialMixer"].uo)?,
+            ),
+            ablation_row(
+                "No constant write budget",
+                "Write count leaks",
+                "ct_gas_only",
+                run_registry_experiment(&registry_ct)?,
+                run_classifier_same_same(&fixed_ct)?,
+                run_registry_experiment(&suite["RegistryCRUD"].uo)?,
+            ),
+            ablation_row(
+                "ORAM without M+-aware writes",
+                "Bucket write classes leak",
+                "ct_gas_only proxy",
+                run_erc20_allowance_value_experiment(&ct_gas_only_artifact(
+                    &suite["ERC20Lite"].uo,
+                ))?,
+                run_classifier_same_same(&fixed_ct)?,
+                run_erc20_allowance_value_experiment(
+                    suite["ERC20Lite"]
+                        .oram
+                        .as_ref()
+                        .ok_or_else(|| anyhow!("missing erc20 oram"))?,
+                )?,
+            ),
+            ablation_row(
+                "Raw zero scrub",
+                "CLEAR/SAME cleanup leak",
+                "raw_insecure_eval",
+                run_registry_experiment(registry_raw)?,
+                run_classifier_same_same(fixed_raw)?,
+                run_registry_experiment(&suite["RegistryCRUD"].uo)?,
+            ),
+            ablation_row(
+                "Secret-dependent early abort",
+                "Public status or timing leaks",
+                "raw_insecure_eval",
+                run_mixer_experiment(mixer_raw)?,
+                run_classifier_same_same(fixed_raw)?,
+                run_mixer_experiment(&mixer_ct)?,
+            ),
+        ];
+        Ok(json!({
+            "excluded_from_uo_claims": true,
+            "controls": ["main_pair", "same_same_control", "public_control"],
+            "cases": cases,
+        }))
+    }
+}
+
+fn run_engineering_cost(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<JsonValue> {
+    let programs = vec![
+        engineering_program_row(
+            "FixedSlotClassifier",
+            "fixed slot",
+            "benches/raw/FixedSlotClassifier.sol",
+            "benches/raw/FixedSlotClassifier.raw.yaml",
+            "benches/raw/FixedSlotClassifier.uo.yaml",
+            &suite["FixedSlotClassifier"].uo,
+            "benchmark",
+        ),
+        engineering_program_row(
+            "AuthScan",
+            "fixed array auth",
+            "benches/raw/AuthScan.sol",
+            "benches/raw/AuthScan.raw.yaml",
+            "benches/raw/AuthScan.uo.yaml",
+            &suite["AuthScan"].uo,
+            "benchmark",
+        ),
+        engineering_program_row(
+            "RegistryCRUD",
+            "bounded registry",
+            "benches/raw/RegistryCRUD.sol",
+            "benches/raw/RegistryCRUD.raw.yaml",
+            "benches/raw/RegistryCRUD.uo.yaml",
+            &suite["RegistryCRUD"].uo,
+            "benchmark",
+        ),
+        engineering_program_row(
+            "ConfidentialMixer",
+            "mixer-style accounting",
+            "benches/raw/ConfidentialMixer.sol",
+            "benches/raw/ConfidentialMixer.raw.yaml",
+            "benches/raw/ConfidentialMixer.uo.yaml",
+            &suite["ConfidentialMixer"].uo,
+            "benchmark",
+        ),
+        engineering_program_row(
+            "ERC20Lite",
+            "token allowance",
+            "benches/raw/ERC20Lite.sol",
+            "benches/raw/ERC20Lite.raw.yaml",
+            "benches/raw/ERC20Lite.uo.yaml",
+            &suite["ERC20Lite"].uo,
+            "benchmark",
+        ),
+        engineering_program_row(
+            "External ERC20-style subset",
+            "external token pattern",
+            "benches/raw/ERC20Lite.sol",
+            "benches/raw/ERC20Lite.raw.yaml",
+            "benches/raw/ERC20Lite.oram.yaml",
+            suite["ERC20Lite"]
+                .oram
+                .as_ref()
+                .unwrap_or(&suite["ERC20Lite"].uo),
+            "external-pattern-adapted",
+        ),
+        engineering_program_row(
+            "External mixer-style subset",
+            "external mixer pattern",
+            "benches/raw/ConfidentialMixer.sol",
+            "benches/raw/ConfidentialMixer.raw.yaml",
+            "benches/raw/ConfidentialMixer.oram.yaml",
+            suite["ConfidentialMixer"]
+                .oram
+                .as_ref()
+                .unwrap_or(&suite["ConfidentialMixer"].uo),
+            "external-pattern-adapted",
+        ),
+    ]
+    .into_iter()
+    .collect::<Result<Vec<_>>>()?;
+    Ok(json!({
+        "programs": programs,
+        "deployment_requirements": {
+            "tcb_loc": trusted_surface_loc_summary()?,
+            "attestation_policy": "required for production TEE deployment; not rerun in this local runbook execution",
+            "runtime_binary_hash": sha256_file_if_exists(&repo_root().join("target/debug/uo-evm")),
+            "proof_root_hash": sha256_file_if_exists(&repo_root().join("proof/lean/lakefile.lean")),
+            "freshness_counter_source": "RuntimeFreshnessState monotone counters plus Path-ORAM leaf derivation",
+            "rollback_policy": "production deployment must reject stale freshness counters",
+            "crash_recovery_policy": "runtime freshness tests cover monotone recovery; host-visible deployment recovery not rerun",
+            "store_cipher": "ChaCha20-Poly1305 sealed store",
+            "nonce_policy": "fresh per-write runtime RNG/counter-derived nonces",
+            "metadata_encryption": "Path-ORAM position-map and stash metadata pages are sealed",
+            "zero_detection_setting": "raw zero encoding is evaluation-only; admitted UO storage uses sealed nonzero transport",
+            "discard_unmap_setting": "not used by in-process runtime",
+            "sparse_metadata_setting": "fixed public metadata pages",
+            "dirty_bitmap_setting": "fixed public write schedules, not host-visible dirty-bit elision",
+            "oram_z": 5,
+            "stash_bound": "max(capacity, 1)",
+            "position_map_policy": "local position map up to capacity 128; private position-map route above 128",
+            "compact_budget_bytes": std::env::var("UO_CANONICAL_CERT_BUDGET_BYTES").unwrap_or_else(|_| (64 * 1024 * 1024u64).to_string()),
+            "heavy_budget_bytes": std::env::var("UO_HEAVY_ARTIFACT_BUDGET_BYTES").unwrap_or_else(|_| (20 * 1024 * 1024 * 1024u64).to_string()),
+        }
+    }))
+}
+
+fn env_usize(name: &str, default: usize) -> usize {
+    std::env::var(name)
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(default)
+}
+
+fn env_usize_list(name: &str, default: &[usize]) -> Vec<usize> {
+    std::env::var(name)
+        .ok()
+        .map(|value| {
+            value
+                .split(',')
+                .filter_map(|part| part.trim().parse::<usize>().ok())
+                .collect::<Vec<_>>()
+        })
+        .filter(|values| !values.is_empty())
+        .unwrap_or_else(|| default.to_vec())
+}
+
+fn env_f64_list(name: &str, default: &[f64]) -> Vec<f64> {
+    std::env::var(name)
+        .ok()
+        .map(|value| {
+            value
+                .split(',')
+                .filter_map(|part| part.trim().parse::<f64>().ok())
+                .collect::<Vec<_>>()
+        })
+        .filter(|values| !values.is_empty())
+        .unwrap_or_else(|| default.to_vec())
+}
+
+fn clock_ticks_per_second() -> f64 {
+    Command::new("getconf")
+        .arg("CLK_TCK")
+        .output()
+        .ok()
+        .and_then(|output| String::from_utf8(output.stdout).ok())
+        .and_then(|text| text.trim().parse::<f64>().ok())
+        .unwrap_or(100.0)
+}
+
+fn read_process_cpu_ticks() -> Result<(u64, u64)> {
+    let stat = fs::read_to_string("/proc/self/stat").context("reading /proc/self/stat")?;
+    let fields = stat
+        .rsplit_once(") ")
+        .ok_or_else(|| anyhow!("unexpected /proc/self/stat format"))?
+        .1
+        .split_whitespace()
+        .collect::<Vec<_>>();
+    let utime = fields
+        .get(11)
+        .ok_or_else(|| anyhow!("missing utime in /proc/self/stat"))?
+        .parse::<u64>()?;
+    let stime = fields
+        .get(12)
+        .ok_or_else(|| anyhow!("missing stime in /proc/self/stat"))?
+        .parse::<u64>()?;
+    Ok((utime, stime))
+}
+
+fn read_max_rss_kb() -> Result<u64> {
+    let status = fs::read_to_string("/proc/self/status").context("reading /proc/self/status")?;
+    for line in status.lines() {
+        if let Some(rest) = line.strip_prefix("VmHWM:") {
+            return rest
+                .split_whitespace()
+                .next()
+                .ok_or_else(|| anyhow!("missing VmHWM value"))?
+                .parse::<u64>()
+                .context("parsing VmHWM");
+        }
+    }
+    Ok(0)
+}
+
+fn ticks_to_ms(ticks: u64, ticks_per_second: f64) -> f64 {
+    (ticks as f64) * 1000.0 / ticks_per_second
+}
+
+fn percentile_sorted(samples: &[u128], percentile: f64) -> u128 {
+    if samples.is_empty() {
+        return 0;
+    }
+    let index = ((samples.len() - 1) as f64 * percentile).round() as usize;
+    samples[index.min(samples.len() - 1)]
+}
+
+fn mean_u128(samples: &[u128]) -> f64 {
+    if samples.is_empty() {
+        return 0.0;
+    }
+    samples.iter().map(|value| *value as f64).sum::<f64>() / samples.len() as f64
+}
+
+fn mean_u64(samples: &[u64]) -> f64 {
+    if samples.is_empty() {
+        return 0.0;
+    }
+    samples.iter().map(|value| *value as f64).sum::<f64>() / samples.len() as f64
+}
+
+fn confidence_interval_95(samples: &[u128]) -> (f64, f64) {
+    if samples.len() < 2 {
+        let mean = mean_u128(samples);
+        return (mean, mean);
+    }
+    let mean = mean_u128(samples);
+    let variance = samples
+        .iter()
+        .map(|value| {
+            let delta = *value as f64 - mean;
+            delta * delta
+        })
+        .sum::<f64>()
+        / (samples.len() - 1) as f64;
+    let half_width = 1.96 * variance.sqrt() / (samples.len() as f64).sqrt();
+    (mean - half_width, mean + half_width)
+}
+
+fn median_u64(mut samples: Vec<u64>) -> u64 {
+    if samples.is_empty() {
+        return 0;
+    }
+    samples.sort_unstable();
+    samples[samples.len() / 2]
+}
+
+fn median_usize(mut samples: Vec<usize>) -> usize {
+    if samples.is_empty() {
+        return 0;
+    }
+    samples.sort_unstable();
+    samples[samples.len() / 2]
+}
+
+fn fixed_storage_call(index: usize) -> CallSpec {
+    CallSpec {
+        entrypoint: "classify(uint256)",
+        args: vec![Value::uint((index % 2) as u64)],
+    }
+}
+
+fn registry_storage_call(index: usize) -> CallSpec {
+    match index % 5 {
+        0 => CallSpec {
+            entrypoint: "upsert(bytes32,uint256)",
+            args: vec![b32(1), Value::uint(index as u64 + 1)],
+        },
+        1 => CallSpec {
+            entrypoint: "upsert(bytes32,uint256)",
+            args: vec![b32(1), Value::uint(index as u64 + 2)],
+        },
+        2 => CallSpec {
+            entrypoint: "clear(bytes32)",
+            args: vec![b32(2)],
+        },
+        3 => CallSpec {
+            entrypoint: "clearIfMatch(bytes32,uint256)",
+            args: vec![b32(1), Value::uint(index as u64 + 2)],
+        },
+        _ => CallSpec {
+            entrypoint: "read(bytes32)",
+            args: vec![b32(3)],
+        },
+    }
+}
+
+fn mixer_storage_call(index: usize) -> CallSpec {
+    if index % 3 == 1 {
+        CallSpec {
+            entrypoint: "withdraw(bytes32,uint256)",
+            args: vec![b32((index % 8) as u8), Value::uint(1)],
+        }
+    } else {
+        CallSpec {
+            entrypoint: "deposit(bytes32,uint256)",
+            args: vec![b32((index % 8) as u8), Value::uint(3)],
+        }
+    }
+}
+
+fn erc20_storage_call(index: usize) -> CallSpec {
+    let alice = addr(0x11);
+    let bob = addr(0x22);
+    let carol = addr(0x33);
+    match index % 4 {
+        0 => CallSpec {
+            entrypoint: "mint(address,uint256)",
+            args: vec![alice, Value::uint(100)],
+        },
+        1 => CallSpec {
+            entrypoint: "approve(address,address,uint256)",
+            args: vec![alice, bob, Value::uint(50)],
+        },
+        2 => CallSpec {
+            entrypoint: "transferFrom(address,address,address,uint256)",
+            args: vec![alice, bob, carol, Value::uint(1)],
+        },
+        _ => CallSpec {
+            entrypoint: "transfer(address,address,uint256)",
+            args: vec![alice, carol, Value::uint(1)],
+        },
+    }
+}
+
+fn single_access_storage_call(index: usize) -> CallSpec {
+    match index % 4 {
+        0 => CallSpec {
+            entrypoint: "put(bytes32,uint256)",
+            args: vec![b32((index % 16) as u8), Value::uint(index as u64 + 1)],
+        },
+        1 => CallSpec {
+            entrypoint: "add(bytes32,uint256)",
+            args: vec![b32((index % 16) as u8), Value::uint(1)],
+        },
+        2 => CallSpec {
+            entrypoint: "clear(bytes32)",
+            args: vec![b32((index % 16) as u8)],
+        },
+        _ => CallSpec {
+            entrypoint: "read(bytes32)",
+            args: vec![b32((index % 16) as u8)],
+        },
+    }
+}
+
+fn static_storage_summary(artifact: &CompiledArtifact) -> Result<JsonValue> {
+    let mut logical_state_bytes = 0usize;
+    let mut physical_state_bytes = 0usize;
+    let mut oram_bucket_bytes = 0usize;
+    let mut position_map_bytes = 0usize;
+    let mut stash_bytes = 0usize;
+    for object in &artifact.contract.state {
+        let value_len = object.value_type.canonical_len();
+        match object.kind {
+            ContainerKind::Cell => {
+                logical_state_bytes += value_len;
+                physical_state_bytes += match object.backend {
+                    BackendKind::Raw => value_len.max(32),
+                    _ => sealed_encoded_len(value_len),
+                };
+            }
+            ContainerKind::Array => {
+                let capacity = object.capacity.unwrap_or(0);
+                logical_state_bytes += capacity * value_len;
+                let slot_len = match object.backend {
+                    BackendKind::Raw => value_len.max(32),
+                    _ => sealed_encoded_len(value_len),
+                };
+                physical_state_bytes += capacity * slot_len;
+            }
+            ContainerKind::Map => {
+                let capacity = object.capacity.unwrap_or(0);
+                let key_len = object
+                    .key_type
+                    .as_ref()
+                    .map(Type::canonical_len)
+                    .unwrap_or(0);
+                let record_len = 1 + key_len + value_len;
+                logical_state_bytes += capacity * record_len;
+                match object.backend {
+                    BackendKind::Raw => physical_state_bytes += capacity * record_len,
+                    BackendKind::FullScan => {
+                        physical_state_bytes += capacity * sealed_encoded_len(record_len)
+                    }
+                    BackendKind::Oram => {
+                        let manifest = uo_core::OramManifest::for_object(object)?;
+                        let page_bytes = 8 * manifest.block_size;
+                        let page_physical = sealed_encoded_len(page_bytes);
+                        let bucket_physical =
+                            manifest.bucket_count * sealed_encoded_len(manifest.bucket_size);
+                        let position_pages = capacity.max(1).div_ceil(8);
+                        let stash_pages = manifest.metadata_pages.saturating_sub(position_pages);
+                        position_map_bytes += position_pages * page_physical;
+                        stash_bytes += stash_pages * page_physical;
+                        oram_bucket_bytes += bucket_physical;
+                        physical_state_bytes += position_pages * page_physical
+                            + stash_pages * page_physical
+                            + bucket_physical
+                            + sealed_encoded_len(8);
+                    }
+                }
+            }
+        }
+    }
+    Ok(json!({
+        "logical_state_bytes": logical_state_bytes,
+        "physical_state_bytes": physical_state_bytes,
+        "oram_bucket_bytes": oram_bucket_bytes,
+        "position_map_bytes": position_map_bytes,
+        "stash_bytes": stash_bytes,
+    }))
+}
+
+fn sealed_encoded_len(payload_len: usize) -> usize {
+    2 * (2 + 12 + payload_len + 16)
+}
+
+struct CapacitySample {
+    entrypoint: &'static str,
+    latency_ns: u128,
+    gas: u64,
+    physical_reads: usize,
+    physical_writes: usize,
+    bytes_read: usize,
+    bytes_written: usize,
+    trace_json_bytes: usize,
+}
+
+fn single_access_map_artifact(capacity: usize, backend: &str) -> Result<CompiledArtifact> {
+    let mut metadata = load_metadata("benches/raw/SingleAccessMap.pathoram.yaml")?;
+    let state = metadata
+        .state
+        .get_mut("records")
+        .ok_or_else(|| anyhow!("SingleAccessMap metadata missing records state"))?;
+    state.capacity = Some(capacity);
+    state.backend = backend.into();
+    state.oram_scheme = if backend == "oram" {
+        Some("path_oram_local_posmap_v1".into())
+    } else {
+        None
+    };
+    compile_artifact_from_metadata(
+        "benches/raw/SingleAccessMap.sol",
+        &metadata,
+        ProgramMode::Uo,
+    )
+}
+
+fn run_capacity_trial(
+    artifact: &CompiledArtifact,
+    read_fraction: f64,
+    trial: usize,
+) -> Result<CapacitySample> {
+    let mut instance = ContractInstance::deploy_with_seed(artifact.clone(), PROBE_DEPLOY_SEED)?;
+    let key = b32((trial % 32) as u8);
+    instance.call("put(bytes32,uint256)", vec![key.clone(), Value::uint(7)])?;
+    let read = ((trial % 10) as f64) < read_fraction * 10.0;
+    let target = if read {
+        CallSpec {
+            entrypoint: "read(bytes32)",
+            args: vec![key],
+        }
+    } else {
+        CallSpec {
+            entrypoint: "put(bytes32,uint256)",
+            args: vec![key, Value::uint(trial as u64 + 11)],
+        }
+    };
+    let started = Instant::now();
+    let result = instance.call(target.entrypoint, target.args)?;
+    let latency_ns = started.elapsed().as_nanos();
+    let trace = result.trace;
+    Ok(CapacitySample {
+        entrypoint: target.entrypoint,
+        latency_ns,
+        gas: trace.gas_used,
+        physical_reads: trace.physical_reads.len(),
+        physical_writes: trace.physical_writes.len(),
+        bytes_read: trace.physical_reads.iter().map(|event| event.len).sum(),
+        bytes_written: trace.physical_writes.iter().map(|event| event.len).sum(),
+        trace_json_bytes: serde_json::to_vec(&trace)?.len(),
+    })
+}
+
+fn max_stash_bound(artifact: &CompiledArtifact) -> usize {
+    artifact
+        .contract
+        .manifest
+        .objects
+        .iter()
+        .filter_map(|object| object.oram.as_ref().map(|oram| oram.stash_bound))
+        .max()
+        .unwrap_or_default()
+}
+
+fn break_even_summary(rows: &[JsonValue]) -> JsonValue {
+    let metrics = [
+        ("gas", "gas"),
+        ("physical_operations", "physical_reads"),
+        ("bytes_moved", "bytes_read"),
+        ("p95_latency", "p95_latency"),
+        ("artifact_size", "artifact_json_bytes"),
+        ("proof_object_size", "proof_object_bytes"),
+    ];
+    let mut result = serde_json::Map::new();
+    for (name, field) in metrics {
+        let mut first_capacity = None;
+        for row in rows {
+            if row["backend"].as_str() != Some("oram") {
+                continue;
+            }
+            let Some(capacity) = row["capacity"].as_u64() else {
+                continue;
+            };
+            let Some(read_fraction) = row["read_fraction"].as_f64() else {
+                continue;
+            };
+            let full = rows.iter().find(|candidate| {
+                candidate["backend"].as_str() == Some("full_scan")
+                    && candidate["capacity"].as_u64() == Some(capacity)
+                    && candidate["read_fraction"].as_f64() == Some(read_fraction)
+            });
+            if let Some(full) = full {
+                let oram_value = row[field]
+                    .as_f64()
+                    .or_else(|| row[field].as_u64().map(|v| v as f64));
+                let full_value = full[field]
+                    .as_f64()
+                    .or_else(|| full[field].as_u64().map(|v| v as f64));
+                if matches!((oram_value, full_value), (Some(o), Some(f)) if o <= f) {
+                    first_capacity =
+                        Some(json!({"capacity": capacity, "read_fraction": read_fraction}));
+                    break;
+                }
+            }
+        }
+        result.insert(name.into(), first_capacity.unwrap_or(JsonValue::Null));
+    }
+    JsonValue::Object(result)
+}
+
+#[cfg(feature = "insecure-eval-raw")]
+fn ablation_row(
+    name: &str,
+    expected_leak: &str,
+    variant: &str,
+    main_pair: ExperimentOutcome,
+    same_same: ExperimentOutcome,
+    public_control: ExperimentOutcome,
+) -> JsonValue {
+    json!({
+        "ablation": name,
+        "expected_leak": expected_leak,
+        "variant": variant,
+        "main_pair": experiment_leakage_bundle(&main_pair),
+        "same_same_control": experiment_leakage_bundle(&same_same),
+        "public_control": experiment_leakage_bundle(&public_control),
+    })
+}
+
+#[cfg(feature = "insecure-eval-raw")]
+fn experiment_leakage_bundle(outcome: &ExperimentOutcome) -> JsonValue {
+    let auc = auc_report(&outcome.class0_metrics, &outcome.class1_metrics);
+    let mi = mi_report(&outcome.class0_metrics, &outcome.class1_metrics);
+    json!({
+        "auc": auc,
+        "mi_bits": mi,
+        "strongest_metric": strongest_metric(&auc, &mi),
+        "opcode_equal": outcome.opcode_equal,
+        "logical_access_equal": outcome.logical_equal,
+        "logical_write_equal": outcome.logical_write_equal,
+        "physical_read_equal": outcome.physical_read_equal,
+        "physical_trace_equal": outcome.physical_equal,
+    })
+}
+
+#[cfg(feature = "insecure-eval-raw")]
+fn strongest_metric(auc: &JsonValue, mi: &JsonValue) -> JsonValue {
+    let mut best_name = String::new();
+    let mut best_score = 0.0f64;
+    if let Some(map) = auc.as_object() {
+        for (name, value) in map {
+            if let Some(v) = value.as_f64() {
+                let score = (v - 0.5).abs();
+                if score > best_score {
+                    best_score = score;
+                    best_name = format!("auc:{name}");
+                }
+            }
+        }
+    }
+    if let Some(map) = mi.as_object() {
+        for (name, value) in map {
+            if let Some(v) = value.as_f64() {
+                let score = v.abs();
+                if score > best_score {
+                    best_score = score;
+                    best_name = format!("mi:{name}");
+                }
+            }
+        }
+    }
+    json!({"metric": best_name, "score": best_score})
+}
+
+fn engineering_program_row(
+    program: &str,
+    domain: &str,
+    source_path: &str,
+    raw_metadata_path: &str,
+    uo_metadata_path: &str,
+    artifact: &CompiledArtifact,
+    notes: &str,
+) -> Result<JsonValue> {
+    let raw_source_loc = count_nonempty_lines(&workspace_path(source_path))?;
+    let raw_metadata_loc = count_nonempty_lines(&workspace_path(raw_metadata_path))?;
+    let uo_metadata_loc = count_nonempty_lines(&workspace_path(uo_metadata_path))?;
+    let confidential_entrypoints = artifact
+        .contract
+        .functions
+        .iter()
+        .filter(|function| function.confidential)
+        .map(|function| function.signature.clone())
+        .collect::<Vec<_>>();
+    let secret_args = artifact
+        .contract
+        .manifest
+        .entrypoints
+        .iter()
+        .map(|(entrypoint, manifest)| {
+            json!({
+                "entrypoint": entrypoint,
+                "secret_args": manifest.secret_args,
+            })
+        })
+        .collect::<Vec<_>>();
+    let confidential_objects = artifact
+        .contract
+        .state
+        .iter()
+        .filter(|object| object.confidential)
+        .map(|object| object.name.clone())
+        .collect::<Vec<_>>();
+    let public_capacity_annotations = artifact
+        .contract
+        .state
+        .iter()
+        .filter_map(|object| {
+            object
+                .capacity
+                .map(|capacity| json!({"object": object.name, "capacity": capacity}))
+        })
+        .collect::<Vec<_>>();
+    Ok(json!({
+        "program": program,
+        "domain": domain,
+        "raw_source_loc": raw_source_loc,
+        "uo_source_loc": raw_source_loc,
+        "metadata_loc": uo_metadata_loc,
+        "raw_metadata_loc": raw_metadata_loc,
+        "metadata_delta_loc": i64::try_from(uo_metadata_loc).unwrap_or_default() - i64::try_from(raw_metadata_loc).unwrap_or_default(),
+        "confidential_entrypoints": confidential_entrypoints,
+        "secret_args": secret_args,
+        "confidential_objects": confidential_objects,
+        "public_capacity_annotations": public_capacity_annotations,
+        "unsupported_features_hit": [],
+        "manual_refactorings": if notes == "benchmark" { "none beyond sidecar backend/capacity policy" } else { "adapted to the restricted subset: single contract, no imports/inheritance/events/external calls" },
+        "checker_errors_before_success": 0,
+        "checker_warnings": &artifact.diagnostics,
+        "developer_hours_or_agent_minutes": "not tracked in source; local agent command timings are recorded in eval-out logs",
+        "api_changes": "sidecar metadata and explicit entrypoint policies",
+        "notes": notes,
+    }))
+}
+
+fn sha256_file_if_exists(path: &Path) -> JsonValue {
+    match fs::read(path) {
+        Ok(bytes) => {
+            let mut hasher = Sha256::new();
+            hasher.update(bytes);
+            json!(format!("{:x}", hasher.finalize()))
+        }
+        Err(_) => JsonValue::Null,
+    }
 }
 
 fn run_overheads(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<JsonValue> {
@@ -47593,8 +48947,21 @@ fn append_overhead_workload(
     target: &CallSpec,
     getters: &[CallSpec],
 ) -> Result<()> {
+    #[cfg(not(feature = "insecure-eval-raw"))]
     let raw = run_optional_raw_scenario(&artifacts.raw, setup, target, getters)
         .with_context(|| format!("{benchmark}/raw"))?;
+    #[cfg(feature = "insecure-eval-raw")]
+    let raw = OptionalScenarioResult::Rejected {
+        error: "raw confidential backends are rejected in proof-grade builds; this feature build emits the executable raw_insecure_eval control separately".into(),
+    };
+    #[cfg(feature = "insecure-eval-raw")]
+    let raw_insecure_eval = run_scenario(&artifacts.raw, setup, target, getters)
+        .with_context(|| format!("{benchmark}/raw_insecure_eval"))?;
+    #[cfg(feature = "insecure-eval-raw")]
+    let ct_gas_only_artifact = ct_gas_only_artifact(&artifacts.uo);
+    #[cfg(feature = "insecure-eval-raw")]
+    let ct_gas_only = run_scenario(&ct_gas_only_artifact, setup, target, getters)
+        .with_context(|| format!("{benchmark}/ct_gas_only"))?;
     let uo = run_scenario(&artifacts.uo, setup, target, getters)
         .with_context(|| format!("{benchmark}/full_scan"))?;
     let fullscan64 = artifacts
@@ -47620,6 +48987,29 @@ fn append_overhead_workload(
     variants.push(raw_row.clone());
     matrix.push(raw_row);
 
+    #[cfg(feature = "insecure-eval-raw")]
+    {
+        let raw_eval_row = overhead_matrix_row(
+            benchmark,
+            "raw_insecure_eval",
+            &artifacts.raw,
+            target.entrypoint,
+            &raw_insecure_eval,
+        )?;
+        variants.push(raw_eval_row.clone());
+        matrix.push(raw_eval_row);
+
+        let ct_row = overhead_matrix_row(
+            benchmark,
+            "ct_gas_only",
+            &ct_gas_only_artifact,
+            target.entrypoint,
+            &ct_gas_only,
+        )?;
+        variants.push(ct_row.clone());
+        matrix.push(ct_row);
+    }
+
     let uo_label = artifact_backend_label(&artifacts.uo);
     let uo_row = overhead_matrix_row(benchmark, &uo_label, &artifacts.uo, target.entrypoint, &uo)?;
     variants.push(uo_row.clone());
@@ -47633,6 +49023,11 @@ fn append_overhead_workload(
         "full_scan": scenario_overhead(&uo),
         "variants": variants,
     });
+    #[cfg(feature = "insecure-eval-raw")]
+    {
+        case["raw_insecure_eval"] = scenario_overhead(&raw_insecure_eval);
+        case["ct_gas_only"] = scenario_overhead(&ct_gas_only);
+    }
 
     if let Some(fullscan64) = fullscan64 {
         let fullscan64_artifact = artifacts.fullscan64.as_ref().unwrap();
@@ -47699,7 +49094,7 @@ fn run_scenario(
     target: &CallSpec,
     getters: &[CallSpec],
 ) -> Result<ScenarioResult> {
-    let mut instance = ContractInstance::deploy(artifact.clone())?;
+    let mut instance = ContractInstance::deploy_with_seed(artifact.clone(), PROBE_DEPLOY_SEED)?;
     for call in setup {
         instance.call(call.entrypoint, call.args.clone())?;
     }
@@ -47735,6 +49130,33 @@ fn run_optional_raw_scenario(
 fn is_expected_confidential_raw_backend_rejection(err: &anyhow::Error) -> bool {
     err.chain()
         .any(|cause| cause.to_string().contains("uses raw backend"))
+}
+
+#[cfg(feature = "insecure-eval-raw")]
+fn ct_gas_only_artifact(artifact: &CompiledArtifact) -> CompiledArtifact {
+    let mut artifact = artifact.clone();
+    for state in &mut artifact.contract.state {
+        if state.confidential {
+            state.backend = BackendKind::Raw;
+            state.oram_scheme = "surrogate_public_schedule_v1".into();
+        }
+    }
+    for manifest_object in &mut artifact.contract.manifest.objects {
+        if artifact
+            .contract
+            .state
+            .iter()
+            .any(|state| state.id == manifest_object.id && state.confidential)
+        {
+            manifest_object.backend = "raw".into();
+            manifest_object.oram = None;
+        }
+    }
+    artifact.admitted_package = None;
+    artifact
+        .diagnostics
+        .push("evaluation-only ct_gas_only: public gas/control schedule from the UO artifact with confidential state forced to raw same-location storage; excluded from UO proof claims".into());
+    artifact
 }
 
 fn optional_scenario_equivalent_to(
@@ -47994,7 +49416,7 @@ fn run_target_call_with_diagnostics(
     entrypoint: &str,
     args: Vec<Value>,
 ) -> Result<DiagnosticCallResult> {
-    let mut instance = ContractInstance::deploy(artifact.clone())?;
+    let mut instance = ContractInstance::deploy_with_seed(artifact.clone(), PROBE_DEPLOY_SEED)?;
     for call in setup {
         instance.call(call.entrypoint, call.args.clone())?;
     }
@@ -48034,6 +49456,14 @@ where
             }))
         }
         Err(err) => Err(err),
+    }
+}
+
+fn raw_eval_mode_label() -> &'static str {
+    if cfg!(feature = "insecure-eval-raw") {
+        "raw_insecure_eval"
+    } else {
+        "raw"
     }
 }
 

@@ -1402,7 +1402,7 @@ fn forbid_raw_expr(expr: &Expr, signature: &str) -> Result<()> {
 mod tests {
     use super::{
         check_artifact, check_artifact_against_source, forbid_raw_expr,
-        translation_validation_bundle_against_source,
+        translation_validation_bundle_against_source_with_metadata_bytes,
     };
     use std::fs;
     use std::path::PathBuf;
@@ -1641,46 +1641,38 @@ bounds:
     fn checker_rejects_confidential_select_arm_outside_branchless_fragment() {
         let expr = Expr::Select {
             cond: Box::new(Expr::Var("cond".into())),
-            when_true: Box::new(Expr::ArrayIndex {
-                base: Box::new(Expr::Literal(Value::Array(
-                    vec![Value::uint(1)].into_boxed_slice(),
-                ))),
-                index: Box::new(Expr::Literal(Value::uint(0))),
+            when_true: Box::new(Expr::MapGet {
+                object_id: 0,
+                key: Box::new(Expr::Literal(Value::uint(0))),
             }),
             when_false: Box::new(Expr::Literal(Value::uint(0))),
         };
         let err = forbid_raw_expr(&expr, "confidentialSelect(uint256)").unwrap_err();
         assert!(err
             .to_string()
-            .contains("select arm outside the branchless pure fragment"));
+            .contains("contains a select arm with storage access"));
     }
 
     #[test]
-    fn checker_rejects_confidential_array_index() {
+    fn checker_accepts_pure_confidential_array_index() {
         let expr = Expr::ArrayIndex {
             base: Box::new(Expr::Literal(Value::Array(
                 vec![Value::uint(1)].into_boxed_slice(),
             ))),
             index: Box::new(Expr::Literal(Value::uint(0))),
         };
-        let err = forbid_raw_expr(&expr, "confidentialArrayIndex()").unwrap_err();
-        assert!(err
-            .to_string()
-            .contains("unsupported array indexing in the confidential fragment"));
+        forbid_raw_expr(&expr, "confidentialArrayIndex()").unwrap();
     }
 
     #[test]
-    fn checker_rejects_confidential_struct_field() {
+    fn checker_accepts_pure_confidential_struct_field() {
         let expr = Expr::StructField {
             base: Box::new(Expr::Literal(Value::Struct(
                 vec![("flag".into(), Value::Bool(true))].into_boxed_slice(),
             ))),
             field: "flag".into(),
         };
-        let err = forbid_raw_expr(&expr, "confidentialStructField()").unwrap_err();
-        assert!(err
-            .to_string()
-            .contains("unsupported struct-field projection in the confidential fragment"));
+        forbid_raw_expr(&expr, "confidentialStructField()").unwrap();
     }
 
     #[test]
@@ -1761,10 +1753,19 @@ bounds:
 
     #[test]
     fn debug_translation_bundle_includes_projection_views() {
-        let (source, metadata, artifact) = sample_artifact();
-        let debug_bundle = translation_validation_bundle_against_source(
+        let (source, metadata) = sample_source_and_metadata();
+        let raw_metadata = serde_yaml::to_string(&metadata).unwrap();
+        let artifact = uo_solc::compile_with_metadata_bytes(
             source.to_str().unwrap(),
             &metadata,
+            raw_metadata.as_bytes(),
+            ProgramMode::Uo,
+        )
+        .unwrap();
+        let debug_bundle = translation_validation_bundle_against_source_with_metadata_bytes(
+            source.to_str().unwrap(),
+            &metadata,
+            raw_metadata.as_bytes(),
             &artifact,
         )
         .unwrap();

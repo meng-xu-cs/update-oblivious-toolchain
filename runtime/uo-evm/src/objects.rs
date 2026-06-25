@@ -436,6 +436,7 @@ impl RuntimeObject {
     }
 
     fn instantiate_from_rng(spec: &StateObject, master_rng: &mut ChaCha20Rng) -> Result<Self> {
+        #[cfg(not(feature = "insecure-eval-raw"))]
         if spec.confidential && matches!(spec.backend, BackendKind::Raw) {
             bail!("confidential object {} uses raw backend", spec.name);
         }
@@ -669,6 +670,7 @@ impl RuntimeObject {
         )
     }
 
+    #[cfg_attr(feature = "insecure-eval-raw", allow(dead_code))]
     pub(in crate::runtime) fn is_update_oblivious_backend(&self) -> bool {
         matches!(
             self,
