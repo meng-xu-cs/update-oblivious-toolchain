@@ -70,6 +70,8 @@ jobs:
         run: cargo run -q -p mplus-probe -- --only static-checks --out-dir results
       - name: fail-closed acceptance aggregate
         run: cargo run -q -p mplus-probe -- --only acceptance-check --out-dir results
+      - name: Path ORAM claim-consistency
+        run: cargo run -q -p mplus-probe -- --only claim-consistency --out-dir results
 
   full-validation:
     # Heavy end-to-end validation. Manual or nightly only.

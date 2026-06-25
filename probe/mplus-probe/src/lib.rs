@@ -45,6 +45,9 @@ pub use acceptance::{
     ACCEPTANCE_SCHEMA,
 };
 
+mod claim_consistency;
+pub use claim_consistency::{run_claim_consistency_report, CLAIM_CONSISTENCY_SCHEMA};
+
 const PROBE_DEPLOY_SEED: u64 = 0x5052_4f42_455f_0001;
 
 #[derive(Clone)]

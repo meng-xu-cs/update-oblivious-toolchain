@@ -31,8 +31,12 @@ a public chain" as its main execution model.
 
 - Exact-UO is claimed for exact backends on the repository's instrumented
   abstract/runtime model: `UOCell`, `UOArray`, and full-scan `UOMap`.
-- The theorem-facing computational-UO path is only
-  `path_oram_local_posmap_v1`.
+- The theorem-facing computational-UO paths are `path_oram_local_posmap_v1`
+  for the bounded local-position-map route (capped at capacity `128`) and
+  `path_oram_private_posmap_v1` for scalable private position metadata. Both
+  are admitted by proof-grade compilation and are in the
+  `UOToolchain.ProofGradeRoot` import closure
+  (`PathOramPrivatePosmapV1`, `ScalablePathOramEvidence`).
 - The runtime-to-Lean bridge is explicit and executable: controller
   certificate, hidden Path ORAM certificate, trusted-kernel slot bundle,
   runtime kernel witness, shell-boundary bundles, refinement witnesses, seeded

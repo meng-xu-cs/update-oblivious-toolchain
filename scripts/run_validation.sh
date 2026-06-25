@@ -44,5 +44,7 @@ cargo test
 cargo run -q -p mplus-probe -- "${PROBE_ARGS[@]}"
 # Fail-closed proof-grade acceptance aggregate over the generated reports.
 cargo run -q -p mplus-probe -- --only acceptance-check "${PROBE_ARGS[@]}"
+# Fail-closed Path ORAM claim-consistency check (README/docs/proof/code agree).
+cargo run -q -p mplus-probe -- --only claim-consistency "${PROBE_ARGS[@]}"
 ./scripts/rebuild_review_validation_false_paths.sh --write
 ./scripts/rebuild_review_validation_false_paths.sh --check

@@ -1,6 +1,6 @@
 {
   "format_version": 3,
-  "file_count": 78,
+  "file_count": 79,
   "lean_toolchain": "leanprover/lean4:v4.30.0-rc2",
   "lean_toolchain_exact_release": true,
   "lean_version": "Lean (version 4.30.0-rc2, x86_64-unknown-linux-gnu, commit 3dc1a088b6d2d8eafe25a7cd7ec7b58d731bd7cc, Release)",
@@ -14,8 +14,8 @@
   "files": [
     {
       "path": "acceptance.json",
-      "bytes": 138151,
-      "sha256": "495b8f0d058e747a94acdb54630fd1ad11a646bbcfefab9ced7c9347bfe07a2b"
+      "bytes": 138797,
+      "sha256": "f9643801bb8c32bcd57e92198f868975e44f91a4d25eb327730da5726240846a"
     },
     {
       "path": "artifact_configuration.json",
@@ -36,6 +36,11 @@
       "path": "canonical_pathoram_pair_validation.json",
       "bytes": 6598,
       "sha256": "435d6d6893b9336885a29ff36dc515271f7b68a97303d12a70f95cec322cb624"
+    },
+    {
+      "path": "claim_consistency.json",
+      "bytes": 2443,
+      "sha256": "29f4dcd5348177735c2f820df7b62298880398dbed75464d28eb25309dc629a8"
     },
     {
       "path": "confidential_core_kernel_finish_slot_validation.json",

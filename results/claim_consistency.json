@@ -1,0 +1,76 @@
+{
+  "accepted": true,
+  "check_count": 13,
+  "checks": [
+    {
+      "detail": "README.md references path_oram_private_posmap_v1",
+      "name": "README.md:mentions:path_oram_private_posmap_v1",
+      "ok": true
+    },
+    {
+      "detail": "docs/claim-boundary.md references path_oram_private_posmap_v1",
+      "name": "docs/claim-boundary.md:mentions:path_oram_private_posmap_v1",
+      "ok": true
+    },
+    {
+      "detail": "docs/supported-subset.md references path_oram_private_posmap_v1",
+      "name": "docs/supported-subset.md:mentions:path_oram_private_posmap_v1",
+      "ok": true
+    },
+    {
+      "detail": "docs/path-oram.md references path_oram_private_posmap_v1",
+      "name": "docs/path-oram.md:mentions:path_oram_private_posmap_v1",
+      "ok": true
+    },
+    {
+      "detail": "README.md does not demote path_oram_private_posmap_v1",
+      "name": "README.md:no-demotion",
+      "ok": true
+    },
+    {
+      "detail": "docs/claim-boundary.md does not demote path_oram_private_posmap_v1",
+      "name": "docs/claim-boundary.md:no-demotion",
+      "ok": true
+    },
+    {
+      "detail": "docs/supported-subset.md does not demote path_oram_private_posmap_v1",
+      "name": "docs/supported-subset.md:no-demotion",
+      "ok": true
+    },
+    {
+      "detail": "docs/path-oram.md does not demote path_oram_private_posmap_v1",
+      "name": "docs/path-oram.md:no-demotion",
+      "ok": true
+    },
+    {
+      "detail": "README presents both theorem-facing computational routes",
+      "name": "README.md:does-not-narrow-to-local-only",
+      "ok": true
+    },
+    {
+      "detail": "ProofGradeRoot imports UOToolchain.PathOramPrivatePosmapV1",
+      "name": "ProofGradeRoot:imports:PathOramPrivatePosmapV1",
+      "ok": true
+    },
+    {
+      "detail": "ProofGradeRoot imports UOToolchain.ScalablePathOramEvidence",
+      "name": "ProofGradeRoot:imports:ScalablePathOramEvidence",
+      "ok": true
+    },
+    {
+      "detail": "manifest.rs defines PATH_ORAM_PRIVATE_POSMAP_SCHEME",
+      "name": "manifest:has-private-scheme-constant",
+      "ok": true
+    },
+    {
+      "detail": "is_path_oram_scheme accepts the private-posmap scheme",
+      "name": "manifest:is-path-oram-scheme-includes-private",
+      "ok": true
+    }
+  ],
+  "failing_count": 0,
+  "local_scheme": "path_oram_local_posmap_v1",
+  "private_scheme": "path_oram_private_posmap_v1",
+  "report": "claim_consistency",
+  "schema": "uo.claim_consistency.v1"
+}

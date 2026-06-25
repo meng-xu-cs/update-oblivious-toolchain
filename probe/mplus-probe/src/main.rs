@@ -102,6 +102,7 @@ enum ReportKind {
     ReviewerSummary,
     AcceptanceCheck,
     BridgeVerdict,
+    ClaimConsistency,
 }
 
 #[derive(Debug, Parser)]
@@ -935,6 +936,25 @@ fn main() -> Result<()> {
                 "stamped bridge_validation proof_grade_verdict (accepted={})",
                 verdict["accepted"]
             );
+        }
+        Some(ReportKind::ClaimConsistency) => {
+            // Fail-closed check that the Path ORAM claim language agrees across
+            // README, docs, the Lean proof-grade root, and the Rust admission
+            // surface.
+            let report = mplus_probe::run_claim_consistency_report()?;
+            fs::create_dir_all(&cli.out_dir)?;
+            fs::write(
+                Path::new(&cli.out_dir).join("claim_consistency.json"),
+                serde_json::to_vec_pretty(&report)?,
+            )?;
+            mplus_probe::write_reproducibility_manifest(&cli.out_dir)?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+            if report["accepted"].as_bool() != Some(true) {
+                anyhow::bail!(
+                    "claim-consistency check failed; see {}/claim_consistency.json",
+                    cli.out_dir
+                );
+            }
         }
         None => {
             let report = mplus_probe::run_probe_with_options(&options)?;
