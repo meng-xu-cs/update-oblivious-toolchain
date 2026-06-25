@@ -4189,6 +4189,184 @@ fn validate_translation_artifacts_against_source(
     }))
 }
 
+/// Seeded differential-correctness trials for one benchmark (Issue 17). Each
+/// seed deterministically derives the same logical inputs for the insecure raw
+/// baseline and the UO artifact; both are executed and their public outputs
+/// (getters + return value, via `optional_scenario_equivalent_to`) must agree.
+/// Trials whose raw baseline is rejected (the strict default build) do not count
+/// toward the differential; the insecure-eval-raw feature build executes the raw
+/// baseline and performs the real comparison. An incorrect UO update makes some
+/// trial diverge, which sets `equivalent: false` and fails the acceptance gate.
+fn differential_correctness_trials(
+    artifacts: &BenchArtifacts,
+    benchmark: &str,
+    trials: u64,
+    mut make_trial: impl FnMut(u64) -> (Vec<CallSpec>, CallSpec, Vec<CallSpec>),
+) -> Result<JsonValue> {
+    let mut differential_executed = 0u64;
+    let mut divergences = 0u64;
+    for seed in 0..trials {
+        let (setup, target, getters) = make_trial(seed);
+        let uo = run_scenario(&artifacts.uo, &setup, &target, &getters)
+            .with_context(|| format!("differential/{benchmark}/uo/seed={seed}"))?;
+        let raw = run_optional_raw_scenario(&artifacts.raw, &setup, &target, &getters)
+            .with_context(|| format!("differential/{benchmark}/raw/seed={seed}"))?;
+        if let JsonValue::Bool(equivalent) = optional_scenario_equivalent_to(&raw, &uo) {
+            differential_executed += 1;
+            if !equivalent {
+                divergences += 1;
+            }
+        }
+    }
+    Ok(json!({
+        "benchmark": benchmark,
+        "trial_count": trials,
+        "seed_range": [0, trials],
+        "differential_trials_executed": differential_executed,
+        "divergences": divergences,
+        "equivalent": divergences == 0,
+    }))
+}
+
+fn run_differential_correctness(
+    suite: &BTreeMap<&'static str, BenchArtifacts>,
+    trials: u64,
+) -> Result<JsonValue> {
+    let mut benchmarks = Vec::new();
+    benchmarks.push(differential_correctness_trials(
+        &suite["FixedSlotClassifier"],
+        "FixedSlotClassifier",
+        trials,
+        |seed| {
+            (
+                vec![],
+                CallSpec {
+                    entrypoint: "classify(uint256)",
+                    args: vec![Value::uint(seed % 7)],
+                },
+                vec![CallSpec {
+                    entrypoint: "peek()",
+                    args: vec![],
+                }],
+            )
+        },
+    )?);
+    benchmarks.push(differential_correctness_trials(
+        &suite["RegistryCRUD"],
+        "RegistryCRUD",
+        trials,
+        |seed| {
+            (
+                vec![],
+                CallSpec {
+                    entrypoint: "upsert(bytes32,uint256)",
+                    args: vec![b32((seed % 13) as u8), Value::uint(seed % 100)],
+                },
+                vec![CallSpec {
+                    entrypoint: "read(bytes32)",
+                    args: vec![b32((seed % 13) as u8)],
+                }],
+            )
+        },
+    )?);
+    benchmarks.push(differential_correctness_trials(
+        &suite["ConfidentialMixer"],
+        "ConfidentialMixer",
+        trials,
+        |seed| {
+            (
+                vec![],
+                CallSpec {
+                    entrypoint: "deposit(bytes32,uint256)",
+                    args: vec![b32((seed % 11) as u8), Value::uint(seed % 10 + 1)],
+                },
+                vec![
+                    CallSpec {
+                        entrypoint: "balanceOf(bytes32)",
+                        args: vec![b32((seed % 11) as u8)],
+                    },
+                    CallSpec {
+                        entrypoint: "totalValue()",
+                        args: vec![],
+                    },
+                ],
+            )
+        },
+    )?);
+    benchmarks.push(differential_correctness_trials(
+        &suite["AuthScan"],
+        "AuthScan",
+        trials,
+        |seed| {
+            (
+                vec![
+                    CallSpec {
+                        entrypoint: "seed(uint256,bytes32)",
+                        args: vec![Value::uint(0u64), b32((seed % 5 + 1) as u8)],
+                    },
+                    CallSpec {
+                        entrypoint: "seed(uint256,bytes32)",
+                        args: vec![Value::uint(1u64), b32((seed % 5 + 2) as u8)],
+                    },
+                ],
+                CallSpec {
+                    entrypoint: "auth(bytes32)",
+                    args: vec![b32((seed % 7) as u8)],
+                },
+                vec![CallSpec {
+                    entrypoint: "readLast()",
+                    args: vec![],
+                }],
+            )
+        },
+    )?);
+    benchmarks.push(differential_correctness_trials(
+        &suite["ERC20Lite"],
+        "ERC20Lite",
+        trials,
+        |seed| {
+            (
+                vec![
+                    CallSpec {
+                        entrypoint: "mint(address,uint256)",
+                        args: vec![addr(0x11), Value::uint(100u64)],
+                    },
+                    CallSpec {
+                        entrypoint: "approve(address,address,uint256)",
+                        args: vec![addr(0x11), addr(0x22), Value::uint(seed % 50)],
+                    },
+                ],
+                CallSpec {
+                    entrypoint: "transferFrom(address,address,address,uint256)",
+                    args: vec![addr(0x22), addr(0x11), addr(0x33), Value::uint(seed % 10)],
+                },
+                vec![
+                    CallSpec {
+                        entrypoint: "balanceOf(address)",
+                        args: vec![addr(0x33)],
+                    },
+                    CallSpec {
+                        entrypoint: "allowanceOf(address,address)",
+                        args: vec![addr(0x11), addr(0x22)],
+                    },
+                ],
+            )
+        },
+    )?);
+    let accepted = benchmarks.iter().all(|benchmark| {
+        benchmark
+            .get("equivalent")
+            .and_then(|equivalent| equivalent.as_bool())
+            .unwrap_or(false)
+    });
+    Ok(json!({
+        "trial_count": trials,
+        "seed_range": [0, trials],
+        "benchmarks": benchmarks,
+        "accepted": accepted,
+    }))
+}
+
 fn run_correctness(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<JsonValue> {
     let mut scenarios = Vec::new();
     scenarios.push(
@@ -4204,7 +4382,18 @@ fn run_correctness(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<Jso
     scenarios.push(
         check_registry_correctness(&suite["RegistryCRUD"]).context("correctness/RegistryCRUD")?,
     );
-    Ok(json!({ "scenarios": scenarios }))
+    // Issue 17: seeded differential trials (insecure raw baseline vs UO). The
+    // trial count is small by default (fast CI subset) and raised to >= 1000 per
+    // benchmark for full validation via UO_CORRECTNESS_TRIALS.
+    let differential_trials = std::env::var("UO_CORRECTNESS_TRIALS")
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+        .unwrap_or(16);
+    let differential_correctness = run_differential_correctness(suite, differential_trials)?;
+    Ok(json!({
+        "scenarios": scenarios,
+        "differential_correctness": differential_correctness,
+    }))
 }
 
 fn run_controller_observer_validation(

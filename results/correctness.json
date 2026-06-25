@@ -1,14 +1,85 @@
 {
+  "differential_correctness": {
+    "accepted": true,
+    "benchmarks": [
+      {
+        "benchmark": "FixedSlotClassifier",
+        "differential_trials_executed": 16,
+        "divergences": 0,
+        "equivalent": true,
+        "seed_range": [
+          0,
+          16
+        ],
+        "trial_count": 16
+      },
+      {
+        "benchmark": "RegistryCRUD",
+        "differential_trials_executed": 16,
+        "divergences": 0,
+        "equivalent": true,
+        "seed_range": [
+          0,
+          16
+        ],
+        "trial_count": 16
+      },
+      {
+        "benchmark": "ConfidentialMixer",
+        "differential_trials_executed": 16,
+        "divergences": 0,
+        "equivalent": true,
+        "seed_range": [
+          0,
+          16
+        ],
+        "trial_count": 16
+      },
+      {
+        "benchmark": "AuthScan",
+        "differential_trials_executed": 16,
+        "divergences": 0,
+        "equivalent": true,
+        "seed_range": [
+          0,
+          16
+        ],
+        "trial_count": 16
+      },
+      {
+        "benchmark": "ERC20Lite",
+        "differential_trials_executed": 16,
+        "divergences": 0,
+        "equivalent": true,
+        "seed_range": [
+          0,
+          16
+        ],
+        "trial_count": 16
+      }
+    ],
+    "seed_range": [
+      0,
+      16
+    ],
+    "trial_count": 16
+  },
   "scenarios": [
     {
       "benchmark": "FixedSlotClassifier",
       "equivalent": true,
       "raw": {
-        "error": "confidential object last uses raw backend",
-        "executable": false,
-        "rejected": true
+        "aborted": false,
+        "executable": true,
+        "gas_used": 22,
+        "getters": [
+          "1"
+        ],
+        "physical_writes": 1,
+        "rejected": false,
+        "return": null
       },
-      "raw_equivalent_to_uo": null,
+      "raw_equivalent_to_uo": true,
       "uo": {
         "aborted": false,
         "executable": true,
@@ -26,11 +97,17 @@
       "benchmark": "AuthScan",
       "equivalent": true,
       "raw": {
-        "error": "confidential object TOKENS uses raw backend",
-        "executable": false,
-        "rejected": true
+        "aborted": false,
+        "executable": true,
+        "gas_used": 34,
+        "getters": [
+          "1"
+        ],
+        "physical_writes": 1,
+        "rejected": false,
+        "return": "1"
       },
-      "raw_equivalent_to_uo": null,
+      "raw_equivalent_to_uo": true,
       "uo": {
         "aborted": false,
         "executable": true,
@@ -61,11 +138,18 @@
       },
       "oram_matches_expected": true,
       "raw": {
-        "error": "confidential object balances uses raw backend",
-        "executable": false,
-        "rejected": true
+        "aborted": false,
+        "executable": true,
+        "gas_used": 50,
+        "getters": [
+          "3",
+          "3"
+        ],
+        "physical_writes": 2,
+        "rejected": false,
+        "return": "2"
       },
-      "raw_equivalent_to_uo": null,
+      "raw_equivalent_to_uo": true,
       "uo": {
         "aborted": false,
         "executable": true,
@@ -98,11 +182,19 @@
       },
       "oram_matches_expected": true,
       "raw": {
-        "error": "confidential object allowances uses raw backend",
-        "executable": false,
-        "rejected": true
+        "aborted": false,
+        "executable": true,
+        "gas_used": 75,
+        "getters": [
+          "7",
+          "3",
+          "1"
+        ],
+        "physical_writes": 3,
+        "rejected": false,
+        "return": "1"
       },
-      "raw_equivalent_to_uo": null,
+      "raw_equivalent_to_uo": true,
       "uo": {
         "aborted": false,
         "executable": true,
@@ -122,11 +214,17 @@
       "benchmark": "RegistryCRUD",
       "equivalent": true,
       "raw": {
-        "error": "confidential object records uses raw backend",
-        "executable": false,
-        "rejected": true
+        "aborted": false,
+        "executable": true,
+        "gas_used": 25,
+        "getters": [
+          "0"
+        ],
+        "physical_writes": 1,
+        "rejected": false,
+        "return": "1"
       },
-      "raw_equivalent_to_uo": null,
+      "raw_equivalent_to_uo": true,
       "uo": {
         "aborted": false,
         "executable": true,

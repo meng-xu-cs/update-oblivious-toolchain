@@ -50,6 +50,12 @@ cargo run -q -p mplus-probe -- "${PROBE_ARGS[@]}"
 # default build, and production/proof-grade translation reject these artifacts.
 cargo run -q -p mplus-probe --features insecure-eval-raw -- --only overheads "${PROBE_ARGS[@]}"
 cargo run -q -p mplus-probe --features insecure-eval-raw -- --only leakage-auc "${PROBE_ARGS[@]}"
+# Differential correctness (Issue 17): with the insecure-eval-raw feature the raw
+# baseline is executable, so each seeded trial compares the raw baseline and the
+# UO artifact on the same logical inputs and requires equal public outputs. The
+# trial count defaults to a fast subset; raise UO_CORRECTNESS_TRIALS for deeper
+# small-domain coverage (cost is ~linear in the trial count).
+cargo run -q -p mplus-probe --features insecure-eval-raw -- --only correctness "${PROBE_ARGS[@]}"
 # Fail-closed proof-grade acceptance aggregate over the generated reports.
 cargo run -q -p mplus-probe -- --only acceptance-check "${PROBE_ARGS[@]}"
 # Fail-closed Path ORAM claim-consistency check (README/docs/proof/code agree).

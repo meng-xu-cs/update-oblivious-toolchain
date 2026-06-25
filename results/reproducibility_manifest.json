@@ -14,8 +14,8 @@
   "files": [
     {
       "path": "acceptance.json",
-      "bytes": 148630,
-      "sha256": "f97c25c272fe5044b7f8bc770258480071060ce79c89b38de5113c5c09f8db43"
+      "bytes": 148775,
+      "sha256": "a64e3976695c700caf05af0e38b10715c67136fc4011f01c199cf1e6af78b8d2"
     },
     {
       "path": "artifact_configuration.json",
@@ -134,8 +134,8 @@
     },
     {
       "path": "correctness.json",
-      "bytes": 3237,
-      "sha256": "26c40724fcd88ee4746397aa11662e2e0c12bd2eaeb20acf8b5859c50b6a2300"
+      "bytes": 5055,
+      "sha256": "1293dc022c9c127363998ad99915634b49c5e2759becce54eef585d2fa3e785b"
     },
     {
       "path": "fresh_coin_validation.json",

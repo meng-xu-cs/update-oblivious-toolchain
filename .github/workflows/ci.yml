@@ -72,6 +72,8 @@ jobs:
         run: cargo run -q -p mplus-probe -- --only static-checks --out-dir results
       - name: Lean assumption and axiom budget
         run: scripts/lean_assumption_budget.sh
+      - name: differential correctness (fast subset)
+        run: UO_CORRECTNESS_TRIALS=4 cargo run -q -p mplus-probe --features insecure-eval-raw -- --only correctness --out-dir results
       - name: fail-closed acceptance aggregate
         run: cargo run -q -p mplus-probe -- --only acceptance-check --out-dir results
       - name: Path ORAM claim-consistency
