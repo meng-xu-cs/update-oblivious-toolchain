@@ -161,6 +161,17 @@ impl RuntimeObjectTable {
         Ok(Self::new(entries.finish()?))
     }
 
+    fn clone_cold(&self) -> Result<Self> {
+        let mut entries = FixedBoxBuilder::new(self.entries.len());
+        for entry in self.entries.iter() {
+            entries.push(RuntimeObjectEntry {
+                object_id: entry.object_id,
+                object: entry.object.clone_committed_cold()?,
+            })?;
+        }
+        Ok(Self::new(entries.finish()?))
+    }
+
     fn into_entries(self) -> Box<[RuntimeObjectEntry]> {
         self.entries
     }
@@ -205,6 +216,16 @@ impl ContractRuntime {
         })
     }
 
+    /// Deep cold clone of the committed state for staged (transactional)
+    /// execution. The returned runtime can be mutated by a call and committed
+    /// back only on full success; on any failure it is dropped, leaving the
+    /// original committed state untouched.
+    pub(in crate::runtime) fn staged_clone(&self) -> Result<Self> {
+        Ok(Self {
+            committed: self.committed.clone_cold()?,
+        })
+    }
+
     pub(in crate::runtime) fn ensure_cold(
         &self,
         expected_object_ids: &[u32],
@@ -241,6 +262,14 @@ impl ContractRuntime {
     fn ensure_ready_for_call(&self, context: &str) -> Result<()> {
         let public_object_ids = self.public_object_ids()?;
         self.ensure_cold(public_object_ids.as_ref(), context)
+    }
+
+    /// Verify the *committed* state is cold before it is cloned for a staged
+    /// call. Staging clones objects cold, so this check must run on the original
+    /// committed state rather than the cold clone, otherwise a hot residual
+    /// would be silently masked.
+    pub(in crate::runtime) fn ensure_committed_cold_for_call(&self) -> Result<()> {
+        self.ensure_ready_for_call("before executing the next call from committed storage")
     }
 
     pub(in crate::runtime) fn finish_traced_call(
@@ -402,6 +431,12 @@ impl CommittedRuntimeState {
         }
         Ok(Self {
             objects: RuntimeObjectTable::new(objects),
+        })
+    }
+
+    fn clone_cold(&self) -> Result<Self> {
+        Ok(Self {
+            objects: self.objects.clone_cold()?,
         })
     }
 

@@ -6,7 +6,8 @@ use crate::deployment::{
 use crate::freshness::RuntimeFreshnessState;
 use crate::return_channel::ReturnChannelSession;
 use crate::runtime::{
-    deploy_contract_runtime, run_contract_call, ContractRuntime, PathOramFreshCoinPlan,
+    deploy_contract_runtime, run_contract_call, stage_contract_runtime, ContractRuntime,
+    PathOramFreshCoinPlan,
 };
 use anyhow::{anyhow, bail, Result};
 use uo_core::{
@@ -36,6 +37,18 @@ pub struct CallResult {
     pub encrypted_return: Option<EncryptedReturnPayload>,
     pub aborted: bool,
     pub trace: ExecutionTrace,
+}
+
+/// A call executed on a staged copy of committed state and freshness. It is
+/// applied to `self` only by `commit_staged`, after all host-visible
+/// validation succeeds; otherwise it is dropped and `self` is unchanged.
+#[derive(Debug)]
+struct StagedCall {
+    result: CallResult,
+    zero_writes: usize,
+    state: ContractRuntime,
+    freshness: RuntimeFreshnessState,
+    initialized: bool,
 }
 
 #[derive(Debug)]
@@ -118,16 +131,18 @@ impl ProductionContractInstance {
         } else {
             None
         };
-        let result = self
-            .inner
-            .call_impl(entrypoint, args, None, execution_session, Some(environment))?
-            .0;
+        // Stage the call, run all production validation on the staged trace,
+        // and commit only if everything passes. A failed environment/proof-bundle
+        // check leaves committed state and freshness untouched.
+        let staged =
+            self.inner
+                .stage_call(entrypoint, args, None, execution_session, Some(environment))?;
         validate_production_public_environment_trace(
-            &result.trace,
+            &staged.result.trace,
             &expected_public_environment_projection,
         )?;
-        validate_production_proof_bundle(&self.inner.artifact, &result.trace, evidence)?;
-        Ok(result)
+        validate_production_proof_bundle(&self.inner.artifact, &staged.result.trace, evidence)?;
+        Ok(self.inner.commit_staged(staged).0)
     }
 }
 
@@ -223,6 +238,31 @@ impl ContractInstance {
         return_channel: Option<&ReturnChannelSession>,
         environment: Option<PublicEnvironment>,
     ) -> Result<(CallResult, usize)> {
+        let staged = self.stage_call(entrypoint, args, fresh_coins, return_channel, environment)?;
+        Ok(self.commit_staged(staged))
+    }
+
+    /// Apply a staged call to `self`. Only called once every host-visible
+    /// validation has succeeded, so a failure before this point leaves
+    /// committed state, freshness counters, and the initialized flag unchanged.
+    fn commit_staged(&mut self, staged: StagedCall) -> (CallResult, usize) {
+        self.state = staged.state;
+        self.freshness = staged.freshness;
+        self.initialized = staged.initialized;
+        (staged.result, staged.zero_writes)
+    }
+
+    /// Execute a call on a staged copy of committed state and freshness without
+    /// mutating `self`. The caller (local or production) commits the result via
+    /// `commit_staged` only after all validation passes.
+    fn stage_call(
+        &self,
+        entrypoint: &str,
+        args: Vec<Value>,
+        fresh_coins: Option<PathOramFreshCoinPlan>,
+        return_channel: Option<&ReturnChannelSession>,
+        environment: Option<PublicEnvironment>,
+    ) -> Result<StagedCall> {
         let function = self
             .artifact
             .contract
@@ -272,9 +312,11 @@ impl ContractInstance {
             runtime_args.push(environment.value_for(*field));
         }
         let args = runtime_args.into_boxed_slice();
-        let call_freshness = self.freshness.begin_call()?;
+        let mut staged_freshness = self.freshness.clone();
+        let call_freshness = staged_freshness.begin_call()?;
+        let mut staged_state = stage_contract_runtime(&self.state)?;
         let (return_value, encrypted_return, aborted, trace, zero_writes) = run_contract_call(
-            &mut self.state,
+            &mut staged_state,
             &self.artifact,
             &function,
             self.deploy_seed,
@@ -283,19 +325,20 @@ impl ContractInstance {
             fresh_coins,
             return_channel,
         )?;
-        self.freshness.finish_call(aborted)?;
-        if initializer && !aborted {
-            self.initialized = true;
-        }
-        Ok((
-            CallResult {
+        staged_freshness.finish_call(aborted)?;
+        let initialized = self.initialized || (initializer && !aborted);
+        Ok(StagedCall {
+            result: CallResult {
                 return_value,
                 encrypted_return,
                 aborted,
                 trace,
             },
             zero_writes,
-        ))
+            state: staged_state,
+            freshness: staged_freshness,
+            initialized,
+        })
     }
 }
 
@@ -316,7 +359,7 @@ pub fn run_artifact_with_seed(
 
 #[cfg(test)]
 mod tests {
-    use super::{ContractInstance, ProductionContractInstance};
+    use super::{CallResult, ContractInstance, ProductionContractInstance};
     use crate::deployment::{production_build_profile_sha256, ProductionRuntimePolicy};
     #[cfg(not(feature = "diagnostics"))]
     use crate::deployment::{
@@ -1297,5 +1340,165 @@ bounds:
             .expect("expected one UO ORAM map object");
         assert_objects_are_cold(&instance);
         assert_eq!(committed_map.path_oram_access_counter_for_test(), Some(0));
+    }
+
+    fn trace_digest(result: &CallResult) -> String {
+        hex::encode(Sha256::digest(
+            serde_json::to_vec(&result.trace).expect("serialize trace"),
+        ))
+    }
+
+    #[test]
+    fn missing_return_channel_rolls_back_and_retry_matches_fresh() {
+        let source = write_temp(
+            "rollback-missing-return-channel",
+            r#"
+            contract C {
+                function f(uint256 secret) public returns (uint256) { return secret; }
+            }
+            "#,
+        );
+        let metadata = r#"
+contract: C
+entrypoints:
+  f(uint256):
+    secret_args: [secret]
+    confidential: true
+    returns: encrypted_to_client
+    status: public
+state: {}
+bounds:
+  loops: {}
+"#;
+        let artifact = compile_bench(source.to_str().unwrap(), metadata, ProgramMode::Uo);
+        let mut instance = ContractInstance::deploy_with_seed(artifact.clone(), 17).unwrap();
+        let before = instance.freshness.snapshot();
+        let before_initialized = instance.initialized;
+
+        // A missing return-channel session is discovered during finalization;
+        // with staging it must roll back rather than advance freshness.
+        let err = instance
+            .call("f(uint256)", vec![Value::uint(7)])
+            .unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("requires a return channel session"));
+        assert_eq!(
+            instance.freshness.snapshot(),
+            before,
+            "rolled-back call must not advance freshness counters"
+        );
+        assert_eq!(instance.initialized, before_initialized);
+
+        // A successful retry must match a fresh instance's trace exactly, proving
+        // the failed attempt left no residue.
+        let session = return_channel_session();
+        let retried = instance
+            .call_with_return_channel("f(uint256)", vec![Value::uint(7)], &session)
+            .unwrap();
+        let mut fresh = ContractInstance::deploy_with_seed(artifact, 17).unwrap();
+        let fresh_result = fresh
+            .call_with_return_channel("f(uint256)", vec![Value::uint(7)], &session)
+            .unwrap();
+        assert_eq!(trace_digest(&retried), trace_digest(&fresh_result));
+    }
+
+    #[test]
+    fn exceeded_commit_budget_rolls_back_committed_state() {
+        let mut artifact = compile_bench(
+            "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
+            include_str!(
+                "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.pathoram.yaml"
+            ),
+            ProgramMode::Uo,
+        );
+        // Force the resource budget to fail after the kernel runs on staged state.
+        artifact
+            .contract
+            .manifest
+            .entrypoints
+            .get_mut("put(bytes32,uint256)")
+            .expect("entrypoint")
+            .max_commit_ops = 0;
+        let mut instance = ContractInstance::deploy_with_seed(artifact, 9).unwrap();
+        let before = instance.freshness.snapshot();
+
+        let err = instance
+            .call("put(bytes32,uint256)", vec![b32(7), Value::uint(9)])
+            .unwrap_err();
+        assert!(err.to_string().contains("exceeded manifest commit budget"));
+        assert_eq!(
+            instance.freshness.snapshot(),
+            before,
+            "budget failure must not advance freshness"
+        );
+        // Committed objects are untouched (still cold and at access counter 0).
+        let committed_map = instance
+            .state
+            .object_values_for_test()
+            .find(|object| matches!(object, RuntimeObject::UoOramMap(_)))
+            .expect("expected one UO ORAM map object");
+        assert_objects_are_cold(&instance);
+        assert_eq!(committed_map.path_oram_access_counter_for_test(), Some(0));
+    }
+
+    #[cfg(not(feature = "diagnostics"))]
+    #[test]
+    fn production_proof_bundle_failure_rolls_back_and_preserves_freshness() {
+        let artifact = compile_bench(
+            "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
+            include_str!(
+                "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.pathoram.yaml"
+            ),
+            ProgramMode::Uo,
+        );
+        let entrypoint = "add(bytes32,uint256)";
+        let args = vec![b32(7), Value::uint(5)];
+        let policy = production_policy();
+        let session = return_channel_session();
+        let environment = PublicEnvironment::default();
+        let mut probe = ContractInstance::deploy_with_seed(artifact.clone(), 91).unwrap();
+        let snapshot = probe.freshness.snapshot();
+        let probe_result = probe
+            .call_impl(entrypoint, args.clone(), None, None, None)
+            .unwrap()
+            .0;
+        let proof_hash = production_proof_bundle_sha256(&artifact, &probe_result.trace).unwrap();
+        let evidence = production_evidence(
+            &artifact,
+            &policy,
+            &session,
+            &environment,
+            snapshot.epoch,
+            snapshot.rollback_counter,
+            snapshot.next_call_counter,
+            proof_hash,
+        );
+
+        let mut production =
+            ProductionContractInstance::deploy_with_authorized_seed(artifact.clone(), policy, 91)
+                .unwrap();
+        let before = production.inner.freshness.snapshot();
+
+        let mut wrong_proof = evidence.clone();
+        wrong_proof.proof_bundle_sha256 = "00".repeat(32);
+        let err = production
+            .call_authorized(entrypoint, args.clone(), &session, &wrong_proof)
+            .unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("production runtime proof_bundle_sha256 mismatch"));
+        assert_eq!(
+            production.inner.freshness.snapshot(),
+            before,
+            "production proof-bundle failure must not advance freshness"
+        );
+
+        // Because freshness was preserved, the original (correct) evidence still
+        // applies and a retry succeeds.
+        let accepted = production
+            .call_authorized(entrypoint, args, &session, &evidence)
+            .unwrap();
+        assert!(!accepted.aborted);
     }
 }
