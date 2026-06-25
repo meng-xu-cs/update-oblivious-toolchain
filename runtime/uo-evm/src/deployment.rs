@@ -36,6 +36,7 @@ pub struct ProductionCallEvidence {
     pub rollback_counter: u64,
     pub next_call_counter: u64,
     pub proof_bundle_sha256: String,
+    pub translation_validation_certificate_sha256: String,
 }
 
 pub fn production_proof_bundle_sha256(
@@ -44,6 +45,32 @@ pub fn production_proof_bundle_sha256(
 ) -> Result<String> {
     let bundle = trace.runtime_confidential_proof_bundle_family(artifact)?;
     Ok(sha256_hex(&serde_json::to_vec(&bundle)?))
+}
+
+/// Translation-validation certificate hash binding the admitted-package
+/// identity, the proof-relevant artifact-view hash (the artifact contents), and
+/// the deployment proof-root. Because the admitted-package identity binds only
+/// source + sidecar metadata, this certificate is the separate binding that
+/// detects post-compilation tampering of `contract.state`, `contract.functions`,
+/// `manifest.objects`, or the confidential slot program: the runtime recomputes
+/// it from the deployed artifact and compares it to the attested evidence.
+pub fn production_translation_validation_certificate_sha256(
+    artifact: &CompiledArtifact,
+    policy: &ProductionRuntimePolicy,
+) -> Result<String> {
+    let identity = artifact
+        .admitted_package
+        .as_ref()
+        .ok_or_else(|| anyhow!("production runtime requires admitted_package identity"))?;
+    let view_sha256 = uo_core::proof_relevant_view_sha256(artifact)?;
+    let certificate = serde_json::json!({
+        "schema": "uo.translation_validation_certificate.v1",
+        "admitted_package_sha256": identity.package_sha256,
+        "toolchain_manifest_sha256": identity.toolchain_manifest_sha256,
+        "proof_relevant_view_sha256": view_sha256,
+        "proof_root_sha256": policy.proof_root_sha256,
+    });
+    Ok(sha256_hex(&serde_json::to_vec(&certificate)?))
 }
 
 pub fn production_build_profile_sha256() -> String {
@@ -121,6 +148,14 @@ pub(crate) fn validate_production_call_preflight(
         "build_profile_sha256",
         &evidence.build_profile_sha256,
         &policy.build_profile_sha256,
+    )?;
+    // Recompute the translation-validation certificate from the deployed
+    // artifact and require it to match the attested evidence, before execution.
+    // This rejects post-compilation tampering of the artifact contents.
+    require_equal(
+        "translation_validation_certificate_sha256",
+        &evidence.translation_validation_certificate_sha256,
+        &production_translation_validation_certificate_sha256(artifact, policy)?,
     )?;
     require_equal(
         "session_id",
@@ -226,7 +261,11 @@ fn validate_evidence_hashes(evidence: &ProductionCallEvidence) -> Result<()> {
         "attestation_transcript_hash",
         &evidence.attestation_transcript_hash,
     )?;
-    validate_sha256_hex("proof_bundle_sha256", &evidence.proof_bundle_sha256)
+    validate_sha256_hex("proof_bundle_sha256", &evidence.proof_bundle_sha256)?;
+    validate_sha256_hex(
+        "translation_validation_certificate_sha256",
+        &evidence.translation_validation_certificate_sha256,
+    )
 }
 
 fn validate_public_environment_evidence(

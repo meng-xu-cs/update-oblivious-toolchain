@@ -388,7 +388,8 @@ mod tests {
     #[cfg(not(feature = "diagnostics"))]
     use crate::deployment::{
         production_proof_bundle_sha256, production_public_environment_sha256,
-        production_public_environment_transcript, ProductionCallEvidence,
+        production_public_environment_transcript,
+        production_translation_validation_certificate_sha256, ProductionCallEvidence,
     };
     use crate::return_channel::{
         return_channel_aad_bytes, ReturnChannelSession, RETURN_CHANNEL_SCHEME,
@@ -486,6 +487,8 @@ mod tests {
             rollback_counter,
             next_call_counter,
             proof_bundle_sha256,
+            translation_validation_certificate_sha256:
+                production_translation_validation_certificate_sha256(artifact, policy).unwrap(),
         }
     }
 
@@ -1667,5 +1670,102 @@ bounds:
             .call_authorized(entrypoint, args, &session, &evidence)
             .unwrap();
         assert!(!accepted.aborted);
+    }
+
+    #[cfg(not(feature = "diagnostics"))]
+    #[test]
+    fn production_translation_validation_certificate_binds_artifact_contents() {
+        let artifact = compile_bench(
+            "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
+            include_str!(
+                "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.pathoram.yaml"
+            ),
+            ProgramMode::Uo,
+        );
+        let entrypoint = "add(bytes32,uint256)";
+        let args = vec![b32(7), Value::uint(5)];
+        let policy = production_policy();
+        let session = return_channel_session();
+        let environment = PublicEnvironment::default();
+        let mut probe = ContractInstance::deploy_with_seed(artifact.clone(), 91).unwrap();
+        let snapshot = probe.freshness.snapshot();
+        let probe_result = probe
+            .call_impl(entrypoint, args.clone(), None, None, None)
+            .unwrap()
+            .0;
+        let proof_hash = production_proof_bundle_sha256(&artifact, &probe_result.trace).unwrap();
+        let evidence = production_evidence(
+            &artifact,
+            &policy,
+            &session,
+            &environment,
+            snapshot.epoch,
+            snapshot.rollback_counter,
+            snapshot.next_call_counter,
+            proof_hash,
+        );
+
+        // Valid certificate: accepted.
+        let mut production = ProductionContractInstance::deploy_with_authorized_seed(
+            artifact.clone(),
+            policy.clone(),
+            91,
+        )
+        .unwrap();
+        production
+            .call_authorized(entrypoint, args.clone(), &session, &evidence)
+            .unwrap();
+
+        // Missing certificate: rejected by the hex validation.
+        let mut missing = evidence.clone();
+        missing.translation_validation_certificate_sha256.clear();
+        let mut production = ProductionContractInstance::deploy_with_authorized_seed(
+            artifact.clone(),
+            policy.clone(),
+            91,
+        )
+        .unwrap();
+        let err = production
+            .call_authorized(entrypoint, args.clone(), &session, &missing)
+            .unwrap_err();
+        assert!(err.to_string().contains(
+            "translation_validation_certificate_sha256 must be a 64-character hex SHA-256 digest"
+        ));
+
+        // Wrong certificate: rejected by the equality check.
+        let mut wrong = evidence.clone();
+        wrong.translation_validation_certificate_sha256 = "00".repeat(32);
+        let mut production = ProductionContractInstance::deploy_with_authorized_seed(
+            artifact.clone(),
+            policy.clone(),
+            91,
+        )
+        .unwrap();
+        let err = production
+            .call_authorized(entrypoint, args.clone(), &session, &wrong)
+            .unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("translation_validation_certificate_sha256 mismatch"));
+
+        // Tampering the artifact contents (a state object) after compilation
+        // changes the recomputed certificate, so the attested evidence no longer
+        // matches and the call is rejected before execution.
+        let mut tampered_artifact = artifact.clone();
+        tampered_artifact
+            .contract
+            .state
+            .first_mut()
+            .expect("state object")
+            .confidential ^= true;
+        let mut production =
+            ProductionContractInstance::deploy_with_authorized_seed(tampered_artifact, policy, 91)
+                .unwrap();
+        let err = production
+            .call_authorized(entrypoint, args, &session, &evidence)
+            .unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("translation_validation_certificate_sha256 mismatch"));
     }
 }

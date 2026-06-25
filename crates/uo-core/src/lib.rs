@@ -128,10 +128,10 @@ pub use trace::{
     TracedRuntimeCallWitnessState, WriteClass,
 };
 pub use translation_validation::{
-    ProofRelevantContractView, ProofRelevantEntrypointView, ProofRelevantFunctionView,
-    ProofRelevantKernelStepView, ProofRelevantManifestObjectView, ProofRelevantManifestView,
-    ProofRelevantOramAccessView, ProofRelevantOramView, ProofRelevantParamView,
-    ProofRelevantStateObjectView, ProofRelevantTranslationBundle,
+    proof_relevant_view_sha256, ProofRelevantContractView, ProofRelevantEntrypointView,
+    ProofRelevantFunctionView, ProofRelevantKernelStepView, ProofRelevantManifestObjectView,
+    ProofRelevantManifestView, ProofRelevantOramAccessView, ProofRelevantOramView,
+    ProofRelevantParamView, ProofRelevantStateObjectView, ProofRelevantTranslationBundle,
 };
 pub use trusted_kernel::{RuntimeTrustedKernelSlotBundle, RuntimeTrustedKernelSlotBundleError};
 pub use types::{FixedBoxBuilder, ScalarType, StructField, Type, Uint256, Value};

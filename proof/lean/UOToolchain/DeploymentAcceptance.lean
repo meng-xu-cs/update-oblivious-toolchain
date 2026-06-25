@@ -42,6 +42,7 @@ structure DeploymentCallEvidence where
   rollbackCounter : Nat
   nextCallCounter : Nat
   proofBundleHash : Option String
+  translationValidationCertificateHash : String
 deriving Repr, DecidableEq
 
 structure DeploymentRuntimeState where
@@ -55,6 +56,7 @@ structure DeploymentRuntimeState where
   freshnessEpoch : Nat
   rollbackCounter : Nat
   nextCallCounter : Nat
+  translationValidationCertificateHash : String
 deriving Repr, DecidableEq
 
 def DeploymentPublicEnvironmentBound
@@ -87,7 +89,8 @@ def DeploymentCallAccepted
   evidence.freshnessEpoch = state.freshnessEpoch ∧
   evidence.rollbackCounter = state.rollbackCounter ∧
   evidence.nextCallCounter = state.nextCallCounter ∧
-  evidence.proofBundleHash.isSome
+  evidence.proofBundleHash.isSome ∧
+  evidence.translationValidationCertificateHash = state.translationValidationCertificateHash
 
 theorem deployment_call_acceptance_requires_validated_proof_bundle
   {policy : DeploymentRuntimePolicy}
@@ -98,7 +101,7 @@ theorem deployment_call_acceptance_requires_validated_proof_bundle
     evidence.proofBundleHash.isSome := by
   intro hAccepted
   rcases hAccepted with
-    ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, hProofBundle⟩
+    ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, hProofBundle, _⟩
   exact hProofBundle
 
 theorem deployment_call_acceptance_binds_runtime_binary
@@ -110,7 +113,7 @@ theorem deployment_call_acceptance_binds_runtime_binary
     evidence.runtimeBinaryHash = policy.runtimeBinaryHash := by
   intro hAccepted
   rcases hAccepted with
-    ⟨_, _, hRuntimeBinary, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _⟩
+    ⟨_, _, hRuntimeBinary, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _⟩
   exact hRuntimeBinary
 
 theorem deployment_call_acceptance_binds_proof_root
@@ -122,7 +125,7 @@ theorem deployment_call_acceptance_binds_proof_root
     evidence.proofRootHash = policy.proofRootHash := by
   intro hAccepted
   rcases hAccepted with
-    ⟨_, _, _, hProofRoot, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _⟩
+    ⟨_, _, _, hProofRoot, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _⟩
   exact hProofRoot
 
 theorem deployment_call_acceptance_binds_build_profile_and_excludes_diagnostics
@@ -140,7 +143,7 @@ theorem deployment_call_acceptance_binds_build_profile_and_excludes_diagnostics
   intro hAccepted
   rcases hAccepted with
     ⟨_, _, _, _, _, hEvidenceBuildProfile, hProfileBuildProfile, hProfileRuntime,
-      hProfileProof, hDiagnostics, hReplay, _, _, _, _, _, _, _, _, _, _⟩
+      hProfileProof, hDiagnostics, hReplay, _, _, _, _, _, _, _, _, _, _, _⟩
   exact ⟨hEvidenceBuildProfile, hProfileBuildProfile, hProfileRuntime, hProfileProof,
     hDiagnostics, hReplay⟩
 
@@ -158,7 +161,7 @@ theorem deployment_call_acceptance_binds_public_environment
   intro hAccepted
   rcases hAccepted with
     ⟨_, _, _, _, _, _, _, _, _, _, _, hEnvironmentHash, hEnvironmentTranscript,
-      hEnvironmentProjection, hProjectionBound, _, _, _, _, _, _⟩
+      hEnvironmentProjection, hProjectionBound, _, _, _, _, _, _, _⟩
   exact ⟨hEnvironmentHash, hEnvironmentTranscript, hEnvironmentProjection, hProjectionBound⟩
 
 theorem deployment_call_acceptance_uses_closed_freshness_surfaces
@@ -195,7 +198,7 @@ theorem deployment_call_acceptance_binds_sgx_quote_and_session
     evidence.attestationTranscriptHash = state.attestationTranscriptHash := by
   intro hAccepted
   rcases hAccepted with
-    ⟨_, _, _, _, hQuote, _, _, _, _, _, _, _, _, _, _, hSession, hTranscript, _, _, _, _⟩
+    ⟨_, _, _, _, hQuote, _, _, _, _, _, _, _, _, _, _, hSession, hTranscript, _, _, _, _, _⟩
   exact ⟨hQuote, hSession, hTranscript⟩
 
 theorem deployment_call_acceptance_binds_freshness
@@ -209,8 +212,21 @@ theorem deployment_call_acceptance_binds_freshness
     evidence.nextCallCounter = state.nextCallCounter := by
   intro hAccepted
   rcases hAccepted with
-    ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, hEpoch, hRollback, hNextCall, _⟩
+    ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, hEpoch, hRollback, hNextCall, _, _⟩
   exact ⟨hEpoch, hRollback, hNextCall⟩
+
+theorem deployment_call_acceptance_binds_translation_validation_certificate
+  {policy : DeploymentRuntimePolicy}
+  {profile : DeploymentBuildProfileEvidence}
+  {state : DeploymentRuntimeState}
+  {evidence : DeploymentCallEvidence} :
+  DeploymentCallAccepted policy profile state evidence →
+    evidence.translationValidationCertificateHash =
+      state.translationValidationCertificateHash := by
+  intro hAccepted
+  rcases hAccepted with
+    ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, hCertificate⟩
+  exact hCertificate
 
 theorem deployment_call_rejects_missing_proof_bundle
   {policy : DeploymentRuntimePolicy}

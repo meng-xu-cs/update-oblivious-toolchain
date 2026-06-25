@@ -9,6 +9,7 @@ use crate::AdmittedPackageIdentity;
 use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
+use sha2::{Digest, Sha256};
 
 fn canonicalize_json_value(value: Value) -> Value {
     match value {
@@ -31,6 +32,18 @@ fn canonicalize_json_value(value: Value) -> Value {
 fn canonical_json_string<T: Serialize>(value: &T) -> Result<String> {
     let json = serde_json::to_value(value)?;
     Ok(serde_json::to_string(&canonicalize_json_value(json))?)
+}
+
+/// SHA-256 over the canonical proof-relevant contract view of an artifact. The
+/// view captures the proof-relevant artifact contents — state objects (including
+/// the `confidential` flag), functions, the confidential kernel/slot programs,
+/// and the manifest — so this hash detects post-compilation tampering of any of
+/// those fields. The admitted-package identity binds only source + sidecar
+/// metadata, so production deployment needs this separate content binding.
+pub fn proof_relevant_view_sha256(artifact: &CompiledArtifact) -> Result<String> {
+    let view = ProofRelevantContractView::from_artifact(artifact)?;
+    let canonical = canonical_json_string(&view)?;
+    Ok(hex::encode(Sha256::digest(canonical.as_bytes())))
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
