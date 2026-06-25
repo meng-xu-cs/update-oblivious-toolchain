@@ -100,6 +100,7 @@ enum ReportKind {
     CanonicalPathoramPairValidation,
     FreshCoinValidation,
     ReviewerSummary,
+    AcceptanceCheck,
 }
 
 #[derive(Debug, Parser)]
@@ -887,10 +888,41 @@ fn main() -> Result<()> {
                 &report,
             )?;
         }
+        Some(ReportKind::AcceptanceCheck) => {
+            // Aggregate the already-generated results/*.json into a fail-closed
+            // acceptance verdict. Always write acceptance.json (so it can be
+            // inspected) and then fail when it is not accepted.
+            let report = mplus_probe::run_acceptance_check_report(&cli.out_dir)?;
+            fs::create_dir_all(&cli.out_dir)?;
+            fs::write(
+                Path::new(&cli.out_dir).join("acceptance.json"),
+                serde_json::to_vec_pretty(&report)?,
+            )?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+            if report["accepted"].as_bool() != Some(true) {
+                anyhow::bail!(
+                    "acceptance gate failed; see {}/acceptance.json",
+                    cli.out_dir
+                );
+            }
+        }
         None => {
             let report = mplus_probe::run_probe_with_options(&options)?;
             mplus_probe::write_results(&cli.out_dir, &report)?;
+            // Emit the aggregate acceptance verdict over the freshly written
+            // reports and fail closed if it is not accepted.
+            let acceptance = mplus_probe::run_acceptance_check_report(&cli.out_dir)?;
+            fs::write(
+                Path::new(&cli.out_dir).join("acceptance.json"),
+                serde_json::to_vec_pretty(&acceptance)?,
+            )?;
             println!("{}", serde_json::to_string_pretty(&report)?);
+            if acceptance["accepted"].as_bool() != Some(true) {
+                anyhow::bail!(
+                    "acceptance gate failed; see {}/acceptance.json",
+                    cli.out_dir
+                );
+            }
         }
     }
     Ok(())

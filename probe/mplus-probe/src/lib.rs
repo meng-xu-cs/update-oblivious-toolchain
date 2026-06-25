@@ -39,6 +39,11 @@ use uo_core::{
 };
 use uo_evm::{CallResult, ContractInstance, DiagnosticCallResult, PathOramFreshCoinPlan};
 
+mod acceptance;
+pub use acceptance::{
+    run_acceptance_check_fail_closed, run_acceptance_check_report, ACCEPTANCE_SCHEMA,
+};
+
 const PROBE_DEPLOY_SEED: u64 = 0x5052_4f42_455f_0001;
 
 #[derive(Clone)]
