@@ -3,14 +3,15 @@
   "admitted_package": {
     "schema": "uo-admitted-package-v5",
     "source_language": "uo-solidity-like-dsl-v1",
+    "semantics_profile": "uo-evm-modular256-v1",
     "source_sha256": "c4bce1c020f6ec45575cdd30211d39a50374b557d0afa607415e7c0288466e70",
     "metadata_sha256": "37434ff39fc174f4bb394e5556b6667f3173476a8708dd303ba9b2d89286098d",
     "raw_metadata_sha256": "24fa7b498fca6d446c85616431edf61fbe4942ec4a3df620dd7b7fbc8f331533",
     "metadata_canonicalization_sha256": "84f504cb54aa3855cd1b5de15c212a2b49381d393660a1b0b742b38800d6681d",
     "compilation_mode": "uo",
     "compiler_version": "0.1.0",
-    "toolchain_manifest_sha256": "0282a01493f4f4e2b2ad16d69fbb4e962378bc213e047eace3238731dd1f4294",
-    "package_sha256": "31263d41ffcee5e3537f5fc3649afb5e18306c3eeafca5c14ac2534e248d8bfc"
+    "toolchain_manifest_sha256": "518f9a7e6241b73df868d775b47998f2030e168db567d622e3cdbf435ef92df4",
+    "package_sha256": "c8be363bebeac37abda7f8380a7d0141057ac8b177e9f1d41909391f60b60668"
   },
   "contract": {
     "contract": "RegistryCRUD",

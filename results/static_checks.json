@@ -586,7 +586,7 @@
       "oram_artifact": null,
       "raw_artifact": {
         "accepted": false,
-        "artifact_json_bytes": 4564,
+        "artifact_json_bytes": 4607,
         "contract": "AuthScan",
         "function_count": 3,
         "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: UOToolchain.ImportedAdmittedPackageIdentity.raw_metadata_sha256: String expected",
@@ -595,7 +595,7 @@
         "manifest_object_count": 2,
         "metadata_contract": "AuthScan",
         "mode": "raw",
-        "source_artifact_json_bytes": 4564,
+        "source_artifact_json_bytes": 4607,
         "state_object_count": 2
       },
       "source_raw": [
@@ -610,7 +610,7 @@
       ],
       "uo_artifact": {
         "accepted": false,
-        "artifact_json_bytes": 13475,
+        "artifact_json_bytes": 13518,
         "contract": "AuthScan",
         "function_count": 3,
         "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: UOToolchain.ImportedAdmittedPackageIdentity.raw_metadata_sha256: String expected",
@@ -619,7 +619,7 @@
         "manifest_object_count": 2,
         "metadata_contract": "AuthScan",
         "mode": "uo",
-        "source_artifact_json_bytes": 13475,
+        "source_artifact_json_bytes": 13518,
         "state_object_count": 2
       }
     },
@@ -627,7 +627,7 @@
       "benchmark": "ConfidentialMixer",
       "fullscan64_artifact": {
         "accepted": false,
-        "artifact_json_bytes": 16088,
+        "artifact_json_bytes": 16131,
         "contract": "ConfidentialMixer",
         "function_count": 4,
         "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: UOToolchain.ImportedAdmittedPackageIdentity.raw_metadata_sha256: String expected",
@@ -636,12 +636,12 @@
         "manifest_object_count": 2,
         "metadata_contract": "ConfidentialMixer",
         "mode": "uo",
-        "source_artifact_json_bytes": 16088,
+        "source_artifact_json_bytes": 16131,
         "state_object_count": 2
       },
       "oram_artifact": {
         "accepted": false,
-        "artifact_json_bytes": 16349,
+        "artifact_json_bytes": 16392,
         "contract": "ConfidentialMixer",
         "function_count": 4,
         "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: UOToolchain.ImportedAdmittedPackageIdentity.raw_metadata_sha256: String expected",
@@ -650,12 +650,12 @@
         "manifest_object_count": 2,
         "metadata_contract": "ConfidentialMixer",
         "mode": "uo",
-        "source_artifact_json_bytes": 16349,
+        "source_artifact_json_bytes": 16392,
         "state_object_count": 2
       },
       "raw_artifact": {
         "accepted": false,
-        "artifact_json_bytes": 6345,
+        "artifact_json_bytes": 6388,
         "contract": "ConfidentialMixer",
         "function_count": 4,
         "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: UOToolchain.ImportedAdmittedPackageIdentity.raw_metadata_sha256: String expected",
@@ -664,7 +664,7 @@
         "manifest_object_count": 2,
         "metadata_contract": "ConfidentialMixer",
         "mode": "raw",
-        "source_artifact_json_bytes": 6345,
+        "source_artifact_json_bytes": 6388,
         "state_object_count": 2
       },
       "source_raw": [
@@ -679,7 +679,7 @@
       ],
       "uo_artifact": {
         "accepted": false,
-        "artifact_json_bytes": 16083,
+        "artifact_json_bytes": 16126,
         "contract": "ConfidentialMixer",
         "function_count": 4,
         "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: UOToolchain.ImportedAdmittedPackageIdentity.raw_metadata_sha256: String expected",
@@ -688,7 +688,7 @@
         "manifest_object_count": 2,
         "metadata_contract": "ConfidentialMixer",
         "mode": "uo",
-        "source_artifact_json_bytes": 16083,
+        "source_artifact_json_bytes": 16126,
         "state_object_count": 2
       }
     },
@@ -697,7 +697,7 @@
       "fullscan64_artifact": null,
       "oram_artifact": {
         "accepted": false,
-        "artifact_json_bytes": 30354,
+        "artifact_json_bytes": 30397,
         "contract": "ERC20Lite",
         "function_count": 6,
         "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: UOToolchain.ImportedAdmittedPackageIdentity.raw_metadata_sha256: String expected",
@@ -706,12 +706,12 @@
         "manifest_object_count": 2,
         "metadata_contract": "ERC20Lite",
         "mode": "uo",
-        "source_artifact_json_bytes": 30354,
+        "source_artifact_json_bytes": 30397,
         "state_object_count": 2
       },
       "raw_artifact": {
         "accepted": false,
-        "artifact_json_bytes": 10349,
+        "artifact_json_bytes": 10392,
         "contract": "ERC20Lite",
         "function_count": 6,
         "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: UOToolchain.ImportedAdmittedPackageIdentity.raw_metadata_sha256: String expected",
@@ -720,7 +720,7 @@
         "manifest_object_count": 2,
         "metadata_contract": "ERC20Lite",
         "mode": "raw",
-        "source_artifact_json_bytes": 10349,
+        "source_artifact_json_bytes": 10392,
         "state_object_count": 2
       },
       "source_raw": [
@@ -735,7 +735,7 @@
       ],
       "uo_artifact": {
         "accepted": false,
-        "artifact_json_bytes": 29817,
+        "artifact_json_bytes": 29860,
         "contract": "ERC20Lite",
         "function_count": 6,
         "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: UOToolchain.ImportedAdmittedPackageIdentity.raw_metadata_sha256: String expected",
@@ -744,7 +744,7 @@
         "manifest_object_count": 2,
         "metadata_contract": "ERC20Lite",
         "mode": "uo",
-        "source_artifact_json_bytes": 29817,
+        "source_artifact_json_bytes": 29860,
         "state_object_count": 2
       }
     },
@@ -754,7 +754,7 @@
       "oram_artifact": null,
       "raw_artifact": {
         "accepted": false,
-        "artifact_json_bytes": 3864,
+        "artifact_json_bytes": 3907,
         "contract": "FixedSlotClassifier",
         "function_count": 3,
         "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: UOToolchain.ImportedAdmittedPackageIdentity.raw_metadata_sha256: String expected",
@@ -763,7 +763,7 @@
         "manifest_object_count": 1,
         "metadata_contract": "FixedSlotClassifier",
         "mode": "raw",
-        "source_artifact_json_bytes": 3864,
+        "source_artifact_json_bytes": 3907,
         "state_object_count": 1
       },
       "source_raw": [
@@ -778,7 +778,7 @@
       ],
       "uo_artifact": {
         "accepted": false,
-        "artifact_json_bytes": 8751,
+        "artifact_json_bytes": 8794,
         "contract": "FixedSlotClassifier",
         "function_count": 3,
         "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: UOToolchain.ImportedAdmittedPackageIdentity.raw_metadata_sha256: String expected",
@@ -787,7 +787,7 @@
         "manifest_object_count": 1,
         "metadata_contract": "FixedSlotClassifier",
         "mode": "uo",
-        "source_artifact_json_bytes": 8751,
+        "source_artifact_json_bytes": 8794,
         "state_object_count": 1
       }
     },
@@ -797,7 +797,7 @@
       "oram_artifact": null,
       "raw_artifact": {
         "accepted": false,
-        "artifact_json_bytes": 5259,
+        "artifact_json_bytes": 5302,
         "contract": "RegistryCRUD",
         "function_count": 4,
         "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: UOToolchain.ImportedAdmittedPackageIdentity.raw_metadata_sha256: String expected",
@@ -806,7 +806,7 @@
         "manifest_object_count": 1,
         "metadata_contract": "RegistryCRUD",
         "mode": "raw",
-        "source_artifact_json_bytes": 5259,
+        "source_artifact_json_bytes": 5302,
         "state_object_count": 1
       },
       "source_raw": [
@@ -821,7 +821,7 @@
       ],
       "uo_artifact": {
         "accepted": false,
-        "artifact_json_bytes": 13509,
+        "artifact_json_bytes": 13552,
         "contract": "RegistryCRUD",
         "function_count": 4,
         "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: UOToolchain.ImportedAdmittedPackageIdentity.raw_metadata_sha256: String expected",
@@ -830,7 +830,7 @@
         "manifest_object_count": 1,
         "metadata_contract": "RegistryCRUD",
         "mode": "uo",
-        "source_artifact_json_bytes": 13509,
+        "source_artifact_json_bytes": 13552,
         "state_object_count": 1
       }
     }

@@ -3,14 +3,15 @@
   "admitted_package": {
     "schema": "uo-admitted-package-v5",
     "source_language": "uo-solidity-like-dsl-v1",
+    "semantics_profile": "uo-evm-modular256-v1",
     "source_sha256": "fa6bceebfe68a1f2d6ff0e7a59ec7523f3441907bd7191999974dca405589548",
     "metadata_sha256": "63a0d025439c8be843275eb9d8134b17795bb96635496df213cbafcc9dfcd7e3",
     "raw_metadata_sha256": "2e2649c5dc37f9f60e14eaa7736a8e73b9ed7b2bfbc24359d7d3f12800af48ed",
     "metadata_canonicalization_sha256": "219e42a69487391c8377e4b6f4798cd62d190a1108d4187cd10c102b20ef9038",
     "compilation_mode": "uo",
     "compiler_version": "0.1.0",
-    "toolchain_manifest_sha256": "0282a01493f4f4e2b2ad16d69fbb4e962378bc213e047eace3238731dd1f4294",
-    "package_sha256": "bae3590a1198fa966549a5d22db6d211471b5a5fa85cbe0bf6885374e1f1fff5"
+    "toolchain_manifest_sha256": "518f9a7e6241b73df868d775b47998f2030e168db567d622e3cdbf435ef92df4",
+    "package_sha256": "ee30290a388e9c181a2643dfdb20e10f8af9ec79e1e36695b2b566acd256c67d"
   },
   "contract": {
     "contract": "AuthScan",

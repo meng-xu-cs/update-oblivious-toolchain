@@ -133,8 +133,10 @@ combines them with `Value::confidential_select` instead of branching on the
 secret condition in Rust, while `uo-check` and the proof-grade
 kernel-witness validator reject confidential select arms outside that
 branchless pure fragment. Confidential `Expr::StructField` and
-`Expr::ArrayIndex` are now both rejected from the admitted confidential
-fragment entirely.
+`Expr::ArrayIndex` are now both admitted as local branchless projection/index
+forms, lowered through the named and slot confidential-kernel DSLs, and
+executed by the generated fixed-shape interpreter helpers without introducing
+new confidential object API access.
 `runtime_boundary_validation.json` now checks that Rust-side boundary
 directly by reading the runtime sources: it verifies that `engine.rs` does not
 call the low-level runtime object helpers, that those helpers remain
@@ -289,8 +291,9 @@ any runtime-local kernel wrapper, and that confidential
 `Expr::Select` routes through `Value::confidential_select` while the checker
 and proof-grade kernel-witness validator both enforce the admitted
 branchless-pure-arm fragment, and that checker, proof-grade validation, and
-the runtime all reject confidential `Expr::StructField` and
-confidential `Expr::ArrayIndex`, and that all direct confidential object API
+the runtime all admit confidential `Expr::StructField` and
+confidential `Expr::ArrayIndex` through the local projection/indexing kernel
+path, and that all direct confidential object API
 call sites (`.get_cell`, `.set_cell`, `.get_array`, `.set_array`, `.get_map`,
 `.put_map`) remain confined to `runtime/uo-evm/src/state.rs`. The same
 report now also checks constructor authority for exported witnesses:
@@ -336,8 +339,9 @@ itself.
 `confidential_fragment_validation.json` complements those source-level checks
 with an artifact-level scan over the admitted UO benchmark suite: it counts
 confidential `Select` nodes per entrypoint and confirms that the compiled
-confidential bodies contain no non-branchless select arms, no confidential
-`StructField`, and no confidential `ArrayIndex` forms.
+confidential bodies contain no non-branchless select arms while recording
+confidential `StructField` and confidential `ArrayIndex` forms as admitted
+local projection/indexing audit counts.
 `kernel_dsl_validation.json` adds the shared-DSL bridge itself to the artifact
 story: for each representative confidential execution, the probe serializes
 the exact lowered confidential-kernel program that Rust executes, Lean
@@ -650,9 +654,10 @@ attached.
 `reviewer_summary.json` plus `reviewer_summary.md` condense the current
 paper-facing metrics into one machine-generated table: they record per-report
 wall-clock cost, the largest materialized and estimated artifact-size fields,
-the runtime overhead report, the current TCB table, explicit assumptions, and
-non-empty source-line counts for the trusted Rust runtime surface plus the
-repo-side Lean theorem/checker surface.
+the proof-artifact size-budget gate for canonical Path-ORAM families and pair
+certificates, the runtime overhead report, the current TCB table, explicit
+assumptions, and non-empty source-line counts for the trusted Rust runtime
+surface plus the repo-side Lean theorem/checker surface.
 
 Security tiers:
 

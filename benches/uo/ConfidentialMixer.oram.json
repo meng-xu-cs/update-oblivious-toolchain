@@ -3,14 +3,15 @@
   "admitted_package": {
     "schema": "uo-admitted-package-v5",
     "source_language": "uo-solidity-like-dsl-v1",
+    "semantics_profile": "uo-evm-modular256-v1",
     "source_sha256": "234fe8ee8ec1332afc02b3f7446ef82d93ed2c0d62180b88012be70e98a57262",
     "metadata_sha256": "83d0bd3829882e58469d5a779c6c8c96551bbb1d64808f5eec9677d35c8c30ad",
     "raw_metadata_sha256": "e9c33227d0c0eee8e3658e2be9c1f75ba50ddb78a38f7cf4fd501d4d5daf1d85",
     "metadata_canonicalization_sha256": "4c4b0887e7f32315ce87ea82df6f7f11a87d26ca06f3290bf25002767438766b",
     "compilation_mode": "uo",
     "compiler_version": "0.1.0",
-    "toolchain_manifest_sha256": "0282a01493f4f4e2b2ad16d69fbb4e962378bc213e047eace3238731dd1f4294",
-    "package_sha256": "0abdd36d9407b36df965edb4a0a170edf196abff5c7020275bc058ece2e68605"
+    "toolchain_manifest_sha256": "518f9a7e6241b73df868d775b47998f2030e168db567d622e3cdbf435ef92df4",
+    "package_sha256": "84991f0b0a1306db1ec5d5b83519a396f9cd55e0ac81c89193c391bb19fbeeda"
   },
   "contract": {
     "contract": "ConfidentialMixer",

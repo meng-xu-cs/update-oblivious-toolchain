@@ -3,14 +3,15 @@
   "admitted_package": {
     "schema": "uo-admitted-package-v5",
     "source_language": "uo-solidity-like-dsl-v1",
+    "semantics_profile": "uo-evm-modular256-v1",
     "source_sha256": "189206eda78843b786e1835056ddce154d2784db22bc36a427f784e1fbcf4b84",
     "metadata_sha256": "e9ba71299fbf91b45ec2bdc30c546473619e0aa5b3b6860e330abbfbf3132879",
     "raw_metadata_sha256": "4e8cea809cea850858cee9374dada4f1eb35e6ed612636c73ee6f484fefc4cd0",
     "metadata_canonicalization_sha256": "ef6e87f99ca6effc2ec34d76ac96006d005c036420c61988578bbe4291bf585e",
     "compilation_mode": "uo",
     "compiler_version": "0.1.0",
-    "toolchain_manifest_sha256": "0282a01493f4f4e2b2ad16d69fbb4e962378bc213e047eace3238731dd1f4294",
-    "package_sha256": "075fd43b9d37488f515217f2e9f369a2dcd29575bb54d360d966c53315085599"
+    "toolchain_manifest_sha256": "518f9a7e6241b73df868d775b47998f2030e168db567d622e3cdbf435ef92df4",
+    "package_sha256": "7484189a23902274a5a150f09b6e8d906e935ade2dde4598c84078150ff4abbd"
   },
   "contract": {
     "contract": "ERC20Lite",
