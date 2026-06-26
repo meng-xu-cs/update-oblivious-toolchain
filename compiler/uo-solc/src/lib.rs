@@ -868,6 +868,9 @@ fn lower_expr(
                     return lower_expr(&helper.body, ctx, &nested_subst);
                 }
             }
+            if let pt::Expression::MemberAccess(_, _, _) = callee.as_ref() {
+                bail!("external/member function calls are unsupported");
+            }
             bail!("unsupported function call in expression")
         }
         pt::Expression::StringLiteral(_) => bail!("string literals are unsupported"),
@@ -1161,6 +1164,11 @@ fn lower_type_expr(expression: &pt::Expression, structs: &BTreeMap<String, Type>
             .get(&identifier.name)
             .cloned()
             .ok_or_else(|| anyhow!("unknown user-defined type {}", identifier.name)),
+        pt::Expression::ArraySubscript(_, _, None) => {
+            bail!(
+                "dynamic arrays are unsupported; use a fixed-size array with a compile-time length"
+            )
+        }
         _ => bail!("unsupported type expression"),
     }
 }
@@ -1221,7 +1229,10 @@ fn lower_state_object(
                 pt::Expression::ArraySubscript(_, base, Some(size)) => {
                     (lower_type_expr(base, structs)?, const_usize(size)?)
                 }
-                _ => bail!("array state {} must have a fixed compile-time size", name),
+                _ => bail!(
+                    "dynamic arrays are unsupported; array state {} must have a fixed compile-time size",
+                    name
+                ),
             };
             if capacity == 0 {
                 bail!("array state {} must have positive capacity", name);

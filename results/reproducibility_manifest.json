@@ -1,6 +1,6 @@
 {
   "format_version": 3,
-  "file_count": 82,
+  "file_count": 83,
   "lean_toolchain": "leanprover/lean4:v4.30.0-rc2",
   "lean_toolchain_exact_release": true,
   "lean_version": "Lean (version 4.30.0-rc2, x86_64-unknown-linux-gnu, commit 3dc1a088b6d2d8eafe25a7cd7ec7b58d731bd7cc, Release)",
@@ -21,6 +21,11 @@
       "path": "acceptance.json",
       "bytes": 150362,
       "sha256": "ff6e4a0d7cb2ea5068270435873d8c29dd36f78ca47824f08783e4df98207131"
+    },
+    {
+      "path": "admission_matrix.json",
+      "bytes": 11776,
+      "sha256": "ec651b427f15172dcc1b5e87b2022dddf188d1ab68c9c98fe474ee6ed2697dec"
     },
     {
       "path": "artifact_configuration.json",

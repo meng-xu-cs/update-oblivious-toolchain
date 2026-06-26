@@ -1353,6 +1353,10 @@ pub fn run_abort_rollback_report() -> Result<JsonValue> {
     run_abort_rollback(&suite)
 }
 
+pub fn run_admission_matrix_report() -> Result<JsonValue> {
+    run_admission_matrix()
+}
+
 pub fn run_ablation_study_report() -> Result<JsonValue> {
     let suite = compile_suite()?;
     run_ablation_study(&suite)
@@ -48644,16 +48648,15 @@ fn run_abort_rollback(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<
             &erc20_setup,
             &CallSpec {
                 entrypoint: "transferFrom(address,address,address,uint256)",
-                args: vec![
-                    alice.clone(),
-                    bob.clone(),
-                    carol.clone(),
-                    Value::uint(5),
-                ],
+                args: vec![alice.clone(), bob.clone(), carol.clone(), Value::uint(5)],
             },
             &erc20_observers,
             "abort",
-            &[Some(Value::uint(10)), Some(Value::uint(0)), Some(Value::uint(4))],
+            &[
+                Some(Value::uint(10)),
+                Some(Value::uint(0)),
+                Some(Value::uint(4)),
+            ],
         )?);
         // In-allowance transferFrom (3 <= 4) commits: alice 10-3=7, carol 0+3=3,
         // allowance 4-3=1.
@@ -48664,16 +48667,15 @@ fn run_abort_rollback(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<
             &erc20_setup,
             &CallSpec {
                 entrypoint: "transferFrom(address,address,address,uint256)",
-                args: vec![
-                    alice.clone(),
-                    bob.clone(),
-                    carol.clone(),
-                    Value::uint(3),
-                ],
+                args: vec![alice.clone(), bob.clone(), carol.clone(), Value::uint(3)],
             },
             &erc20_observers,
             "commit",
-            &[Some(Value::uint(7)), Some(Value::uint(3)), Some(Value::uint(1))],
+            &[
+                Some(Value::uint(7)),
+                Some(Value::uint(3)),
+                Some(Value::uint(1)),
+            ],
         )?);
     }
 
@@ -48689,9 +48691,7 @@ fn run_abort_rollback(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<
     // recorded as edge cases but cannot stand in for a demonstrated rollback.
     let demonstrated = |outcome: &str| {
         case_studies.iter().any(|case| {
-            executed(case)
-                && case["expected_outcome"] == json!(outcome)
-                && matched(&case)
+            executed(case) && case["expected_outcome"] == json!(outcome) && matched(&case)
         })
     };
     let accepted = all_executed_match && demonstrated("abort") && demonstrated("commit");
@@ -48700,6 +48700,938 @@ fn run_abort_rollback(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<
         "case_studies": case_studies,
         "accepted": accepted,
     }))
+}
+
+/// Standard non-confidential sidecar metadata for an admission snippet whose
+/// single public entrypoint is `f(uint256)` over one raw `uint256` cell `x`.
+/// Source-level rejection cases reuse this so the rejected feature is the only
+/// variable.
+const ADMISSION_CELL_META: &str = r#"contract: C
+entrypoints:
+  f(uint256):
+    confidential: false
+    returns: forbidden
+    status: public
+state:
+  x:
+    kind: cell
+    value: uint256
+    backend: raw
+    confidential: false
+bounds:
+  loops: {}
+"#;
+
+/// What an admission case asserts about the compiler's verdict.
+enum AdmissionExpectation {
+    /// The feature is admitted: the snippet must compile and the named
+    /// entrypoint must execute on the runtime.
+    AcceptedRuns {
+        entrypoint: &'static str,
+        args: Vec<Value>,
+    },
+    /// The feature is rejected: compilation must fail with a diagnostic whose
+    /// (lowercased) text contains `names`, so the diagnostic clearly identifies
+    /// the unsupported feature.
+    Rejected { names: &'static str },
+}
+
+struct AdmissionCase {
+    feature: &'static str,
+    category: &'static str,
+    mode: ProgramMode,
+    source: &'static str,
+    metadata: &'static str,
+    expectation: AdmissionExpectation,
+}
+
+/// Compile a self-contained admission snippet against inline sidecar metadata.
+/// The source is written to a private temp file (the admitted-package hash binds
+/// source *bytes*, not the path) so the file-based compiler entry point can read
+/// it; the file is removed before returning. The compiler `Result` is returned
+/// verbatim so the matrix can record either a compiled artifact or the rejection
+/// diagnostic.
+fn compile_admission_snippet(
+    index: usize,
+    source: &str,
+    metadata_yaml: &str,
+    mode: ProgramMode,
+) -> Result<CompiledArtifact> {
+    let metadata: ContractMetadata = serde_yaml::from_str(metadata_yaml)
+        .with_context(|| format!("admission case {index}: metadata parse"))?;
+    let dir = std::env::temp_dir().join(format!("uo-admission-{}", std::process::id()));
+    fs::create_dir_all(&dir)?;
+    let path = dir.join(format!("case_{index}.sol"));
+    fs::write(&path, source)?;
+    let result = uo_solc::compile(path.to_str().unwrap(), &metadata, mode);
+    let _ = fs::remove_file(&path);
+    result
+}
+
+fn program_mode_label(mode: &ProgramMode) -> &'static str {
+    match mode {
+        ProgramMode::Raw => "raw",
+        ProgramMode::Uo => "uo",
+    }
+}
+
+/// Compiler admission matrix (Issue 20): an executable, fail-closed record of
+/// which Solidity-like DSL features `uo-solc` admits and which it rejects, with
+/// the rejection diagnostic for each unsupported feature. Every accepted feature
+/// carries a compile-and-run case; every rejected feature in
+/// `docs/supported-subset.md` carries a reject-with-clear-diagnostic case. The
+/// report is `accepted` only when every case matches its expected verdict and
+/// every rejection diagnostic names the unsupported feature.
+fn run_admission_matrix() -> Result<JsonValue> {
+    let cases = admission_cases();
+    let mut accepted_rows = Vec::new();
+    let mut rejected_rows = Vec::new();
+    let mut all_match = true;
+    for (index, case) in cases.iter().enumerate() {
+        let result =
+            compile_admission_snippet(index, case.source, case.metadata, case.mode.clone());
+        match &case.expectation {
+            AdmissionExpectation::AcceptedRuns { entrypoint, args } => {
+                let (compiles, runs, detail) = match result {
+                    Ok(artifact) => {
+                        match ContractInstance::deploy_with_seed(artifact, PROBE_DEPLOY_SEED)
+                            .and_then(|mut instance| instance.call(entrypoint, args.clone()))
+                        {
+                            Ok(_) => (true, true, String::new()),
+                            Err(err) => (true, false, format!("run failed: {err:#}")),
+                        }
+                    }
+                    Err(err) => (false, false, format!("compile failed: {err:#}")),
+                };
+                let matches_expectation = compiles && runs;
+                if !matches_expectation {
+                    all_match = false;
+                }
+                accepted_rows.push(json!({
+                    "feature": case.feature,
+                    "category": case.category,
+                    "mode": program_mode_label(&case.mode),
+                    "expectation": "accepted",
+                    "entrypoint": entrypoint,
+                    "compiles": compiles,
+                    "runs": runs,
+                    "matches_expectation": matches_expectation,
+                    "detail": detail,
+                }));
+            }
+            AdmissionExpectation::Rejected { names } => {
+                let (rejected, diagnostic) = match result {
+                    Ok(_) => (false, String::new()),
+                    Err(err) => (true, format!("{err:#}")),
+                };
+                let diagnostic_names_feature =
+                    rejected && diagnostic.to_lowercase().contains(&names.to_lowercase());
+                let matches_expectation = rejected && diagnostic_names_feature;
+                if !matches_expectation {
+                    all_match = false;
+                }
+                rejected_rows.push(json!({
+                    "feature": case.feature,
+                    "category": case.category,
+                    "mode": program_mode_label(&case.mode),
+                    "expectation": "rejected",
+                    "rejected": rejected,
+                    "diagnostic": diagnostic,
+                    "expected_diagnostic_substring": names,
+                    "diagnostic_names_feature": diagnostic_names_feature,
+                    "matches_expectation": matches_expectation,
+                }));
+            }
+        }
+    }
+    let _ = fs::remove_dir_all(
+        std::env::temp_dir().join(format!("uo-admission-{}", std::process::id())),
+    );
+    Ok(json!({
+        "schema": "uo.admission_matrix.v1",
+        "source_language": "uo-solidity-like-dsl-v1",
+        "accepted_features": accepted_rows,
+        "rejected_features": rejected_rows,
+        "accepted_feature_count": accepted_rows.len(),
+        "rejected_feature_count": rejected_rows.len(),
+        "accepted": all_match,
+    }))
+}
+
+/// The admission matrix: one case per accepted feature (compile and run) and one
+/// per rejected feature in `docs/supported-subset.md` (reject with a diagnostic
+/// that names the feature).
+fn admission_cases() -> Vec<AdmissionCase> {
+    use AdmissionExpectation::{AcceptedRuns, Rejected};
+    let mut cases = Vec::new();
+
+    // -------------------- Accepted features (compile and run) --------------------
+    cases.push(AdmissionCase {
+        feature: "scalar arithmetic/bitwise/precedence over uint256",
+        category: "scalar",
+        mode: ProgramMode::Raw,
+        source: r#"pragma solidity ^0.8.0;
+contract C {
+    uint256 private x;
+    function f(uint256 a) public { x = ((a + 3) * 2 - 1) & 7 | 1; }
+}
+"#,
+        metadata: ADMISSION_CELL_META,
+        expectation: AcceptedRuns {
+            entrypoint: "f(uint256)",
+            args: vec![Value::uint(5)],
+        },
+    });
+    cases.push(AdmissionCase {
+        feature: "comparison/boolean connectives with if/else",
+        category: "control-flow",
+        mode: ProgramMode::Raw,
+        source: r#"pragma solidity ^0.8.0;
+contract C {
+    uint256 private x;
+    function f(uint256 a) public {
+        bool b = (a > 3) && (a < 100);
+        if (b) { x = 1; } else { x = 0; }
+    }
+}
+"#,
+        metadata: ADMISSION_CELL_META,
+        expectation: AcceptedRuns {
+            entrypoint: "f(uint256)",
+            args: vec![Value::uint(5)],
+        },
+    });
+    cases.push(AdmissionCase {
+        feature: "bounded for loop with compile-time bound",
+        category: "bounded-loop",
+        mode: ProgramMode::Raw,
+        source: r#"pragma solidity ^0.8.0;
+contract C {
+    uint256 private x;
+    function f() public { for (uint256 i = 0; i < 4; i++) { x = x + i; } }
+}
+"#,
+        metadata: r#"contract: C
+entrypoints:
+  f():
+    confidential: false
+    returns: forbidden
+    status: public
+state:
+  x:
+    kind: cell
+    value: uint256
+    backend: raw
+    confidential: false
+bounds:
+  loops: {}
+"#,
+        expectation: AcceptedRuns {
+            entrypoint: "f()",
+            args: vec![],
+        },
+    });
+    cases.push(AdmissionCase {
+        feature: "pure/view single-expression internal helper",
+        category: "helper",
+        mode: ProgramMode::Raw,
+        source: r#"pragma solidity ^0.8.0;
+contract C {
+    uint256 private x;
+    function dbl(uint256 v) internal pure returns (uint256) { return v * 2; }
+    function f(uint256 a) public { x = dbl(a); }
+}
+"#,
+        metadata: ADMISSION_CELL_META,
+        expectation: AcceptedRuns {
+            entrypoint: "f(uint256)",
+            args: vec![Value::uint(5)],
+        },
+    });
+    cases.push(AdmissionCase {
+        feature: "require(expr) guard",
+        category: "require",
+        mode: ProgramMode::Raw,
+        source: r#"pragma solidity ^0.8.0;
+contract C {
+    uint256 private x;
+    function f(uint256 a) public { require(a > 0); x = a; }
+}
+"#,
+        metadata: ADMISSION_CELL_META,
+        expectation: AcceptedRuns {
+            entrypoint: "f(uint256)",
+            args: vec![Value::uint(5)],
+        },
+    });
+    cases.push(AdmissionCase {
+        feature: "public environment reads (msg.sender/tx.origin/block.*)",
+        category: "public-env",
+        mode: ProgramMode::Raw,
+        source: r#"pragma solidity ^0.8.0;
+contract C {
+    uint256 private x;
+    function f() public {
+        require(msg.sender == tx.origin);
+        require(block.chainid == 1);
+        x = block.number + block.timestamp;
+    }
+}
+"#,
+        metadata: r#"contract: C
+entrypoints:
+  f():
+    confidential: false
+    returns: forbidden
+    status: public
+state:
+  x:
+    kind: cell
+    value: uint256
+    backend: raw
+    confidential: false
+bounds:
+  loops: {}
+"#,
+        expectation: AcceptedRuns {
+            entrypoint: "f()",
+            args: vec![],
+        },
+    });
+    cases.push(AdmissionCase {
+        feature: "fixed-size array with public length",
+        category: "fixed-array",
+        mode: ProgramMode::Uo,
+        source: r#"pragma solidity ^0.8.0;
+contract C {
+    uint256[4] private arr;
+    function f(uint256 v) public { arr[1] = v; }
+}
+"#,
+        metadata: r#"contract: C
+entrypoints:
+  f(uint256):
+    confidential: false
+    returns: forbidden
+    status: public
+state:
+  arr:
+    kind: array
+    value: uint256
+    capacity: 4
+    backend: full_scan
+    confidential: true
+bounds:
+  loops: {}
+"#,
+        expectation: AcceptedRuns {
+            entrypoint: "f(uint256)",
+            args: vec![Value::uint(5)],
+        },
+    });
+    cases.push(AdmissionCase {
+        feature: "fixed-size struct of scalar fields (state projection)",
+        category: "struct",
+        mode: ProgramMode::Raw,
+        source: r#"pragma solidity ^0.8.0;
+contract C {
+    struct Pair { uint256 a; uint256 b; }
+    Pair private p;
+    uint256 private x;
+    function f() public { x = p.a + p.b; }
+}
+"#,
+        metadata: r#"contract: C
+entrypoints:
+  f():
+    confidential: false
+    returns: forbidden
+    status: public
+state:
+  p:
+    kind: cell
+    value: "struct{a:uint256,b:uint256}"
+    backend: raw
+    confidential: false
+  x:
+    kind: cell
+    value: uint256
+    backend: raw
+    confidential: false
+bounds:
+  loops: {}
+"#,
+        expectation: AcceptedRuns {
+            entrypoint: "f()",
+            args: vec![],
+        },
+    });
+    cases.push(AdmissionCase {
+        feature: "mapping with explicit public capacity",
+        category: "mapping",
+        mode: ProgramMode::Uo,
+        source: r#"pragma solidity ^0.8.0;
+contract C {
+    mapping(bytes32 => uint256) private m;
+    function f(bytes32 k, uint256 v) public { m[k] = v; }
+}
+"#,
+        metadata: r#"contract: C
+entrypoints:
+  f(bytes32,uint256):
+    secret_args: [k, v]
+    confidential: true
+    public_gas_budget: 8192
+    returns: forbidden
+    status: public
+state:
+  m:
+    kind: map
+    key: bytes32
+    value: uint256
+    capacity: 8
+    backend: full_scan
+    confidential: true
+bounds:
+  loops: {}
+"#,
+        expectation: AcceptedRuns {
+            entrypoint: "f(bytes32,uint256)",
+            args: vec![b32(7), Value::uint(5)],
+        },
+    });
+    cases.push(AdmissionCase {
+        feature: "keccak256(abi.encodePacked(..)) over fixed-size args",
+        category: "keccak",
+        mode: ProgramMode::Uo,
+        source: r#"pragma solidity ^0.8.0;
+contract C {
+    bytes32 private h;
+    function f(address a, address b) public { h = keccak256(abi.encodePacked(a, b)); }
+}
+"#,
+        metadata: r#"contract: C
+entrypoints:
+  f(address,address):
+    secret_args: [a, b]
+    confidential: true
+    public_gas_budget: 8192
+    returns: forbidden
+    status: public
+state:
+  h:
+    kind: cell
+    value: bytes32
+    backend: full_scan
+    confidential: true
+bounds:
+  loops: {}
+"#,
+        expectation: AcceptedRuns {
+            entrypoint: "f(address,address)",
+            args: vec![addr(0x11), addr(0x22)],
+        },
+    });
+    cases.push(AdmissionCase {
+        feature: "single declassified return value getter",
+        category: "return",
+        mode: ProgramMode::Uo,
+        source: r#"pragma solidity ^0.8.0;
+contract C {
+    uint256 private last;
+    function setv(uint256 secret) public { last = secret; }
+    function value() public returns (uint256) { return last; }
+}
+"#,
+        metadata: r#"contract: C
+entrypoints:
+  setv(uint256):
+    secret_args: [secret]
+    confidential: true
+    public_gas_budget: 4096
+    returns: forbidden
+    status: public
+  value():
+    confidential: true
+    returns: declassified
+    status: public
+    declassifies: [return]
+state:
+  last:
+    kind: cell
+    value: uint256
+    backend: full_scan
+    confidential: true
+bounds:
+  loops: {}
+"#,
+        expectation: AcceptedRuns {
+            entrypoint: "value()",
+            args: vec![],
+        },
+    });
+    cases.push(AdmissionCase {
+        feature: "secret-dependent branch in a confidential entrypoint",
+        category: "secret-branch",
+        mode: ProgramMode::Uo,
+        source: r#"pragma solidity ^0.8.0;
+contract C {
+    uint256 private last;
+    function classify(uint256 secret) public {
+        if (secret > 10) { last = 1; } else { last = 0; }
+    }
+}
+"#,
+        metadata: r#"contract: C
+entrypoints:
+  classify(uint256):
+    secret_args: [secret]
+    confidential: true
+    public_gas_budget: 4096
+    returns: forbidden
+    status: public
+state:
+  last:
+    kind: cell
+    value: uint256
+    backend: full_scan
+    confidential: true
+bounds:
+  loops: {}
+"#,
+        expectation: AcceptedRuns {
+            entrypoint: "classify(uint256)",
+            args: vec![Value::uint(15)],
+        },
+    });
+
+    // -------------------- Rejected features (clear diagnostic) --------------------
+    cases.push(AdmissionCase {
+        feature: "inline assembly / Yul",
+        category: "inline-assembly",
+        mode: ProgramMode::Raw,
+        source: r#"pragma solidity ^0.8.0;
+contract C {
+    uint256 private x;
+    function f(uint256 a) public { assembly { let y := a } }
+}
+"#,
+        metadata: ADMISSION_CELL_META,
+        expectation: Rejected { names: "assembly" },
+    });
+    cases.push(AdmissionCase {
+        feature: "while loop",
+        category: "loops",
+        mode: ProgramMode::Raw,
+        source: r#"pragma solidity ^0.8.0;
+contract C {
+    uint256 private x;
+    function f(uint256 a) public { while (a > 0) { a = a - 1; } x = a; }
+}
+"#,
+        metadata: ADMISSION_CELL_META,
+        expectation: Rejected { names: "while" },
+    });
+    cases.push(AdmissionCase {
+        feature: "do-while loop",
+        category: "loops",
+        mode: ProgramMode::Raw,
+        source: r#"pragma solidity ^0.8.0;
+contract C {
+    uint256 private x;
+    function f(uint256 a) public { do { a = a - 1; } while (a > 0); x = a; }
+}
+"#,
+        metadata: ADMISSION_CELL_META,
+        expectation: Rejected { names: "do-while" },
+    });
+    cases.push(AdmissionCase {
+        feature: "break statement",
+        category: "loops",
+        mode: ProgramMode::Raw,
+        source: r#"pragma solidity ^0.8.0;
+contract C {
+    uint256 private x;
+    function f(uint256 a) public { for (uint256 i = 0; i < 4; i++) { break; } x = a; }
+}
+"#,
+        metadata: ADMISSION_CELL_META,
+        expectation: Rejected { names: "break" },
+    });
+    cases.push(AdmissionCase {
+        feature: "continue statement",
+        category: "loops",
+        mode: ProgramMode::Raw,
+        source: r#"pragma solidity ^0.8.0;
+contract C {
+    uint256 private x;
+    function f(uint256 a) public { for (uint256 i = 0; i < 4; i++) { continue; } x = a; }
+}
+"#,
+        metadata: ADMISSION_CELL_META,
+        expectation: Rejected { names: "continue" },
+    });
+    cases.push(AdmissionCase {
+        feature: "revert statement",
+        category: "revert",
+        mode: ProgramMode::Raw,
+        source: r#"pragma solidity ^0.8.0;
+contract C {
+    uint256 private x;
+    function f(uint256 a) public { if (a == 0) { revert(); } x = a; }
+}
+"#,
+        metadata: ADMISSION_CELL_META,
+        expectation: Rejected { names: "revert" },
+    });
+    cases.push(AdmissionCase {
+        feature: "events",
+        category: "events",
+        mode: ProgramMode::Raw,
+        source: r#"pragma solidity ^0.8.0;
+contract C {
+    uint256 private x;
+    event E(uint256 v);
+    function f(uint256 a) public { emit E(a); x = a; }
+}
+"#,
+        metadata: ADMISSION_CELL_META,
+        expectation: Rejected { names: "event" },
+    });
+    cases.push(AdmissionCase {
+        feature: "custom errors",
+        category: "errors",
+        mode: ProgramMode::Raw,
+        source: r#"pragma solidity ^0.8.0;
+contract C {
+    uint256 private x;
+    error Bad();
+    function f(uint256 a) public { x = a; }
+}
+"#,
+        metadata: ADMISSION_CELL_META,
+        expectation: Rejected { names: "error" },
+    });
+    cases.push(AdmissionCase {
+        feature: "try/catch",
+        category: "try-catch",
+        mode: ProgramMode::Raw,
+        source: r#"pragma solidity ^0.8.0;
+contract C {
+    uint256 private x;
+    function g(uint256 a) external returns (uint256) { return a; }
+    function f(uint256 a) public { try this.g(a) returns (uint256 r) { x = r; } catch { x = 0; } }
+}
+"#,
+        metadata: r#"contract: C
+entrypoints:
+  f(uint256):
+    confidential: false
+    returns: forbidden
+    status: public
+  g(uint256):
+    confidential: false
+    returns: public
+    status: public
+state:
+  x:
+    kind: cell
+    value: uint256
+    backend: raw
+    confidential: false
+bounds:
+  loops: {}
+"#,
+        expectation: Rejected { names: "try/catch" },
+    });
+    cases.push(AdmissionCase {
+        feature: "dynamic arrays",
+        category: "dynamic-array",
+        mode: ProgramMode::Raw,
+        source: r#"pragma solidity ^0.8.0;
+contract C {
+    uint256 private x;
+    uint256[] private d;
+    function f(uint256 a) public { x = a; }
+}
+"#,
+        metadata: r#"contract: C
+entrypoints:
+  f(uint256):
+    confidential: false
+    returns: forbidden
+    status: public
+state:
+  x:
+    kind: cell
+    value: uint256
+    backend: raw
+    confidential: false
+  d:
+    kind: array
+    value: uint256
+    capacity: 4
+    backend: raw
+    confidential: false
+bounds:
+  loops: {}
+"#,
+        expectation: Rejected {
+            names: "dynamic array",
+        },
+    });
+    cases.push(AdmissionCase {
+        feature: "string type / string literals",
+        category: "string",
+        mode: ProgramMode::Raw,
+        source: r#"pragma solidity ^0.8.0;
+contract C {
+    uint256 private x;
+    function f(uint256 a) public { string memory s = "hi"; x = a; }
+}
+"#,
+        metadata: ADMISSION_CELL_META,
+        expectation: Rejected { names: "string" },
+    });
+    cases.push(AdmissionCase {
+        feature: "dynamic bytes",
+        category: "dynamic-bytes",
+        mode: ProgramMode::Raw,
+        source: r#"pragma solidity ^0.8.0;
+contract C {
+    uint256 private x;
+    function f(uint256 a) public { bytes memory b = abi.encodePacked(a); x = b.length; }
+}
+"#,
+        metadata: ADMISSION_CELL_META,
+        expectation: Rejected { names: "bytes" },
+    });
+    cases.push(AdmissionCase {
+        feature: "unbounded mapping (no capacity)",
+        category: "unbounded-mapping",
+        mode: ProgramMode::Raw,
+        source: r#"pragma solidity ^0.8.0;
+contract C {
+    mapping(bytes32 => uint256) private m;
+    function f(bytes32 k, uint256 v) public { m[k] = v; }
+}
+"#,
+        metadata: r#"contract: C
+entrypoints:
+  f(bytes32,uint256):
+    confidential: false
+    returns: forbidden
+    status: public
+state:
+  m:
+    kind: map
+    key: bytes32
+    value: uint256
+    backend: raw
+    confidential: false
+bounds:
+  loops: {}
+"#,
+        expectation: Rejected { names: "capacity" },
+    });
+    cases.push(AdmissionCase {
+        feature: "inheritance",
+        category: "inheritance",
+        mode: ProgramMode::Raw,
+        source: r#"pragma solidity ^0.8.0;
+contract C is Base {
+    uint256 private x;
+    function f(uint256 a) public { x = a; }
+}
+"#,
+        metadata: ADMISSION_CELL_META,
+        expectation: Rejected {
+            names: "inheritance",
+        },
+    });
+    cases.push(AdmissionCase {
+        feature: "modifiers",
+        category: "modifiers",
+        mode: ProgramMode::Raw,
+        source: r#"pragma solidity ^0.8.0;
+contract C {
+    uint256 private x;
+    modifier onlyPos(uint256 a) { require(a > 0); _; }
+    function f(uint256 a) public onlyPos(a) { x = a; }
+}
+"#,
+        metadata: ADMISSION_CELL_META,
+        expectation: Rejected { names: "modifier" },
+    });
+    cases.push(AdmissionCase {
+        feature: "constructors",
+        category: "constructor",
+        mode: ProgramMode::Raw,
+        source: r#"pragma solidity ^0.8.0;
+contract C {
+    uint256 private x;
+    constructor() { x = 1; }
+    function f(uint256 a) public { x = a; }
+}
+"#,
+        metadata: ADMISSION_CELL_META,
+        expectation: Rejected {
+            names: "constructor",
+        },
+    });
+    cases.push(AdmissionCase {
+        feature: "fallback/receive",
+        category: "fallback",
+        mode: ProgramMode::Raw,
+        source: r#"pragma solidity ^0.8.0;
+contract C {
+    uint256 private x;
+    fallback() external { }
+    function f(uint256 a) public { x = a; }
+}
+"#,
+        metadata: ADMISSION_CELL_META,
+        expectation: Rejected { names: "fallback" },
+    });
+    cases.push(AdmissionCase {
+        feature: "external calls",
+        category: "external-call",
+        mode: ProgramMode::Raw,
+        source: r#"pragma solidity ^0.8.0;
+contract C {
+    uint256 private x;
+    function g(uint256 v) external returns (uint256) { return v; }
+    function f(uint256 a) public { x = this.g(a); }
+}
+"#,
+        metadata: r#"contract: C
+entrypoints:
+  f(uint256):
+    confidential: false
+    returns: forbidden
+    status: public
+  g(uint256):
+    confidential: false
+    returns: public
+    status: public
+state:
+  x:
+    kind: cell
+    value: uint256
+    backend: raw
+    confidential: false
+bounds:
+  loops: {}
+"#,
+        expectation: Rejected { names: "external" },
+    });
+    cases.push(AdmissionCase {
+        feature: "multi-statement internal helper",
+        category: "helper",
+        mode: ProgramMode::Raw,
+        source: r#"pragma solidity ^0.8.0;
+contract C {
+    uint256 private x;
+    function h(uint256 v) internal pure returns (uint256) { uint256 t = v * 2; return t; }
+    function f(uint256 a) public { x = h(a); }
+}
+"#,
+        metadata: ADMISSION_CELL_META,
+        expectation: Rejected { names: "single" },
+    });
+    cases.push(AdmissionCase {
+        feature: "multiple return values",
+        category: "multiple-returns",
+        mode: ProgramMode::Raw,
+        source: r#"pragma solidity ^0.8.0;
+contract C {
+    uint256 private x;
+    function f(uint256 a) public returns (uint256, uint256) { x = a; return (a, a); }
+}
+"#,
+        metadata: r#"contract: C
+entrypoints:
+  f(uint256):
+    confidential: false
+    returns: public
+    status: public
+state:
+  x:
+    kind: cell
+    value: uint256
+    backend: raw
+    confidential: false
+bounds:
+  loops: {}
+"#,
+        expectation: Rejected { names: "return" },
+    });
+    cases.push(AdmissionCase {
+        feature: "integer widths other than uint256",
+        category: "integer-width",
+        mode: ProgramMode::Raw,
+        source: r#"pragma solidity ^0.8.0;
+contract C {
+    uint256 private x;
+    function f(uint256 a) public { uint128 b = 1; x = a; }
+}
+"#,
+        metadata: ADMISSION_CELL_META,
+        expectation: Rejected { names: "uint256" },
+    });
+    cases.push(AdmissionCase {
+        feature: "unsupported lvalue / assignment target",
+        category: "lvalue",
+        mode: ProgramMode::Raw,
+        source: r#"pragma solidity ^0.8.0;
+contract C {
+    uint256 private x;
+    function f(uint256 a) public { msg.sender = address(0); x = a; }
+}
+"#,
+        metadata: ADMISSION_CELL_META,
+        expectation: Rejected {
+            names: "assignment target",
+        },
+    });
+    cases.push(AdmissionCase {
+        feature: "early confidential return",
+        category: "early-return",
+        mode: ProgramMode::Uo,
+        source: r#"pragma solidity ^0.8.0;
+contract C {
+    uint256 private last;
+    function f(uint256 secret) public returns (uint256) {
+        if (secret > 0) { return 1; }
+        last = secret;
+        return 0;
+    }
+}
+"#,
+        metadata: r#"contract: C
+entrypoints:
+  f(uint256):
+    secret_args: [secret]
+    confidential: true
+    public_gas_budget: 4096
+    returns: declassified
+    status: public
+    declassifies: [return]
+state:
+  last:
+    kind: cell
+    value: uint256
+    backend: full_scan
+    confidential: true
+bounds:
+  loops: {}
+"#,
+        expectation: Rejected {
+            names: "predicated return",
+        },
+    });
+
+    cases
 }
 
 fn run_ablation_study(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<JsonValue> {

@@ -63,6 +63,10 @@ cargo run -q -p mplus-probe --features insecure-eval-raw -- --only correctness "
 # commits otherwise. Override UO_SWEEP_* for deeper capacity sweeps.
 cargo run -q -p mplus-probe -- --only capacity-sweep "${PROBE_ARGS[@]}"
 cargo run -q -p mplus-probe -- --only abort-rollback "${PROBE_ARGS[@]}"
+# Compiler admission matrix (Issue 20): compile-and-run every accepted DSL
+# feature and reject every unsupported one with a diagnostic that names the
+# feature. Generated on the strict default build; fail-closed via acceptance.
+cargo run -q -p mplus-probe -- --only admission-matrix "${PROBE_ARGS[@]}"
 # Fail-closed proof-grade acceptance aggregate over the generated reports.
 cargo run -q -p mplus-probe -- --only acceptance-check "${PROBE_ARGS[@]}"
 # Fail-closed Path ORAM claim-consistency check (README/docs/proof/code agree).

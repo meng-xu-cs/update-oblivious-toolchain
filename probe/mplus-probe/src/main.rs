@@ -32,6 +32,7 @@ enum ReportKind {
     StorageGrowth,
     CapacitySweep,
     AbortRollback,
+    AdmissionMatrix,
     AblationStudy,
     EngineeringCost,
     BridgeValidation,
@@ -247,6 +248,15 @@ fn main() -> Result<()> {
                 &cli.out_dir,
                 "abort_rollback.json",
                 "abort_rollback",
+                &report,
+            )?;
+        }
+        Some(ReportKind::AdmissionMatrix) => {
+            let report = mplus_probe::run_admission_matrix_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "admission_matrix.json",
+                "admission_matrix",
                 &report,
             )?;
         }
