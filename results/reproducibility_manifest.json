@@ -50,7 +50,7 @@
     {
       "path": "capacity_sweep.json",
       "bytes": 27485,
-      "sha256": "4189b59a257b4570ae66580b9564052981119f569b064f00404cba1373af0c79"
+      "sha256": "b6195a30153a558d5f1af40b3eb879c7f8ba7891974e1960026deae9b2785db2"
     },
     {
       "path": "claim_artifact_manifest.json",
@@ -279,13 +279,13 @@
     },
     {
       "path": "reviewer_summary.json",
-      "bytes": 108938,
-      "sha256": "cc21f0629e51abe87400aaf5ea7a1b5c0df004b4cfe0f405182c7adfa3bd5755"
+      "bytes": 108939,
+      "sha256": "aa3856a54ccba6f1ab6cace77db0dd3dcdf1bf1fb14a6219adb973930b59172c"
     },
     {
       "path": "reviewer_summary.md",
-      "bytes": 28639,
-      "sha256": "1033475229bb16b3d8d750340a5df8a53b8ff029fe5eda691c9f12a44a40563a"
+      "bytes": 28640,
+      "sha256": "1a26d30d943b90526ddf777168a55270f1f7df921be123c0064314e69d5dd5ad"
     },
     {
       "path": "runtime_boundary_validation.json",
