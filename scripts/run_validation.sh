@@ -53,9 +53,11 @@ cargo run -q -p mplus-probe --features insecure-eval-raw -- --only leakage-auc "
 # Differential correctness (Issue 17): with the insecure-eval-raw feature the raw
 # baseline is executable, so each seeded trial compares the raw baseline and the
 # UO artifact on the same logical inputs and requires equal public outputs. The
-# trial count defaults to a fast subset; raise UO_CORRECTNESS_TRIALS for deeper
-# small-domain coverage (cost is ~linear in the trial count).
-cargo run -q -p mplus-probe --features insecure-eval-raw -- --only correctness "${PROBE_ARGS[@]}"
+# raw baselines execute the insecure path, which is slow per trial, so this gate
+# defaults to a feasible 4-trial subset (matching CI's focused run); raise
+# UO_CORRECTNESS_TRIALS for deeper small-domain coverage (cost ~linear in trials).
+UO_CORRECTNESS_TRIALS="${UO_CORRECTNESS_TRIALS:-4}" \
+  cargo run -q -p mplus-probe --features insecure-eval-raw -- --only correctness "${PROBE_ARGS[@]}"
 # End-to-end edge cases (Issue 19), strict default build. The capacity sweep
 # drives a bounded map past the proof-grade ORAM position-map bound (overflow
 # rows recorded explicitly); the abort/rollback study drives confidential calls

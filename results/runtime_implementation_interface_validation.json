@@ -1,6 +1,6 @@
 {
   "accepted": true,
-  "artifact_json_bytes": 1286210,
+  "artifact_json_bytes": 1286381,
   "checker": "proof/lean/.lake/build/bin/checkProofGradeRuntimeImplementationInterface",
   "deeper_semantics_of_rust_refinement_required": true,
   "evidence_classification": "source-frozen/static-drift checked",
@@ -43,7 +43,7 @@
     "store_lib": 154,
     "store_store": 2898,
     "theorem": 6238,
-    "trace": 413454,
+    "trace": 413621,
     "trusted_kernel": 4548,
     "types": 29154
   },

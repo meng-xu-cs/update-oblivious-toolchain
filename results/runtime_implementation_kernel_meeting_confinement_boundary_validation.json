@@ -15,7 +15,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1290802,
+      "boundary_json_bytes": 1290973,
       "entrypoint": "classify(uint256)",
       "gas_used": 4096,
       "handwritten_runtime_public_only_theorem_checked": true,
@@ -48,7 +48,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413454,
+        "trace": 413621,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -272,7 +272,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1290802,
+      "boundary_json_bytes": 1290973,
       "entrypoint": "classify(uint256)",
       "gas_used": 4096,
       "handwritten_runtime_public_only_theorem_checked": true,
@@ -305,7 +305,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413454,
+        "trace": 413621,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -529,7 +529,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1297431,
+      "boundary_json_bytes": 1297602,
       "entrypoint": "auth(bytes32)",
       "gas_used": 8192,
       "handwritten_runtime_public_only_theorem_checked": true,
@@ -562,7 +562,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413454,
+        "trace": 413621,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -994,7 +994,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1297431,
+      "boundary_json_bytes": 1297602,
       "entrypoint": "auth(bytes32)",
       "gas_used": 8192,
       "handwritten_runtime_public_only_theorem_checked": true,
@@ -1027,7 +1027,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413454,
+        "trace": 413621,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -1459,7 +1459,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1294632,
+      "boundary_json_bytes": 1294803,
       "entrypoint": "upsert(bytes32,uint256)",
       "gas_used": 12288,
       "handwritten_runtime_public_only_theorem_checked": true,
@@ -1492,7 +1492,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413454,
+        "trace": 413621,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -1878,7 +1878,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1294632,
+      "boundary_json_bytes": 1294803,
       "entrypoint": "upsert(bytes32,uint256)",
       "gas_used": 12288,
       "handwritten_runtime_public_only_theorem_checked": true,
@@ -1911,7 +1911,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413454,
+        "trace": 413621,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -2297,7 +2297,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1297432,
+      "boundary_json_bytes": 1297603,
       "entrypoint": "deposit(bytes32,uint256)",
       "gas_used": 16384,
       "handwritten_runtime_public_only_theorem_checked": true,
@@ -2330,7 +2330,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413454,
+        "trace": 413621,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -2804,7 +2804,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1297432,
+      "boundary_json_bytes": 1297603,
       "entrypoint": "deposit(bytes32,uint256)",
       "gas_used": 16384,
       "handwritten_runtime_public_only_theorem_checked": true,
@@ -2837,7 +2837,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413454,
+        "trace": 413621,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -3311,7 +3311,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1300285,
+      "boundary_json_bytes": 1300456,
       "entrypoint": "approve(address,address,uint256)",
       "gas_used": 20480,
       "handwritten_runtime_public_only_theorem_checked": true,
@@ -3344,7 +3344,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413454,
+        "trace": 413621,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -3961,7 +3961,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1300285,
+      "boundary_json_bytes": 1300456,
       "entrypoint": "approve(address,address,uint256)",
       "gas_used": 20480,
       "handwritten_runtime_public_only_theorem_checked": true,
@@ -3994,7 +3994,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413454,
+        "trace": 413621,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -4611,7 +4611,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "boundary_json_bytes": 1304869,
+      "boundary_json_bytes": 1305040,
       "entrypoint": "put(bytes32,uint256)",
       "gas_used": 2322,
       "handwritten_runtime_public_only_theorem_checked": true,
@@ -4644,7 +4644,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413454,
+        "trace": 413621,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -5450,7 +5450,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "boundary_json_bytes": 1304869,
+      "boundary_json_bytes": 1305040,
       "entrypoint": "put(bytes32,uint256)",
       "gas_used": 2322,
       "handwritten_runtime_public_only_theorem_checked": true,
@@ -5483,7 +5483,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413454,
+        "trace": 413621,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -6289,7 +6289,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 1310090,
+      "boundary_json_bytes": 1310261,
       "entrypoint": "add(bytes32,uint256)",
       "gas_used": 2651,
       "handwritten_runtime_public_only_theorem_checked": true,
@@ -6322,7 +6322,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413454,
+        "trace": 413621,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -7332,7 +7332,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 1310090,
+      "boundary_json_bytes": 1310261,
       "entrypoint": "add(bytes32,uint256)",
       "gas_used": 2651,
       "handwritten_runtime_public_only_theorem_checked": true,
@@ -7365,7 +7365,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413454,
+        "trace": 413621,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -8375,7 +8375,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 1352936,
+      "boundary_json_bytes": 1353107,
       "entrypoint": "deposit(bytes32,uint256)",
       "gas_used": 12288,
       "handwritten_runtime_public_only_theorem_checked": true,
@@ -8408,7 +8408,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413454,
+        "trace": 413621,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -11162,7 +11162,7 @@
     {
       "accepted": true,
       "boundary_events": 14,
-      "boundary_json_bytes": 1486387,
+      "boundary_json_bytes": 1486558,
       "entrypoint": "transferFrom(address,address,address,uint256)",
       "gas_used": 16384,
       "handwritten_runtime_public_only_theorem_checked": true,
@@ -11195,7 +11195,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413454,
+        "trace": 413621,
         "trusted_kernel": 4548,
         "types": 29154
       },

@@ -6800,6 +6800,7 @@ impl RuntimeCallOutcome {
         self
     }
 
+    #[allow(clippy::type_complexity)]
     pub fn into_theorem_trace_parts(
         self,
     ) -> (
@@ -6880,6 +6881,7 @@ impl FinalizedRuntimeCallTraceParts {
         }
     }
 
+    #[allow(clippy::type_complexity)]
     pub fn into_execution_trace_inputs(
         self,
     ) -> (
@@ -6951,6 +6953,7 @@ impl RuntimePublicCallTraceBundle {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn into_runtime_finalization_input(
         self,
         opcode_trace: Box<[String]>,
@@ -8232,6 +8235,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::field_reassign_with_default)]
     fn primitive_event_transcript_hash_binds_trace_and_proof_payloads() {
         let mut trace = ExecutionTrace::default();
         trace.opcode_trace = vec!["CellGet".to_string()].into_boxed_slice();

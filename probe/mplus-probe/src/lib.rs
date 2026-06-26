@@ -48239,6 +48239,7 @@ fn summarize_latency_rows(rows: &[JsonValue]) -> JsonValue {
 fn run_storage_growth(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<JsonValue> {
     let lengths = env_usize_list("UO_STORAGE_LENGTHS", &[1, 10, 100, 1000, 10000]);
     let mut rows = Vec::new();
+    #[allow(clippy::type_complexity)]
     let mut plans: Vec<(&str, &CompiledArtifact, fn(usize) -> CallSpec)> = vec![
         (
             "FixedSlotClassifier",
@@ -52815,6 +52816,10 @@ mod tests {
     };
 
     #[test]
+    // Asserts the strict default-build property that raw confidential artifacts
+    // are rejected; the insecure-eval-raw evaluation feature deliberately makes
+    // them executable, so this case is default-build only.
+    #[cfg(not(feature = "insecure-eval-raw"))]
     fn authscan_correctness_reports_raw_rejection_and_uo_result() {
         let artifacts = BenchArtifacts {
             raw: compile_artifact(
@@ -52845,6 +52850,9 @@ mod tests {
     }
 
     #[test]
+    // Raw confidential artifacts are rejected only in the strict default build;
+    // the insecure-eval-raw evaluation feature executes them on purpose.
+    #[cfg(not(feature = "insecure-eval-raw"))]
     fn report_paths_mark_raw_confidential_artifacts_as_rejected() {
         let suite = compile_suite().unwrap();
 

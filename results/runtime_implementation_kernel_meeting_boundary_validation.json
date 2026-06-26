@@ -15,7 +15,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1290802,
+      "boundary_json_bytes": 1290973,
       "confidential_statement_trace_bridge_boundary_theorem_checked": true,
       "entrypoint": "classify(uint256)",
       "gas_used": 4096,
@@ -49,7 +49,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413454,
+        "trace": 413621,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -262,7 +262,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1290802,
+      "boundary_json_bytes": 1290973,
       "confidential_statement_trace_bridge_boundary_theorem_checked": true,
       "entrypoint": "classify(uint256)",
       "gas_used": 4096,
@@ -296,7 +296,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413454,
+        "trace": 413621,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -509,7 +509,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1297431,
+      "boundary_json_bytes": 1297602,
       "confidential_statement_trace_bridge_boundary_theorem_checked": true,
       "entrypoint": "auth(bytes32)",
       "gas_used": 8192,
@@ -543,7 +543,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413454,
+        "trace": 413621,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -959,7 +959,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1297431,
+      "boundary_json_bytes": 1297602,
       "confidential_statement_trace_bridge_boundary_theorem_checked": true,
       "entrypoint": "auth(bytes32)",
       "gas_used": 8192,
@@ -993,7 +993,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413454,
+        "trace": 413621,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -1409,7 +1409,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1294632,
+      "boundary_json_bytes": 1294803,
       "confidential_statement_trace_bridge_boundary_theorem_checked": true,
       "entrypoint": "upsert(bytes32,uint256)",
       "gas_used": 12288,
@@ -1443,7 +1443,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413454,
+        "trace": 413621,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -1818,7 +1818,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1294632,
+      "boundary_json_bytes": 1294803,
       "confidential_statement_trace_bridge_boundary_theorem_checked": true,
       "entrypoint": "upsert(bytes32,uint256)",
       "gas_used": 12288,
@@ -1852,7 +1852,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413454,
+        "trace": 413621,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -2227,7 +2227,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1297432,
+      "boundary_json_bytes": 1297603,
       "confidential_statement_trace_bridge_boundary_theorem_checked": true,
       "entrypoint": "deposit(bytes32,uint256)",
       "gas_used": 16384,
@@ -2261,7 +2261,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413454,
+        "trace": 413621,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -2720,7 +2720,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1297432,
+      "boundary_json_bytes": 1297603,
       "confidential_statement_trace_bridge_boundary_theorem_checked": true,
       "entrypoint": "deposit(bytes32,uint256)",
       "gas_used": 16384,
@@ -2754,7 +2754,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413454,
+        "trace": 413621,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -3213,7 +3213,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1300285,
+      "boundary_json_bytes": 1300456,
       "confidential_statement_trace_bridge_boundary_theorem_checked": true,
       "entrypoint": "approve(address,address,uint256)",
       "gas_used": 20480,
@@ -3247,7 +3247,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413454,
+        "trace": 413621,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -3852,7 +3852,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1300285,
+      "boundary_json_bytes": 1300456,
       "confidential_statement_trace_bridge_boundary_theorem_checked": true,
       "entrypoint": "approve(address,address,uint256)",
       "gas_used": 20480,
@@ -3886,7 +3886,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413454,
+        "trace": 413621,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -4491,7 +4491,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "boundary_json_bytes": 1304869,
+      "boundary_json_bytes": 1305040,
       "confidential_statement_trace_bridge_boundary_theorem_checked": true,
       "entrypoint": "put(bytes32,uint256)",
       "gas_used": 2322,
@@ -4525,7 +4525,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413454,
+        "trace": 413621,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -5320,7 +5320,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "boundary_json_bytes": 1304869,
+      "boundary_json_bytes": 1305040,
       "confidential_statement_trace_bridge_boundary_theorem_checked": true,
       "entrypoint": "put(bytes32,uint256)",
       "gas_used": 2322,
@@ -5354,7 +5354,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413454,
+        "trace": 413621,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -6149,7 +6149,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 1310090,
+      "boundary_json_bytes": 1310261,
       "confidential_statement_trace_bridge_boundary_theorem_checked": true,
       "entrypoint": "add(bytes32,uint256)",
       "gas_used": 2651,
@@ -6183,7 +6183,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413454,
+        "trace": 413621,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -7181,7 +7181,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 1310090,
+      "boundary_json_bytes": 1310261,
       "confidential_statement_trace_bridge_boundary_theorem_checked": true,
       "entrypoint": "add(bytes32,uint256)",
       "gas_used": 2651,
@@ -7215,7 +7215,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413454,
+        "trace": 413621,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -8213,7 +8213,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 1352936,
+      "boundary_json_bytes": 1353107,
       "confidential_statement_trace_bridge_boundary_theorem_checked": true,
       "entrypoint": "deposit(bytes32,uint256)",
       "gas_used": 12288,
@@ -8247,7 +8247,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413454,
+        "trace": 413621,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -10986,7 +10986,7 @@
     {
       "accepted": true,
       "boundary_events": 14,
-      "boundary_json_bytes": 1486387,
+      "boundary_json_bytes": 1486558,
       "confidential_statement_trace_bridge_boundary_theorem_checked": true,
       "entrypoint": "transferFrom(address,address,address,uint256)",
       "gas_used": 16384,
@@ -11020,7 +11020,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413454,
+        "trace": 413621,
         "trusted_kernel": 4548,
         "types": 29154
       },

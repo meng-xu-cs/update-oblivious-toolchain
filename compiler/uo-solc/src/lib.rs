@@ -3551,10 +3551,7 @@ bounds:
             .get("f(uint256)")
             .unwrap();
         assert_eq!(manifest_entry.public_env, function.public_env);
-        assert_eq!(
-            manifest_entry.entry_input_len,
-            1 * 32 + 20 + 20 + 32 + 32 + 32
-        );
+        assert_eq!(manifest_entry.entry_input_len, 32 + 20 + 20 + 32 + 32 + 32);
     }
 
     #[test]

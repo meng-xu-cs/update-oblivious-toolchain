@@ -4,65 +4,65 @@
     "benchmarks": [
       {
         "benchmark": "FixedSlotClassifier",
-        "differential_trials_executed": 16,
+        "differential_trials_executed": 4,
         "divergences": 0,
         "equivalent": true,
         "seed_range": [
           0,
-          16
+          4
         ],
-        "trial_count": 16
+        "trial_count": 4
       },
       {
         "benchmark": "RegistryCRUD",
-        "differential_trials_executed": 16,
+        "differential_trials_executed": 4,
         "divergences": 0,
         "equivalent": true,
         "seed_range": [
           0,
-          16
+          4
         ],
-        "trial_count": 16
+        "trial_count": 4
       },
       {
         "benchmark": "ConfidentialMixer",
-        "differential_trials_executed": 16,
+        "differential_trials_executed": 4,
         "divergences": 0,
         "equivalent": true,
         "seed_range": [
           0,
-          16
+          4
         ],
-        "trial_count": 16
+        "trial_count": 4
       },
       {
         "benchmark": "AuthScan",
-        "differential_trials_executed": 16,
+        "differential_trials_executed": 4,
         "divergences": 0,
         "equivalent": true,
         "seed_range": [
           0,
-          16
+          4
         ],
-        "trial_count": 16
+        "trial_count": 4
       },
       {
         "benchmark": "ERC20Lite",
-        "differential_trials_executed": 16,
+        "differential_trials_executed": 4,
         "divergences": 0,
         "equivalent": true,
         "seed_range": [
           0,
-          16
+          4
         ],
-        "trial_count": 16
+        "trial_count": 4
       }
     ],
     "seed_range": [
       0,
-      16
+      4
     ],
-    "trial_count": 16
+    "trial_count": 4
   },
   "scenarios": [
     {
