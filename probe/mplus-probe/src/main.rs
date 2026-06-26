@@ -31,6 +31,7 @@ enum ReportKind {
     LatencyMemory,
     StorageGrowth,
     CapacitySweep,
+    AbortRollback,
     AblationStudy,
     EngineeringCost,
     BridgeValidation,
@@ -237,6 +238,15 @@ fn main() -> Result<()> {
                 &cli.out_dir,
                 "capacity_sweep.json",
                 "capacity_sweep",
+                &report,
+            )?;
+        }
+        Some(ReportKind::AbortRollback) => {
+            let report = mplus_probe::run_abort_rollback_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "abort_rollback.json",
+                "abort_rollback",
                 &report,
             )?;
         }

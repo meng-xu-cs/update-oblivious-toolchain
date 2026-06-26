@@ -1,7 +1,7 @@
 {
   "accepted": true,
   "class_counts": {
-    "advisory_nonclaim": 561,
+    "advisory_nonclaim": 565,
     "deprecated_report": 0,
     "expected_computational_difference": 98,
     "expected_negative": 1008,
@@ -19,6 +19,33 @@
   "mode": "proof_grade",
   "report": "acceptance",
   "reports": [
+    {
+      "accepted": true,
+      "advisory_false_paths": [
+        "case_studies.1.aborted",
+        "case_studies.3.aborted",
+        "case_studies.5.aborted",
+        "case_studies.7.aborted"
+      ],
+      "class_counts": {
+        "advisory_nonclaim": 4,
+        "deprecated_report": 0,
+        "expected_computational_difference": 0,
+        "expected_negative": 0,
+        "required_failure": 0,
+        "unclassified": 0
+      },
+      "declared_accepted": true,
+      "expected_false_paths": [],
+      "false_count": 4,
+      "false_paths": 4,
+      "mode": "evaluation",
+      "report": "abort_rollback",
+      "required": false,
+      "required_failures": [],
+      "schema": "uo.acceptance.report.v1",
+      "unclassified_false_paths": []
+    },
     {
       "accepted": true,
       "advisory_false_paths": [],
@@ -797,6 +824,28 @@
       "mode": "proof_grade",
       "report": "canonical_pathoram_pair_validation",
       "required": true,
+      "required_failures": [],
+      "schema": "uo.acceptance.report.v1",
+      "unclassified_false_paths": []
+    },
+    {
+      "accepted": true,
+      "advisory_false_paths": [],
+      "class_counts": {
+        "advisory_nonclaim": 0,
+        "deprecated_report": 0,
+        "expected_computational_difference": 0,
+        "expected_negative": 0,
+        "required_failure": 0,
+        "unclassified": 0
+      },
+      "declared_accepted": null,
+      "expected_false_paths": [],
+      "false_count": 0,
+      "false_paths": 0,
+      "mode": "evaluation",
+      "report": "capacity_sweep",
+      "required": false,
       "required_failures": [],
       "schema": "uo.acceptance.report.v1",
       "unclassified_false_paths": []
@@ -3403,9 +3452,11 @@
     }
   ],
   "reports_scanned": [
+    "abort_rollback",
     "artifact_configuration",
     "bridge_validation",
     "canonical_pathoram_pair_validation",
+    "capacity_sweep",
     "claim_consistency",
     "confidential_core_kernel_finish_slot_validation",
     "confidential_core_kernel_interface_slot_finish_boundary_validation",

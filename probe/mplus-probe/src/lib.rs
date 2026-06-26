@@ -1348,6 +1348,11 @@ pub fn run_capacity_sweep_report() -> Result<JsonValue> {
     run_capacity_sweep()
 }
 
+pub fn run_abort_rollback_report() -> Result<JsonValue> {
+    let suite = compile_suite()?;
+    run_abort_rollback(&suite)
+}
+
 pub fn run_ablation_study_report() -> Result<JsonValue> {
     let suite = compile_suite()?;
     run_ablation_study(&suite)
@@ -2680,6 +2685,52 @@ fn render_reviewer_summary_markdown(summary: &JsonValue) -> Result<String> {
                 markdown_escape(entry["target"].as_str().unwrap_or("unknown")),
                 entry["report_field"].as_str().unwrap_or("unknown"),
             ));
+        }
+    }
+
+    out.push('\n');
+    out.push_str("## Benchmark Overhead\n\n");
+    out.push_str(
+        "Executable overhead rows for every benchmark backend. `gas_used` is a \
+        modeled resource cost, not stock EVM gas (see `cost_model` in \
+        `overheads.json`).\n\n",
+    );
+    out.push_str("| Benchmark | Backend | Modeled gas_used |\n");
+    out.push_str("| --- | --- | ---: |\n");
+    if let Some(matrix) = summary["runtime_overheads"]["matrix"].as_array() {
+        for row in matrix {
+            if row["executable"].as_bool() == Some(true) {
+                out.push_str(&format!(
+                    "| `{}` | `{}` | `{}` |\n",
+                    row["benchmark"].as_str().unwrap_or("unknown"),
+                    row["backend"].as_str().unwrap_or("unknown"),
+                    row["gas_used"]
+                        .as_u64()
+                        .map(|gas| gas.to_string())
+                        .unwrap_or_else(|| "-".into()),
+                ));
+            }
+        }
+    }
+
+    out.push('\n');
+    out.push_str("## Rejected Backends\n\n");
+    out.push_str(
+        "Compile/admission failures recorded as explicit rows with reasons, not \
+        missing data.\n\n",
+    );
+    out.push_str("| Benchmark | Backend | Reason |\n");
+    out.push_str("| --- | --- | --- |\n");
+    if let Some(matrix) = summary["runtime_overheads"]["matrix"].as_array() {
+        for row in matrix {
+            if row["rejected"].as_bool() == Some(true) {
+                out.push_str(&format!(
+                    "| `{}` | `{}` | {} |\n",
+                    row["benchmark"].as_str().unwrap_or("unknown"),
+                    row["backend"].as_str().unwrap_or("unknown"),
+                    markdown_escape(row["error"].as_str().unwrap_or("rejected")),
+                ));
+            }
         }
     }
 
@@ -48272,13 +48323,17 @@ fn run_storage_growth(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<
 }
 
 fn run_capacity_sweep() -> Result<JsonValue> {
-    let capacities = env_usize_list(
-        "UO_SWEEP_CAPACITIES",
-        &[1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096],
-    );
-    let read_fractions = env_f64_list("UO_SWEEP_READ_FRACTIONS", &[0.0, 0.1, 0.5, 0.9, 1.0]);
-    let warmups = env_usize("UO_SWEEP_WARMUPS", 3);
-    let trials = env_usize("UO_SWEEP_TRIALS", 30);
+    // Default capacities span the proof-grade ORAM position-map bound (128): the
+    // ORAM backend admits 1..=128 and explicitly rejects 256 as an overflow edge
+    // case, while the full-scan baseline scales across the whole range. This keeps
+    // a committed regeneration feasible (run_validation.sh uses these defaults)
+    // while giving the CapacityOverflow case study >=3 working map-heavy
+    // capacities plus an explicit overflow row. Override UO_SWEEP_* for deeper
+    // sweeps (e.g. to drive the runtime allocator-event bound at higher capacity).
+    let capacities = env_usize_list("UO_SWEEP_CAPACITIES", &[1, 2, 4, 8, 16, 32, 64, 128, 256]);
+    let read_fractions = env_f64_list("UO_SWEEP_READ_FRACTIONS", &[0.0, 0.5, 1.0]);
+    let warmups = env_usize("UO_SWEEP_WARMUPS", 2);
+    let trials = env_usize("UO_SWEEP_TRIALS", 10);
     let mut rows = Vec::new();
     for capacity in capacities {
         for backend in ["full_scan", "oram"] {
@@ -48303,8 +48358,24 @@ fn run_capacity_sweep() -> Result<JsonValue> {
             };
             let validation_time_ms = validation_started.elapsed().as_millis();
             for read_fraction in &read_fractions {
+                let mut warmup_error = None;
                 for _ in 0..warmups {
-                    let _ = run_capacity_trial(&artifact, *read_fraction, 0)?;
+                    if let Err(err) = run_capacity_trial(&artifact, *read_fraction, 0) {
+                        warmup_error = Some(format!("warmup: {err:#}"));
+                        break;
+                    }
+                }
+                if let Some(warmup_error) = warmup_error {
+                    rows.push(json!({
+                        "capacity": capacity,
+                        "backend": backend,
+                        "read_fraction": read_fraction,
+                        "status": "error",
+                        "error": warmup_error,
+                        "completed_trials": 0,
+                        "validation_time_ms": validation_time_ms,
+                    }));
+                    continue;
                 }
                 let mut samples = Vec::new();
                 let mut error = None;
@@ -48366,6 +48437,268 @@ fn run_capacity_sweep() -> Result<JsonValue> {
         "trials": trials,
         "rows": rows,
         "break_even": break_even,
+    }))
+}
+
+/// One AbortRollback case study: deploy `artifact`, run `setup`, fire `target`,
+/// then read the `observers`. `expected_outcome` is `"abort"` when `target` is
+/// supposed to hit a `require(...)` guard (so the public state stays at its
+/// post-setup value) and `"commit"` when it should succeed (so the public state
+/// moves to its updated value); `expected_post_state` is the observer reading
+/// each outcome requires. The single `outcome_matches_expected` obligation is
+/// `true` only when the observed abort flag and the post-call public state both
+/// match the declared outcome; a `false` there is fail-closed by the acceptance
+/// gate. Observers are read only *after* the target: under Path ORAM every access
+/// remaps the touched block, so a pre-call read would perturb the hidden leaf
+/// schedule the target's refinement witness is checked against.
+fn abort_rollback_case(
+    benchmark: &str,
+    backend: &str,
+    artifact: &CompiledArtifact,
+    setup: &[CallSpec],
+    target: &CallSpec,
+    observers: &[CallSpec],
+    expected_outcome: &str,
+    expected_post_state: &[Option<Value>],
+) -> Result<JsonValue> {
+    let mut instance = ContractInstance::deploy_with_seed(artifact.clone(), PROBE_DEPLOY_SEED)?;
+    for call in setup {
+        instance
+            .call(call.entrypoint, call.args.clone())
+            .with_context(|| {
+                format!(
+                    "abort_rollback setup {benchmark}/{backend}: {}",
+                    call.entrypoint
+                )
+            })?;
+    }
+    let expect_abort = expected_outcome == "abort";
+    let outcome = match instance.call(target.entrypoint, target.args.clone()) {
+        Ok(outcome) => outcome,
+        Err(err) => {
+            // The fail-closed proof-grade route refused to admit this call rather
+            // than emit an unvalidated witness. The Path ORAM route currently does
+            // this for a mid-call abort: every ORAM access must remap the touched
+            // block, so restoring the pre-call hidden state on abort leaves the
+            // emitted leaf schedule inconsistent with the restored position map,
+            // and the refinement-witness check rejects it. Record the rejection
+            // with its exact reason as an explicit edge case (not a silent gap),
+            // mirroring the capacity-overflow rows in the capacity sweep.
+            return Ok(json!({
+                "benchmark": benchmark,
+                "backend": backend,
+                "expected_outcome": expected_outcome,
+                "runtime_status": "rejected_by_proof_grade_route",
+                "recorded_edge_case": true,
+                "rejection_reason": format!("{err:#}"),
+            }));
+        }
+    };
+    let aborted = outcome.aborted;
+    let post = observers
+        .iter()
+        .map(|observer| {
+            instance
+                .call(observer.entrypoint, observer.args.clone())
+                .map(|result| result.return_value)
+        })
+        .collect::<Result<Vec<Option<Value>>>>()?;
+    let state_matches_expected = post == expected_post_state;
+    // Combined obligation: the abort flag and the post-call public state both
+    // match the declared outcome (preserved on abort, updated on commit).
+    let outcome_matches_expected = (aborted == expect_abort) && state_matches_expected;
+    Ok(json!({
+        "benchmark": benchmark,
+        "backend": backend,
+        "expected_outcome": expected_outcome,
+        "runtime_status": "executed",
+        "aborted": aborted,
+        "outcome_matches_expected": outcome_matches_expected,
+        "post_state": post.iter().map(|value| format_value(value.as_ref())).collect::<Vec<_>>(),
+        "expected_post_state": expected_post_state.iter().map(|value| format_value(value.as_ref())).collect::<Vec<_>>(),
+        "target_return": format_value(outcome.return_value.as_ref()),
+        "target_gas_used": outcome.trace.gas_used,
+    }))
+}
+
+/// AbortRollback edge-case study (Issue 19): drive coherent confidential
+/// workloads past a `require(...)` guard so the runtime aborts the call, and
+/// verify that public state rolls back exactly when the call aborts and commits
+/// exactly when it succeeds. This exercises the Issue 06 transactional-atomicity
+/// path end-to-end on the exact (`uo`) and ORAM backends.
+fn run_abort_rollback(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<JsonValue> {
+    let mut case_studies = Vec::new();
+
+    // ConfidentialMixer: an over-balance withdraw hits `require(oldBalance >=
+    // amount)` and must leave the deposited balance intact; an in-balance
+    // withdraw commits and reduces the balance.
+    let mixer = suite
+        .get("ConfidentialMixer")
+        .ok_or_else(|| anyhow!("missing ConfidentialMixer benchmark"))?;
+    let key = b32(9);
+    let mixer_setup = vec![CallSpec {
+        entrypoint: "deposit(bytes32,uint256)",
+        args: vec![key.clone(), Value::uint(5)],
+    }];
+    let mixer_observers = vec![
+        CallSpec {
+            entrypoint: "balanceOf(bytes32)",
+            args: vec![key.clone()],
+        },
+        CallSpec {
+            entrypoint: "totalValue()",
+            args: vec![],
+        },
+    ];
+    let mixer_targets: Vec<(&str, &CompiledArtifact)> = vec![
+        ("uo", &mixer.uo),
+        (
+            "oram",
+            mixer
+                .oram
+                .as_ref()
+                .ok_or_else(|| anyhow!("missing ConfidentialMixer oram"))?,
+        ),
+    ];
+    for (backend, artifact) in mixer_targets {
+        // Over-balance withdraw aborts: balance and total stay at the deposited 5.
+        case_studies.push(abort_rollback_case(
+            "ConfidentialMixer",
+            backend,
+            artifact,
+            &mixer_setup,
+            &CallSpec {
+                entrypoint: "withdraw(bytes32,uint256)",
+                args: vec![key.clone(), Value::uint(9)],
+            },
+            &mixer_observers,
+            "abort",
+            &[Some(Value::uint(5)), Some(Value::uint(5))],
+        )?);
+        // In-balance withdraw commits: 5 - 2 leaves balance and total at 3.
+        case_studies.push(abort_rollback_case(
+            "ConfidentialMixer",
+            backend,
+            artifact,
+            &mixer_setup,
+            &CallSpec {
+                entrypoint: "withdraw(bytes32,uint256)",
+                args: vec![key.clone(), Value::uint(2)],
+            },
+            &mixer_observers,
+            "commit",
+            &[Some(Value::uint(3)), Some(Value::uint(3))],
+        )?);
+    }
+
+    // ERC20Lite: a transferFrom above the approved allowance hits the
+    // allowance/balance `require` guards and must leave every balance and
+    // allowance untouched; an in-allowance transferFrom commits.
+    let erc20 = suite
+        .get("ERC20Lite")
+        .ok_or_else(|| anyhow!("missing ERC20Lite benchmark"))?;
+    let alice = addr(0x11);
+    let bob = addr(0x22);
+    let carol = addr(0x33);
+    let erc20_setup = vec![
+        CallSpec {
+            entrypoint: "mint(address,uint256)",
+            args: vec![alice.clone(), Value::uint(10)],
+        },
+        CallSpec {
+            entrypoint: "approve(address,address,uint256)",
+            args: vec![alice.clone(), bob.clone(), Value::uint(4)],
+        },
+    ];
+    let erc20_observers = vec![
+        CallSpec {
+            entrypoint: "balanceOf(address)",
+            args: vec![alice.clone()],
+        },
+        CallSpec {
+            entrypoint: "balanceOf(address)",
+            args: vec![carol.clone()],
+        },
+        CallSpec {
+            entrypoint: "allowanceOf(address,address)",
+            args: vec![alice.clone(), bob.clone()],
+        },
+    ];
+    let erc20_targets: Vec<(&str, &CompiledArtifact)> = vec![
+        ("uo", &erc20.uo),
+        (
+            "oram",
+            erc20
+                .oram
+                .as_ref()
+                .ok_or_else(|| anyhow!("missing ERC20Lite oram"))?,
+        ),
+    ];
+    for (backend, artifact) in erc20_targets {
+        // transferFrom above the approved allowance (5 > 4) aborts: alice keeps
+        // 10, carol keeps 0, and the allowance stays at 4.
+        case_studies.push(abort_rollback_case(
+            "ERC20Lite",
+            backend,
+            artifact,
+            &erc20_setup,
+            &CallSpec {
+                entrypoint: "transferFrom(address,address,address,uint256)",
+                args: vec![
+                    alice.clone(),
+                    bob.clone(),
+                    carol.clone(),
+                    Value::uint(5),
+                ],
+            },
+            &erc20_observers,
+            "abort",
+            &[Some(Value::uint(10)), Some(Value::uint(0)), Some(Value::uint(4))],
+        )?);
+        // In-allowance transferFrom (3 <= 4) commits: alice 10-3=7, carol 0+3=3,
+        // allowance 4-3=1.
+        case_studies.push(abort_rollback_case(
+            "ERC20Lite",
+            backend,
+            artifact,
+            &erc20_setup,
+            &CallSpec {
+                entrypoint: "transferFrom(address,address,address,uint256)",
+                args: vec![
+                    alice.clone(),
+                    bob.clone(),
+                    carol.clone(),
+                    Value::uint(3),
+                ],
+            },
+            &erc20_observers,
+            "commit",
+            &[Some(Value::uint(7)), Some(Value::uint(3)), Some(Value::uint(1))],
+        )?);
+    }
+
+    let executed = |case: &JsonValue| case["runtime_status"] == json!("executed");
+    let matched = |case: &&JsonValue| case["outcome_matches_expected"] == json!(true);
+    // Every call the runtime actually executed must match its declared outcome.
+    let all_executed_match = case_studies
+        .iter()
+        .filter(|case| executed(case))
+        .all(|case| matched(&case));
+    // The study is only meaningful if at least one abort (rollback) and one
+    // commit were genuinely executed and matched; proof-grade rejections are
+    // recorded as edge cases but cannot stand in for a demonstrated rollback.
+    let demonstrated = |outcome: &str| {
+        case_studies.iter().any(|case| {
+            executed(case)
+                && case["expected_outcome"] == json!(outcome)
+                && matched(&case)
+        })
+    };
+    let accepted = all_executed_match && demonstrated("abort") && demonstrated("commit");
+    Ok(json!({
+        "description": "AbortRollback edge-case study: confidential calls that hit a require(...) guard abort and roll back public state, while in-bound calls commit. Exercises Issue 06 transactional atomicity on the exact backend (uo); the proof-grade Path ORAM route fail-closed-rejects a mid-call abort and that rejection is recorded as an explicit edge case.",
+        "case_studies": case_studies,
+        "accepted": accepted,
     }))
 }
 

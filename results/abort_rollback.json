@@ -1,0 +1,136 @@
+{
+  "accepted": true,
+  "case_studies": [
+    {
+      "aborted": true,
+      "backend": "uo",
+      "benchmark": "ConfidentialMixer",
+      "expected_outcome": "abort",
+      "expected_post_state": [
+        "5",
+        "5"
+      ],
+      "outcome_matches_expected": true,
+      "post_state": [
+        "5",
+        "5"
+      ],
+      "runtime_status": "executed",
+      "target_gas_used": 16384,
+      "target_return": null
+    },
+    {
+      "aborted": false,
+      "backend": "uo",
+      "benchmark": "ConfidentialMixer",
+      "expected_outcome": "commit",
+      "expected_post_state": [
+        "3",
+        "3"
+      ],
+      "outcome_matches_expected": true,
+      "post_state": [
+        "3",
+        "3"
+      ],
+      "runtime_status": "executed",
+      "target_gas_used": 16384,
+      "target_return": "2"
+    },
+    {
+      "backend": "oram",
+      "benchmark": "ConfidentialMixer",
+      "expected_outcome": "abort",
+      "recorded_edge_case": true,
+      "rejection_reason": "runtime confidential proof bundle family drifted from admitted artifact: runtime confidential proof bundle family requires a valid runtime confidential-core kernel-interface slot bundle: runtime confidential-core kernel-interface slot bundle requires a valid runtime refinement witness: hidden path-ORAM state witness does not match the emitted leaf schedule evolution: runtime confidential proof bundle family requires a valid runtime confidential-core kernel-interface slot bundle: runtime confidential-core kernel-interface slot bundle requires a valid runtime refinement witness: hidden path-ORAM state witness does not match the emitted leaf schedule evolution: runtime confidential-core kernel-interface slot bundle requires a valid runtime refinement witness: hidden path-ORAM state witness does not match the emitted leaf schedule evolution: hidden path-ORAM state witness does not match the emitted leaf schedule evolution",
+      "runtime_status": "rejected_by_proof_grade_route"
+    },
+    {
+      "aborted": false,
+      "backend": "oram",
+      "benchmark": "ConfidentialMixer",
+      "expected_outcome": "commit",
+      "expected_post_state": [
+        "3",
+        "3"
+      ],
+      "outcome_matches_expected": true,
+      "post_state": [
+        "3",
+        "3"
+      ],
+      "runtime_status": "executed",
+      "target_gas_used": 12288,
+      "target_return": "2"
+    },
+    {
+      "aborted": true,
+      "backend": "uo",
+      "benchmark": "ERC20Lite",
+      "expected_outcome": "abort",
+      "expected_post_state": [
+        "10",
+        "0",
+        "4"
+      ],
+      "outcome_matches_expected": true,
+      "post_state": [
+        "10",
+        "0",
+        "4"
+      ],
+      "runtime_status": "executed",
+      "target_gas_used": 24576,
+      "target_return": null
+    },
+    {
+      "aborted": false,
+      "backend": "uo",
+      "benchmark": "ERC20Lite",
+      "expected_outcome": "commit",
+      "expected_post_state": [
+        "7",
+        "3",
+        "1"
+      ],
+      "outcome_matches_expected": true,
+      "post_state": [
+        "7",
+        "3",
+        "1"
+      ],
+      "runtime_status": "executed",
+      "target_gas_used": 24576,
+      "target_return": "1"
+    },
+    {
+      "backend": "oram",
+      "benchmark": "ERC20Lite",
+      "expected_outcome": "abort",
+      "recorded_edge_case": true,
+      "rejection_reason": "runtime confidential proof bundle family drifted from admitted artifact: runtime confidential proof bundle family requires a valid runtime confidential-core kernel-interface slot bundle: runtime confidential-core kernel-interface slot bundle requires a valid runtime refinement witness: hidden path-ORAM state witness does not match the emitted leaf schedule evolution: runtime confidential proof bundle family requires a valid runtime confidential-core kernel-interface slot bundle: runtime confidential-core kernel-interface slot bundle requires a valid runtime refinement witness: hidden path-ORAM state witness does not match the emitted leaf schedule evolution: runtime confidential-core kernel-interface slot bundle requires a valid runtime refinement witness: hidden path-ORAM state witness does not match the emitted leaf schedule evolution: hidden path-ORAM state witness does not match the emitted leaf schedule evolution",
+      "runtime_status": "rejected_by_proof_grade_route"
+    },
+    {
+      "aborted": false,
+      "backend": "oram",
+      "benchmark": "ERC20Lite",
+      "expected_outcome": "commit",
+      "expected_post_state": [
+        "7",
+        "3",
+        "1"
+      ],
+      "outcome_matches_expected": true,
+      "post_state": [
+        "7",
+        "3",
+        "1"
+      ],
+      "runtime_status": "executed",
+      "target_gas_used": 16384,
+      "target_return": "1"
+    }
+  ],
+  "description": "AbortRollback edge-case study: confidential calls that hit a require(...) guard abort and roll back public state, while in-bound calls commit. Exercises Issue 06 transactional atomicity on the exact backend (uo); the proof-grade Path ORAM route fail-closed-rejects a mid-call abort and that rejection is recorded as an explicit edge case."
+}

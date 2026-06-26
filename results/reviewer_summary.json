@@ -402,83 +402,94 @@
     "theorem_facing_large_artifacts_require_enumeration": false
   },
   "proof_checking_cost_ms": {
-    "canonical_pathoram_pair_validation": 103666,
-    "confidential_core_kernel_finish_slot_validation": 79608,
-    "confidential_core_kernel_interface_slot_finish_boundary_validation": 79590,
-    "confidential_core_kernel_interface_slot_validation": 79340,
-    "confidential_core_lowering_validation": 81134,
-    "confidential_core_shell_boundary_lowering_validation": 80617,
-    "confidential_core_shell_boundary_slot_validation": 80006,
-    "confidential_core_slot_validation": 79827,
-    "confidential_core_validation": 80455,
+    "canonical_pathoram_pair_validation": 103431,
+    "confidential_core_kernel_finish_slot_validation": 77982,
+    "confidential_core_kernel_interface_slot_finish_boundary_validation": 78049,
+    "confidential_core_kernel_interface_slot_validation": 78133,
+    "confidential_core_lowering_validation": 79641,
+    "confidential_core_shell_boundary_lowering_validation": 79262,
+    "confidential_core_shell_boundary_slot_validation": 78279,
+    "confidential_core_slot_validation": 78513,
+    "confidential_core_validation": 79315,
     "confidential_fragment_validation": 0,
-    "confidential_proof_family_assurance_validation": 80471,
-    "confidential_proof_family_boundary_validation": 80485,
-    "confidential_proof_family_finish_slot_boundary_validation": 80284,
-    "confidential_proof_family_kernel_interface_validation": 80409,
-    "confidential_proof_family_refinement_boundary_validation": 80149,
-    "confidential_proof_family_slot_assurance_validation": 80637,
-    "confidential_proof_family_slot_boundary_validation": 80546,
-    "confidential_proof_family_validation": 80447,
-    "controller_observer_validation": 79366,
-    "correctness": 43898,
-    "fresh_coin_validation": 53712,
-    "kernel_confinement_boundary_validation": 77111,
-    "kernel_dsl_validation": 79674,
-    "kernel_finish_boundary_validation": 77428,
-    "kernel_interface_confinement_boundary_validation": 77607,
-    "kernel_interface_singleton_boundary_validation": 77725,
-    "kernel_interface_validation": 77320,
-    "kernel_lowering_validation": 79369,
-    "kernel_model_alignment_validation": 7291,
-    "kernel_refinement_boundary_validation": 77174,
-    "kernel_refinement_validation": 79249,
-    "kernel_slot_boundary_validation": 79377,
-    "kernel_slot_dsl_validation": 79785,
-    "kernel_validation": 80125,
-    "leakage_auc": 303386,
-    "mutual_information": 303677,
-    "overheads": 43998,
+    "confidential_proof_family_assurance_validation": 79128,
+    "confidential_proof_family_boundary_validation": 79086,
+    "confidential_proof_family_finish_slot_boundary_validation": 79136,
+    "confidential_proof_family_kernel_interface_validation": 79115,
+    "confidential_proof_family_refinement_boundary_validation": 79152,
+    "confidential_proof_family_slot_assurance_validation": 79164,
+    "confidential_proof_family_slot_boundary_validation": 79096,
+    "confidential_proof_family_validation": 79003,
+    "controller_observer_validation": 78388,
+    "correctness": 617094,
+    "fresh_coin_validation": 52289,
+    "kernel_confinement_boundary_validation": 76920,
+    "kernel_dsl_validation": 78440,
+    "kernel_finish_boundary_validation": 77525,
+    "kernel_interface_confinement_boundary_validation": 77649,
+    "kernel_interface_singleton_boundary_validation": 77740,
+    "kernel_interface_validation": 77187,
+    "kernel_lowering_validation": 77876,
+    "kernel_model_alignment_validation": 7397,
+    "kernel_refinement_boundary_validation": 77046,
+    "kernel_refinement_validation": 77874,
+    "kernel_slot_boundary_validation": 78166,
+    "kernel_slot_dsl_validation": 78417,
+    "kernel_validation": 78604,
+    "leakage_auc": 307316,
+    "mutual_information": 304738,
+    "overheads": 44850,
     "paper_main_family_boundary_validation": 1,
     "paper_main_slot_boundary_validation": 1,
-    "pathoram_hidden_validation": 7270,
-    "pathoram_pair_validation": 38316,
-    "runtime_boundary_validation": 1443,
-    "runtime_confidential_statement_trace_bridge_boundary_validation": 2214,
-    "runtime_implementation_confidential_statement_trace_bridge_refinement_boundary_validation": 81448,
-    "runtime_implementation_confinement_boundary_validation": 131663,
-    "runtime_implementation_interface_validation": 5732,
-    "runtime_implementation_kernel_machine_confinement_boundary_validation": 133023,
-    "runtime_implementation_kernel_meeting_boundary_validation": 128486,
-    "runtime_implementation_kernel_meeting_confinement_boundary_validation": 176031,
-    "runtime_implementation_public_bridge_observer_refinement_boundary_validation": 108550,
-    "runtime_implementation_residual_helper_shell_machine_refinement_boundary_validation": 110178,
-    "runtime_implementation_shared_kernel_machine_refinement_boundary_validation": 130794,
-    "runtime_implementation_shared_kernel_refinement_boundary_validation": 128191,
-    "runtime_implementation_slot_adapter_machine_refinement_boundary_validation": 82042,
-    "runtime_implementation_small_confidential_kernel_machine_refinement_boundary_validation": 128419,
-    "runtime_kernel_machine_finish_boundary_validation": 80402,
-    "runtime_kernel_machine_finish_witness_validation": 80989,
-    "runtime_public_bridge_boundary_validation": 2129,
-    "runtime_residual_helper_shell_boundary_validation": 5151,
-    "runtime_shared_confidential_kernel_boundary_validation": 5461,
-    "runtime_slot_adapter_boundary_validation": 2425,
-    "runtime_small_confidential_kernel_boundary_validation": 5266,
-    "seeded_witness_validation": 25434,
-    "shell_boundary_lowering_validation": 82357,
-    "shell_boundary_slot_validation": 80875,
-    "shell_boundary_validation": 79818,
-    "static_checks": 18626,
-    "tamper_validation": 993053,
-    "total_probe_ms": 6481871,
-    "trace_equivalence": 304079,
-    "trusted_kernel_validation": 79203,
-    "witness_validation": 77070
+    "pathoram_hidden_validation": 5682,
+    "pathoram_pair_validation": 38202,
+    "runtime_boundary_validation": 1470,
+    "runtime_confidential_statement_trace_bridge_boundary_validation": 757,
+    "runtime_implementation_confidential_statement_trace_bridge_refinement_boundary_validation": 80443,
+    "runtime_implementation_confinement_boundary_validation": 130439,
+    "runtime_implementation_interface_validation": 3880,
+    "runtime_implementation_kernel_machine_confinement_boundary_validation": 130926,
+    "runtime_implementation_kernel_meeting_boundary_validation": 127606,
+    "runtime_implementation_kernel_meeting_confinement_boundary_validation": 175121,
+    "runtime_implementation_public_bridge_observer_refinement_boundary_validation": 107345,
+    "runtime_implementation_residual_helper_shell_machine_refinement_boundary_validation": 109231,
+    "runtime_implementation_shared_kernel_machine_refinement_boundary_validation": 129999,
+    "runtime_implementation_shared_kernel_refinement_boundary_validation": 127175,
+    "runtime_implementation_slot_adapter_machine_refinement_boundary_validation": 81085,
+    "runtime_implementation_small_confidential_kernel_machine_refinement_boundary_validation": 127982,
+    "runtime_kernel_machine_finish_boundary_validation": 79615,
+    "runtime_kernel_machine_finish_witness_validation": 80275,
+    "runtime_public_bridge_boundary_validation": 758,
+    "runtime_residual_helper_shell_boundary_validation": 2640,
+    "runtime_shared_confidential_kernel_boundary_validation": 3825,
+    "runtime_slot_adapter_boundary_validation": 762,
+    "runtime_small_confidential_kernel_boundary_validation": 3719,
+    "seeded_witness_validation": 22387,
+    "shell_boundary_lowering_validation": 102581,
+    "shell_boundary_slot_validation": 79636,
+    "shell_boundary_validation": 78388,
+    "static_checks": 1674,
+    "tamper_validation": 965182,
+    "total_probe_ms": 6970281,
+    "trace_equivalence": 304663,
+    "trusted_kernel_validation": 78033,
+    "witness_validation": 77039
   },
   "runtime_overheads": {
     "cases": [
       {
         "benchmark": "FixedSlotClassifier/classify",
+        "cost_formula": [
+          {
+            "backend": "full_scan",
+            "cost_formula": "modeled_static_budget",
+            "cost_model": "uo-modeled-resource-cost-v1",
+            "entrypoint": "classify(uint256)",
+            "formula_exact": true,
+            "gas_used": 4096,
+            "manifest_public_gas_budget": 4096
+          }
+        ],
         "entrypoint": "classify(uint256)",
         "full_scan": {
           "bytes_read": 124.0,
@@ -553,6 +564,17 @@
       },
       {
         "benchmark": "AuthScan/auth",
+        "cost_formula": [
+          {
+            "backend": "full_scan",
+            "cost_formula": "modeled_static_budget",
+            "cost_model": "uo-modeled-resource-cost-v1",
+            "entrypoint": "auth(bytes32)",
+            "formula_exact": true,
+            "gas_used": 8192,
+            "manifest_public_gas_budget": 8192
+          }
+        ],
         "entrypoint": "auth(bytes32)",
         "full_scan": {
           "bytes_read": 2108.0,
@@ -641,6 +663,35 @@
       },
       {
         "benchmark": "ConfidentialMixer/deposit",
+        "cost_formula": [
+          {
+            "backend": "full_scan",
+            "cost_formula": "modeled_static_budget",
+            "cost_model": "uo-modeled-resource-cost-v1",
+            "entrypoint": "deposit(bytes32,uint256)",
+            "formula_exact": true,
+            "gas_used": 16384,
+            "manifest_public_gas_budget": 16384
+          },
+          {
+            "backend": "full_scan_64",
+            "cost_formula": "modeled_static_budget",
+            "cost_model": "uo-modeled-resource-cost-v1",
+            "entrypoint": "deposit(bytes32,uint256)",
+            "formula_exact": true,
+            "gas_used": 32768,
+            "manifest_public_gas_budget": 32768
+          },
+          {
+            "backend": "full_scan+oram",
+            "cost_formula": "modeled_static_budget",
+            "cost_model": "uo-modeled-resource-cost-v1",
+            "entrypoint": "deposit(bytes32,uint256)",
+            "formula_exact": true,
+            "gas_used": 12288,
+            "manifest_public_gas_budget": 12288
+          }
+        ],
         "entrypoint": "deposit(bytes32,uint256)",
         "full_scan": {
           "bytes_read": 3288.0,
@@ -844,6 +895,35 @@
       },
       {
         "benchmark": "ConfidentialMixer/withdraw",
+        "cost_formula": [
+          {
+            "backend": "full_scan",
+            "cost_formula": "modeled_static_budget",
+            "cost_model": "uo-modeled-resource-cost-v1",
+            "entrypoint": "withdraw(bytes32,uint256)",
+            "formula_exact": true,
+            "gas_used": 16384,
+            "manifest_public_gas_budget": 16384
+          },
+          {
+            "backend": "full_scan_64",
+            "cost_formula": "modeled_static_budget",
+            "cost_model": "uo-modeled-resource-cost-v1",
+            "entrypoint": "withdraw(bytes32,uint256)",
+            "formula_exact": true,
+            "gas_used": 32768,
+            "manifest_public_gas_budget": 32768
+          },
+          {
+            "backend": "full_scan+oram",
+            "cost_formula": "modeled_static_budget",
+            "cost_model": "uo-modeled-resource-cost-v1",
+            "entrypoint": "withdraw(bytes32,uint256)",
+            "formula_exact": true,
+            "gas_used": 12288,
+            "manifest_public_gas_budget": 12288
+          }
+        ],
         "entrypoint": "withdraw(bytes32,uint256)",
         "full_scan": {
           "bytes_read": 3288.0,
@@ -1047,6 +1127,26 @@
       },
       {
         "benchmark": "ERC20Lite/transferFrom",
+        "cost_formula": [
+          {
+            "backend": "full_scan",
+            "cost_formula": "modeled_static_budget",
+            "cost_model": "uo-modeled-resource-cost-v1",
+            "entrypoint": "transferFrom(address,address,address,uint256)",
+            "formula_exact": true,
+            "gas_used": 24576,
+            "manifest_public_gas_budget": 24576
+          },
+          {
+            "backend": "oram",
+            "cost_formula": "modeled_static_budget",
+            "cost_model": "uo-modeled-resource-cost-v1",
+            "entrypoint": "transferFrom(address,address,address,uint256)",
+            "formula_exact": true,
+            "gas_used": 16384,
+            "manifest_public_gas_budget": 16384
+          }
+        ],
         "entrypoint": "transferFrom(address,address,address,uint256)",
         "full_scan": {
           "bytes_read": 11392.0,
@@ -1204,6 +1304,17 @@
       },
       {
         "benchmark": "RegistryCRUD/clearIfMatch",
+        "cost_formula": [
+          {
+            "backend": "full_scan",
+            "cost_formula": "modeled_static_budget",
+            "cost_model": "uo-modeled-resource-cost-v1",
+            "entrypoint": "clearIfMatch(bytes32,uint256)",
+            "formula_exact": true,
+            "gas_used": 12288,
+            "manifest_public_gas_budget": 12288
+          }
+        ],
         "entrypoint": "clearIfMatch(bytes32,uint256)",
         "full_scan": {
           "bytes_read": 3040.0,
@@ -1277,6 +1388,16 @@
         ]
       }
     ],
+    "cost_formula_exact": true,
+    "cost_model": {
+      "confidential_formula": "modeled_public_gas = 2000 + statements*11 + expressions*7 + commit_ops*29",
+      "excludes_evm_bytecode_backend": true,
+      "excludes_evm_gas_schedule": true,
+      "excludes_stock_evm_gas": true,
+      "id": "uo-modeled-resource-cost-v1",
+      "kind": "modeled-resource-units",
+      "public_runtime_formula": "logical_reads*3 + logical_writes*5 + physical_writes*17"
+    },
     "coverage": {
       "matrix_row_count": 17,
       "metrics": [

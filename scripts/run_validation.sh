@@ -56,6 +56,13 @@ cargo run -q -p mplus-probe --features insecure-eval-raw -- --only leakage-auc "
 # trial count defaults to a fast subset; raise UO_CORRECTNESS_TRIALS for deeper
 # small-domain coverage (cost is ~linear in the trial count).
 cargo run -q -p mplus-probe --features insecure-eval-raw -- --only correctness "${PROBE_ARGS[@]}"
+# End-to-end edge cases (Issue 19), strict default build. The capacity sweep
+# drives a bounded map past the proof-grade ORAM position-map bound (overflow
+# rows recorded explicitly); the abort/rollback study drives confidential calls
+# past a require(...) guard and checks public state rolls back on abort and
+# commits otherwise. Override UO_SWEEP_* for deeper capacity sweeps.
+cargo run -q -p mplus-probe -- --only capacity-sweep "${PROBE_ARGS[@]}"
+cargo run -q -p mplus-probe -- --only abort-rollback "${PROBE_ARGS[@]}"
 # Fail-closed proof-grade acceptance aggregate over the generated reports.
 cargo run -q -p mplus-probe -- --only acceptance-check "${PROBE_ARGS[@]}"
 # Fail-closed Path ORAM claim-consistency check (README/docs/proof/code agree).

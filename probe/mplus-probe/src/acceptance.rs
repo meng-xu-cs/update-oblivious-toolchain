@@ -40,7 +40,7 @@ fn report_mode(report: &str) -> &'static str {
         "tamper_validation" => "expected_negative",
         "overheads" | "correctness" | "leakage_auc" | "mutual_information"
         | "trace_equivalence" | "latency_memory" | "storage_growth" | "capacity_sweep"
-        | "ablation_study" | "engineering_cost" => "evaluation",
+        | "abort_rollback" | "ablation_study" | "engineering_cost" => "evaluation",
         "reviewer_summary"
         | "artifact_configuration"
         | "reproducibility_manifest"
