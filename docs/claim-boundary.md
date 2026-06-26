@@ -159,3 +159,15 @@ This repository does not claim:
   `VersionedSoliditySemanticsBridge` in `SolidityDialectBoundary.lean`
 
 Those would require additional models and proofs, not only more prose.
+
+## Generated Manifest
+
+This document is the source of truth for a generated claim/evaluation artifact
+manifest. `mplus-probe --only claim-status` emits `results/claim_status.json`
+(per-claim id/text/status), `results/claim_status.md` (the rendered status
+table), and `results/claim_artifact_manifest.json` (each claim, assumption,
+non-claim, and TCB component mapped to its source, Lean, runtime/compiler, and
+benchmark/result artifacts plus a validation command). The report fails closed
+and CI rejects the change if any assumption-table row, TCB-table row, or
+non-claim bullet here is missing from the manifest, or if a referenced artifact
+does not exist. `scripts/run_validation.sh` regenerates it.

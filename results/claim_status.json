@@ -1,0 +1,1012 @@
+{
+  "accepted": true,
+  "checks": [
+    {
+      "detail": "doc_anchor \"update-obliviousness theorem\" for paper-update-obliviousness-theorem appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:paper-update-obliviousness-theorem",
+      "ok": true
+    },
+    {
+      "detail": "paper-update-obliviousness-theorem declares an allowed status (Lean-proved)",
+      "name": "status-allowed:paper-update-obliviousness-theorem",
+      "ok": true
+    },
+    {
+      "detail": "doc_anchor \"ProductionContractInstance::call_authorized\" for deployment-acceptance-theorem appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:deployment-acceptance-theorem",
+      "ok": true
+    },
+    {
+      "detail": "deployment-acceptance-theorem declares an allowed status (Lean-proved)",
+      "name": "status-allowed:deployment-acceptance-theorem",
+      "ok": true
+    },
+    {
+      "detail": "doc_anchor \"Exact-UO is claimed for exact backends\" for exact-uo-backends appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:exact-uo-backends",
+      "ok": true
+    },
+    {
+      "detail": "exact-uo-backends declares an allowed status (Lean-proved)",
+      "name": "status-allowed:exact-uo-backends",
+      "ok": true
+    },
+    {
+      "detail": "doc_anchor \"path_oram_local_posmap_v1\" for computational-uo-path-oram-local appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:computational-uo-path-oram-local",
+      "ok": true
+    },
+    {
+      "detail": "computational-uo-path-oram-local declares an allowed status (Lean-proved)",
+      "name": "status-allowed:computational-uo-path-oram-local",
+      "ok": true
+    },
+    {
+      "detail": "doc_anchor \"path_oram_private_posmap_v1\" for computational-uo-path-oram-private appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:computational-uo-path-oram-private",
+      "ok": true
+    },
+    {
+      "detail": "computational-uo-path-oram-private declares an allowed status (Lean-proved)",
+      "name": "status-allowed:computational-uo-path-oram-private",
+      "ok": true
+    },
+    {
+      "detail": "doc_anchor \"admitted-package hash\" for admitted-package-identity-hash appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:admitted-package-identity-hash",
+      "ok": true
+    },
+    {
+      "detail": "admitted-package-identity-hash declares an allowed status (generated-and-checked)",
+      "name": "status-allowed:admitted-package-identity-hash",
+      "ok": true
+    },
+    {
+      "detail": "doc_anchor \"uo-evm-modular256-v1\" for executable-semantics-profile appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:executable-semantics-profile",
+      "ok": true
+    },
+    {
+      "detail": "executable-semantics-profile declares an allowed status (generated-and-checked)",
+      "name": "status-allowed:executable-semantics-profile",
+      "ok": true
+    },
+    {
+      "detail": "doc_anchor \"source-frozen/static-drift evidence\" for source-backed-runtime-boundaries appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:source-backed-runtime-boundaries",
+      "ok": true
+    },
+    {
+      "detail": "source-backed-runtime-boundaries declares an allowed status (source-frozen)",
+      "name": "status-allowed:source-backed-runtime-boundaries",
+      "ok": true
+    },
+    {
+      "detail": "doc_anchor \"uo-solidity-like-dsl-v1\" for dsl-admission-subset appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:dsl-admission-subset",
+      "ok": true
+    },
+    {
+      "detail": "dsl-admission-subset declares an allowed status (empirically-tested)",
+      "name": "status-allowed:dsl-admission-subset",
+      "ok": true
+    },
+    {
+      "detail": "doc_anchor \"Executable insecure raw baselines\" for insecure-evaluation-baselines appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:insecure-evaluation-baselines",
+      "ok": true
+    },
+    {
+      "detail": "insecure-evaluation-baselines declares an allowed status (experimental)",
+      "name": "status-allowed:insecure-evaluation-baselines",
+      "ok": true
+    },
+    {
+      "detail": "doc_anchor \"bucketEncryptionINDCPA\" for assumption-bucket-encryption-indcpa appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:assumption-bucket-encryption-indcpa",
+      "ok": true
+    },
+    {
+      "detail": "assumption-bucket-encryption-indcpa declares an allowed status (trusted)",
+      "name": "status-allowed:assumption-bucket-encryption-indcpa",
+      "ok": true
+    },
+    {
+      "detail": "doc_anchor \"metadataEncryptionINDCPA\" for assumption-metadata-encryption-indcpa appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:assumption-metadata-encryption-indcpa",
+      "ok": true
+    },
+    {
+      "detail": "assumption-metadata-encryption-indcpa declares an allowed status (trusted)",
+      "name": "status-allowed:assumption-metadata-encryption-indcpa",
+      "ok": true
+    },
+    {
+      "detail": "doc_anchor \"stashOverflowBounded\" for assumption-stash-overflow-bounded appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:assumption-stash-overflow-bounded",
+      "ok": true
+    },
+    {
+      "detail": "assumption-stash-overflow-bounded declares an allowed status (trusted)",
+      "name": "status-allowed:assumption-stash-overflow-bounded",
+      "ok": true
+    },
+    {
+      "detail": "doc_anchor \"TEE deployment assumptions\" for assumption-tee-deployment appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:assumption-tee-deployment",
+      "ok": true
+    },
+    {
+      "detail": "assumption-tee-deployment declares an allowed status (trusted)",
+      "name": "status-allowed:assumption-tee-deployment",
+      "ok": true
+    },
+    {
+      "detail": "doc_anchor \"Parser/preprocessing equivalence\" for assumption-parser-preprocessing-equivalence appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:assumption-parser-preprocessing-equivalence",
+      "ok": true
+    },
+    {
+      "detail": "assumption-parser-preprocessing-equivalence declares an allowed status (trusted)",
+      "name": "status-allowed:assumption-parser-preprocessing-equivalence",
+      "ok": true
+    },
+    {
+      "detail": "doc_anchor \"Real Keccak equivalence\" for assumption-real-keccak-equivalence appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:assumption-real-keccak-equivalence",
+      "ok": true
+    },
+    {
+      "detail": "assumption-real-keccak-equivalence declares an allowed status (trusted)",
+      "name": "status-allowed:assumption-real-keccak-equivalence",
+      "ok": true
+    },
+    {
+      "detail": "doc_anchor \"downstream machine-code equivalence\" for nonclaim-machine-code-equivalence appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:nonclaim-machine-code-equivalence",
+      "ok": true
+    },
+    {
+      "detail": "nonclaim-machine-code-equivalence declares an allowed status (non-claim)",
+      "name": "status-allowed:nonclaim-machine-code-equivalence",
+      "ok": true
+    },
+    {
+      "detail": "doc_anchor \"semantics-of-Rust refinement\" for nonclaim-rust-semantics-refinement appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:nonclaim-rust-semantics-refinement",
+      "ok": true
+    },
+    {
+      "detail": "nonclaim-rust-semantics-refinement declares an allowed status (non-claim)",
+      "name": "status-allowed:nonclaim-rust-semantics-refinement",
+      "ok": true
+    },
+    {
+      "detail": "doc_anchor \"raw equality of SGX page identities\" for nonclaim-sgx-page-identities appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:nonclaim-sgx-page-identities",
+      "ok": true
+    },
+    {
+      "detail": "nonclaim-sgx-page-identities declares an allowed status (non-claim)",
+      "name": "status-allowed:nonclaim-sgx-page-identities",
+      "ok": true
+    },
+    {
+      "detail": "doc_anchor \"cache-behavior, page-fault\" for nonclaim-physical-side-channels appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:nonclaim-physical-side-channels",
+      "ok": true
+    },
+    {
+      "detail": "nonclaim-physical-side-channels declares an allowed status (non-claim)",
+      "name": "status-allowed:nonclaim-physical-side-channels",
+      "ok": true
+    },
+    {
+      "detail": "doc_anchor \"value-level equality between the Lean mock hash\" for nonclaim-mock-hash-keccak-value-equality appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:nonclaim-mock-hash-keccak-value-equality",
+      "ok": true
+    },
+    {
+      "detail": "nonclaim-mock-hash-keccak-value-equality declares an allowed status (non-claim)",
+      "name": "status-allowed:nonclaim-mock-hash-keccak-value-equality",
+      "ok": true
+    },
+    {
+      "detail": "doc_anchor \"Solidity 0.8 checked-arithmetic\" for nonclaim-solidity-08-semantics appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:nonclaim-solidity-08-semantics",
+      "ok": true
+    },
+    {
+      "detail": "nonclaim-solidity-08-semantics declares an allowed status (non-claim)",
+      "name": "status-allowed:nonclaim-solidity-08-semantics",
+      "ok": true
+    },
+    {
+      "detail": "doc_anchor \"Lean kernel plus Lean theorem/checker development\" for tcb-lean-kernel appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:tcb-lean-kernel",
+      "ok": true
+    },
+    {
+      "detail": "tcb-lean-kernel declares an allowed status (trusted)",
+      "name": "status-allowed:tcb-lean-kernel",
+      "ok": true
+    },
+    {
+      "detail": "doc_anchor \"Rust runtime kernel plus witness\" for tcb-rust-runtime-kernel appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:tcb-rust-runtime-kernel",
+      "ok": true
+    },
+    {
+      "detail": "tcb-rust-runtime-kernel declares an allowed status (trusted)",
+      "name": "status-allowed:tcb-rust-runtime-kernel",
+      "ok": true
+    },
+    {
+      "detail": "doc_anchor \"Source-backed runtime implementation boundaries\" for tcb-source-backed-boundaries appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:tcb-source-backed-boundaries",
+      "ok": true
+    },
+    {
+      "detail": "tcb-source-backed-boundaries declares an allowed status (trusted)",
+      "name": "status-allowed:tcb-source-backed-boundaries",
+      "ok": true
+    },
+    {
+      "detail": "doc_anchor \"Fixed-capacity Rust buffer helpers\" for tcb-fixed-capacity-buffers appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:tcb-fixed-capacity-buffers",
+      "ok": true
+    },
+    {
+      "detail": "tcb-fixed-capacity-buffers declares an allowed status (trusted)",
+      "name": "status-allowed:tcb-fixed-capacity-buffers",
+      "ok": true
+    },
+    {
+      "detail": "doc_anchor \"Explicit backend/crypto/deployment assumptions\" for tcb-trusted-assumptions appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:tcb-trusted-assumptions",
+      "ok": true
+    },
+    {
+      "detail": "tcb-trusted-assumptions declares an allowed status (trusted)",
+      "name": "status-allowed:tcb-trusted-assumptions",
+      "ok": true
+    },
+    {
+      "detail": "doc_anchor \"Rust code outside the tiny confidential kernel\" for tcb-rust-outside-kernel appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:tcb-rust-outside-kernel",
+      "ok": true
+    },
+    {
+      "detail": "tcb-rust-outside-kernel declares an allowed status (trusted)",
+      "name": "status-allowed:tcb-rust-outside-kernel",
+      "ok": true
+    },
+    {
+      "detail": "doc_anchor \"uo-solc\" for tcb-uo-solc-front-end appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:tcb-uo-solc-front-end",
+      "ok": true
+    },
+    {
+      "detail": "tcb-uo-solc-front-end declares an allowed status (trusted)",
+      "name": "status-allowed:tcb-uo-solc-front-end",
+      "ok": true
+    },
+    {
+      "detail": "doc_anchor \"uo-check\" for tcb-uo-check appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:tcb-uo-check",
+      "ok": true
+    },
+    {
+      "detail": "tcb-uo-check declares an allowed status (trusted)",
+      "name": "status-allowed:tcb-uo-check",
+      "ok": true
+    },
+    {
+      "detail": "doc_anchor \"mplus-probe\" for tcb-mplus-probe appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:tcb-mplus-probe",
+      "ok": true
+    },
+    {
+      "detail": "tcb-mplus-probe declares an allowed status (trusted)",
+      "name": "status-allowed:tcb-mplus-probe",
+      "ok": true
+    },
+    {
+      "detail": "assumption-table row \"bucketEncryptionINDCPA\" is covered by the manifest",
+      "name": "assumption-covered:bucketEncryptionINDCPA",
+      "ok": true
+    },
+    {
+      "detail": "assumption-table row \"metadataEncryptionINDCPA\" is covered by the manifest",
+      "name": "assumption-covered:metadataEncryptionINDCPA",
+      "ok": true
+    },
+    {
+      "detail": "assumption-table row \"stashOverflowBounded\" is covered by the manifest",
+      "name": "assumption-covered:stashOverflowBounded",
+      "ok": true
+    },
+    {
+      "detail": "assumption-table row \"TEE deployment assumptions\" is covered by the manifest",
+      "name": "assumption-covered:TEE deployment assumptions",
+      "ok": true
+    },
+    {
+      "detail": "assumption-table row \"Parser/preprocessing equivalence\" is covered by the manifest",
+      "name": "assumption-covered:Parser/preprocessing equivalence",
+      "ok": true
+    },
+    {
+      "detail": "assumption-table row \"Real Keccak equivalence\" is covered by the manifest",
+      "name": "assumption-covered:Real Keccak equivalence",
+      "ok": true
+    },
+    {
+      "detail": "TCB-table row \"Lean kernel plus Lean theorem/checker development\" is covered by the manifest",
+      "name": "tcb-covered:Lean kernel plus Lean theorem/checker development",
+      "ok": true
+    },
+    {
+      "detail": "TCB-table row \"Explicit backend/crypto/deployment assumptions\" is covered by the manifest",
+      "name": "tcb-covered:Explicit backend/crypto/deployment assumptions",
+      "ok": true
+    },
+    {
+      "detail": "TCB-table row \"Rust runtime kernel plus witness/certificate/bundle extraction and serialization\" is covered by the manifest",
+      "name": "tcb-covered:Rust runtime kernel plus witness/certificate/bundle extraction and serialization",
+      "ok": true
+    },
+    {
+      "detail": "TCB-table row \"Source-backed runtime implementation boundaries\" is covered by the manifest",
+      "name": "tcb-covered:Source-backed runtime implementation boundaries",
+      "ok": true
+    },
+    {
+      "detail": "TCB-table row \"Rust code outside the tiny confidential kernel\" is covered by the manifest",
+      "name": "tcb-covered:Rust code outside the tiny confidential kernel",
+      "ok": true
+    },
+    {
+      "detail": "TCB-table row \"Fixed-capacity Rust buffer helpers\" is covered by the manifest",
+      "name": "tcb-covered:Fixed-capacity Rust buffer helpers",
+      "ok": true
+    },
+    {
+      "detail": "TCB-table row \"uo-solc\" is covered by the manifest",
+      "name": "tcb-covered:uo-solc",
+      "ok": true
+    },
+    {
+      "detail": "TCB-table row \"uo-check\" is covered by the manifest",
+      "name": "tcb-covered:uo-check",
+      "ok": true
+    },
+    {
+      "detail": "TCB-table row \"mplus-probe\" is covered by the manifest",
+      "name": "tcb-covered:mplus-probe",
+      "ok": true
+    },
+    {
+      "detail": "non-claim \"downstream machine-code equivalence below the checked runtime boundary\" is covered by the manifest",
+      "name": "nonclaim-covered:downstream machine-code equivalence belo",
+      "ok": true
+    },
+    {
+      "detail": "non-claim \"a complete semantics-of-Rust refinement for every residual implementation\" is covered by the manifest",
+      "name": "nonclaim-covered:a complete semantics-of-Rust refinement ",
+      "ok": true
+    },
+    {
+      "detail": "non-claim \"raw equality of SGX page identities or full micro-event sequences\" is covered by the manifest",
+      "name": "nonclaim-covered:raw equality of SGX page identities or f",
+      "ok": true
+    },
+    {
+      "detail": "non-claim \"CPU-time, cache-behavior, page-fault, allocator, scheduler, power,\" is covered by the manifest",
+      "name": "nonclaim-covered:CPU-time, cache-behavior, page-fault, al",
+      "ok": true
+    },
+    {
+      "detail": "non-claim \"value-level equality between the Lean mock hash and real runtime Keccak\" is covered by the manifest",
+      "name": "nonclaim-covered:value-level equality between the Lean mo",
+      "ok": true
+    },
+    {
+      "detail": "non-claim \"Solidity 0.8 checked-arithmetic, division/modulo-by-zero, ABI, revert, or\" is covered by the manifest",
+      "name": "nonclaim-covered:Solidity 0.8 checked-arithmetic, divisio",
+      "ok": true
+    },
+    {
+      "detail": "10 manifest entries in category claim",
+      "name": "category-present:claim",
+      "ok": true
+    },
+    {
+      "detail": "6 manifest entries in category assumption",
+      "name": "category-present:assumption",
+      "ok": true
+    },
+    {
+      "detail": "6 manifest entries in category non_claim",
+      "name": "category-present:non_claim",
+      "ok": true
+    },
+    {
+      "detail": "9 manifest entries in category tcb",
+      "name": "category-present:tcb",
+      "ok": true
+    },
+    {
+      "detail": "artifact crates/uo-core/src/lib.rs referenced by paper-update-obliviousness-theorem exists",
+      "name": "file-exists:paper-update-obliviousness-theorem:crates/uo-core/src/lib.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact proof/lean/UOToolchain/ProofGradeRoot.lean referenced by paper-update-obliviousness-theorem exists",
+      "name": "file-exists:paper-update-obliviousness-theorem:proof/lean/UOToolchain/ProofGradeRoot.lean",
+      "ok": true
+    },
+    {
+      "detail": "artifact proof/lean/UOToolchain/PaperMainTheorem.lean referenced by paper-update-obliviousness-theorem exists",
+      "name": "file-exists:paper-update-obliviousness-theorem:proof/lean/UOToolchain/PaperMainTheorem.lean",
+      "ok": true
+    },
+    {
+      "detail": "artifact runtime/uo-evm/src/lib.rs referenced by paper-update-obliviousness-theorem exists",
+      "name": "file-exists:paper-update-obliviousness-theorem:runtime/uo-evm/src/lib.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact crates/uo-core/src/lib.rs referenced by deployment-acceptance-theorem exists",
+      "name": "file-exists:deployment-acceptance-theorem:crates/uo-core/src/lib.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact proof/lean/UOToolchain/DeploymentAcceptance.lean referenced by deployment-acceptance-theorem exists",
+      "name": "file-exists:deployment-acceptance-theorem:proof/lean/UOToolchain/DeploymentAcceptance.lean",
+      "ok": true
+    },
+    {
+      "detail": "artifact runtime/uo-evm/src/lib.rs referenced by deployment-acceptance-theorem exists",
+      "name": "file-exists:deployment-acceptance-theorem:runtime/uo-evm/src/lib.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact crates/uo-core/src/trace.rs referenced by exact-uo-backends exists",
+      "name": "file-exists:exact-uo-backends:crates/uo-core/src/trace.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact proof/lean/UOToolchain/ProofGradeRoot.lean referenced by exact-uo-backends exists",
+      "name": "file-exists:exact-uo-backends:proof/lean/UOToolchain/ProofGradeRoot.lean",
+      "ok": true
+    },
+    {
+      "detail": "artifact runtime/uo-evm/src/objects.rs referenced by exact-uo-backends exists",
+      "name": "file-exists:exact-uo-backends:runtime/uo-evm/src/objects.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact crates/uo-core/src/trace.rs referenced by computational-uo-path-oram-local exists",
+      "name": "file-exists:computational-uo-path-oram-local:crates/uo-core/src/trace.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact proof/lean/UOToolchain/PathOramLocalPosmapV1.lean referenced by computational-uo-path-oram-local exists",
+      "name": "file-exists:computational-uo-path-oram-local:proof/lean/UOToolchain/PathOramLocalPosmapV1.lean",
+      "ok": true
+    },
+    {
+      "detail": "artifact runtime/uo-evm/src/controller.rs referenced by computational-uo-path-oram-local exists",
+      "name": "file-exists:computational-uo-path-oram-local:runtime/uo-evm/src/controller.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact crates/uo-core/src/trace.rs referenced by computational-uo-path-oram-private exists",
+      "name": "file-exists:computational-uo-path-oram-private:crates/uo-core/src/trace.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact proof/lean/UOToolchain/PathOramPrivatePosmapV1.lean referenced by computational-uo-path-oram-private exists",
+      "name": "file-exists:computational-uo-path-oram-private:proof/lean/UOToolchain/PathOramPrivatePosmapV1.lean",
+      "ok": true
+    },
+    {
+      "detail": "artifact runtime/uo-evm/src/controller.rs referenced by computational-uo-path-oram-private exists",
+      "name": "file-exists:computational-uo-path-oram-private:runtime/uo-evm/src/controller.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact crates/uo-core/src/artifact.rs referenced by admitted-package-identity-hash exists",
+      "name": "file-exists:admitted-package-identity-hash:crates/uo-core/src/artifact.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact proof/lean/UOToolchain/TranslationValidationJson.lean referenced by admitted-package-identity-hash exists",
+      "name": "file-exists:admitted-package-identity-hash:proof/lean/UOToolchain/TranslationValidationJson.lean",
+      "ok": true
+    },
+    {
+      "detail": "artifact compiler/uo-solc/src/lib.rs referenced by admitted-package-identity-hash exists",
+      "name": "file-exists:admitted-package-identity-hash:compiler/uo-solc/src/lib.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact crates/uo-core/src/artifact.rs referenced by executable-semantics-profile exists",
+      "name": "file-exists:executable-semantics-profile:crates/uo-core/src/artifact.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact proof/lean/UOToolchain/SolidityDialectBoundary.lean referenced by executable-semantics-profile exists",
+      "name": "file-exists:executable-semantics-profile:proof/lean/UOToolchain/SolidityDialectBoundary.lean",
+      "ok": true
+    },
+    {
+      "detail": "artifact crates/uo-core/src/translation_validation.rs referenced by executable-semantics-profile exists",
+      "name": "file-exists:executable-semantics-profile:crates/uo-core/src/translation_validation.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact crates/uo-core/src/runtime_boundary_schema.rs referenced by source-backed-runtime-boundaries exists",
+      "name": "file-exists:source-backed-runtime-boundaries:crates/uo-core/src/runtime_boundary_schema.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact proof/lean/UOToolchain/ProofGradeRoot.lean referenced by source-backed-runtime-boundaries exists",
+      "name": "file-exists:source-backed-runtime-boundaries:proof/lean/UOToolchain/ProofGradeRoot.lean",
+      "ok": true
+    },
+    {
+      "detail": "artifact runtime/uo-evm/src/lib.rs referenced by source-backed-runtime-boundaries exists",
+      "name": "file-exists:source-backed-runtime-boundaries:runtime/uo-evm/src/lib.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact docs/supported-subset.md referenced by dsl-admission-subset exists",
+      "name": "file-exists:dsl-admission-subset:docs/supported-subset.md",
+      "ok": true
+    },
+    {
+      "detail": "artifact compiler/uo-solc/src/lib.rs referenced by dsl-admission-subset exists",
+      "name": "file-exists:dsl-admission-subset:compiler/uo-solc/src/lib.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact probe/mplus-probe/src/lib.rs referenced by insecure-evaluation-baselines exists",
+      "name": "file-exists:insecure-evaluation-baselines:probe/mplus-probe/src/lib.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact runtime/uo-evm/src/lib.rs referenced by insecure-evaluation-baselines exists",
+      "name": "file-exists:insecure-evaluation-baselines:runtime/uo-evm/src/lib.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact runtime/uo-store/src/lib.rs referenced by assumption-bucket-encryption-indcpa exists",
+      "name": "file-exists:assumption-bucket-encryption-indcpa:runtime/uo-store/src/lib.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact proof/lean/UOToolchain/PathOramLocalPosmapV1.lean referenced by assumption-bucket-encryption-indcpa exists",
+      "name": "file-exists:assumption-bucket-encryption-indcpa:proof/lean/UOToolchain/PathOramLocalPosmapV1.lean",
+      "ok": true
+    },
+    {
+      "detail": "artifact runtime/uo-store/src/lib.rs referenced by assumption-bucket-encryption-indcpa exists",
+      "name": "file-exists:assumption-bucket-encryption-indcpa:runtime/uo-store/src/lib.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact runtime/uo-store/src/lib.rs referenced by assumption-metadata-encryption-indcpa exists",
+      "name": "file-exists:assumption-metadata-encryption-indcpa:runtime/uo-store/src/lib.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact proof/lean/UOToolchain/PathOramLocalPosmapV1.lean referenced by assumption-metadata-encryption-indcpa exists",
+      "name": "file-exists:assumption-metadata-encryption-indcpa:proof/lean/UOToolchain/PathOramLocalPosmapV1.lean",
+      "ok": true
+    },
+    {
+      "detail": "artifact runtime/uo-store/src/lib.rs referenced by assumption-metadata-encryption-indcpa exists",
+      "name": "file-exists:assumption-metadata-encryption-indcpa:runtime/uo-store/src/lib.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact runtime/uo-evm/src/controller.rs referenced by assumption-stash-overflow-bounded exists",
+      "name": "file-exists:assumption-stash-overflow-bounded:runtime/uo-evm/src/controller.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact proof/lean/UOToolchain/PathOramLocalPosmapV1.lean referenced by assumption-stash-overflow-bounded exists",
+      "name": "file-exists:assumption-stash-overflow-bounded:proof/lean/UOToolchain/PathOramLocalPosmapV1.lean",
+      "ok": true
+    },
+    {
+      "detail": "artifact runtime/uo-evm/src/controller.rs referenced by assumption-stash-overflow-bounded exists",
+      "name": "file-exists:assumption-stash-overflow-bounded:runtime/uo-evm/src/controller.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact crates/uo-core/src/lib.rs referenced by assumption-tee-deployment exists",
+      "name": "file-exists:assumption-tee-deployment:crates/uo-core/src/lib.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact proof/lean/UOToolchain/DeploymentAcceptance.lean referenced by assumption-tee-deployment exists",
+      "name": "file-exists:assumption-tee-deployment:proof/lean/UOToolchain/DeploymentAcceptance.lean",
+      "ok": true
+    },
+    {
+      "detail": "artifact runtime/uo-evm/src/lib.rs referenced by assumption-tee-deployment exists",
+      "name": "file-exists:assumption-tee-deployment:runtime/uo-evm/src/lib.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact compiler/uo-solc/src/lib.rs referenced by assumption-parser-preprocessing-equivalence exists",
+      "name": "file-exists:assumption-parser-preprocessing-equivalence:compiler/uo-solc/src/lib.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact compiler/uo-solc/src/lib.rs referenced by assumption-parser-preprocessing-equivalence exists",
+      "name": "file-exists:assumption-parser-preprocessing-equivalence:compiler/uo-solc/src/lib.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact runtime/uo-precompiles/src/lib.rs referenced by assumption-real-keccak-equivalence exists",
+      "name": "file-exists:assumption-real-keccak-equivalence:runtime/uo-precompiles/src/lib.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact runtime/uo-precompiles/src/lib.rs referenced by assumption-real-keccak-equivalence exists",
+      "name": "file-exists:assumption-real-keccak-equivalence:runtime/uo-precompiles/src/lib.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact docs/claim-boundary.md referenced by nonclaim-machine-code-equivalence exists",
+      "name": "file-exists:nonclaim-machine-code-equivalence:docs/claim-boundary.md",
+      "ok": true
+    },
+    {
+      "detail": "artifact docs/claim-boundary.md referenced by nonclaim-rust-semantics-refinement exists",
+      "name": "file-exists:nonclaim-rust-semantics-refinement:docs/claim-boundary.md",
+      "ok": true
+    },
+    {
+      "detail": "artifact docs/claim-boundary.md referenced by nonclaim-sgx-page-identities exists",
+      "name": "file-exists:nonclaim-sgx-page-identities:docs/claim-boundary.md",
+      "ok": true
+    },
+    {
+      "detail": "artifact docs/claim-boundary.md referenced by nonclaim-physical-side-channels exists",
+      "name": "file-exists:nonclaim-physical-side-channels:docs/claim-boundary.md",
+      "ok": true
+    },
+    {
+      "detail": "artifact docs/claim-boundary.md referenced by nonclaim-mock-hash-keccak-value-equality exists",
+      "name": "file-exists:nonclaim-mock-hash-keccak-value-equality:docs/claim-boundary.md",
+      "ok": true
+    },
+    {
+      "detail": "artifact docs/supported-subset.md referenced by nonclaim-solidity-08-semantics exists",
+      "name": "file-exists:nonclaim-solidity-08-semantics:docs/supported-subset.md",
+      "ok": true
+    },
+    {
+      "detail": "artifact proof/lean/UOToolchain/SolidityDialectBoundary.lean referenced by nonclaim-solidity-08-semantics exists",
+      "name": "file-exists:nonclaim-solidity-08-semantics:proof/lean/UOToolchain/SolidityDialectBoundary.lean",
+      "ok": true
+    },
+    {
+      "detail": "artifact proof/lean/UOToolchain/ProofGradeRoot.lean referenced by tcb-lean-kernel exists",
+      "name": "file-exists:tcb-lean-kernel:proof/lean/UOToolchain/ProofGradeRoot.lean",
+      "ok": true
+    },
+    {
+      "detail": "artifact crates/uo-core/src/confidential_kernel.rs referenced by tcb-rust-runtime-kernel exists",
+      "name": "file-exists:tcb-rust-runtime-kernel:crates/uo-core/src/confidential_kernel.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact runtime/uo-kernel-runtime/src/lib.rs referenced by tcb-rust-runtime-kernel exists",
+      "name": "file-exists:tcb-rust-runtime-kernel:runtime/uo-kernel-runtime/src/lib.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact crates/uo-core/src/runtime_boundary_schema.rs referenced by tcb-source-backed-boundaries exists",
+      "name": "file-exists:tcb-source-backed-boundaries:crates/uo-core/src/runtime_boundary_schema.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact runtime/uo-evm/src/lib.rs referenced by tcb-source-backed-boundaries exists",
+      "name": "file-exists:tcb-source-backed-boundaries:runtime/uo-evm/src/lib.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact crates/uo-core/src/fixed_buffer.rs referenced by tcb-fixed-capacity-buffers exists",
+      "name": "file-exists:tcb-fixed-capacity-buffers:crates/uo-core/src/fixed_buffer.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact crates/uo-core/src/fixed_buffer.rs referenced by tcb-fixed-capacity-buffers exists",
+      "name": "file-exists:tcb-fixed-capacity-buffers:crates/uo-core/src/fixed_buffer.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact proof/lean/UOToolchain/PathOramLocalPosmapV1.lean referenced by tcb-trusted-assumptions exists",
+      "name": "file-exists:tcb-trusted-assumptions:proof/lean/UOToolchain/PathOramLocalPosmapV1.lean",
+      "ok": true
+    },
+    {
+      "detail": "artifact crates/uo-core/src/lib.rs referenced by tcb-rust-outside-kernel exists",
+      "name": "file-exists:tcb-rust-outside-kernel:crates/uo-core/src/lib.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact runtime/uo-evm/src/lib.rs referenced by tcb-rust-outside-kernel exists",
+      "name": "file-exists:tcb-rust-outside-kernel:runtime/uo-evm/src/lib.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact compiler/uo-solc/src/lib.rs referenced by tcb-uo-solc-front-end exists",
+      "name": "file-exists:tcb-uo-solc-front-end:compiler/uo-solc/src/lib.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact compiler/uo-solc/src/lib.rs referenced by tcb-uo-solc-front-end exists",
+      "name": "file-exists:tcb-uo-solc-front-end:compiler/uo-solc/src/lib.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact checker/uo-check/src/lib.rs referenced by tcb-uo-check exists",
+      "name": "file-exists:tcb-uo-check:checker/uo-check/src/lib.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact checker/uo-check/src/lib.rs referenced by tcb-uo-check exists",
+      "name": "file-exists:tcb-uo-check:checker/uo-check/src/lib.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact probe/mplus-probe/src/lib.rs referenced by tcb-mplus-probe exists",
+      "name": "file-exists:tcb-mplus-probe:probe/mplus-probe/src/lib.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact probe/mplus-probe/src/lib.rs referenced by tcb-mplus-probe exists",
+      "name": "file-exists:tcb-mplus-probe:probe/mplus-probe/src/lib.rs",
+      "ok": true
+    }
+  ],
+  "claim_count": 31,
+  "claims": [
+    {
+      "category": "claim",
+      "id": "paper-update-obliviousness-theorem",
+      "status": "Lean-proved",
+      "text": "For every admitted package the execution's normalized hostile-host observer satisfies the paper update-obliviousness theorem against the stated observer and the artifact-declared declassification policy.",
+      "validation_command": "lake build UOToolchain.ProofGradeRoot"
+    },
+    {
+      "category": "claim",
+      "id": "deployment-acceptance-theorem",
+      "status": "Lean-proved",
+      "text": "A production runtime result is accepted only under a current admitted-package identity, runtime proof-bundle hash, deployment policy hash match, return-channel session match, and freshness evidence.",
+      "validation_command": "cargo test -p uo-evm"
+    },
+    {
+      "category": "claim",
+      "id": "exact-uo-backends",
+      "status": "Lean-proved",
+      "text": "Exact-UO is claimed for the exact backends on the instrumented abstract/runtime model: UOCell, UOArray, and full-scan UOMap.",
+      "validation_command": "cargo run -q -p mplus-probe -- --only trace-equivalence --out-dir results"
+    },
+    {
+      "category": "claim",
+      "id": "computational-uo-path-oram-local",
+      "status": "Lean-proved",
+      "text": "The bounded local-position-map Path ORAM route path_oram_local_posmap_v1 (capacity 128) is a theorem-facing computational-UO path in the proof-grade import closure.",
+      "validation_command": "cargo run -q -p mplus-probe -- --only claim-consistency --out-dir results"
+    },
+    {
+      "category": "claim",
+      "id": "computational-uo-path-oram-private",
+      "status": "Lean-proved",
+      "text": "The scalable private-position-map Path ORAM route path_oram_private_posmap_v1 is a theorem-facing computational-UO path carrying compact symbolic position-map evidence.",
+      "validation_command": "cargo run -q -p mplus-probe -- --only claim-consistency --out-dir results"
+    },
+    {
+      "category": "claim",
+      "id": "admitted-package-identity-hash",
+      "status": "generated-and-checked",
+      "text": "The artifact-level admitted-package hash is a canonical SHA-256 binding over source-language tag, semantics-profile tag, source bytes, sidecar metadata, compilation mode, compiler version, toolchain digest, and package schema tag.",
+      "validation_command": "cargo test -p uo-core"
+    },
+    {
+      "category": "claim",
+      "id": "executable-semantics-profile",
+      "status": "generated-and-checked",
+      "text": "Every artifact declares the executable-semantics profile tag uo-evm-modular256-v1, bound into the admitted-package hash, pinning the executable divergences from Solidity 0.8; the proof-grade checker rejects an unknown or divergent profile.",
+      "validation_command": "cargo test -p uo-core"
+    },
+    {
+      "category": "claim",
+      "id": "source-backed-runtime-boundaries",
+      "status": "source-frozen",
+      "text": "The source-backed runtime implementation boundaries are source-frozen/static-drift evidence, not a full semantics-of-Rust refinement; proof-critical obligations may not rest solely on a source regression.",
+      "validation_command": "cargo run -q -p mplus-probe -- --only runtime-boundary-validation --out-dir results"
+    },
+    {
+      "category": "claim",
+      "id": "dsl-admission-subset",
+      "status": "empirically-tested",
+      "text": "uo-solc admits the uo-solidity-like-dsl-v1 subset and rejects every unsupported feature with a diagnostic that names it; admission is empirically exercised, not a semantic proof.",
+      "validation_command": "cargo run -q -p mplus-probe -- --only admission-matrix --out-dir results"
+    },
+    {
+      "category": "claim",
+      "id": "insecure-evaluation-baselines",
+      "status": "experimental",
+      "text": "Executable insecure raw baselines (insecure-eval-raw) run confidential work on raw backends to measure overhead and leakage; they are evaluation-only and never admitted by the proof-grade or deployment paths.",
+      "validation_command": "cargo run -q -p mplus-probe --features insecure-eval-raw -- --only overheads --out-dir results"
+    },
+    {
+      "category": "assumption",
+      "id": "assumption-bucket-encryption-indcpa",
+      "status": "trusted",
+      "text": "bucketEncryptionINDCPA: hides Path ORAM bucket/path ciphertext contents; explicit Lean assumption grounded in the runtime ChaCha20Poly1305 sealed-record boundary.",
+      "validation_command": "scripts/lean_assumption_budget.sh"
+    },
+    {
+      "category": "assumption",
+      "id": "assumption-metadata-encryption-indcpa",
+      "status": "trusted",
+      "text": "metadataEncryptionINDCPA: hides encrypted position-map metadata pages; explicit Lean assumption paired with the same sealed-record crypto route.",
+      "validation_command": "scripts/lean_assumption_budget.sh"
+    },
+    {
+      "category": "assumption",
+      "id": "assumption-stash-overflow-bounded",
+      "status": "trusted",
+      "text": "stashOverflowBounded: bounds Path ORAM stash failure for deployed parameters; explicit Lean assumption paired with the JACM stash theorem at Z = 5 and pinned parameters.",
+      "validation_command": "scripts/lean_assumption_budget.sh"
+    },
+    {
+      "category": "assumption",
+      "id": "assumption-tee-deployment",
+      "status": "trusted",
+      "text": "TEE deployment assumptions: enclave memory confidentiality/integrity, attestation authenticity, rollback resistance, freshness, crash recovery, and patch-level trust; explicit Lean bundle SgxDeploymentAssumptions.",
+      "validation_command": "scripts/lean_assumption_budget.sh"
+    },
+    {
+      "category": "assumption",
+      "id": "assumption-parser-preprocessing-equivalence",
+      "status": "trusted",
+      "text": "Parser/preprocessing equivalence: connects raw Solidity-like source text to the post-resolution AST consumed by Lean; still a trusted front-end surface.",
+      "validation_command": "scripts/lean_assumption_budget.sh"
+    },
+    {
+      "category": "assumption",
+      "id": "assumption-real-keccak-equivalence",
+      "status": "trusted",
+      "text": "Real Keccak equivalence: connects runtime tiny_keccak Keccak::v256() to the Lean mock-hash abstraction; not yet proved, Lean preservation uses the shared abstraction.",
+      "validation_command": "scripts/lean_assumption_budget.sh"
+    },
+    {
+      "category": "non_claim",
+      "id": "nonclaim-machine-code-equivalence",
+      "status": "non-claim",
+      "text": "Not claimed: downstream machine-code equivalence below the checked runtime boundary. Would require additional models and proofs.",
+      "validation_command": "cargo run -q -p mplus-probe -- --only claim-status --out-dir results"
+    },
+    {
+      "category": "non_claim",
+      "id": "nonclaim-rust-semantics-refinement",
+      "status": "non-claim",
+      "text": "Not claimed: a complete semantics-of-Rust refinement for every residual implementation detail.",
+      "validation_command": "cargo run -q -p mplus-probe -- --only claim-status --out-dir results"
+    },
+    {
+      "category": "non_claim",
+      "id": "nonclaim-sgx-page-identities",
+      "status": "non-claim",
+      "text": "Not claimed: raw equality of SGX page identities or full micro-event sequences.",
+      "validation_command": "cargo run -q -p mplus-probe -- --only claim-status --out-dir results"
+    },
+    {
+      "category": "non_claim",
+      "id": "nonclaim-physical-side-channels",
+      "status": "non-claim",
+      "text": "Not claimed: CPU-time, cache-behavior, page-fault, allocator, scheduler, power, electromagnetic, or wall-clock obliviousness.",
+      "validation_command": "cargo run -q -p mplus-probe -- --only claim-status --out-dir results"
+    },
+    {
+      "category": "non_claim",
+      "id": "nonclaim-mock-hash-keccak-value-equality",
+      "status": "non-claim",
+      "text": "Not claimed: value-level equality between the Lean mock hash and real runtime Keccak outputs.",
+      "validation_command": "cargo run -q -p mplus-probe -- --only claim-status --out-dir results"
+    },
+    {
+      "category": "non_claim",
+      "id": "nonclaim-solidity-08-semantics",
+      "status": "non-claim",
+      "text": "Not claimed: Solidity 0.8 checked-arithmetic, division/modulo-by-zero, ABI, revert, or context-variable semantics beyond the admitted public-environment fields.",
+      "validation_command": "cargo run -q -p mplus-probe -- --only claim-status --out-dir results"
+    },
+    {
+      "category": "tcb",
+      "id": "tcb-lean-kernel",
+      "status": "trusted",
+      "text": "Lean kernel plus Lean theorem/checker development: trusted proof checker and theorem body.",
+      "validation_command": "lake build UOToolchain.ProofGradeRoot"
+    },
+    {
+      "category": "tcb",
+      "id": "tcb-rust-runtime-kernel",
+      "status": "trusted",
+      "text": "Rust runtime kernel plus witness/certificate/bundle extraction and serialization: trusted implementation-side extraction surface.",
+      "validation_command": "cargo run -q -p mplus-probe -- --only kernel-validation --out-dir results"
+    },
+    {
+      "category": "tcb",
+      "id": "tcb-source-backed-boundaries",
+      "status": "trusted",
+      "text": "Source-backed runtime implementation boundaries: source-frozen/static-drift evidence classified by evidence kind in runtime_boundary_validation.json.",
+      "validation_command": "cargo run -q -p mplus-probe -- --only runtime-boundary-validation --out-dir results"
+    },
+    {
+      "category": "tcb",
+      "id": "tcb-fixed-capacity-buffers",
+      "status": "trusted",
+      "text": "Fixed-capacity Rust buffer helpers: safe Vec-backed wrappers; no production unsafe or MaybeUninit surface remains in fixed_buffer.",
+      "validation_command": "cargo test -p uo-core"
+    },
+    {
+      "category": "tcb",
+      "id": "tcb-trusted-assumptions",
+      "status": "trusted",
+      "text": "Explicit backend/crypto/deployment assumptions: trusted assumptions enumerated above and grounded by the Lean assumption budget.",
+      "validation_command": "scripts/lean_assumption_budget.sh"
+    },
+    {
+      "category": "tcb",
+      "id": "tcb-rust-outside-kernel",
+      "status": "trusted",
+      "text": "Rust code outside the tiny confidential kernel: not part of the confidential-work TCB when pinned to public-only or generated-helper routes.",
+      "validation_command": "cargo run -q -p mplus-probe -- --only runtime-boundary-validation --out-dir results"
+    },
+    {
+      "category": "tcb",
+      "id": "tcb-uo-solc-front-end",
+      "status": "trusted",
+      "text": "uo-solc: not trusted as a proof oracle for accepted artifacts, but its parser/preprocessing front end remains trusted.",
+      "validation_command": "cargo test -p uo-solc"
+    },
+    {
+      "category": "tcb",
+      "id": "tcb-uo-check",
+      "status": "trusted",
+      "text": "uo-check: diagnostics/debug wrapper, outside the proof-grade TCB.",
+      "validation_command": "cargo test -p uo-check"
+    },
+    {
+      "category": "tcb",
+      "id": "tcb-mplus-probe",
+      "status": "trusted",
+      "text": "mplus-probe: orchestration and reporting, outside the proof-grade TCB.",
+      "validation_command": "cargo run -q -p mplus-probe -- --only acceptance-check --out-dir results"
+    }
+  ],
+  "failing_check_count": 0,
+  "schema": "uo.claim_status.v1",
+  "source_of_truth": "docs/claim-boundary.md",
+  "status_counts": {
+    "Lean-proved": 5,
+    "empirically-tested": 1,
+    "experimental": 1,
+    "generated-and-checked": 2,
+    "non-claim": 6,
+    "source-frozen": 1,
+    "trusted": 15
+  }
+}

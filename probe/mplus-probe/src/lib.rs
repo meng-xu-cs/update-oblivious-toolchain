@@ -49,6 +49,12 @@ pub use acceptance::{
 mod claim_consistency;
 pub use claim_consistency::{run_claim_consistency_report, CLAIM_CONSISTENCY_SCHEMA};
 
+mod claim_manifest;
+pub use claim_manifest::{
+    claim_artifact_manifest_json, claim_status_markdown, run_claim_status_report,
+    CLAIM_MANIFEST_SCHEMA, CLAIM_STATUS_SCHEMA,
+};
+
 const PROBE_DEPLOY_SEED: u64 = 0x5052_4f42_455f_0001;
 
 #[derive(Clone)]

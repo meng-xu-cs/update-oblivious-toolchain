@@ -38,11 +38,20 @@ const ALL_CLASSES: &[&str] = &[
 fn report_mode(report: &str) -> &'static str {
     match report {
         "tamper_validation" => "expected_negative",
-        "overheads" | "correctness" | "leakage_auc" | "mutual_information"
-        | "trace_equivalence" | "latency_memory" | "storage_growth" | "capacity_sweep"
-        | "abort_rollback" | "admission_matrix" | "ablation_study" | "engineering_cost" => {
-            "evaluation"
-        }
+        "overheads"
+        | "correctness"
+        | "leakage_auc"
+        | "mutual_information"
+        | "trace_equivalence"
+        | "latency_memory"
+        | "storage_growth"
+        | "capacity_sweep"
+        | "abort_rollback"
+        | "admission_matrix"
+        | "claim_status"
+        | "claim_artifact_manifest"
+        | "ablation_study"
+        | "engineering_cost" => "evaluation",
         "reviewer_summary"
         | "artifact_configuration"
         | "reproducibility_manifest"

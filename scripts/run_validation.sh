@@ -71,5 +71,9 @@ cargo run -q -p mplus-probe -- --only admission-matrix "${PROBE_ARGS[@]}"
 cargo run -q -p mplus-probe -- --only acceptance-check "${PROBE_ARGS[@]}"
 # Fail-closed Path ORAM claim-consistency check (README/docs/proof/code agree).
 cargo run -q -p mplus-probe -- --only claim-consistency "${PROBE_ARGS[@]}"
+# Generated claim/evaluation artifact manifests (Issue 21). Fails closed if
+# docs/claim-boundary.md names a claim/assumption/non-claim/TCB row that the
+# manifest does not carry, or if a referenced artifact is missing.
+cargo run -q -p mplus-probe -- --only claim-status "${PROBE_ARGS[@]}"
 ./scripts/rebuild_review_validation_false_paths.sh --write
 ./scripts/rebuild_review_validation_false_paths.sh --check

@@ -105,6 +105,7 @@ enum ReportKind {
     AcceptanceCheck,
     BridgeVerdict,
     ClaimConsistency,
+    ClaimStatus,
 }
 
 #[derive(Debug, Parser)]
@@ -972,6 +973,37 @@ fn main() -> Result<()> {
             if report["accepted"].as_bool() != Some(true) {
                 anyhow::bail!(
                     "claim-consistency check failed; see {}/claim_consistency.json",
+                    cli.out_dir
+                );
+            }
+        }
+        Some(ReportKind::ClaimStatus) => {
+            // Generated claim/evaluation artifact manifests (Issue 21). Emits the
+            // status summary, the full artifact map, and the markdown rendering,
+            // and fails closed if the doc-coverage checks do not pass.
+            let status = mplus_probe::run_claim_status_report()?;
+            let manifest = mplus_probe::claim_artifact_manifest_json()?;
+            let markdown = mplus_probe::claim_status_markdown();
+            fs::create_dir_all(&cli.out_dir)?;
+            fs::write(
+                Path::new(&cli.out_dir).join("claim_status.json"),
+                serde_json::to_vec_pretty(&status)?,
+            )?;
+            fs::write(
+                Path::new(&cli.out_dir).join("claim_artifact_manifest.json"),
+                serde_json::to_vec_pretty(&manifest)?,
+            )?;
+            fs::write(
+                Path::new(&cli.out_dir).join("claim_status.md"),
+                markdown.as_bytes(),
+            )?;
+            mplus_probe::write_reproducibility_manifest(&cli.out_dir)?;
+            println!("{}", serde_json::to_string_pretty(&status)?);
+            if status["accepted"].as_bool() != Some(true)
+                || manifest["accepted"].as_bool() != Some(true)
+            {
+                anyhow::bail!(
+                    "claim-status manifest failed doc-coverage; see {}/claim_status.json",
                     cli.out_dir
                 );
             }
