@@ -97,7 +97,10 @@ const CLAIM_ENTRIES: &[ClaimEntry] = &[
         status: STATUS_LEAN_PROVED,
         doc_anchor: "Exact-UO is claimed for exact backends",
         source_files: &["crates/uo-core/src/trace.rs"],
-        lean_modules: &["proof/lean/UOToolchain/ProofGradeRoot.lean"],
+        lean_modules: &[
+            "proof/lean/UOToolchain/ProofGradeRoot.lean",
+            "proof/lean/UOToolchain/KernelExactTrace.lean",
+        ],
         runtime_compiler_files: &["runtime/uo-evm/src/objects.rs"],
         benchmark_result_files: &["results/trace_equivalence.json", "results/correctness.json"],
         validation_command: "cargo run -q -p mplus-probe -- --only trace-equivalence --out-dir results",

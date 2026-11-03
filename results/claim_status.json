@@ -487,6 +487,11 @@
       "ok": true
     },
     {
+      "detail": "artifact proof/lean/UOToolchain/KernelExactTrace.lean referenced by exact-uo-backends exists",
+      "name": "file-exists:exact-uo-backends:proof/lean/UOToolchain/KernelExactTrace.lean",
+      "ok": true
+    },
+    {
       "detail": "artifact runtime/uo-evm/src/objects.rs referenced by exact-uo-backends exists",
       "name": "file-exists:exact-uo-backends:runtime/uo-evm/src/objects.rs",
       "ok": true

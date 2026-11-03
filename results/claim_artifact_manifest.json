@@ -487,6 +487,11 @@
       "ok": true
     },
     {
+      "detail": "artifact proof/lean/UOToolchain/KernelExactTrace.lean referenced by exact-uo-backends exists",
+      "name": "file-exists:exact-uo-backends:proof/lean/UOToolchain/KernelExactTrace.lean",
+      "ok": true
+    },
+    {
       "detail": "artifact runtime/uo-evm/src/objects.rs referenced by exact-uo-backends exists",
       "name": "file-exists:exact-uo-backends:runtime/uo-evm/src/objects.rs",
       "ok": true
@@ -835,7 +840,8 @@
       "doc_anchor": "Exact-UO is claimed for exact backends",
       "id": "exact-uo-backends",
       "lean_modules": [
-        "proof/lean/UOToolchain/ProofGradeRoot.lean"
+        "proof/lean/UOToolchain/ProofGradeRoot.lean",
+        "proof/lean/UOToolchain/KernelExactTrace.lean"
       ],
       "runtime_compiler_files": [
         "runtime/uo-evm/src/objects.rs"

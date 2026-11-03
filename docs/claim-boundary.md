@@ -118,7 +118,16 @@ field bindings required by `DeploymentCallAccepted`.
 ## Backend Scope
 
 - Exact-UO is claimed for exact backends on the repository's instrumented
-  abstract/runtime model: `UOCell`, `UOArray`, and full-scan `UOMap`.
+  abstract/runtime model: `UOCell`, `UOArray`, and full-scan `UOMap`. For
+  admitted kernel programs it is a Lean theorem over the exact store's
+  encoding (`UOToolchain/KernelExactTrace.lean`): every admitted run executes
+  the whole kernel body, each storage access scans its whole object, and every
+  touched object is rewritten at commit with `Update`-class writes, so all
+  admitted runs of a program produce the same trace (`admittedKernel_exactUO`)
+  and `paperMain_admittedKernel_exact_noninterference_moduloReleases`
+  discharges the paper-main theorem's storage-trace premise. That the runtime
+  store emits exactly this encoding is checked against runtime traces
+  (`exact_encoding_matches` in `results/trace_equivalence.json`), not proved.
 - The theorem-facing computational-UO path is only
   `path_oram_local_posmap_v1` for the bounded local-position-map route and
   `path_oram_private_posmap_v1` for scalable private position metadata.

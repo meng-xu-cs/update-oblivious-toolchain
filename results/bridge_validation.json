@@ -849759,6 +849759,14 @@
       },
       {
         "print_axioms_present": true,
+        "theorem": "UOToolchain.IR.admittedKernel_exactUO"
+      },
+      {
+        "print_axioms_present": true,
+        "theorem": "UOToolchain.paperMain_admittedKernel_exact_noninterference_moduloReleases"
+      },
+      {
+        "print_axioms_present": true,
         "theorem": "UOToolchain.RuntimeImplementationKernelMachineConfinementBoundary.paperEndToEndConfinementWithPublicOnlyHandwrittenShell"
       },
       {
@@ -850283,6 +850291,11 @@
       },
       {
         "file": "proof/lean/UOToolchain/KernelTyping.lean",
+        "forbidden_import_hits": [],
+        "restricted": true
+      },
+      {
+        "file": "proof/lean/UOToolchain/KernelExactTrace.lean",
         "forbidden_import_hits": [],
         "restricted": true
       }

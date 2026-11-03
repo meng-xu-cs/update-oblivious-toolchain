@@ -39,8 +39,8 @@
     },
     {
       "path": "bridge_validation.json",
-      "bytes": 25653643,
-      "sha256": "9be0f7f22a5b07a15eeeafef2475e3e8826a6a0859d94ab96bdf9202028deccd"
+      "bytes": 25654052,
+      "sha256": "ddfb1ad92a270ee71356baae2bfe76247ea37f7c79169ef9212695ddf8a55d0a"
     },
     {
       "path": "canonical_pathoram_pair_validation.json",
@@ -49,13 +49,13 @@
     },
     {
       "path": "capacity_sweep.json",
-      "bytes": 27480,
-      "sha256": "b4ccc6c9c6f8d510e939a4813065db8e8e36af9bdd8da4922b1ec40aaa6a24d9"
+      "bytes": 27477,
+      "sha256": "c729242ee6aa6cc789b0537de62ea81d8ff397e2304f4b9d01debe5832dc55f8"
     },
     {
       "path": "claim_artifact_manifest.json",
-      "bytes": 55442,
-      "sha256": "e4462ce567f275f17ed85e2536de287ff134d8361b74d26263637f507dab355f"
+      "bytes": 55732,
+      "sha256": "f170cbd7cc219f0d9056bbb087d6f675e602aa97bdb9f1966b39631923788cbf"
     },
     {
       "path": "claim_consistency.json",
@@ -64,8 +64,8 @@
     },
     {
       "path": "claim_status.json",
-      "bytes": 45367,
-      "sha256": "c32ed8e9f037b98d650a9d32cc73c72e34cf0dab47f487113c22d00e5eb08b90"
+      "bytes": 45601,
+      "sha256": "4b7ef807d632906312ffc3123fd427fb75784e87a3f18bd4f066daf6384cc35e"
     },
     {
       "path": "claim_status.md",
@@ -279,13 +279,13 @@
     },
     {
       "path": "reviewer_summary.json",
-      "bytes": 109070,
-      "sha256": "9f36f154a27f8e52a14e326bca850a57eaa3e50e021a9efd80af6ce6cd59b573"
+      "bytes": 109220,
+      "sha256": "96c811723ec9479e1599f9d90ef90a0986ed7cf169bd4a4d2223f4feb2096d9e"
     },
     {
       "path": "reviewer_summary.md",
-      "bytes": 28567,
-      "sha256": "2134758d909de77e7c3e26f2aa94b42186d96c1272e864483354741778246736"
+      "bytes": 28600,
+      "sha256": "164a5085e8e7deeb8e7239813b01d2c2a70d17965c343ce37e9902349e13f846"
     },
     {
       "path": "runtime_boundary_validation.json",
@@ -414,8 +414,8 @@
     },
     {
       "path": "static_checks.json",
-      "bytes": 30517,
-      "sha256": "bce4cdb9d57a302709460eefbb1cfba17ee7576ede7ac145deba0409f32a5385"
+      "bytes": 30900,
+      "sha256": "07469b34a49478e5eaaf556ae79446e3446b0b8cd7f1f7c73e79e3f85817174d"
     },
     {
       "path": "tamper_validation.json",
@@ -429,8 +429,8 @@
     },
     {
       "path": "trace_equivalence.json",
-      "bytes": 2642,
-      "sha256": "82cdfea8ae3f624c6bf622d4b245d71d6e676b1e67c45bb128fdf5863f132204"
+      "bytes": 2908,
+      "sha256": "c563771e506ace35c956ea4eb35d982d5324b570f33a3fa5103e5f3d6e6c85d5"
     },
     {
       "path": "trusted_kernel_validation.json",

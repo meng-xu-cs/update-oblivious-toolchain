@@ -53,6 +53,23 @@ function (`proofGrade_sol_kernel_steps_eq_of_wellTyped`). Running the type
 checker on the kernel programs of concrete admitted artifacts is not yet part
 of the proof-grade checker.
 
+`UOToolchain.KernelExactTrace` turns the schedule result into exact
+update-obliviousness of the storage trace. `evalKernelBodyExecuted` lists the
+statements a run executes, following `evalKernelBody`'s control flow, and every
+conforming run of an admitted program executes the whole body
+(`evalKernelProgramExecuted_eq_body`). The exact store's encoding
+(`exactEncodeRun`) maps the executed statements to a physical trace: a full
+scan of the object for every storage access, in evaluation order, and at commit
+an `Update`-class rewrite of every touched object, in object-id order. The
+trace of a run is therefore the same for all admitted runs
+(`admittedKernel_exactUO`), and
+`paperMain_admittedKernel_exact_noninterference_moduloReleases` states the
+paper-main theorem modulo releases over admitted runs with the storage-trace
+premise discharged; its remaining premises are the public outcome, boundary
+schedule, controller shape, final public state, and release functions. The
+probe checks that the runtime's traces are exactly the encoding's prediction
+(`exact_encoding_matches` in `trace_equivalence.json`).
+
 ## Runtime Bridge
 
 Runtime execution emits or supports these proof-facing objects:

@@ -25,7 +25,8 @@ use uo_core::{
     runtime_boundary_obligation_ids, runtime_boundary_schema_is_mechanized_for_claim,
     validate_runtime_boundary_schema, BackendKind, BoundaryEvent,
     CanonicalFreshCoinRuntimePathOramTheoremInput, CanonicalFreshCoinRuntimePathOramWitnessFamily,
-    CompiledArtifact, ConfidentialKernelSlotProgram, ContainerKind, ContractMetadata, LogicalEvent,
+    CompiledArtifact, ConfidentialKernelExpr, ConfidentialKernelSlotProgram,
+    ConfidentialKernelStatement, ContainerKind, ContractMetadata, LogicalEvent,
     NormalizedMicroTrace, ProgramMode, PublicOutcomeTrace, RuntimeBoundaryEvidenceKind,
     RuntimeConfidentialCoreKernelFinishSlotBundle, RuntimeKernelInterfaceBundle,
     RuntimeKernelMachineFinishWitness, RuntimeKernelRefinementWitness, RuntimeKernelWitness,
@@ -4061,6 +4062,7 @@ fn run_static_checks(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<J
         "proof/lean/UOToolchain/PathOramLocalPosmapV1.lean",
         "proof/lean/UOToolchain/PaperMainReleases.lean",
         "proof/lean/UOToolchain/KernelTyping.lean",
+        "proof/lean/UOToolchain/KernelExactTrace.lean",
     ]
     .into_iter()
     .map(|relative_path| {
@@ -4101,6 +4103,8 @@ fn run_static_checks(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<J
         "UOToolchain.acceptedPrivatePosmapPathOramPackageCapstone_noninterference_moduloReleases",
         "UOToolchain.proofGrade_sol_kernel_steps_eq_of_wellTyped",
         "UOToolchain.IR.evalKernelProgram_continues_of_wellTyped",
+        "UOToolchain.IR.admittedKernel_exactUO",
+        "UOToolchain.paperMain_admittedKernel_exact_noninterference_moduloReleases",
         "UOToolchain.RuntimeImplementationKernelMachineConfinementBoundary.paperEndToEndConfinementWithPublicOnlyHandwrittenShell",
         "UOToolchain.RuntimePaperNativeKernelAssumptions.paperEndToEndConfinementWithPublicOnlyHandwrittenShell",
     ]
@@ -50987,6 +50991,10 @@ struct ExperimentOutcome {
     logical_write_equal: bool,
     physical_read_equal: bool,
     physical_equal: bool,
+    /// Whether every run's physical trace is the one the Lean exact-store
+    /// encoding predicts (`None` when an accessed object is not on an exact
+    /// backend, e.g. the ORAM route).
+    exact_encoding_matches: Option<bool>,
 }
 
 enum OptionalExperimentOutcome {
@@ -51166,6 +51174,207 @@ fn run_erc20_allowance_key_experiment(artifact: &CompiledArtifact) -> Result<Exp
     )
 }
 
+/// Physical `(object, location)` trace the exact store's encoding predicts for
+/// one run of a confidential kernel program. Rust mirror of `IR.exactEncodeRun`
+/// in `proof/lean/UOToolchain/KernelExactTrace.lean`: every storage access
+/// scans all slots of its object, in evaluation order (a write scans before it
+/// writes), and at commit every touched object is rewritten slot by slot, in
+/// object-id order, with `Update`-class writes.
+struct ExactEncodingPrediction {
+    reads: Vec<(String, String)>,
+    writes: Vec<(String, String)>,
+}
+
+/// Objects an expression reads, in evaluation order (`IR.KernelExpr.storageReads`).
+/// `select` arms are pure, so only the condition can read storage.
+fn exact_expr_storage_reads(expr: &ConfidentialKernelExpr, reads: &mut Vec<u32>) {
+    match expr {
+        ConfidentialKernelExpr::Literal { .. } | ConfidentialKernelExpr::Var { .. } => {}
+        ConfidentialKernelExpr::Unary { expr, .. } => exact_expr_storage_reads(expr, reads),
+        ConfidentialKernelExpr::Binary { lhs, rhs, .. } => {
+            exact_expr_storage_reads(lhs, reads);
+            exact_expr_storage_reads(rhs, reads);
+        }
+        ConfidentialKernelExpr::Select { cond, .. } => exact_expr_storage_reads(cond, reads),
+        ConfidentialKernelExpr::CellGet { object_id } => reads.push(*object_id),
+        ConfidentialKernelExpr::ArrayGet { object_id, index } => {
+            exact_expr_storage_reads(index, reads);
+            reads.push(*object_id);
+        }
+        ConfidentialKernelExpr::MapGet { object_id, key } => {
+            exact_expr_storage_reads(key, reads);
+            reads.push(*object_id);
+        }
+        ConfidentialKernelExpr::StructField { base, .. } => exact_expr_storage_reads(base, reads),
+        ConfidentialKernelExpr::ArrayIndex { base, index } => {
+            exact_expr_storage_reads(base, reads);
+            exact_expr_storage_reads(index, reads);
+        }
+        ConfidentialKernelExpr::Keccak256 { parts } => {
+            for part in parts.iter() {
+                exact_expr_storage_reads(part, reads);
+            }
+        }
+    }
+}
+
+/// Objects a statement accesses (`IR.KernelStatement.accesses`): the reads of
+/// its expressions, then its write target.
+fn exact_statement_accesses(statement: &ConfidentialKernelStatement, accesses: &mut Vec<u32>) {
+    match statement {
+        ConfidentialKernelStatement::Declare { value, .. }
+        | ConfidentialKernelStatement::Assign { value, .. } => {
+            exact_expr_storage_reads(value, accesses)
+        }
+        ConfidentialKernelStatement::Require { cond }
+        | ConfidentialKernelStatement::AbortIf { cond } => exact_expr_storage_reads(cond, accesses),
+        ConfidentialKernelStatement::CellSet {
+            object_id,
+            value,
+            predicate,
+        } => {
+            exact_expr_storage_reads(value, accesses);
+            if let Some(predicate) = predicate {
+                exact_expr_storage_reads(predicate, accesses);
+            }
+            accesses.push(*object_id);
+        }
+        ConfidentialKernelStatement::ArraySet {
+            object_id,
+            index,
+            value,
+            predicate,
+        } => {
+            exact_expr_storage_reads(index, accesses);
+            exact_expr_storage_reads(value, accesses);
+            if let Some(predicate) = predicate {
+                exact_expr_storage_reads(predicate, accesses);
+            }
+            accesses.push(*object_id);
+        }
+        ConfidentialKernelStatement::MapPut {
+            object_id,
+            key,
+            value,
+            predicate,
+        } => {
+            exact_expr_storage_reads(key, accesses);
+            exact_expr_storage_reads(value, accesses);
+            if let Some(predicate) = predicate {
+                exact_expr_storage_reads(predicate, accesses);
+            }
+            accesses.push(*object_id);
+        }
+        ConfidentialKernelStatement::Return { value } => {
+            if let Some(value) = value {
+                exact_expr_storage_reads(value, accesses);
+            }
+        }
+    }
+}
+
+/// The exact-store encoding's prediction for one run of `entrypoint`, or `None`
+/// when the entrypoint is not a confidential UO kernel program or an accessed
+/// object is not on an exact (full-scan) backend.
+fn exact_encoding_prediction(
+    artifact: &CompiledArtifact,
+    entrypoint: &str,
+) -> Option<ExactEncodingPrediction> {
+    if artifact.contract.mode != ProgramMode::Uo {
+        return None;
+    }
+    let function = artifact
+        .contract
+        .functions
+        .iter()
+        .find(|function| function.signature == entrypoint)?;
+    let program = function.confidential_program.as_ref()?;
+    let mut accesses = Vec::new();
+    for statement in program.body.iter() {
+        exact_statement_accesses(statement, &mut accesses);
+    }
+    let slot_locations = |object_id: u32| -> Option<(String, Vec<String>)> {
+        let object = artifact
+            .contract
+            .state
+            .iter()
+            .find(|object| object.id == object_id)?;
+        if object.backend != BackendKind::FullScan {
+            return None;
+        }
+        let locations = match object.kind {
+            ContainerKind::Cell => vec![object.name.clone()],
+            ContainerKind::Array => (0..object.capacity?)
+                .map(|slot| format!("{}[{}]", object.name, slot))
+                .collect(),
+            ContainerKind::Map => (0..object.capacity?)
+                .map(|slot| format!("{}#{}", object.name, slot))
+                .collect(),
+        };
+        Some((object.name.clone(), locations))
+    };
+    let mut reads = Vec::new();
+    for object_id in &accesses {
+        let (name, locations) = slot_locations(*object_id)?;
+        reads.extend(
+            locations
+                .into_iter()
+                .map(|location| (name.clone(), location)),
+        );
+    }
+    let mut touched = accesses.clone();
+    touched.sort_unstable();
+    touched.dedup();
+    let mut writes = Vec::new();
+    for object_id in touched {
+        let (name, locations) = slot_locations(object_id)?;
+        writes.extend(
+            locations
+                .into_iter()
+                .map(|location| (name.clone(), location)),
+        );
+    }
+    Some(ExactEncodingPrediction { reads, writes })
+}
+
+/// Whether a runtime trace is the predicted one: the same `(object, location)`
+/// reads and writes in order, only `Update`-class writes, and one record
+/// length per object.
+fn trace_matches_exact_encoding(
+    trace: &uo_core::ExecutionTrace,
+    prediction: &ExactEncodingPrediction,
+) -> bool {
+    let reads = trace
+        .physical_reads
+        .iter()
+        .map(|event| (event.object.clone(), event.location.clone()))
+        .collect::<Vec<_>>();
+    let writes = trace
+        .physical_writes
+        .iter()
+        .map(|event| (event.object.clone(), event.location.clone()))
+        .collect::<Vec<_>>();
+    let mut record_lengths = BTreeMap::new();
+    let lengths_consistent = trace
+        .physical_reads
+        .iter()
+        .map(|event| (&event.object, event.len))
+        .chain(
+            trace
+                .physical_writes
+                .iter()
+                .map(|event| (&event.object, event.len)),
+        )
+        .all(|(object, len)| *record_lengths.entry(object.clone()).or_insert(len) == len);
+    reads == prediction.reads
+        && writes == prediction.writes
+        && trace
+            .physical_writes
+            .iter()
+            .all(|event| event.class == WriteClass::Update)
+        && lengths_consistent
+}
+
 fn run_binary_experiment(
     artifact: &CompiledArtifact,
     setup: &[CallSpec],
@@ -51177,17 +51386,30 @@ fn run_binary_experiment(
     let mut class1_metrics = Vec::new();
     let mut class0_hashes = Vec::new();
     let mut class1_hashes = Vec::new();
+    let prediction = exact_encoding_prediction(artifact, entrypoint);
+    let mut exact_encoding_matches = prediction.as_ref().map(|_| true);
     for args in class0 {
         let result = run_target_call_with_diagnostics(artifact, setup, entrypoint, args)?;
+        if let (Some(prediction), Some(matches)) =
+            (prediction.as_ref(), exact_encoding_matches.as_mut())
+        {
+            *matches &= trace_matches_exact_encoding(&result.call.trace, prediction);
+        }
         class0_hashes.push(result.call.trace.hashes()?);
         class0_metrics.push(extract_metrics(&result));
     }
     for args in class1 {
         let result = run_target_call_with_diagnostics(artifact, setup, entrypoint, args)?;
+        if let (Some(prediction), Some(matches)) =
+            (prediction.as_ref(), exact_encoding_matches.as_mut())
+        {
+            *matches &= trace_matches_exact_encoding(&result.call.trace, prediction);
+        }
         class1_hashes.push(result.call.trace.hashes()?);
         class1_metrics.push(extract_metrics(&result));
     }
     Ok(ExperimentOutcome {
+        exact_encoding_matches,
         opcode_equal: hashes_equal(&class0_hashes, &class1_hashes, |hash| {
             &hash.opcode_trace_hash
         }),
@@ -51707,6 +51929,7 @@ fn trace_summary(benchmark: &str, mode: &str, outcome: &ExperimentOutcome) -> Js
         "logical_write_equal": outcome.logical_write_equal,
         "physical_read_equal": outcome.physical_read_equal,
         "physical_trace_equal": outcome.physical_equal,
+        "exact_encoding_matches": outcome.exact_encoding_matches,
     })
 }
 
@@ -52913,6 +53136,7 @@ mod tests {
     };
     // Only used by the strict-default-build tests below, which the
     // insecure-eval-raw feature compiles out.
+    use super::{b32, exact_encoding_prediction, trace_matches_exact_encoding, PROBE_DEPLOY_SEED};
     #[cfg(not(feature = "insecure-eval-raw"))]
     use super::{
         check_authscan_correctness, compile_suite, run_auc_reports, run_mutual_information_reports,
@@ -52920,7 +53144,47 @@ mod tests {
     };
     use uo_core::{
         canonical_path_oram_leaf_values_of_seed, ProgramMode, RuntimePathOramTransitionKind, Value,
+        WriteClass,
     };
+    use uo_evm::ContractInstance;
+
+    #[test]
+    fn exact_encoding_prediction_matches_runtime_and_rejects_drift() {
+        let artifact = compile_artifact(
+            "benches/raw/ConfidentialMixer.sol",
+            "benches/raw/ConfidentialMixer.uo.yaml",
+            ProgramMode::Uo,
+        )
+        .unwrap();
+        let entrypoint = "deposit(bytes32,uint256)";
+        let prediction = exact_encoding_prediction(&artifact, entrypoint).unwrap();
+        // Capacity-8 balances map and the total cell: the balances read, the map
+        // write's scan, the total read, and the cell write's scan; then one
+        // rewrite of each touched object, in object-id order.
+        assert_eq!(prediction.reads.len(), 18);
+        assert_eq!(prediction.writes.len(), 9);
+        let run = || {
+            let mut instance =
+                ContractInstance::deploy_with_seed(artifact.clone(), PROBE_DEPLOY_SEED).unwrap();
+            instance
+                .call(entrypoint, vec![b32(7), Value::uint(5)])
+                .unwrap()
+                .trace
+        };
+        assert!(trace_matches_exact_encoding(&run(), &prediction));
+
+        let mut reclassed = run();
+        let mut writes = std::mem::take(&mut reclassed.physical_writes).into_vec();
+        writes[0].class = WriteClass::Set;
+        reclassed.physical_writes = writes.into_boxed_slice();
+        assert!(!trace_matches_exact_encoding(&reclassed, &prediction));
+
+        let mut shortened = run();
+        let mut reads = std::mem::take(&mut shortened.physical_reads).into_vec();
+        reads.pop();
+        shortened.physical_reads = reads.into_boxed_slice();
+        assert!(!trace_matches_exact_encoding(&shortened, &prediction));
+    }
 
     #[test]
     // Asserts the strict default-build property that raw confidential artifacts

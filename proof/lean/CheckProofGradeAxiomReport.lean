@@ -92,4 +92,18 @@ info: 'UOToolchain.IR.evalKernelProgram_continues_of_wellTyped' depends on axiom
 #guard_msgs in
 #print axioms UOToolchain.IR.evalKernelProgram_continues_of_wellTyped
 
+/--
+info: 'UOToolchain.IR.admittedKernel_exactUO' depends on axioms: [propext, Classical.choice, Quot.sound]
+-/
+#guard_msgs in
+#print axioms UOToolchain.IR.admittedKernel_exactUO
+
+/--
+info: 'UOToolchain.paperMain_admittedKernel_exact_noninterference_moduloReleases' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+-/
+#guard_msgs in
+#print axioms UOToolchain.paperMain_admittedKernel_exact_noninterference_moduloReleases
+
 def main : IO UInt32 := pure 0
