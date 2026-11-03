@@ -10,13 +10,13 @@
     "metadata_canonicalization_sha256": "e9fb68daeb2cf2fd00bfc143f41348e21f9e352f872365c63a322db533dcfd0a",
     "compilation_mode": "uo",
     "compiler_version": "0.1.0",
-    "toolchain_manifest_sha256": "8fcbb03b8b958e7282b5e8eaf95bac1bf2b2c76095f82383cb8e4b0dec8acf4a",
-    "package_sha256": "906a624e363ad73bd44639361381ba8f680fceadabcee7c0a48327f367662e7c"
+    "toolchain_manifest_sha256": "81a1a552da93aeb36b466cbeb978c650ac5dbeb3bbc57b8a9cc2cae08e3b5550",
+    "package_sha256": "ea9df8931e13131ac3ccad1ae20321c88690c5e81a9b492f8cf73ecf4e2ea11d"
   },
   "contract": {
     "contract": "FixedSlotClassifier",
     "mode": "Uo",
-    "source_file": "/home/m285xu/update-oblivious-toolchain/benches/raw/FixedSlotClassifier.sol",
+    "source_file": "benches/raw/FixedSlotClassifier.sol",
     "state": [
       {
         "id": 1,

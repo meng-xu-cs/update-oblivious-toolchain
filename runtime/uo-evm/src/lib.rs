@@ -30,11 +30,22 @@ pub use runtime::PathOramFreshCoinPlan;
 
 #[cfg(test)]
 mod tests {
+    /// Path of a benchmark file under `benches/raw`, resolved from this
+    /// crate's manifest directory so the tests do not depend on where the
+    /// repository is checked out. Usable both as a runtime path and inside
+    /// `include_str!`.
+    macro_rules! bench_raw {
+        ($name:literal) => {
+            concat!(env!("CARGO_MANIFEST_DIR"), "/../../benches/raw/", $name)
+        };
+    }
+
     use super::ContractInstance;
     #[cfg(feature = "diagnostics")]
     use super::PathOramFreshCoinPlan;
     use std::fs;
     use std::path::PathBuf;
+    #[cfg(not(feature = "insecure-eval-raw"))]
     use uo_core::ir::BackendKind;
     #[cfg(feature = "diagnostics")]
     use uo_core::{
@@ -61,22 +72,28 @@ mod tests {
     }
 
     fn write_temp(name: &str, contents: &str) -> PathBuf {
-        let path = PathBuf::from(format!(
-            "/tmp/uo-evm-lib-test-{}-{}.sol",
+        // A per-call suffix keeps parallel tests that reuse a label from racing
+        // on the same file.
+        static NEXT_TEMP: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        let path = std::env::temp_dir().join(format!(
+            "uo-evm-lib-test-{}-{}-{}.sol",
             name,
-            std::process::id()
+            std::process::id(),
+            NEXT_TEMP.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
         ));
         fs::write(&path, contents).unwrap();
         path
     }
 
     #[test]
+    // Strict default-build property: the insecure-eval-raw evaluation feature
+    // deliberately admits raw confidential backends and skips the
+    // confidential-object targeting check, so this rejection is not expected there.
+    #[cfg(not(feature = "insecure-eval-raw"))]
     fn confidential_raw_classifier_is_rejected() {
         let artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/FixedSlotClassifier.sol",
-            include_str!(
-                "/home/m285xu/update-oblivious-toolchain/benches/raw/FixedSlotClassifier.raw.yaml"
-            ),
+            bench_raw!("FixedSlotClassifier.sol"),
+            include_str!(bench_raw!("FixedSlotClassifier.raw.yaml")),
             ProgramMode::Raw,
         );
         let err = ContractInstance::deploy(artifact).unwrap_err();
@@ -88,12 +105,14 @@ mod tests {
     }
 
     #[test]
+    // Strict default-build property: the insecure-eval-raw evaluation feature
+    // deliberately admits raw confidential backends and skips the
+    // confidential-object targeting check, so this rejection is not expected there.
+    #[cfg(not(feature = "insecure-eval-raw"))]
     fn confidential_entrypoint_rejects_public_raw_kernel_target_after_artifact_tamper() {
         let mut artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/FixedSlotClassifier.sol",
-            include_str!(
-                "/home/m285xu/update-oblivious-toolchain/benches/raw/FixedSlotClassifier.uo.yaml"
-            ),
+            bench_raw!("FixedSlotClassifier.sol"),
+            include_str!(bench_raw!("FixedSlotClassifier.uo.yaml")),
             ProgramMode::Uo,
         );
         artifact.contract.state[0].backend = BackendKind::Raw;
@@ -111,10 +130,8 @@ mod tests {
     #[test]
     fn uo_classifier_rewrites_to_update_only() {
         let artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/FixedSlotClassifier.sol",
-            include_str!(
-                "/home/m285xu/update-oblivious-toolchain/benches/raw/FixedSlotClassifier.uo.yaml"
-            ),
+            bench_raw!("FixedSlotClassifier.sol"),
+            include_str!(bench_raw!("FixedSlotClassifier.uo.yaml")),
             ProgramMode::Uo,
         );
         let mut zero_instance = ContractInstance::deploy(artifact.clone()).unwrap();
@@ -319,8 +336,8 @@ bounds:
     #[test]
     fn authscan_exact_trace_is_secret_independent() {
         let artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/AuthScan.sol",
-            include_str!("/home/m285xu/update-oblivious-toolchain/benches/raw/AuthScan.uo.yaml"),
+            bench_raw!("AuthScan.sol"),
+            include_str!(bench_raw!("AuthScan.uo.yaml")),
             ProgramMode::Uo,
         );
         let token0 = Value::Bytes32([1u8; 32]);
@@ -376,10 +393,8 @@ bounds:
     #[test]
     fn same_same_entrypoint_runs_with_exact_kernel_budget() {
         let artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/FixedSlotClassifier.sol",
-            include_str!(
-                "/home/m285xu/update-oblivious-toolchain/benches/raw/FixedSlotClassifier.uo.yaml"
-            ),
+            bench_raw!("FixedSlotClassifier.sol"),
+            include_str!(bench_raw!("FixedSlotClassifier.uo.yaml")),
             ProgramMode::Uo,
         );
         let mut inst = ContractInstance::deploy(artifact).unwrap();
@@ -400,10 +415,8 @@ bounds:
     #[test]
     fn mixer_abort_is_normalized_but_state_is_preserved() {
         let artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/ConfidentialMixer.sol",
-            include_str!(
-                "/home/m285xu/update-oblivious-toolchain/benches/raw/ConfidentialMixer.uo.yaml"
-            ),
+            bench_raw!("ConfidentialMixer.sol"),
+            include_str!(bench_raw!("ConfidentialMixer.uo.yaml")),
             ProgramMode::Uo,
         );
         let key = Value::Bytes32([9u8; 32]);
@@ -475,10 +488,8 @@ bounds:
     #[test]
     fn registry_clear_if_match_roundtrips() {
         let artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/RegistryCRUD.sol",
-            include_str!(
-                "/home/m285xu/update-oblivious-toolchain/benches/raw/RegistryCRUD.uo.yaml"
-            ),
+            bench_raw!("RegistryCRUD.sol"),
+            include_str!(bench_raw!("RegistryCRUD.uo.yaml")),
             ProgramMode::Uo,
         );
         let key = Value::Bytes32([4u8; 32]);
@@ -502,8 +513,8 @@ bounds:
     #[test]
     fn erc20_keccak_helper_and_maps_roundtrip() {
         let artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/ERC20Lite.sol",
-            include_str!("/home/m285xu/update-oblivious-toolchain/benches/raw/ERC20Lite.uo.yaml"),
+            bench_raw!("ERC20Lite.sol"),
+            include_str!(bench_raw!("ERC20Lite.uo.yaml")),
             ProgramMode::Uo,
         );
         let alice = Value::Address([0x11; 20]);
@@ -543,10 +554,8 @@ bounds:
     #[test]
     fn mixer_oram_hides_secret_commitment_schedule() {
         let artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/ConfidentialMixer.sol",
-            include_str!(
-                "/home/m285xu/update-oblivious-toolchain/benches/raw/ConfidentialMixer.pathoram.yaml"
-            ),
+            bench_raw!("ConfidentialMixer.sol"),
+            include_str!(bench_raw!("ConfidentialMixer.pathoram.yaml")),
             ProgramMode::Uo,
         );
         let mut first = ContractInstance::deploy(artifact.clone()).unwrap();
@@ -584,10 +593,8 @@ bounds:
     #[test]
     fn mixer_path_oram_trace_builds_shared_paper_main_bundles() {
         let artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/ConfidentialMixer.sol",
-            include_str!(
-                "/home/m285xu/update-oblivious-toolchain/benches/raw/ConfidentialMixer.pathoram.yaml"
-            ),
+            bench_raw!("ConfidentialMixer.sol"),
+            include_str!(bench_raw!("ConfidentialMixer.pathoram.yaml")),
             ProgramMode::Uo,
         );
         let mut instance = ContractInstance::deploy(artifact.clone()).unwrap();
@@ -626,10 +633,8 @@ bounds:
     #[test]
     fn erc20_oram_hides_secret_allowance_keys() {
         let artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/ERC20Lite.sol",
-            include_str!(
-                "/home/m285xu/update-oblivious-toolchain/benches/raw/ERC20Lite.pathoram.yaml"
-            ),
+            bench_raw!("ERC20Lite.sol"),
+            include_str!(bench_raw!("ERC20Lite.pathoram.yaml")),
             ProgramMode::Uo,
         );
         let mut first = ContractInstance::deploy(artifact.clone()).unwrap();
@@ -665,10 +670,8 @@ bounds:
     #[test]
     fn oram_theorem_trace_is_public_determined() {
         let artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/ConfidentialMixer.sol",
-            include_str!(
-                "/home/m285xu/update-oblivious-toolchain/benches/raw/ConfidentialMixer.pathoram.yaml"
-            ),
+            bench_raw!("ConfidentialMixer.sol"),
+            include_str!(bench_raw!("ConfidentialMixer.pathoram.yaml")),
             ProgramMode::Uo,
         );
         let mut first = ContractInstance::deploy(artifact.clone()).unwrap();
@@ -719,10 +722,8 @@ bounds:
     #[test]
     fn path_oram_candidate_hides_single_access_keys() {
         let artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
-            include_str!(
-                "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.pathoram.yaml"
-            ),
+            bench_raw!("SingleAccessMap.sol"),
+            include_str!(bench_raw!("SingleAccessMap.pathoram.yaml")),
             ProgramMode::Uo,
         );
         let mut first = ContractInstance::deploy(artifact.clone()).unwrap();
@@ -773,10 +774,8 @@ bounds:
     #[test]
     fn path_oram_candidate_supports_multi_access_entrypoints() {
         let artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
-            include_str!(
-                "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.pathoram.yaml"
-            ),
+            bench_raw!("SingleAccessMap.sol"),
+            include_str!(bench_raw!("SingleAccessMap.pathoram.yaml")),
             ProgramMode::Uo,
         );
         let mut first = ContractInstance::deploy(artifact.clone()).unwrap();
@@ -842,10 +841,8 @@ bounds:
     #[test]
     fn execution_trace_exports_refinement_witness() {
         let artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
-            include_str!(
-                "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.pathoram.yaml"
-            ),
+            bench_raw!("SingleAccessMap.sol"),
+            include_str!(bench_raw!("SingleAccessMap.pathoram.yaml")),
             ProgramMode::Uo,
         );
         let mut instance = ContractInstance::deploy(artifact.clone()).unwrap();
@@ -873,8 +870,8 @@ bounds:
     #[test]
     fn execution_trace_exports_confidential_kernel_witness() {
         let artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/AuthScan.sol",
-            include_str!("/home/m285xu/update-oblivious-toolchain/benches/raw/AuthScan.uo.yaml"),
+            bench_raw!("AuthScan.sol"),
+            include_str!(bench_raw!("AuthScan.uo.yaml")),
             ProgramMode::Uo,
         );
         let mut instance = ContractInstance::deploy(artifact.clone()).unwrap();
@@ -950,8 +947,8 @@ bounds:
     #[test]
     fn execution_trace_exports_trusted_kernel_slot_bundle() {
         let artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/AuthScan.sol",
-            include_str!("/home/m285xu/update-oblivious-toolchain/benches/raw/AuthScan.uo.yaml"),
+            bench_raw!("AuthScan.sol"),
+            include_str!(bench_raw!("AuthScan.uo.yaml")),
             ProgramMode::Uo,
         );
         let mut instance = ContractInstance::deploy(artifact.clone()).unwrap();
@@ -1003,8 +1000,8 @@ bounds:
     #[test]
     fn execution_trace_exports_runtime_kernel_interface_bundle() {
         let artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/AuthScan.sol",
-            include_str!("/home/m285xu/update-oblivious-toolchain/benches/raw/AuthScan.uo.yaml"),
+            bench_raw!("AuthScan.sol"),
+            include_str!(bench_raw!("AuthScan.uo.yaml")),
             ProgramMode::Uo,
         );
         let mut instance = ContractInstance::deploy(artifact.clone()).unwrap();
@@ -1052,8 +1049,8 @@ bounds:
     #[test]
     fn trusted_kernel_slot_bundle_rejects_slot_program_entrypoint_drift() {
         let artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/AuthScan.sol",
-            include_str!("/home/m285xu/update-oblivious-toolchain/benches/raw/AuthScan.uo.yaml"),
+            bench_raw!("AuthScan.sol"),
+            include_str!(bench_raw!("AuthScan.uo.yaml")),
             ProgramMode::Uo,
         );
         let mut instance = ContractInstance::deploy(artifact.clone()).unwrap();
@@ -1100,8 +1097,8 @@ bounds:
     #[test]
     fn runtime_kernel_interface_bundle_rejects_manifest_kernel_step_drift() {
         let artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/AuthScan.sol",
-            include_str!("/home/m285xu/update-oblivious-toolchain/benches/raw/AuthScan.uo.yaml"),
+            bench_raw!("AuthScan.sol"),
+            include_str!(bench_raw!("AuthScan.uo.yaml")),
             ProgramMode::Uo,
         );
         let mut instance = ContractInstance::deploy(artifact.clone()).unwrap();
@@ -1145,10 +1142,8 @@ bounds:
     #[test]
     fn execution_trace_exports_runtime_phase_refinement_witness() {
         let artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
-            include_str!(
-                "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.pathoram.yaml"
-            ),
+            bench_raw!("SingleAccessMap.sol"),
+            include_str!(bench_raw!("SingleAccessMap.pathoram.yaml")),
             ProgramMode::Uo,
         );
         let mut instance = ContractInstance::deploy(artifact).unwrap();
@@ -1190,10 +1185,8 @@ bounds:
     #[test]
     fn execution_trace_exports_confidential_core_shell_boundary_slot_bundle() {
         let artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
-            include_str!(
-                "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.pathoram.yaml"
-            ),
+            bench_raw!("SingleAccessMap.sol"),
+            include_str!(bench_raw!("SingleAccessMap.pathoram.yaml")),
             ProgramMode::Uo,
         );
         let mut instance = ContractInstance::deploy(artifact.clone()).unwrap();
@@ -1222,10 +1215,8 @@ bounds:
     #[test]
     fn execution_trace_exports_confidential_core_kernel_interface_slot_bundle() {
         let artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
-            include_str!(
-                "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.pathoram.yaml"
-            ),
+            bench_raw!("SingleAccessMap.sol"),
+            include_str!(bench_raw!("SingleAccessMap.pathoram.yaml")),
             ProgramMode::Uo,
         );
         let mut instance = ContractInstance::deploy(artifact.clone()).unwrap();
@@ -1265,10 +1256,8 @@ bounds:
     #[test]
     fn execution_trace_exports_runtime_confidential_proof_bundle_family() {
         let artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
-            include_str!(
-                "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.pathoram.yaml"
-            ),
+            bench_raw!("SingleAccessMap.sol"),
+            include_str!(bench_raw!("SingleAccessMap.pathoram.yaml")),
             ProgramMode::Uo,
         );
         let mut instance = ContractInstance::deploy(artifact.clone()).unwrap();
@@ -1315,10 +1304,8 @@ bounds:
     #[test]
     fn confidential_core_shell_boundary_slot_bundle_rejects_slot_program_entrypoint_drift() {
         let artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
-            include_str!(
-                "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.pathoram.yaml"
-            ),
+            bench_raw!("SingleAccessMap.sol"),
+            include_str!(bench_raw!("SingleAccessMap.pathoram.yaml")),
             ProgramMode::Uo,
         );
         let mut instance = ContractInstance::deploy(artifact.clone()).unwrap();
@@ -1388,10 +1375,8 @@ bounds:
     #[test]
     fn confidential_core_shell_boundary_lowering_bundle_rejects_named_program_drift() {
         let artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
-            include_str!(
-                "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.pathoram.yaml"
-            ),
+            bench_raw!("SingleAccessMap.sol"),
+            include_str!(bench_raw!("SingleAccessMap.pathoram.yaml")),
             ProgramMode::Uo,
         );
         let mut instance = ContractInstance::deploy(artifact.clone()).unwrap();
@@ -1439,10 +1424,8 @@ bounds:
     #[test]
     fn call_rejects_confidential_core_kernel_interface_slot_drift() {
         let mut artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
-            include_str!(
-                "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.pathoram.yaml"
-            ),
+            bench_raw!("SingleAccessMap.sol"),
+            include_str!(bench_raw!("SingleAccessMap.pathoram.yaml")),
             ProgramMode::Uo,
         );
         artifact
@@ -1475,10 +1458,8 @@ bounds:
     #[test]
     fn serialized_execution_trace_preserves_trusted_kernel_bundle_only_on_matching_trace() {
         let artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
-            include_str!(
-                "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.pathoram.yaml"
-            ),
+            bench_raw!("SingleAccessMap.sol"),
+            include_str!(bench_raw!("SingleAccessMap.pathoram.yaml")),
             ProgramMode::Uo,
         );
         let mut instance = ContractInstance::deploy(artifact.clone()).unwrap();
@@ -1567,10 +1548,8 @@ bounds:
     #[test]
     fn deploy_with_seed_makes_path_oram_trace_replayable() {
         let artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
-            include_str!(
-                "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.pathoram.yaml"
-            ),
+            bench_raw!("SingleAccessMap.sol"),
+            include_str!(bench_raw!("SingleAccessMap.pathoram.yaml")),
             ProgramMode::Uo,
         );
         let mut first = ContractInstance::deploy_with_seed(artifact.clone(), 17).unwrap();
@@ -1604,10 +1583,8 @@ bounds:
     #[test]
     fn injected_path_oram_fresh_coin_tape_realizes_canonical_values() {
         let artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
-            include_str!(
-                "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.pathoram.yaml"
-            ),
+            bench_raw!("SingleAccessMap.sol"),
+            include_str!(bench_raw!("SingleAccessMap.pathoram.yaml")),
             ProgramMode::Uo,
         );
         let mut baseline = ContractInstance::deploy_with_seed(artifact.clone(), 17).unwrap();
@@ -1653,10 +1630,8 @@ bounds:
     #[test]
     fn injected_path_oram_fresh_coin_tape_rejects_short_tape() {
         let artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
-            include_str!(
-                "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.pathoram.yaml"
-            ),
+            bench_raw!("SingleAccessMap.sol"),
+            include_str!(bench_raw!("SingleAccessMap.pathoram.yaml")),
             ProgramMode::Uo,
         );
         let mut baseline = ContractInstance::deploy_with_seed(artifact.clone(), 17).unwrap();
@@ -1692,10 +1667,8 @@ bounds:
     #[test]
     fn transfer_from_witness_records_multi_object_oram_order() {
         let artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/ERC20Lite.sol",
-            include_str!(
-                "/home/m285xu/update-oblivious-toolchain/benches/raw/ERC20Lite.pathoram.yaml"
-            ),
+            bench_raw!("ERC20Lite.sol"),
+            include_str!(bench_raw!("ERC20Lite.pathoram.yaml")),
             ProgramMode::Uo,
         );
         let balances_id = artifact
@@ -1778,10 +1751,8 @@ bounds:
     #[test]
     fn call_rejects_manifest_oram_parameter_drift() {
         let mut artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
-            include_str!(
-                "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.pathoram.yaml"
-            ),
+            bench_raw!("SingleAccessMap.sol"),
+            include_str!(bench_raw!("SingleAccessMap.pathoram.yaml")),
             ProgramMode::Uo,
         );
         artifact
@@ -1811,10 +1782,8 @@ bounds:
     #[test]
     fn call_rejects_manifest_kernel_step_drift_by_append() {
         let mut artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/FixedSlotClassifier.sol",
-            include_str!(
-                "/home/m285xu/update-oblivious-toolchain/benches/raw/FixedSlotClassifier.uo.yaml"
-            ),
+            bench_raw!("FixedSlotClassifier.sol"),
+            include_str!(bench_raw!("FixedSlotClassifier.uo.yaml")),
             ProgramMode::Uo,
         );
         artifact
@@ -1841,10 +1810,8 @@ bounds:
     #[test]
     fn call_rejects_missing_manifest_kernel_step_trace() {
         let mut artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/FixedSlotClassifier.sol",
-            include_str!(
-                "/home/m285xu/update-oblivious-toolchain/benches/raw/FixedSlotClassifier.uo.yaml"
-            ),
+            bench_raw!("FixedSlotClassifier.sol"),
+            include_str!(bench_raw!("FixedSlotClassifier.uo.yaml")),
             ProgramMode::Uo,
         );
         artifact
@@ -1868,10 +1835,8 @@ bounds:
     #[test]
     fn call_rejects_manifest_kernel_step_drift() {
         let mut artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/FixedSlotClassifier.sol",
-            include_str!(
-                "/home/m285xu/update-oblivious-toolchain/benches/raw/FixedSlotClassifier.uo.yaml"
-            ),
+            bench_raw!("FixedSlotClassifier.sol"),
+            include_str!(bench_raw!("FixedSlotClassifier.uo.yaml")),
             ProgramMode::Uo,
         );
         artifact

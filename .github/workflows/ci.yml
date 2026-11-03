@@ -26,6 +26,8 @@ jobs:
       # rustup honors rust-toolchain.toml, installing the pinned channel.
       - run: rustup show
       - run: cargo fmt --all --check
+      - name: No machine-specific absolute paths in tracked files
+        run: scripts/check_portable_paths.sh
 
   rust-tests:
     runs-on: ubuntu-latest
@@ -66,6 +68,14 @@ jobs:
       - uses: actions/checkout@v4
       - run: rustup show
       - uses: Swatinem/rust-cache@v2
+      # The static-checks report builds and runs the Lean proof-grade checker
+      # executables, so this job needs the pinned Lean toolchain as well.
+      - name: Install elan (pinned Lean toolchain)
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf \
+            https://raw.githubusercontent.com/leanprover/elan/v3.1.1/elan-init.sh \
+            | sh -s -- -y --default-toolchain "$(cat proof/lean/lean-toolchain)"
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
       - name: Install jq
         run: sudo apt-get update && sudo apt-get install -y jq
       - name: static checks probe report

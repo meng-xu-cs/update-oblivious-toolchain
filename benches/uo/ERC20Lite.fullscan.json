@@ -10,13 +10,13 @@
     "metadata_canonicalization_sha256": "38132977ca368ce6b4c34bf1d4c45bbd46e7b383c71a22e49affae23e544622f",
     "compilation_mode": "uo",
     "compiler_version": "0.1.0",
-    "toolchain_manifest_sha256": "8fcbb03b8b958e7282b5e8eaf95bac1bf2b2c76095f82383cb8e4b0dec8acf4a",
-    "package_sha256": "f535fcf2b43acdfef3f3e5dc4e7b26430f9f4a062ffd8146fe4d80b95f8087e2"
+    "toolchain_manifest_sha256": "81a1a552da93aeb36b466cbeb978c650ac5dbeb3bbc57b8a9cc2cae08e3b5550",
+    "package_sha256": "a089acc0da1f4822da570b7a593bc9dac516da1b1a29d2605c7dc21c0aa3864d"
   },
   "contract": {
     "contract": "ERC20Lite",
     "mode": "Uo",
-    "source_file": "/home/m285xu/update-oblivious-toolchain/benches/raw/ERC20Lite.sol",
+    "source_file": "benches/raw/ERC20Lite.sol",
     "state": [
       {
         "id": 2,

@@ -111,6 +111,12 @@ update `probe/mplus-probe` and regenerate.
   be added there and to the corresponding Lean boundary if they are part of the
   proof-facing implementation surface.
 - `uo-check` and `mplus-probe` are not in the proof-grade TCB.
+- Never hard-code absolute machine paths. Resolve repository files from
+  `env!("CARGO_MANIFEST_DIR")` in Rust (including inside `include_str!`) and
+  from the script's own location in shell. `uo-solc` records workspace-relative
+  `source_file` names, so regenerated artifacts and results do not depend on
+  the checkout location; `scripts/check_portable_paths.sh` (run in CI) rejects
+  tracked `/home/<user>/` and `/Users/<user>/` paths.
 - Treat Lean linter warnings in older modules as background unless they
   accompany build failures or missing report bits.
 

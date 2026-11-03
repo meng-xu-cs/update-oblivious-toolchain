@@ -49645,11 +49645,11 @@ fn run_ablation_study(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<
     #[cfg(not(feature = "insecure-eval-raw"))]
     {
         let _ = suite;
-        return Ok(json!({
+        Ok(json!({
             "requires_feature": "insecure-eval-raw",
             "status": "not_run",
             "reason": "ablation controls intentionally require executable insecure raw backends",
-        }));
+        }))
     }
     #[cfg(feature = "insecure-eval-raw")]
     {
@@ -52805,11 +52805,16 @@ Prototype assumptions:
 #[cfg(test)]
 mod tests {
     use super::{
-        addr, check_authscan_correctness, compile_artifact, compile_suite,
-        path_oram_fresh_coin_plan_for_runtime_tape, prepare_instance_with_seed,
-        production_source_slice, proof_artifact_size_budget_summary, run_auc_reports,
-        run_mutual_information_reports, run_overheads, run_trace_equivalence, BenchArtifacts,
+        addr, compile_artifact, path_oram_fresh_coin_plan_for_runtime_tape,
+        prepare_instance_with_seed, production_source_slice, proof_artifact_size_budget_summary,
         CallSpec,
+    };
+    // Only used by the strict-default-build tests below, which the
+    // insecure-eval-raw feature compiles out.
+    #[cfg(not(feature = "insecure-eval-raw"))]
+    use super::{
+        check_authscan_correctness, compile_suite, run_auc_reports, run_mutual_information_reports,
+        run_overheads, run_trace_equivalence, BenchArtifacts,
     };
     use uo_core::{
         canonical_path_oram_leaf_values_of_seed, ProgramMode, RuntimePathOramTransitionKind, Value,

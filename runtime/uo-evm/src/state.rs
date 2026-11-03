@@ -843,12 +843,21 @@ pub(in crate::runtime) fn public_state_transition_from_hashes(
     .map_err(anyhow::Error::from)
 }
 
+/// Allocator for hashing the committed public state.
+///
+/// Snapshotting only decodes public objects through scratch reservations: it
+/// never records kernel ops or stack checks, and the session is dropped without
+/// `finish()`, so its resource-event log is never consumed. The kernel-op and
+/// stack budgets are therefore zero. They only size the eagerly materialized
+/// event log (`(max_kernel_ops + max_stack_words) * 128 + 128` slots), and the
+/// previous `1 << 20` kernel-op budget materialized ~135M slots (~5 GB) on every
+/// digest, three digests per call.
 fn public_state_snapshot_allocator() -> Result<AllocatorSession> {
     AllocatorSession::new(AllocatorPlan {
         arena_bytes: 1 << 20,
-        max_stack_words: 4096,
+        max_stack_words: 0,
         scratch_bytes: 1 << 20,
-        max_kernel_ops: 1 << 20,
+        max_kernel_ops: 0,
     })
 }
 

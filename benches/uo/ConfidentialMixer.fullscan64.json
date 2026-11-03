@@ -10,13 +10,13 @@
     "metadata_canonicalization_sha256": "b7d80b720b9f6337b574e520b83c0c05680fb1ab1b212a49368e05f713f6ca5a",
     "compilation_mode": "uo",
     "compiler_version": "0.1.0",
-    "toolchain_manifest_sha256": "8fcbb03b8b958e7282b5e8eaf95bac1bf2b2c76095f82383cb8e4b0dec8acf4a",
-    "package_sha256": "0c06f69c7434b97b7d0bd533523c0a0737e106da67542be3d96c5bbcea33c196"
+    "toolchain_manifest_sha256": "81a1a552da93aeb36b466cbeb978c650ac5dbeb3bbc57b8a9cc2cae08e3b5550",
+    "package_sha256": "23c82e64261bb2f96392a6208cc335c38665fdbf2a80868b356b9b7127c96ebd"
   },
   "contract": {
     "contract": "ConfidentialMixer",
     "mode": "Uo",
-    "source_file": "/home/m285xu/update-oblivious-toolchain/benches/raw/ConfidentialMixer.sol",
+    "source_file": "benches/raw/ConfidentialMixer.sol",
     "state": [
       {
         "id": 1,

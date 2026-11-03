@@ -10,13 +10,13 @@
     "metadata_canonicalization_sha256": "84f504cb54aa3855cd1b5de15c212a2b49381d393660a1b0b742b38800d6681d",
     "compilation_mode": "uo",
     "compiler_version": "0.1.0",
-    "toolchain_manifest_sha256": "8fcbb03b8b958e7282b5e8eaf95bac1bf2b2c76095f82383cb8e4b0dec8acf4a",
-    "package_sha256": "6b7ad5be2a966307085c2e131c2a8d974fca68ab5c329282a0528e60162788c6"
+    "toolchain_manifest_sha256": "81a1a552da93aeb36b466cbeb978c650ac5dbeb3bbc57b8a9cc2cae08e3b5550",
+    "package_sha256": "3f85f73b8e8a32000e00206edf9f5e94ab71d1a3a253a1be0f1d7e6b7872b837"
   },
   "contract": {
     "contract": "RegistryCRUD",
     "mode": "Uo",
-    "source_file": "/home/m285xu/update-oblivious-toolchain/benches/raw/RegistryCRUD.sol",
+    "source_file": "benches/raw/RegistryCRUD.sol",
     "state": [
       {
         "id": 1,

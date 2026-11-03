@@ -383,6 +383,16 @@ pub fn run_artifact_with_seed(
 
 #[cfg(test)]
 mod tests {
+    /// Path of a benchmark file under `benches/raw`, resolved from this
+    /// crate's manifest directory so the tests do not depend on where the
+    /// repository is checked out. Usable both as a runtime path and inside
+    /// `include_str!`.
+    macro_rules! bench_raw {
+        ($name:literal) => {
+            concat!(env!("CARGO_MANIFEST_DIR"), "/../../benches/raw/", $name)
+        };
+    }
+
     use super::{CallResult, ContractInstance, ProductionContractInstance};
     use crate::deployment::{production_build_profile_sha256, ProductionRuntimePolicy};
     #[cfg(not(feature = "diagnostics"))]
@@ -415,10 +425,14 @@ mod tests {
     }
 
     fn write_temp(name: &str, contents: &str) -> PathBuf {
-        let path = PathBuf::from(format!(
-            "/tmp/uo-evm-engine-test-{}-{}.sol",
+        // A per-call suffix keeps parallel tests that reuse a label from racing
+        // on the same file.
+        static NEXT_TEMP: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        let path = std::env::temp_dir().join(format!(
+            "uo-evm-engine-test-{}-{}-{}.sol",
             name,
-            std::process::id()
+            std::process::id(),
+            NEXT_TEMP.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
         ));
         fs::write(&path, contents).unwrap();
         path
@@ -770,10 +784,8 @@ bounds:
     #[test]
     fn production_runtime_requires_attested_proof_bundle_session_and_freshness() {
         let artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
-            include_str!(
-                "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.pathoram.yaml"
-            ),
+            bench_raw!("SingleAccessMap.sol"),
+            include_str!(bench_raw!("SingleAccessMap.pathoram.yaml")),
             ProgramMode::Uo,
         );
         let entrypoint = "add(bytes32,uint256)";
@@ -1086,10 +1098,8 @@ bounds:
     #[test]
     fn production_runtime_rejects_diagnostics_build_profile() {
         let artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
-            include_str!(
-                "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.pathoram.yaml"
-            ),
+            bench_raw!("SingleAccessMap.sol"),
+            include_str!(bench_raw!("SingleAccessMap.pathoram.yaml")),
             ProgramMode::Uo,
         );
         let err = ProductionContractInstance::deploy_with_authorized_seed(
@@ -1263,10 +1273,8 @@ bounds:
     #[test]
     fn committed_uo_cell_state_is_cold_between_calls() {
         let artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/FixedSlotClassifier.sol",
-            include_str!(
-                "/home/m285xu/update-oblivious-toolchain/benches/raw/FixedSlotClassifier.uo.yaml"
-            ),
+            bench_raw!("FixedSlotClassifier.sol"),
+            include_str!(bench_raw!("FixedSlotClassifier.uo.yaml")),
             ProgramMode::Uo,
         );
         let mut instance = ContractInstance::deploy_with_seed(artifact, 7).unwrap();
@@ -1288,10 +1296,8 @@ bounds:
     #[test]
     fn call_rejects_hot_committed_state_before_execution() {
         let artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/FixedSlotClassifier.sol",
-            include_str!(
-                "/home/m285xu/update-oblivious-toolchain/benches/raw/FixedSlotClassifier.uo.yaml"
-            ),
+            bench_raw!("FixedSlotClassifier.sol"),
+            include_str!(bench_raw!("FixedSlotClassifier.uo.yaml")),
             ProgramMode::Uo,
         );
         let mut instance = ContractInstance::deploy_with_seed(artifact, 11).unwrap();
@@ -1327,10 +1333,8 @@ bounds:
     #[test]
     fn committed_path_oram_state_is_cold_between_calls() {
         let artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
-            include_str!(
-                "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.pathoram.yaml"
-            ),
+            bench_raw!("SingleAccessMap.sol"),
+            include_str!(bench_raw!("SingleAccessMap.pathoram.yaml")),
             ProgramMode::Uo,
         );
         let mut instance = ContractInstance::deploy_with_seed(artifact, 9).unwrap();
@@ -1353,10 +1357,8 @@ bounds:
     #[test]
     fn deployed_path_oram_state_is_cold_before_first_call() {
         let artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
-            include_str!(
-                "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.pathoram.yaml"
-            ),
+            bench_raw!("SingleAccessMap.sol"),
+            include_str!(bench_raw!("SingleAccessMap.pathoram.yaml")),
             ProgramMode::Uo,
         );
         let instance = ContractInstance::deploy_with_seed(artifact, 13).unwrap();
@@ -1433,10 +1435,8 @@ bounds:
     #[test]
     fn exceeded_commit_budget_rolls_back_committed_state() {
         let mut artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
-            include_str!(
-                "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.pathoram.yaml"
-            ),
+            bench_raw!("SingleAccessMap.sol"),
+            include_str!(bench_raw!("SingleAccessMap.pathoram.yaml")),
             ProgramMode::Uo,
         );
         // Force the resource budget to fail after the kernel runs on staged state.
@@ -1560,6 +1560,10 @@ bounds:
     }
 
     #[test]
+    // Strict default-build property: the insecure-eval-raw evaluation feature
+    // deliberately admits raw confidential backends and skips the
+    // confidential-object targeting check, so this rejection is not expected there.
+    #[cfg(not(feature = "insecure-eval-raw"))]
     fn confidential_kernel_targeting_public_uo_object_is_rejected() {
         let source = write_temp(
             "confidential-target",
@@ -1616,10 +1620,8 @@ bounds:
     #[test]
     fn production_proof_bundle_failure_rolls_back_and_preserves_freshness() {
         let artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
-            include_str!(
-                "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.pathoram.yaml"
-            ),
+            bench_raw!("SingleAccessMap.sol"),
+            include_str!(bench_raw!("SingleAccessMap.pathoram.yaml")),
             ProgramMode::Uo,
         );
         let entrypoint = "add(bytes32,uint256)";
@@ -1676,10 +1678,8 @@ bounds:
     #[test]
     fn production_translation_validation_certificate_binds_artifact_contents() {
         let artifact = compile_bench(
-            "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.sol",
-            include_str!(
-                "/home/m285xu/update-oblivious-toolchain/benches/raw/SingleAccessMap.pathoram.yaml"
-            ),
+            bench_raw!("SingleAccessMap.sol"),
+            include_str!(bench_raw!("SingleAccessMap.pathoram.yaml")),
             ProgramMode::Uo,
         );
         let entrypoint = "add(bytes32,uint256)";

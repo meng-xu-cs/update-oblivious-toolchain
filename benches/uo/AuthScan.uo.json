@@ -10,13 +10,13 @@
     "metadata_canonicalization_sha256": "219e42a69487391c8377e4b6f4798cd62d190a1108d4187cd10c102b20ef9038",
     "compilation_mode": "uo",
     "compiler_version": "0.1.0",
-    "toolchain_manifest_sha256": "8fcbb03b8b958e7282b5e8eaf95bac1bf2b2c76095f82383cb8e4b0dec8acf4a",
-    "package_sha256": "f646a83eb4a6cee1d09ecd5f618727afd945cbc6bf0552075e930eda37929420"
+    "toolchain_manifest_sha256": "81a1a552da93aeb36b466cbeb978c650ac5dbeb3bbc57b8a9cc2cae08e3b5550",
+    "package_sha256": "1557e2d7396c70bcf97ff8534ddc2bb3ac63890cadde38bb3a2dd90ca760656d"
   },
   "contract": {
     "contract": "AuthScan",
     "mode": "Uo",
-    "source_file": "/home/m285xu/update-oblivious-toolchain/benches/raw/AuthScan.sol",
+    "source_file": "benches/raw/AuthScan.sol",
     "state": [
       {
         "id": 1,

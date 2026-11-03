@@ -1,6 +1,7 @@
 use anyhow::{anyhow, bail, Context, Result};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
+use std::path::Path;
 use uo_core::ir::{
     BackendKind, BinaryOp, CompiledContract, CompiledFunction, ContainerKind, Expr, ProgramMode,
     PublicEnvField, StateObject, Statement, UnaryOp,
@@ -99,6 +100,26 @@ pub fn compile_with_metadata_bytes(
     mode: ProgramMode,
 ) -> Result<CompiledArtifact> {
     compile_impl(source_path, metadata, Some(raw_metadata), mode)
+}
+
+/// Location-independent name recorded for a source file in artifacts
+/// (`source_file`) and translation bundles (`source_path`).
+///
+/// Generated artifacts must not depend on where the repository is checked out,
+/// so a source inside this workspace is named by its workspace-relative path and
+/// any other source by its file name. The name is informational: the
+/// admitted-package identity binds the source bytes, not this name.
+pub fn artifact_source_name(source_path: &str) -> String {
+    let path = Path::new(source_path);
+    let workspace_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    if let (Ok(source), Ok(root)) = (path.canonicalize(), workspace_root.canonicalize()) {
+        if let Ok(relative) = source.strip_prefix(&root) {
+            return relative.to_string_lossy().into_owned();
+        }
+    }
+    path.file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_else(|| source_path.to_string())
 }
 
 fn compile_impl(
@@ -236,7 +257,12 @@ pub fn translation_validation_bundle_against_artifact_with_metadata_bytes(
         raw_metadata,
         artifact.contract.mode.clone(),
     )?;
-    ProofRelevantTranslationBundle::from_artifacts(source_path, metadata, &expected, artifact)
+    ProofRelevantTranslationBundle::from_artifacts(
+        artifact_source_name(source_path),
+        metadata,
+        &expected,
+        artifact,
+    )
 }
 
 fn parse_frontend(
@@ -417,7 +443,7 @@ fn parse_frontend(
         }
     }
     Ok(Frontend {
-        source_file: source_path.into(),
+        source_file: artifact_source_name(source_path),
         contract_name: metadata.contract.clone(),
         structs,
         state_by_name,
@@ -3276,7 +3302,8 @@ fn render_expr(expr: &Expr) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        compile, compile_with_metadata_bytes, translation_validation_bundle_against_artifact,
+        artifact_source_name, compile, compile_with_metadata_bytes,
+        translation_validation_bundle_against_artifact,
         translation_validation_bundle_against_artifact_with_metadata_bytes, validate_source,
     };
     use std::fs;
@@ -3284,10 +3311,14 @@ mod tests {
     use uo_core::{ContractMetadata, Expr, ProgramMode, PublicEnvField, Statement, Uint256, Value};
 
     fn write_temp(name: &str, contents: &str) -> PathBuf {
-        let path = PathBuf::from(format!(
-            "/tmp/uo-solc-test-{}-{}.sol",
+        // A per-call suffix keeps parallel tests that reuse a label from racing
+        // on the same file.
+        static NEXT_TEMP: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        let path = std::env::temp_dir().join(format!(
+            "uo-solc-test-{}-{}-{}.sol",
             name,
-            std::process::id()
+            std::process::id(),
+            NEXT_TEMP.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
         ));
         fs::write(&path, contents).unwrap();
         path
@@ -5495,6 +5526,38 @@ bounds:
         assert_eq!(
             entry.kernel_steps.last().and_then(|step| step.object_id),
             None
+        );
+    }
+
+    #[test]
+    fn artifact_source_name_does_not_depend_on_checkout_location() {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let absolute = root.join("benches/raw/FixedSlotClassifier.sol");
+        assert_eq!(
+            artifact_source_name(absolute.to_str().unwrap()),
+            "benches/raw/FixedSlotClassifier.sol"
+        );
+        // Tests run from the crate directory, so this relative spelling names
+        // the same workspace file.
+        assert_eq!(
+            artifact_source_name("../../benches/raw/FixedSlotClassifier.sol"),
+            "benches/raw/FixedSlotClassifier.sol"
+        );
+        // Sources outside the workspace keep only their file name.
+        let outside = write_temp("source-name-outside", "contract C {}");
+        assert_eq!(
+            artifact_source_name(outside.to_str().unwrap()),
+            outside.file_name().unwrap().to_str().unwrap()
+        );
+
+        let metadata: ContractMetadata = serde_yaml::from_str(
+            &fs::read_to_string(root.join("benches/raw/FixedSlotClassifier.uo.yaml")).unwrap(),
+        )
+        .unwrap();
+        let artifact = compile(absolute.to_str().unwrap(), &metadata, ProgramMode::Uo).unwrap();
+        assert_eq!(
+            artifact.contract.source_file,
+            "benches/raw/FixedSlotClassifier.sol"
         );
     }
 
