@@ -5,13 +5,13 @@
     "source_language": "uo-solidity-like-dsl-v1",
     "semantics_profile": "uo-evm-modular256-v1",
     "source_sha256": "189206eda78843b786e1835056ddce154d2784db22bc36a427f784e1fbcf4b84",
-    "metadata_sha256": "e9ba71299fbf91b45ec2bdc30c546473619e0aa5b3b6860e330abbfbf3132879",
-    "raw_metadata_sha256": "4e8cea809cea850858cee9374dada4f1eb35e6ed612636c73ee6f484fefc4cd0",
-    "metadata_canonicalization_sha256": "ef6e87f99ca6effc2ec34d76ac96006d005c036420c61988578bbe4291bf585e",
+    "metadata_sha256": "f32f04989ff124f80101b4512f61fe4e003fedd63fea19d3d3a5ecf0ef43a5af",
+    "raw_metadata_sha256": "fd83d2b8103040592505c89193176b48c9dca9973d02bd99e7c38fb58837d7d9",
+    "metadata_canonicalization_sha256": "0cc71f427c5802bc5dbf3da8dfa3594b7e57cf479a99b260f71e34f5ac7feccb",
     "compilation_mode": "uo",
     "compiler_version": "0.1.0",
-    "toolchain_manifest_sha256": "81a1a552da93aeb36b466cbeb978c650ac5dbeb3bbc57b8a9cc2cae08e3b5550",
-    "package_sha256": "6d61e0a7c04ed6ca863cf75ed66e45feb098b90544f09e821698cc477fa1c74d"
+    "toolchain_manifest_sha256": "0e7f80a1da02fdf34842a26b9abe21a31f9a7e35f0aabeaed20c4486c145722a",
+    "package_sha256": "da2534cd34193b78ac8351dc871a371cf70acdb391ef4fadbdf0c54a3e0b4eea"
   },
   "contract": {
     "contract": "ERC20Lite",
@@ -1869,7 +1869,7 @@
             "amount"
           ],
           "entry_input_len": 72,
-          "public_gas_budget": 14336,
+          "public_gas_budget": 3253,
           "arena_bytes": 4160,
           "max_stack_words": 65,
           "max_hash_part_bytes": 20,
@@ -2277,7 +2277,7 @@
             "amount"
           ],
           "entry_input_len": 72,
-          "public_gas_budget": 14336,
+          "public_gas_budget": 4965,
           "arena_bytes": 4160,
           "max_stack_words": 65,
           "max_hash_part_bytes": 0,
@@ -2595,7 +2595,7 @@
             "amount"
           ],
           "entry_input_len": 92,
-          "public_gas_budget": 16384,
+          "public_gas_budget": 7485,
           "arena_bytes": 4288,
           "max_stack_words": 67,
           "max_hash_part_bytes": 20,

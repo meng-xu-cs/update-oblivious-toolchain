@@ -49088,7 +49088,6 @@ entrypoints:
   f(bytes32,uint256):
     secret_args: [k, v]
     confidential: true
-    public_gas_budget: 8192
     returns: forbidden
     status: public
 state:
@@ -49122,7 +49121,6 @@ entrypoints:
   f(address,address):
     secret_args: [a, b]
     confidential: true
-    public_gas_budget: 8192
     returns: forbidden
     status: public
 state:
@@ -49155,7 +49153,6 @@ entrypoints:
   setv(uint256):
     secret_args: [secret]
     confidential: true
-    public_gas_budget: 4096
     returns: forbidden
     status: public
   value():
@@ -49194,7 +49191,6 @@ entrypoints:
   classify(uint256):
     secret_args: [secret]
     confidential: true
-    public_gas_budget: 4096
     returns: forbidden
     status: public
 state:
@@ -49620,7 +49616,6 @@ entrypoints:
   f(uint256):
     secret_args: [secret]
     confidential: true
-    public_gas_budget: 4096
     returns: declassified
     status: public
     declassifies: [return]

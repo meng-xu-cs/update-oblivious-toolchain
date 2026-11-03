@@ -71,6 +71,13 @@ mod tests {
             .unwrap()
     }
 
+    /// Public gas the manifest promises for `entrypoint`: the compiler's
+    /// modeled cost of the entrypoint's fixed schedule. The runtime must charge
+    /// exactly this, whatever the secret inputs are.
+    fn modeled_gas(artifact: &uo_core::CompiledArtifact, entrypoint: &str) -> u64 {
+        artifact.contract.manifest.entrypoints[entrypoint].public_gas_budget
+    }
+
     fn write_temp(name: &str, contents: &str) -> PathBuf {
         // A per-call suffix keeps parallel tests that reuse a label from racing
         // on the same file.
@@ -134,6 +141,7 @@ mod tests {
             include_str!(bench_raw!("FixedSlotClassifier.uo.yaml")),
             ProgramMode::Uo,
         );
+        let expected_gas = modeled_gas(&artifact, "classify(uint256)");
         let mut zero_instance = ContractInstance::deploy(artifact.clone()).unwrap();
         let zero = zero_instance
             .call("classify(uint256)", vec![Value::uint(0)])
@@ -156,8 +164,8 @@ mod tests {
             zero.trace.hashes().unwrap().physical_access_trace_hash,
             one.trace.hashes().unwrap().physical_access_trace_hash
         );
-        assert_eq!(zero.trace.gas_used, 4096);
-        assert_eq!(one.trace.gas_used, 4096);
+        assert_eq!(zero.trace.gas_used, expected_gas);
+        assert_eq!(one.trace.gas_used, expected_gas);
     }
 
     #[test]
@@ -340,6 +348,7 @@ bounds:
             include_str!(bench_raw!("AuthScan.uo.yaml")),
             ProgramMode::Uo,
         );
+        let expected_gas = modeled_gas(&artifact, "auth(bytes32)");
         let token0 = Value::Bytes32([1u8; 32]);
         let token1 = Value::Bytes32([2u8; 32]);
         let token_absent = Value::Bytes32([3u8; 32]);
@@ -386,8 +395,8 @@ bounds:
             hit.trace.hashes().unwrap().physical_access_trace_hash,
             miss.trace.hashes().unwrap().physical_access_trace_hash
         );
-        assert_eq!(hit.trace.gas_used, 8192);
-        assert_eq!(miss.trace.gas_used, 8192);
+        assert_eq!(hit.trace.gas_used, expected_gas);
+        assert_eq!(miss.trace.gas_used, expected_gas);
     }
 
     #[test]
@@ -397,13 +406,14 @@ bounds:
             include_str!(bench_raw!("FixedSlotClassifier.uo.yaml")),
             ProgramMode::Uo,
         );
+        let expected_gas = modeled_gas(&artifact, "sameSame(uint256)");
         let mut inst = ContractInstance::deploy(artifact).unwrap();
         let result = inst
             .call("sameSame(uint256)", vec![Value::uint(5)])
             .unwrap();
         let peek = inst.call("peek()", vec![]).unwrap();
 
-        assert_eq!(result.trace.gas_used, 4096);
+        assert_eq!(result.trace.gas_used, expected_gas);
         assert!(result
             .trace
             .physical_writes
@@ -419,6 +429,7 @@ bounds:
             include_str!(bench_raw!("ConfidentialMixer.uo.yaml")),
             ProgramMode::Uo,
         );
+        let expected_gas = modeled_gas(&artifact, "withdraw(bytes32,uint256)");
         let key = Value::Bytes32([9u8; 32]);
 
         let mut ok_inst = ContractInstance::deploy(artifact.clone()).unwrap();
@@ -453,8 +464,8 @@ bounds:
             .unwrap();
         let abort_balance = abort_inst.call("balanceOf(bytes32)", vec![key]).unwrap();
 
-        assert_eq!(ok.trace.gas_used, 16384);
-        assert_eq!(abort.trace.gas_used, 16384);
+        assert_eq!(ok.trace.gas_used, expected_gas);
+        assert_eq!(abort.trace.gas_used, expected_gas);
         assert_eq!(
             ok.trace.hashes().unwrap().physical_access_trace_hash,
             abort.trace.hashes().unwrap().physical_access_trace_hash
@@ -492,6 +503,7 @@ bounds:
             include_str!(bench_raw!("RegistryCRUD.uo.yaml")),
             ProgramMode::Uo,
         );
+        let expected_gas = modeled_gas(&artifact, "clearIfMatch(bytes32,uint256)");
         let key = Value::Bytes32([4u8; 32]);
 
         let mut inst = ContractInstance::deploy(artifact).unwrap();
@@ -505,7 +517,7 @@ bounds:
             .unwrap();
         let read = inst.call("read(bytes32)", vec![key]).unwrap();
 
-        assert_eq!(clear.trace.gas_used, 12288);
+        assert_eq!(clear.trace.gas_used, expected_gas);
         assert_eq!(clear.return_value, Some(Value::uint(1)));
         assert_eq!(read.return_value, Some(Value::uint(0)));
     }
@@ -558,6 +570,7 @@ bounds:
             include_str!(bench_raw!("ConfidentialMixer.pathoram.yaml")),
             ProgramMode::Uo,
         );
+        let expected_gas = modeled_gas(&artifact, "deposit(bytes32,uint256)");
         let mut first = ContractInstance::deploy(artifact.clone()).unwrap();
         let first_trace = first
             .call(
@@ -586,8 +599,8 @@ bounds:
             .physical_writes
             .iter()
             .all(|event| event.class == WriteClass::Update));
-        assert_eq!(first_trace.trace.gas_used, 12288);
-        assert_eq!(second_trace.trace.gas_used, 12288);
+        assert_eq!(first_trace.trace.gas_used, expected_gas);
+        assert_eq!(second_trace.trace.gas_used, expected_gas);
     }
 
     #[test]
@@ -637,6 +650,7 @@ bounds:
             include_str!(bench_raw!("ERC20Lite.pathoram.yaml")),
             ProgramMode::Uo,
         );
+        let expected_gas = modeled_gas(&artifact, "approve(address,address,uint256)");
         let mut first = ContractInstance::deploy(artifact.clone()).unwrap();
         let first_trace = first
             .call(
@@ -663,8 +677,8 @@ bounds:
             first_trace.trace.theorem_trace,
             second_trace.trace.theorem_trace
         );
-        assert_eq!(first_trace.trace.gas_used, 14336);
-        assert_eq!(second_trace.trace.gas_used, 14336);
+        assert_eq!(first_trace.trace.gas_used, expected_gas);
+        assert_eq!(second_trace.trace.gas_used, expected_gas);
     }
 
     #[test]

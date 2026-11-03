@@ -42,7 +42,7 @@
       "controller_phase_count": 3,
       "entrypoint": "classify(uint256)",
       "exit_events": 4,
-      "gas_used": 4096,
+      "gas_used": 2086,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 4,
         "expected_kernel_step_public_object_schedule": [
@@ -315,7 +315,7 @@
       "controller_phase_count": 3,
       "entrypoint": "classify(uint256)",
       "exit_events": 4,
-      "gas_used": 4096,
+      "gas_used": 2086,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 4,
         "expected_kernel_step_public_object_schedule": [
@@ -588,7 +588,7 @@
       "controller_phase_count": 3,
       "entrypoint": "auth(bytes32)",
       "exit_events": 4,
-      "gas_used": 8192,
+      "gas_used": 2446,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 8,
         "expected_kernel_step_public_object_schedule": [
@@ -1087,7 +1087,7 @@
       "controller_phase_count": 3,
       "entrypoint": "auth(bytes32)",
       "exit_events": 4,
-      "gas_used": 8192,
+      "gas_used": 2446,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 8,
         "expected_kernel_step_public_object_schedule": [
@@ -1572,7 +1572,7 @@
         "secret_arg_count": 2,
         "statement_count": 1
       },
-      "confidential_proof_bundle_family_json_bytes": 109535,
+      "confidential_proof_bundle_family_json_bytes": 109515,
       "confidential_slot_program": {
         "entrypoint_id": "upsert(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -1586,7 +1586,7 @@
       "controller_phase_count": 3,
       "entrypoint": "upsert(bytes32,uint256)",
       "exit_events": 4,
-      "gas_used": 12288,
+      "gas_used": 2264,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 4,
         "expected_kernel_step_public_object_schedule": [
@@ -2007,7 +2007,7 @@
         "secret_arg_count": 2,
         "statement_count": 1
       },
-      "confidential_proof_bundle_family_json_bytes": 109535,
+      "confidential_proof_bundle_family_json_bytes": 109515,
       "confidential_slot_program": {
         "entrypoint_id": "upsert(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -2021,7 +2021,7 @@
       "controller_phase_count": 3,
       "entrypoint": "upsert(bytes32,uint256)",
       "exit_events": 4,
-      "gas_used": 12288,
+      "gas_used": 2264,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 4,
         "expected_kernel_step_public_object_schedule": [
@@ -2442,7 +2442,7 @@
         "secret_arg_count": 2,
         "statement_count": 3
       },
-      "confidential_proof_bundle_family_json_bytes": 150904,
+      "confidential_proof_bundle_family_json_bytes": 150884,
       "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
@@ -2456,7 +2456,7 @@
       "controller_phase_count": 3,
       "entrypoint": "deposit(bytes32,uint256)",
       "exit_events": 4,
-      "gas_used": 16384,
+      "gas_used": 2371,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 7,
         "expected_kernel_step_public_object_schedule": [
@@ -2980,7 +2980,7 @@
         "secret_arg_count": 2,
         "statement_count": 3
       },
-      "confidential_proof_bundle_family_json_bytes": 150904,
+      "confidential_proof_bundle_family_json_bytes": 150884,
       "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
@@ -2994,7 +2994,7 @@
       "controller_phase_count": 3,
       "entrypoint": "deposit(bytes32,uint256)",
       "exit_events": 4,
-      "gas_used": 16384,
+      "gas_used": 2371,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 7,
         "expected_kernel_step_public_object_schedule": [
@@ -3518,7 +3518,7 @@
         "secret_arg_count": 3,
         "statement_count": 2
       },
-      "confidential_proof_bundle_family_json_bytes": 176309,
+      "confidential_proof_bundle_family_json_bytes": 176289,
       "confidential_slot_program": {
         "entrypoint_id": "approve(address,address,uint256)",
         "expected_runtime_step_count": 4,
@@ -3532,7 +3532,7 @@
       "controller_phase_count": 3,
       "entrypoint": "approve(address,address,uint256)",
       "exit_events": 4,
-      "gas_used": 20480,
+      "gas_used": 2528,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 4,
         "expected_kernel_step_public_object_schedule": [
@@ -4186,7 +4186,7 @@
         "secret_arg_count": 3,
         "statement_count": 2
       },
-      "confidential_proof_bundle_family_json_bytes": 176309,
+      "confidential_proof_bundle_family_json_bytes": 176289,
       "confidential_slot_program": {
         "entrypoint_id": "approve(address,address,uint256)",
         "expected_runtime_step_count": 4,
@@ -4200,7 +4200,7 @@
       "controller_phase_count": 3,
       "entrypoint": "approve(address,address,uint256)",
       "exit_events": 4,
-      "gas_used": 20480,
+      "gas_used": 2528,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 4,
         "expected_kernel_step_public_object_schedule": [
@@ -8688,7 +8688,7 @@
         "secret_arg_count": 2,
         "statement_count": 3
       },
-      "confidential_proof_bundle_family_json_bytes": 846435,
+      "confidential_proof_bundle_family_json_bytes": 846415,
       "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
@@ -8702,7 +8702,7 @@
       "controller_phase_count": 13,
       "entrypoint": "deposit(bytes32,uint256)",
       "exit_events": 16,
-      "gas_used": 12288,
+      "gas_used": 3531,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 7,
         "expected_kernel_step_public_object_schedule": [
@@ -11506,7 +11506,7 @@
         "secret_arg_count": 4,
         "statement_count": 9
       },
-      "confidential_proof_bundle_family_json_bytes": 2643224,
+      "confidential_proof_bundle_family_json_bytes": 2643204,
       "confidential_slot_program": {
         "entrypoint_id": "transferFrom(address,address,address,uint256)",
         "expected_runtime_step_count": 9,
@@ -11520,7 +11520,7 @@
       "controller_phase_count": 33,
       "entrypoint": "transferFrom(address,address,address,uint256)",
       "exit_events": 40,
-      "gas_used": 16384,
+      "gas_used": 7485,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 9,
         "expected_kernel_step_public_object_schedule": [

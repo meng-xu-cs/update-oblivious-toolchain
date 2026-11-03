@@ -7,7 +7,6 @@ entrypoints:
   auth(bytes32):
     secret_args: [token]
     confidential: true
-    public_gas_budget: 8192
     returns: declassified
     status: public
     declassifies: [return]

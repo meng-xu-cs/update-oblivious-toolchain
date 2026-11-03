@@ -7,20 +7,17 @@ entrypoints:
   approve(address,address,uint256):
     secret_args: [owner, spender, amount]
     confidential: true
-    public_gas_budget: 14336
     returns: forbidden
     status: public
   transfer(address,address,uint256):
     secret_args: [from, to, amount]
     confidential: true
-    public_gas_budget: 14336
     returns: declassified
     status: declassified
     declassifies: [return, success]
   transferFrom(address,address,address,uint256):
     secret_args: [owner, spender, to, amount]
     confidential: true
-    public_gas_budget: 16384
     returns: declassified
     status: declassified
     declassifies: [return, success]

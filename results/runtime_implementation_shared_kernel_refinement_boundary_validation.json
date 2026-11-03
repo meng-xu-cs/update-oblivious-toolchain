@@ -15,7 +15,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1286980,
+      "boundary_json_bytes": 1288016,
       "confidential_slot_program": {
         "entrypoint_id": "classify(uint256)",
         "expected_runtime_step_count": 4,
@@ -27,7 +27,7 @@
         "statement_trace_count": 2
       },
       "entrypoint": "classify(uint256)",
-      "gas_used": 4096,
+      "gas_used": 2086,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
         "allocator": 15664,
@@ -50,7 +50,7 @@
         "objects": 90720,
         "oram": 55848,
         "precompiles": 240,
-        "runtime_evm_lib": 65783,
+        "runtime_evm_lib": 66791,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -257,7 +257,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1286980,
+      "boundary_json_bytes": 1288016,
       "confidential_slot_program": {
         "entrypoint_id": "classify(uint256)",
         "expected_runtime_step_count": 4,
@@ -269,7 +269,7 @@
         "statement_trace_count": 2
       },
       "entrypoint": "classify(uint256)",
-      "gas_used": 4096,
+      "gas_used": 2086,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
         "allocator": 15664,
@@ -292,7 +292,7 @@
         "objects": 90720,
         "oram": 55848,
         "precompiles": 240,
-        "runtime_evm_lib": 65783,
+        "runtime_evm_lib": 66791,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -499,7 +499,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1290911,
+      "boundary_json_bytes": 1291947,
       "confidential_slot_program": {
         "entrypoint_id": "auth(bytes32)",
         "expected_runtime_step_count": 8,
@@ -511,7 +511,7 @@
         "statement_trace_count": 7
       },
       "entrypoint": "auth(bytes32)",
-      "gas_used": 8192,
+      "gas_used": 2446,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
         "allocator": 15664,
@@ -534,7 +534,7 @@
         "objects": 90720,
         "oram": 55848,
         "precompiles": 240,
-        "runtime_evm_lib": 65783,
+        "runtime_evm_lib": 66791,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -944,7 +944,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1290911,
+      "boundary_json_bytes": 1291947,
       "confidential_slot_program": {
         "entrypoint_id": "auth(bytes32)",
         "expected_runtime_step_count": 8,
@@ -956,7 +956,7 @@
         "statement_trace_count": 7
       },
       "entrypoint": "auth(bytes32)",
-      "gas_used": 8192,
+      "gas_used": 2446,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
         "allocator": 15664,
@@ -979,7 +979,7 @@
         "objects": 90720,
         "oram": 55848,
         "precompiles": 240,
-        "runtime_evm_lib": 65783,
+        "runtime_evm_lib": 66791,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -1389,7 +1389,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1288836,
+      "boundary_json_bytes": 1289872,
       "confidential_slot_program": {
         "entrypoint_id": "upsert(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -1401,7 +1401,7 @@
         "statement_trace_count": 1
       },
       "entrypoint": "upsert(bytes32,uint256)",
-      "gas_used": 12288,
+      "gas_used": 2264,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
         "allocator": 15664,
@@ -1424,7 +1424,7 @@
         "objects": 90720,
         "oram": 55848,
         "precompiles": 240,
-        "runtime_evm_lib": 65783,
+        "runtime_evm_lib": 66791,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -1793,7 +1793,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1288836,
+      "boundary_json_bytes": 1289872,
       "confidential_slot_program": {
         "entrypoint_id": "upsert(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -1805,7 +1805,7 @@
         "statement_trace_count": 1
       },
       "entrypoint": "upsert(bytes32,uint256)",
-      "gas_used": 12288,
+      "gas_used": 2264,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
         "allocator": 15664,
@@ -1828,7 +1828,7 @@
         "objects": 90720,
         "oram": 55848,
         "precompiles": 240,
-        "runtime_evm_lib": 65783,
+        "runtime_evm_lib": 66791,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -2197,7 +2197,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1290427,
+      "boundary_json_bytes": 1291463,
       "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
@@ -2209,7 +2209,7 @@
         "statement_trace_count": 3
       },
       "entrypoint": "deposit(bytes32,uint256)",
-      "gas_used": 16384,
+      "gas_used": 2371,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
         "allocator": 15664,
@@ -2232,7 +2232,7 @@
         "objects": 90720,
         "oram": 55848,
         "precompiles": 240,
-        "runtime_evm_lib": 65783,
+        "runtime_evm_lib": 66791,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -2685,7 +2685,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1290427,
+      "boundary_json_bytes": 1291463,
       "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
@@ -2697,7 +2697,7 @@
         "statement_trace_count": 3
       },
       "entrypoint": "deposit(bytes32,uint256)",
-      "gas_used": 16384,
+      "gas_used": 2371,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
         "allocator": 15664,
@@ -2720,7 +2720,7 @@
         "objects": 90720,
         "oram": 55848,
         "precompiles": 240,
-        "runtime_evm_lib": 65783,
+        "runtime_evm_lib": 66791,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -3173,7 +3173,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1291731,
+      "boundary_json_bytes": 1292767,
       "confidential_slot_program": {
         "entrypoint_id": "approve(address,address,uint256)",
         "expected_runtime_step_count": 4,
@@ -3185,7 +3185,7 @@
         "statement_trace_count": 2
       },
       "entrypoint": "approve(address,address,uint256)",
-      "gas_used": 20480,
+      "gas_used": 2528,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
         "allocator": 15664,
@@ -3208,7 +3208,7 @@
         "objects": 90720,
         "oram": 55848,
         "precompiles": 240,
-        "runtime_evm_lib": 65783,
+        "runtime_evm_lib": 66791,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -3807,7 +3807,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1291731,
+      "boundary_json_bytes": 1292767,
       "confidential_slot_program": {
         "entrypoint_id": "approve(address,address,uint256)",
         "expected_runtime_step_count": 4,
@@ -3819,7 +3819,7 @@
         "statement_trace_count": 2
       },
       "entrypoint": "approve(address,address,uint256)",
-      "gas_used": 20480,
+      "gas_used": 2528,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
         "allocator": 15664,
@@ -3842,7 +3842,7 @@
         "objects": 90720,
         "oram": 55848,
         "precompiles": 240,
-        "runtime_evm_lib": 65783,
+        "runtime_evm_lib": 66791,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -4441,7 +4441,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "boundary_json_bytes": 1293953,
+      "boundary_json_bytes": 1294989,
       "confidential_slot_program": {
         "entrypoint_id": "put(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -4476,7 +4476,7 @@
         "objects": 90720,
         "oram": 55848,
         "precompiles": 240,
-        "runtime_evm_lib": 65783,
+        "runtime_evm_lib": 66791,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -5265,7 +5265,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "boundary_json_bytes": 1293953,
+      "boundary_json_bytes": 1294989,
       "confidential_slot_program": {
         "entrypoint_id": "put(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -5300,7 +5300,7 @@
         "objects": 90720,
         "oram": 55848,
         "precompiles": 240,
-        "runtime_evm_lib": 65783,
+        "runtime_evm_lib": 66791,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -6089,7 +6089,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 1296651,
+      "boundary_json_bytes": 1297687,
       "confidential_slot_program": {
         "entrypoint_id": "add(bytes32,uint256)",
         "expected_runtime_step_count": 5,
@@ -6124,7 +6124,7 @@
         "objects": 90720,
         "oram": 55848,
         "precompiles": 240,
-        "runtime_evm_lib": 65783,
+        "runtime_evm_lib": 66791,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -7116,7 +7116,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 1296651,
+      "boundary_json_bytes": 1297687,
       "confidential_slot_program": {
         "entrypoint_id": "add(bytes32,uint256)",
         "expected_runtime_step_count": 5,
@@ -7151,7 +7151,7 @@
         "objects": 90720,
         "oram": 55848,
         "precompiles": 240,
-        "runtime_evm_lib": 65783,
+        "runtime_evm_lib": 66791,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -8143,7 +8143,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 1318179,
+      "boundary_json_bytes": 1319215,
       "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
@@ -8155,7 +8155,7 @@
         "statement_trace_count": 3
       },
       "entrypoint": "deposit(bytes32,uint256)",
-      "gas_used": 12288,
+      "gas_used": 3531,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
         "allocator": 15664,
@@ -8178,7 +8178,7 @@
         "objects": 90720,
         "oram": 55848,
         "precompiles": 240,
-        "runtime_evm_lib": 65783,
+        "runtime_evm_lib": 66791,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -10911,7 +10911,7 @@
     {
       "accepted": true,
       "boundary_events": 14,
-      "boundary_json_bytes": 1385389,
+      "boundary_json_bytes": 1386425,
       "confidential_slot_program": {
         "entrypoint_id": "transferFrom(address,address,address,uint256)",
         "expected_runtime_step_count": 9,
@@ -10923,7 +10923,7 @@
         "statement_trace_count": 9
       },
       "entrypoint": "transferFrom(address,address,address,uint256)",
-      "gas_used": 16384,
+      "gas_used": 7485,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
         "allocator": 15664,
@@ -10946,7 +10946,7 @@
         "objects": 90720,
         "oram": 55848,
         "precompiles": 240,
-        "runtime_evm_lib": 65783,
+        "runtime_evm_lib": 66791,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,

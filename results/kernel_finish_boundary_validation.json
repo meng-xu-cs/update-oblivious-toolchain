@@ -16,7 +16,7 @@
       "accepted": true,
       "boundary_events": 2,
       "entrypoint": "classify(uint256)",
-      "gas_used": 4096,
+      "gas_used": 2086,
       "kernel_finish_bundle": {
         "emitted_kernel_step_count": 4,
         "entrypoint_id": "classify(uint256)",
@@ -206,7 +206,7 @@
       "accepted": true,
       "boundary_events": 2,
       "entrypoint": "classify(uint256)",
-      "gas_used": 4096,
+      "gas_used": 2086,
       "kernel_finish_bundle": {
         "emitted_kernel_step_count": 4,
         "entrypoint_id": "classify(uint256)",
@@ -396,7 +396,7 @@
       "accepted": true,
       "boundary_events": 2,
       "entrypoint": "auth(bytes32)",
-      "gas_used": 8192,
+      "gas_used": 2446,
       "kernel_finish_bundle": {
         "emitted_kernel_step_count": 8,
         "entrypoint_id": "auth(bytes32)",
@@ -789,7 +789,7 @@
       "accepted": true,
       "boundary_events": 2,
       "entrypoint": "auth(bytes32)",
-      "gas_used": 8192,
+      "gas_used": 2446,
       "kernel_finish_bundle": {
         "emitted_kernel_step_count": 8,
         "entrypoint_id": "auth(bytes32)",
@@ -1182,7 +1182,7 @@
       "accepted": true,
       "boundary_events": 2,
       "entrypoint": "upsert(bytes32,uint256)",
-      "gas_used": 12288,
+      "gas_used": 2264,
       "kernel_finish_bundle": {
         "emitted_kernel_step_count": 4,
         "entrypoint_id": "upsert(bytes32,uint256)",
@@ -1534,7 +1534,7 @@
       "accepted": true,
       "boundary_events": 2,
       "entrypoint": "upsert(bytes32,uint256)",
-      "gas_used": 12288,
+      "gas_used": 2264,
       "kernel_finish_bundle": {
         "emitted_kernel_step_count": 4,
         "entrypoint_id": "upsert(bytes32,uint256)",
@@ -1886,7 +1886,7 @@
       "accepted": true,
       "boundary_events": 2,
       "entrypoint": "deposit(bytes32,uint256)",
-      "gas_used": 16384,
+      "gas_used": 2371,
       "kernel_finish_bundle": {
         "emitted_kernel_step_count": 7,
         "entrypoint_id": "deposit(bytes32,uint256)",
@@ -2322,7 +2322,7 @@
       "accepted": true,
       "boundary_events": 2,
       "entrypoint": "deposit(bytes32,uint256)",
-      "gas_used": 16384,
+      "gas_used": 2371,
       "kernel_finish_bundle": {
         "emitted_kernel_step_count": 7,
         "entrypoint_id": "deposit(bytes32,uint256)",
@@ -2758,7 +2758,7 @@
       "accepted": true,
       "boundary_events": 2,
       "entrypoint": "approve(address,address,uint256)",
-      "gas_used": 20480,
+      "gas_used": 2528,
       "kernel_finish_bundle": {
         "emitted_kernel_step_count": 4,
         "entrypoint_id": "approve(address,address,uint256)",
@@ -3340,7 +3340,7 @@
       "accepted": true,
       "boundary_events": 2,
       "entrypoint": "approve(address,address,uint256)",
-      "gas_used": 20480,
+      "gas_used": 2528,
       "kernel_finish_bundle": {
         "emitted_kernel_step_count": 4,
         "entrypoint_id": "approve(address,address,uint256)",
@@ -7416,7 +7416,7 @@
       "accepted": true,
       "boundary_events": 6,
       "entrypoint": "deposit(bytes32,uint256)",
-      "gas_used": 12288,
+      "gas_used": 3531,
       "kernel_finish_bundle": {
         "emitted_kernel_step_count": 7,
         "entrypoint_id": "deposit(bytes32,uint256)",
@@ -10132,7 +10132,7 @@
       "accepted": true,
       "boundary_events": 14,
       "entrypoint": "transferFrom(address,address,address,uint256)",
-      "gas_used": 16384,
+      "gas_used": 7485,
       "kernel_finish_bundle": {
         "emitted_kernel_step_count": 9,
         "entrypoint_id": "transferFrom(address,address,address,uint256)",

@@ -9,15 +9,15 @@
           "cost_model": "uo-modeled-resource-cost-v1",
           "entrypoint": "classify(uint256)",
           "formula_exact": true,
-          "gas_used": 4096,
-          "manifest_public_gas_budget": 4096
+          "gas_used": 2086,
+          "manifest_public_gas_budget": 2086
         }
       ],
       "ct_gas_only": {
         "bytes_read": 32.0,
         "bytes_written": 32.0,
         "executable": true,
-        "gas_used": 4096,
+        "gas_used": 2086,
         "physical_reads": 1,
         "physical_writes": 1,
         "rejected": false,
@@ -28,7 +28,7 @@
         "bytes_read": 124.0,
         "bytes_written": 124.0,
         "executable": true,
-        "gas_used": 4096,
+        "gas_used": 2086,
         "physical_reads": 1,
         "physical_writes": 1,
         "rejected": false,
@@ -117,7 +117,7 @@
             "signature": "classify(uint256)"
           },
           "executable": true,
-          "gas_used": 4096,
+          "gas_used": 2086,
           "physical_reads": 1,
           "physical_writes": 1,
           "rejected": false,
@@ -146,7 +146,7 @@
             "signature": "classify(uint256)"
           },
           "executable": true,
-          "gas_used": 4096,
+          "gas_used": 2086,
           "physical_reads": 1,
           "physical_writes": 1,
           "rejected": false,
@@ -172,15 +172,15 @@
           "cost_model": "uo-modeled-resource-cost-v1",
           "entrypoint": "auth(bytes32)",
           "formula_exact": true,
-          "gas_used": 8192,
-          "manifest_public_gas_budget": 8192
+          "gas_used": 2446,
+          "manifest_public_gas_budget": 2446
         }
       ],
       "ct_gas_only": {
         "bytes_read": 160.0,
         "bytes_written": 32.0,
         "executable": true,
-        "gas_used": 8192,
+        "gas_used": 2446,
         "physical_reads": 5,
         "physical_writes": 1,
         "rejected": false,
@@ -191,7 +191,7 @@
         "bytes_read": 2108.0,
         "bytes_written": 620.0,
         "executable": true,
-        "gas_used": 8192,
+        "gas_used": 2446,
         "physical_reads": 17,
         "physical_writes": 5,
         "rejected": false,
@@ -294,7 +294,7 @@
             "signature": "auth(bytes32)"
           },
           "executable": true,
-          "gas_used": 8192,
+          "gas_used": 2446,
           "physical_reads": 5,
           "physical_writes": 1,
           "rejected": false,
@@ -330,7 +330,7 @@
             "signature": "auth(bytes32)"
           },
           "executable": true,
-          "gas_used": 8192,
+          "gas_used": 2446,
           "physical_reads": 17,
           "physical_writes": 5,
           "rejected": false,
@@ -363,8 +363,8 @@
           "cost_model": "uo-modeled-resource-cost-v1",
           "entrypoint": "deposit(bytes32,uint256)",
           "formula_exact": true,
-          "gas_used": 16384,
-          "manifest_public_gas_budget": 16384
+          "gas_used": 2371,
+          "manifest_public_gas_budget": 2371
         },
         {
           "backend": "full_scan_64",
@@ -372,8 +372,8 @@
           "cost_model": "uo-modeled-resource-cost-v1",
           "entrypoint": "deposit(bytes32,uint256)",
           "formula_exact": true,
-          "gas_used": 32768,
-          "manifest_public_gas_budget": 32768
+          "gas_used": 3995,
+          "manifest_public_gas_budget": 3995
         },
         {
           "backend": "full_scan+oram",
@@ -381,60 +381,60 @@
           "cost_model": "uo-modeled-resource-cost-v1",
           "entrypoint": "deposit(bytes32,uint256)",
           "formula_exact": true,
-          "gas_used": 12288,
-          "manifest_public_gas_budget": 12288
+          "gas_used": 3531,
+          "manifest_public_gas_budget": 3531
         }
       ],
       "ct_gas_only": {
         "bytes_read": 96.0,
         "bytes_written": 64.0,
         "executable": true,
-        "gas_used": 16384,
+        "gas_used": 2371,
         "physical_reads": 3,
         "physical_writes": 2,
         "rejected": false,
-        "trace_json_bytes": 12144
+        "trace_json_bytes": 12140
       },
       "entrypoint": "deposit(bytes32,uint256)",
       "full_scan": {
         "bytes_read": 3288.0,
         "bytes_written": 1644.0,
         "executable": true,
-        "gas_used": 16384,
+        "gas_used": 2371,
         "physical_reads": 18,
         "physical_writes": 9,
         "rejected": false,
-        "trace_json_bytes": 24058
+        "trace_json_bytes": 24054
       },
       "full_scan_64": {
         "bytes_read": 24568.0,
         "bytes_written": 12284.0,
         "executable": true,
-        "gas_used": 32768,
+        "gas_used": 3995,
         "physical_reads": 130,
         "physical_writes": 65,
         "rejected": false,
-        "trace_json_bytes": 107817
+        "trace_json_bytes": 107813
       },
       "oram": {
         "bytes_read": 56644.0,
         "bytes_written": 56520.0,
         "executable": true,
-        "gas_used": 12288,
+        "gas_used": 3531,
         "physical_reads": 50,
         "physical_writes": 49,
         "rejected": false,
-        "trace_json_bytes": 156611
+        "trace_json_bytes": 156607
       },
       "oram_64": {
         "bytes_read": 56644.0,
         "bytes_written": 56520.0,
         "executable": true,
-        "gas_used": 12288,
+        "gas_used": 3531,
         "physical_reads": 50,
         "physical_writes": 49,
         "rejected": false,
-        "trace_json_bytes": 156611
+        "trace_json_bytes": 156607
       },
       "oram_improves_physical_writes": true,
       "oram_improves_physical_writes_baseline": "full_scan_64",
@@ -522,7 +522,7 @@
           "trace_json_bytes": 12183
         },
         {
-          "artifact_json_bytes": 15670,
+          "artifact_json_bytes": 15668,
           "backend": "ct_gas_only",
           "benchmark": "ConfidentialMixer/deposit",
           "bytes_read": 96.0,
@@ -535,7 +535,7 @@
             "signature": "deposit(bytes32,uint256)"
           },
           "executable": true,
-          "gas_used": 16384,
+          "gas_used": 2371,
           "physical_reads": 3,
           "physical_writes": 2,
           "rejected": false,
@@ -555,10 +555,10 @@
               "name": "total"
             }
           ],
-          "trace_json_bytes": 12144
+          "trace_json_bytes": 12140
         },
         {
-          "artifact_json_bytes": 16062,
+          "artifact_json_bytes": 16060,
           "backend": "full_scan",
           "benchmark": "ConfidentialMixer/deposit",
           "bytes_read": 3288.0,
@@ -571,7 +571,7 @@
             "signature": "deposit(bytes32,uint256)"
           },
           "executable": true,
-          "gas_used": 16384,
+          "gas_used": 2371,
           "physical_reads": 18,
           "physical_writes": 9,
           "rejected": false,
@@ -591,10 +591,10 @@
               "name": "total"
             }
           ],
-          "trace_json_bytes": 24058
+          "trace_json_bytes": 24054
         },
         {
-          "artifact_json_bytes": 16067,
+          "artifact_json_bytes": 16065,
           "backend": "full_scan_64",
           "benchmark": "ConfidentialMixer/deposit",
           "bytes_read": 24568.0,
@@ -607,7 +607,7 @@
             "signature": "deposit(bytes32,uint256)"
           },
           "executable": true,
-          "gas_used": 32768,
+          "gas_used": 3995,
           "physical_reads": 130,
           "physical_writes": 65,
           "rejected": false,
@@ -627,10 +627,10 @@
               "name": "total"
             }
           ],
-          "trace_json_bytes": 107817
+          "trace_json_bytes": 107813
         },
         {
-          "artifact_json_bytes": 16328,
+          "artifact_json_bytes": 16326,
           "backend": "full_scan+oram",
           "benchmark": "ConfidentialMixer/deposit",
           "bytes_read": 56644.0,
@@ -654,7 +654,7 @@
             "signature": "deposit(bytes32,uint256)"
           },
           "executable": true,
-          "gas_used": 12288,
+          "gas_used": 3531,
           "physical_reads": 50,
           "physical_writes": 49,
           "rejected": false,
@@ -674,7 +674,7 @@
               "name": "total"
             }
           ],
-          "trace_json_bytes": 156611
+          "trace_json_bytes": 156607
         }
       ]
     },
@@ -687,8 +687,8 @@
           "cost_model": "uo-modeled-resource-cost-v1",
           "entrypoint": "withdraw(bytes32,uint256)",
           "formula_exact": true,
-          "gas_used": 16384,
-          "manifest_public_gas_budget": 16384
+          "gas_used": 2428,
+          "manifest_public_gas_budget": 2428
         },
         {
           "backend": "full_scan_64",
@@ -696,8 +696,8 @@
           "cost_model": "uo-modeled-resource-cost-v1",
           "entrypoint": "withdraw(bytes32,uint256)",
           "formula_exact": true,
-          "gas_used": 32768,
-          "manifest_public_gas_budget": 32768
+          "gas_used": 4052,
+          "manifest_public_gas_budget": 4052
         },
         {
           "backend": "full_scan+oram",
@@ -705,60 +705,60 @@
           "cost_model": "uo-modeled-resource-cost-v1",
           "entrypoint": "withdraw(bytes32,uint256)",
           "formula_exact": true,
-          "gas_used": 12288,
-          "manifest_public_gas_budget": 12288
+          "gas_used": 3588,
+          "manifest_public_gas_budget": 3588
         }
       ],
       "ct_gas_only": {
         "bytes_read": 96.0,
         "bytes_written": 64.0,
         "executable": true,
-        "gas_used": 16384,
+        "gas_used": 2428,
         "physical_reads": 3,
         "physical_writes": 2,
         "rejected": false,
-        "trace_json_bytes": 12259
+        "trace_json_bytes": 12255
       },
       "entrypoint": "withdraw(bytes32,uint256)",
       "full_scan": {
         "bytes_read": 3288.0,
         "bytes_written": 1644.0,
         "executable": true,
-        "gas_used": 16384,
+        "gas_used": 2428,
         "physical_reads": 18,
         "physical_writes": 9,
         "rejected": false,
-        "trace_json_bytes": 24161
+        "trace_json_bytes": 24157
       },
       "full_scan_64": {
         "bytes_read": 24568.0,
         "bytes_written": 12284.0,
         "executable": true,
-        "gas_used": 32768,
+        "gas_used": 4052,
         "physical_reads": 130,
         "physical_writes": 65,
         "rejected": false,
-        "trace_json_bytes": 107920
+        "trace_json_bytes": 107916
       },
       "oram": {
         "bytes_read": 56644.0,
         "bytes_written": 56520.0,
         "executable": true,
-        "gas_used": 12288,
+        "gas_used": 3588,
         "physical_reads": 50,
         "physical_writes": 49,
         "rejected": false,
-        "trace_json_bytes": 156704
+        "trace_json_bytes": 156700
       },
       "oram_64": {
         "bytes_read": 56644.0,
         "bytes_written": 56520.0,
         "executable": true,
-        "gas_used": 12288,
+        "gas_used": 3588,
         "physical_reads": 50,
         "physical_writes": 49,
         "rejected": false,
-        "trace_json_bytes": 156704
+        "trace_json_bytes": 156700
       },
       "oram_improves_physical_writes": true,
       "oram_improves_physical_writes_baseline": "full_scan_64",
@@ -846,7 +846,7 @@
           "trace_json_bytes": 12296
         },
         {
-          "artifact_json_bytes": 15670,
+          "artifact_json_bytes": 15668,
           "backend": "ct_gas_only",
           "benchmark": "ConfidentialMixer/withdraw",
           "bytes_read": 96.0,
@@ -859,7 +859,7 @@
             "signature": "withdraw(bytes32,uint256)"
           },
           "executable": true,
-          "gas_used": 16384,
+          "gas_used": 2428,
           "physical_reads": 3,
           "physical_writes": 2,
           "rejected": false,
@@ -879,10 +879,10 @@
               "name": "total"
             }
           ],
-          "trace_json_bytes": 12259
+          "trace_json_bytes": 12255
         },
         {
-          "artifact_json_bytes": 16062,
+          "artifact_json_bytes": 16060,
           "backend": "full_scan",
           "benchmark": "ConfidentialMixer/withdraw",
           "bytes_read": 3288.0,
@@ -895,7 +895,7 @@
             "signature": "withdraw(bytes32,uint256)"
           },
           "executable": true,
-          "gas_used": 16384,
+          "gas_used": 2428,
           "physical_reads": 18,
           "physical_writes": 9,
           "rejected": false,
@@ -915,10 +915,10 @@
               "name": "total"
             }
           ],
-          "trace_json_bytes": 24161
+          "trace_json_bytes": 24157
         },
         {
-          "artifact_json_bytes": 16067,
+          "artifact_json_bytes": 16065,
           "backend": "full_scan_64",
           "benchmark": "ConfidentialMixer/withdraw",
           "bytes_read": 24568.0,
@@ -931,7 +931,7 @@
             "signature": "withdraw(bytes32,uint256)"
           },
           "executable": true,
-          "gas_used": 32768,
+          "gas_used": 4052,
           "physical_reads": 130,
           "physical_writes": 65,
           "rejected": false,
@@ -951,10 +951,10 @@
               "name": "total"
             }
           ],
-          "trace_json_bytes": 107920
+          "trace_json_bytes": 107916
         },
         {
-          "artifact_json_bytes": 16328,
+          "artifact_json_bytes": 16326,
           "backend": "full_scan+oram",
           "benchmark": "ConfidentialMixer/withdraw",
           "bytes_read": 56644.0,
@@ -978,7 +978,7 @@
             "signature": "withdraw(bytes32,uint256)"
           },
           "executable": true,
-          "gas_used": 12288,
+          "gas_used": 3588,
           "physical_reads": 50,
           "physical_writes": 49,
           "rejected": false,
@@ -998,7 +998,7 @@
               "name": "total"
             }
           ],
-          "trace_json_bytes": 156704
+          "trace_json_bytes": 156700
         }
       ]
     },
@@ -1011,8 +1011,8 @@
           "cost_model": "uo-modeled-resource-cost-v1",
           "entrypoint": "transferFrom(address,address,address,uint256)",
           "formula_exact": true,
-          "gas_used": 24576,
-          "manifest_public_gas_budget": 24576
+          "gas_used": 3019,
+          "manifest_public_gas_budget": 3019
         },
         {
           "backend": "oram",
@@ -1020,40 +1020,40 @@
           "cost_model": "uo-modeled-resource-cost-v1",
           "entrypoint": "transferFrom(address,address,address,uint256)",
           "formula_exact": true,
-          "gas_used": 16384,
-          "manifest_public_gas_budget": 16384
+          "gas_used": 7485,
+          "manifest_public_gas_budget": 7485
         }
       ],
       "ct_gas_only": {
         "bytes_read": 96.0,
         "bytes_written": 96.0,
         "executable": true,
-        "gas_used": 24576,
+        "gas_used": 3019,
         "physical_reads": 3,
         "physical_writes": 3,
         "rejected": false,
-        "trace_json_bytes": 16839
+        "trace_json_bytes": 16835
       },
       "entrypoint": "transferFrom(address,address,address,uint256)",
       "full_scan": {
         "bytes_read": 11392.0,
         "bytes_written": 4368.0,
         "executable": true,
-        "gas_used": 24576,
+        "gas_used": 3019,
         "physical_reads": 64,
         "physical_writes": 24,
         "rejected": false,
-        "trace_json_bytes": 54559
+        "trace_json_bytes": 54555
       },
       "oram": {
         "bytes_read": 198768.0,
         "bytes_written": 198768.0,
         "executable": true,
-        "gas_used": 16384,
+        "gas_used": 7485,
         "physical_reads": 178,
         "physical_writes": 178,
         "rejected": false,
-        "trace_json_bytes": 499450
+        "trace_json_bytes": 499446
       },
       "oram_improves_physical_writes": false,
       "oram_improves_physical_writes_baseline": "full_scan",
@@ -1141,7 +1141,7 @@
           "trace_json_bytes": 17036
         },
         {
-          "artifact_json_bytes": 29404,
+          "artifact_json_bytes": 29401,
           "backend": "ct_gas_only",
           "benchmark": "ERC20Lite/transferFrom",
           "bytes_read": 96.0,
@@ -1154,7 +1154,7 @@
             "signature": "transferFrom(address,address,address,uint256)"
           },
           "executable": true,
-          "gas_used": 24576,
+          "gas_used": 3019,
           "physical_reads": 3,
           "physical_writes": 3,
           "rejected": false,
@@ -1174,10 +1174,10 @@
               "name": "balances"
             }
           ],
-          "trace_json_bytes": 16839
+          "trace_json_bytes": 16835
         },
         {
-          "artifact_json_bytes": 29796,
+          "artifact_json_bytes": 29793,
           "backend": "full_scan",
           "benchmark": "ERC20Lite/transferFrom",
           "bytes_read": 11392.0,
@@ -1190,7 +1190,7 @@
             "signature": "transferFrom(address,address,address,uint256)"
           },
           "executable": true,
-          "gas_used": 24576,
+          "gas_used": 3019,
           "physical_reads": 64,
           "physical_writes": 24,
           "rejected": false,
@@ -1210,10 +1210,10 @@
               "name": "balances"
             }
           ],
-          "trace_json_bytes": 54559
+          "trace_json_bytes": 54555
         },
         {
-          "artifact_json_bytes": 30333,
+          "artifact_json_bytes": 30330,
           "backend": "oram",
           "benchmark": "ERC20Lite/transferFrom",
           "bytes_read": 198768.0,
@@ -1247,7 +1247,7 @@
             "signature": "transferFrom(address,address,address,uint256)"
           },
           "executable": true,
-          "gas_used": 16384,
+          "gas_used": 7485,
           "physical_reads": 178,
           "physical_writes": 178,
           "rejected": false,
@@ -1267,7 +1267,7 @@
               "name": "balances"
             }
           ],
-          "trace_json_bytes": 499450
+          "trace_json_bytes": 499446
         }
       ]
     },
@@ -1280,30 +1280,30 @@
           "cost_model": "uo-modeled-resource-cost-v1",
           "entrypoint": "clearIfMatch(bytes32,uint256)",
           "formula_exact": true,
-          "gas_used": 12288,
-          "manifest_public_gas_budget": 12288
+          "gas_used": 2392,
+          "manifest_public_gas_budget": 2392
         }
       ],
       "ct_gas_only": {
         "bytes_read": 32.0,
         "bytes_written": 32.0,
         "executable": true,
-        "gas_used": 12288,
+        "gas_used": 2392,
         "physical_reads": 1,
         "physical_writes": 1,
         "rejected": false,
-        "trace_json_bytes": 10616
+        "trace_json_bytes": 10612
       },
       "entrypoint": "clearIfMatch(bytes32,uint256)",
       "full_scan": {
         "bytes_read": 3040.0,
         "bytes_written": 1520.0,
         "executable": true,
-        "gas_used": 12288,
+        "gas_used": 2392,
         "physical_reads": 16,
         "physical_writes": 8,
         "rejected": false,
-        "trace_json_bytes": 21526
+        "trace_json_bytes": 21522
       },
       "raw": {
         "error": "raw confidential backends are rejected in proof-grade builds; this feature build emits the executable raw_insecure_eval control separately",
@@ -1375,7 +1375,7 @@
           "trace_json_bytes": 10875
         },
         {
-          "artifact_json_bytes": 13107,
+          "artifact_json_bytes": 13104,
           "backend": "ct_gas_only",
           "benchmark": "RegistryCRUD/clearIfMatch",
           "bytes_read": 32.0,
@@ -1388,7 +1388,7 @@
             "signature": "clearIfMatch(bytes32,uint256)"
           },
           "executable": true,
-          "gas_used": 12288,
+          "gas_used": 2392,
           "physical_reads": 1,
           "physical_writes": 1,
           "rejected": false,
@@ -1401,10 +1401,10 @@
               "name": "records"
             }
           ],
-          "trace_json_bytes": 10616
+          "trace_json_bytes": 10612
         },
         {
-          "artifact_json_bytes": 13488,
+          "artifact_json_bytes": 13485,
           "backend": "full_scan",
           "benchmark": "RegistryCRUD/clearIfMatch",
           "bytes_read": 3040.0,
@@ -1417,7 +1417,7 @@
             "signature": "clearIfMatch(bytes32,uint256)"
           },
           "executable": true,
-          "gas_used": 12288,
+          "gas_used": 2392,
           "physical_reads": 16,
           "physical_writes": 8,
           "rejected": false,
@@ -1430,7 +1430,7 @@
               "name": "records"
             }
           ],
-          "trace_json_bytes": 21526
+          "trace_json_bytes": 21522
         }
       ]
     }
@@ -1527,7 +1527,7 @@
         "signature": "classify(uint256)"
       },
       "executable": true,
-      "gas_used": 4096,
+      "gas_used": 2086,
       "physical_reads": 1,
       "physical_writes": 1,
       "rejected": false,
@@ -1556,7 +1556,7 @@
         "signature": "classify(uint256)"
       },
       "executable": true,
-      "gas_used": 4096,
+      "gas_used": 2086,
       "physical_reads": 1,
       "physical_writes": 1,
       "rejected": false,
@@ -1652,7 +1652,7 @@
         "signature": "auth(bytes32)"
       },
       "executable": true,
-      "gas_used": 8192,
+      "gas_used": 2446,
       "physical_reads": 5,
       "physical_writes": 1,
       "rejected": false,
@@ -1688,7 +1688,7 @@
         "signature": "auth(bytes32)"
       },
       "executable": true,
-      "gas_used": 8192,
+      "gas_used": 2446,
       "physical_reads": 17,
       "physical_writes": 5,
       "rejected": false,
@@ -1778,7 +1778,7 @@
       "trace_json_bytes": 12183
     },
     {
-      "artifact_json_bytes": 15670,
+      "artifact_json_bytes": 15668,
       "backend": "ct_gas_only",
       "benchmark": "ConfidentialMixer/deposit",
       "bytes_read": 96.0,
@@ -1791,7 +1791,7 @@
         "signature": "deposit(bytes32,uint256)"
       },
       "executable": true,
-      "gas_used": 16384,
+      "gas_used": 2371,
       "physical_reads": 3,
       "physical_writes": 2,
       "rejected": false,
@@ -1811,10 +1811,10 @@
           "name": "total"
         }
       ],
-      "trace_json_bytes": 12144
+      "trace_json_bytes": 12140
     },
     {
-      "artifact_json_bytes": 16062,
+      "artifact_json_bytes": 16060,
       "backend": "full_scan",
       "benchmark": "ConfidentialMixer/deposit",
       "bytes_read": 3288.0,
@@ -1827,7 +1827,7 @@
         "signature": "deposit(bytes32,uint256)"
       },
       "executable": true,
-      "gas_used": 16384,
+      "gas_used": 2371,
       "physical_reads": 18,
       "physical_writes": 9,
       "rejected": false,
@@ -1847,10 +1847,10 @@
           "name": "total"
         }
       ],
-      "trace_json_bytes": 24058
+      "trace_json_bytes": 24054
     },
     {
-      "artifact_json_bytes": 16067,
+      "artifact_json_bytes": 16065,
       "backend": "full_scan_64",
       "benchmark": "ConfidentialMixer/deposit",
       "bytes_read": 24568.0,
@@ -1863,7 +1863,7 @@
         "signature": "deposit(bytes32,uint256)"
       },
       "executable": true,
-      "gas_used": 32768,
+      "gas_used": 3995,
       "physical_reads": 130,
       "physical_writes": 65,
       "rejected": false,
@@ -1883,10 +1883,10 @@
           "name": "total"
         }
       ],
-      "trace_json_bytes": 107817
+      "trace_json_bytes": 107813
     },
     {
-      "artifact_json_bytes": 16328,
+      "artifact_json_bytes": 16326,
       "backend": "full_scan+oram",
       "benchmark": "ConfidentialMixer/deposit",
       "bytes_read": 56644.0,
@@ -1910,7 +1910,7 @@
         "signature": "deposit(bytes32,uint256)"
       },
       "executable": true,
-      "gas_used": 12288,
+      "gas_used": 3531,
       "physical_reads": 50,
       "physical_writes": 49,
       "rejected": false,
@@ -1930,7 +1930,7 @@
           "name": "total"
         }
       ],
-      "trace_json_bytes": 156611
+      "trace_json_bytes": 156607
     },
     {
       "artifact_json_bytes": 6324,
@@ -2000,7 +2000,7 @@
       "trace_json_bytes": 12296
     },
     {
-      "artifact_json_bytes": 15670,
+      "artifact_json_bytes": 15668,
       "backend": "ct_gas_only",
       "benchmark": "ConfidentialMixer/withdraw",
       "bytes_read": 96.0,
@@ -2013,7 +2013,7 @@
         "signature": "withdraw(bytes32,uint256)"
       },
       "executable": true,
-      "gas_used": 16384,
+      "gas_used": 2428,
       "physical_reads": 3,
       "physical_writes": 2,
       "rejected": false,
@@ -2033,10 +2033,10 @@
           "name": "total"
         }
       ],
-      "trace_json_bytes": 12259
+      "trace_json_bytes": 12255
     },
     {
-      "artifact_json_bytes": 16062,
+      "artifact_json_bytes": 16060,
       "backend": "full_scan",
       "benchmark": "ConfidentialMixer/withdraw",
       "bytes_read": 3288.0,
@@ -2049,7 +2049,7 @@
         "signature": "withdraw(bytes32,uint256)"
       },
       "executable": true,
-      "gas_used": 16384,
+      "gas_used": 2428,
       "physical_reads": 18,
       "physical_writes": 9,
       "rejected": false,
@@ -2069,10 +2069,10 @@
           "name": "total"
         }
       ],
-      "trace_json_bytes": 24161
+      "trace_json_bytes": 24157
     },
     {
-      "artifact_json_bytes": 16067,
+      "artifact_json_bytes": 16065,
       "backend": "full_scan_64",
       "benchmark": "ConfidentialMixer/withdraw",
       "bytes_read": 24568.0,
@@ -2085,7 +2085,7 @@
         "signature": "withdraw(bytes32,uint256)"
       },
       "executable": true,
-      "gas_used": 32768,
+      "gas_used": 4052,
       "physical_reads": 130,
       "physical_writes": 65,
       "rejected": false,
@@ -2105,10 +2105,10 @@
           "name": "total"
         }
       ],
-      "trace_json_bytes": 107920
+      "trace_json_bytes": 107916
     },
     {
-      "artifact_json_bytes": 16328,
+      "artifact_json_bytes": 16326,
       "backend": "full_scan+oram",
       "benchmark": "ConfidentialMixer/withdraw",
       "bytes_read": 56644.0,
@@ -2132,7 +2132,7 @@
         "signature": "withdraw(bytes32,uint256)"
       },
       "executable": true,
-      "gas_used": 12288,
+      "gas_used": 3588,
       "physical_reads": 50,
       "physical_writes": 49,
       "rejected": false,
@@ -2152,7 +2152,7 @@
           "name": "total"
         }
       ],
-      "trace_json_bytes": 156704
+      "trace_json_bytes": 156700
     },
     {
       "artifact_json_bytes": 10328,
@@ -2222,7 +2222,7 @@
       "trace_json_bytes": 17036
     },
     {
-      "artifact_json_bytes": 29404,
+      "artifact_json_bytes": 29401,
       "backend": "ct_gas_only",
       "benchmark": "ERC20Lite/transferFrom",
       "bytes_read": 96.0,
@@ -2235,7 +2235,7 @@
         "signature": "transferFrom(address,address,address,uint256)"
       },
       "executable": true,
-      "gas_used": 24576,
+      "gas_used": 3019,
       "physical_reads": 3,
       "physical_writes": 3,
       "rejected": false,
@@ -2255,10 +2255,10 @@
           "name": "balances"
         }
       ],
-      "trace_json_bytes": 16839
+      "trace_json_bytes": 16835
     },
     {
-      "artifact_json_bytes": 29796,
+      "artifact_json_bytes": 29793,
       "backend": "full_scan",
       "benchmark": "ERC20Lite/transferFrom",
       "bytes_read": 11392.0,
@@ -2271,7 +2271,7 @@
         "signature": "transferFrom(address,address,address,uint256)"
       },
       "executable": true,
-      "gas_used": 24576,
+      "gas_used": 3019,
       "physical_reads": 64,
       "physical_writes": 24,
       "rejected": false,
@@ -2291,10 +2291,10 @@
           "name": "balances"
         }
       ],
-      "trace_json_bytes": 54559
+      "trace_json_bytes": 54555
     },
     {
-      "artifact_json_bytes": 30333,
+      "artifact_json_bytes": 30330,
       "backend": "oram",
       "benchmark": "ERC20Lite/transferFrom",
       "bytes_read": 198768.0,
@@ -2328,7 +2328,7 @@
         "signature": "transferFrom(address,address,address,uint256)"
       },
       "executable": true,
-      "gas_used": 16384,
+      "gas_used": 7485,
       "physical_reads": 178,
       "physical_writes": 178,
       "rejected": false,
@@ -2348,7 +2348,7 @@
           "name": "balances"
         }
       ],
-      "trace_json_bytes": 499450
+      "trace_json_bytes": 499446
     },
     {
       "artifact_json_bytes": 5238,
@@ -2404,7 +2404,7 @@
       "trace_json_bytes": 10875
     },
     {
-      "artifact_json_bytes": 13107,
+      "artifact_json_bytes": 13104,
       "backend": "ct_gas_only",
       "benchmark": "RegistryCRUD/clearIfMatch",
       "bytes_read": 32.0,
@@ -2417,7 +2417,7 @@
         "signature": "clearIfMatch(bytes32,uint256)"
       },
       "executable": true,
-      "gas_used": 12288,
+      "gas_used": 2392,
       "physical_reads": 1,
       "physical_writes": 1,
       "rejected": false,
@@ -2430,10 +2430,10 @@
           "name": "records"
         }
       ],
-      "trace_json_bytes": 10616
+      "trace_json_bytes": 10612
     },
     {
-      "artifact_json_bytes": 13488,
+      "artifact_json_bytes": 13485,
       "backend": "full_scan",
       "benchmark": "RegistryCRUD/clearIfMatch",
       "bytes_read": 3040.0,
@@ -2446,7 +2446,7 @@
         "signature": "clearIfMatch(bytes32,uint256)"
       },
       "executable": true,
-      "gas_used": 12288,
+      "gas_used": 2392,
       "physical_reads": 16,
       "physical_writes": 8,
       "rejected": false,
@@ -2459,7 +2459,7 @@
           "name": "records"
         }
       ],
-      "trace_json_bytes": 21526
+      "trace_json_bytes": 21522
     }
   ],
   "rejected_oram_cases": [

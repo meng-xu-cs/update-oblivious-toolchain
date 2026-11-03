@@ -1442,11 +1442,12 @@ fn build_manifest_entry(
         .collect::<Result<Vec<_>>>()?
         .into_iter()
         .sum::<usize>();
-    let budget = entry_meta.public_gas_budget.unwrap_or(
-        2000 + counts.statement_count as u64 * 11
-            + counts.expr_count as u64 * 7
-            + max_commit_ops as u64 * 29,
-    );
+    // The public gas of an entrypoint is always the modeled cost of its fixed
+    // schedule; sidecars cannot override it (see validate_entrypoint_metadata).
+    let budget = 2000
+        + counts.statement_count as u64 * 11
+        + counts.expr_count as u64 * 7
+        + max_commit_ops as u64 * 29;
     let (confidential_program, confidential_slot_program, kernel_steps) = if function.confidential {
         let confidential_program = function.confidential_kernel_program()?;
         let confidential_slot_program = confidential_program.to_slot_program()?;
@@ -3011,6 +3012,15 @@ fn validate_entrypoint_metadata_well_formed(
              confidential releases must use the return, status, or encrypted-return channels",
             signature,
             entry_meta.public_state_declassifies
+        );
+    }
+    if let Some(budget) = entry_meta.public_gas_budget {
+        bail!(
+            "entrypoint {} declares public_gas_budget {}, which is not supported; the public gas \
+             of an entrypoint is the compiler's modeled cost (uo-modeled-resource-cost-v1) and \
+             cannot be overridden",
+            signature,
+            budget
         );
     }
     Ok(())
@@ -4632,6 +4642,65 @@ bounds:
             "unexpected: {msg}"
         );
         assert!(msg.contains("not supported"), "unexpected: {msg}");
+    }
+
+    #[test]
+    fn rejects_declared_public_gas_budget() {
+        let source = write_temp(
+            "declared-gas-budget",
+            r#"
+            contract C {
+                uint256 private x;
+                function f(uint256 a) public { x = a; }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  f(uint256):
+    secret_args: [a]
+    confidential: true
+    public_gas_budget: 1000
+    returns: forbidden
+    status: public
+state:
+  x:
+    kind: cell
+    value: uint256
+    backend: full_scan
+    confidential: true
+bounds:
+  loops: {}
+"#,
+        );
+        let err = validate_source(source.to_str().unwrap(), &meta).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("public_gas_budget"), "unexpected: {msg}");
+        assert!(msg.contains("modeled cost"), "unexpected: {msg}");
+    }
+
+    #[test]
+    fn public_gas_is_the_modeled_cost() {
+        // Pins cost model uo-modeled-resource-cost-v1 on a benchmark: changing
+        // how statements, expressions, or commit ops are counted changes the
+        // reported gas and needs a cost-model version bump.
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let metadata: ContractMetadata = serde_yaml::from_str(
+            &fs::read_to_string(root.join("benches/raw/FixedSlotClassifier.uo.yaml")).unwrap(),
+        )
+        .unwrap();
+        let artifact = compile(
+            root.join("benches/raw/FixedSlotClassifier.sol")
+                .to_str()
+                .unwrap(),
+            &metadata,
+            ProgramMode::Uo,
+        )
+        .unwrap();
+        let entry = &artifact.contract.manifest.entrypoints["classify(uint256)"];
+        assert_eq!(entry.public_gas_budget, 2086);
     }
 
     #[test]

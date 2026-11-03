@@ -19,7 +19,7 @@
       "controller_phase_count": 3,
       "entrypoint": "classify(uint256)",
       "exit_events": 4,
-      "gas_used": 4096,
+      "gas_used": 2086,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 4,
         "expected_kernel_step_public_object_schedule": [
@@ -262,7 +262,7 @@
       "controller_phase_count": 3,
       "entrypoint": "classify(uint256)",
       "exit_events": 4,
-      "gas_used": 4096,
+      "gas_used": 2086,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 4,
         "expected_kernel_step_public_object_schedule": [
@@ -505,7 +505,7 @@
       "controller_phase_count": 3,
       "entrypoint": "auth(bytes32)",
       "exit_events": 4,
-      "gas_used": 8192,
+      "gas_used": 2446,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 8,
         "expected_kernel_step_public_object_schedule": [
@@ -974,7 +974,7 @@
       "controller_phase_count": 3,
       "entrypoint": "auth(bytes32)",
       "exit_events": 4,
-      "gas_used": 8192,
+      "gas_used": 2446,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 8,
         "expected_kernel_step_public_object_schedule": [
@@ -1443,7 +1443,7 @@
       "controller_phase_count": 3,
       "entrypoint": "upsert(bytes32,uint256)",
       "exit_events": 4,
-      "gas_used": 12288,
+      "gas_used": 2264,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 4,
         "expected_kernel_step_public_object_schedule": [
@@ -1839,7 +1839,7 @@
       "scenario": "RegistryCRUD/uo/class0",
       "setup_calls": 0,
       "shared_resource_events": 3,
-      "witness_json_bytes": 7381
+      "witness_json_bytes": 7379
     },
     {
       "accepted": true,
@@ -1848,7 +1848,7 @@
       "controller_phase_count": 3,
       "entrypoint": "upsert(bytes32,uint256)",
       "exit_events": 4,
-      "gas_used": 12288,
+      "gas_used": 2264,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 4,
         "expected_kernel_step_public_object_schedule": [
@@ -2244,7 +2244,7 @@
       "scenario": "RegistryCRUD/uo/class1",
       "setup_calls": 0,
       "shared_resource_events": 3,
-      "witness_json_bytes": 7381
+      "witness_json_bytes": 7379
     },
     {
       "accepted": true,
@@ -2253,7 +2253,7 @@
       "controller_phase_count": 3,
       "entrypoint": "deposit(bytes32,uint256)",
       "exit_events": 4,
-      "gas_used": 16384,
+      "gas_used": 2371,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 7,
         "expected_kernel_step_public_object_schedule": [
@@ -2752,7 +2752,7 @@
       "scenario": "ConfidentialMixer/fullscan/class0",
       "setup_calls": 0,
       "shared_resource_events": 3,
-      "witness_json_bytes": 9974
+      "witness_json_bytes": 9972
     },
     {
       "accepted": true,
@@ -2761,7 +2761,7 @@
       "controller_phase_count": 3,
       "entrypoint": "deposit(bytes32,uint256)",
       "exit_events": 4,
-      "gas_used": 16384,
+      "gas_used": 2371,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 7,
         "expected_kernel_step_public_object_schedule": [
@@ -3260,7 +3260,7 @@
       "scenario": "ConfidentialMixer/fullscan/class1",
       "setup_calls": 0,
       "shared_resource_events": 3,
-      "witness_json_bytes": 9974
+      "witness_json_bytes": 9972
     },
     {
       "accepted": true,
@@ -3269,7 +3269,7 @@
       "controller_phase_count": 3,
       "entrypoint": "approve(address,address,uint256)",
       "exit_events": 4,
-      "gas_used": 20480,
+      "gas_used": 2528,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 4,
         "expected_kernel_step_public_object_schedule": [
@@ -3898,7 +3898,7 @@
       "scenario": "ERC20Lite/fullscan/class0",
       "setup_calls": 1,
       "shared_resource_events": 3,
-      "witness_json_bytes": 12022
+      "witness_json_bytes": 12020
     },
     {
       "accepted": true,
@@ -3907,7 +3907,7 @@
       "controller_phase_count": 3,
       "entrypoint": "approve(address,address,uint256)",
       "exit_events": 4,
-      "gas_used": 20480,
+      "gas_used": 2528,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 4,
         "expected_kernel_step_public_object_schedule": [
@@ -4536,7 +4536,7 @@
       "scenario": "ERC20Lite/fullscan/class1",
       "setup_calls": 1,
       "shared_resource_events": 3,
-      "witness_json_bytes": 12022
+      "witness_json_bytes": 12020
     },
     {
       "accepted": true,
@@ -8259,7 +8259,7 @@
       "controller_phase_count": 13,
       "entrypoint": "deposit(bytes32,uint256)",
       "exit_events": 16,
-      "gas_used": 12288,
+      "gas_used": 3531,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 7,
         "expected_kernel_step_public_object_schedule": [
@@ -11038,7 +11038,7 @@
       "scenario": "ConfidentialMixer/pathoram/deposit",
       "setup_calls": 0,
       "shared_resource_events": 189,
-      "witness_json_bytes": 62495
+      "witness_json_bytes": 62493
     },
     {
       "accepted": true,
@@ -11047,7 +11047,7 @@
       "controller_phase_count": 33,
       "entrypoint": "transferFrom(address,address,address,uint256)",
       "exit_events": 40,
-      "gas_used": 16384,
+      "gas_used": 7485,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 9,
         "expected_kernel_step_public_object_schedule": [
@@ -19268,7 +19268,7 @@
       "scenario": "ERC20Lite/pathoram/transferFrom",
       "setup_calls": 2,
       "shared_resource_events": 723,
-      "witness_json_bytes": 201295
+      "witness_json_bytes": 201293
     }
   ]
 }

@@ -3,19 +3,16 @@ entrypoints:
   upsert(bytes32,uint256):
     secret_args: [key, value]
     confidential: true
-    public_gas_budget: 12288
     returns: forbidden
     status: public
   clear(bytes32):
     secret_args: [key]
     confidential: true
-    public_gas_budget: 12288
     returns: forbidden
     status: public
   clearIfMatch(bytes32,uint256):
     secret_args: [key, value]
     confidential: true
-    public_gas_budget: 12288
     returns: declassified
     status: public
     declassifies: [return]

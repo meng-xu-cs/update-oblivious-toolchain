@@ -15,7 +15,7 @@
     {
       "accepted": true,
       "entrypoint": "classify(uint256)",
-      "gas_used": 4096,
+      "gas_used": 2086,
       "kernel_json_bytes": 1510,
       "kernel_op_count": 4,
       "kernel_step_count": 4,
@@ -146,7 +146,7 @@
     {
       "accepted": true,
       "entrypoint": "classify(uint256)",
-      "gas_used": 4096,
+      "gas_used": 2086,
       "kernel_json_bytes": 1510,
       "kernel_op_count": 4,
       "kernel_step_count": 4,
@@ -277,7 +277,7 @@
     {
       "accepted": true,
       "entrypoint": "auth(bytes32)",
-      "gas_used": 8192,
+      "gas_used": 2446,
       "kernel_json_bytes": 3803,
       "kernel_op_count": 8,
       "kernel_step_count": 8,
@@ -593,7 +593,7 @@
     {
       "accepted": true,
       "entrypoint": "auth(bytes32)",
-      "gas_used": 8192,
+      "gas_used": 2446,
       "kernel_json_bytes": 3803,
       "kernel_op_count": 8,
       "kernel_step_count": 8,
@@ -909,7 +909,7 @@
     {
       "accepted": true,
       "entrypoint": "upsert(bytes32,uint256)",
-      "gas_used": 12288,
+      "gas_used": 2264,
       "kernel_json_bytes": 3485,
       "kernel_op_count": 4,
       "kernel_step_count": 4,
@@ -1202,7 +1202,7 @@
     {
       "accepted": true,
       "entrypoint": "upsert(bytes32,uint256)",
-      "gas_used": 12288,
+      "gas_used": 2264,
       "kernel_json_bytes": 3485,
       "kernel_op_count": 4,
       "kernel_step_count": 4,
@@ -1495,7 +1495,7 @@
     {
       "accepted": true,
       "entrypoint": "deposit(bytes32,uint256)",
-      "gas_used": 16384,
+      "gas_used": 2371,
       "kernel_json_bytes": 4350,
       "kernel_op_count": 7,
       "kernel_step_count": 7,
@@ -1856,7 +1856,7 @@
     {
       "accepted": true,
       "entrypoint": "deposit(bytes32,uint256)",
-      "gas_used": 16384,
+      "gas_used": 2371,
       "kernel_json_bytes": 4350,
       "kernel_op_count": 7,
       "kernel_step_count": 7,
@@ -2217,7 +2217,7 @@
     {
       "accepted": true,
       "entrypoint": "approve(address,address,uint256)",
-      "gas_used": 20480,
+      "gas_used": 2528,
       "kernel_json_bytes": 6177,
       "kernel_op_count": 4,
       "kernel_step_count": 4,
@@ -2735,7 +2735,7 @@
     {
       "accepted": true,
       "entrypoint": "approve(address,address,uint256)",
-      "gas_used": 20480,
+      "gas_used": 2528,
       "kernel_json_bytes": 6177,
       "kernel_op_count": 4,
       "kernel_step_count": 4,
@@ -6507,7 +6507,7 @@
     {
       "accepted": true,
       "entrypoint": "deposit(bytes32,uint256)",
-      "gas_used": 12288,
+      "gas_used": 3531,
       "kernel_json_bytes": 32102,
       "kernel_op_count": 7,
       "kernel_step_count": 7,
@@ -9148,7 +9148,7 @@
     {
       "accepted": true,
       "entrypoint": "transferFrom(address,address,address,uint256)",
-      "gas_used": 16384,
+      "gas_used": 7485,
       "kernel_json_bytes": 98235,
       "kernel_op_count": 9,
       "kernel_step_count": 9,

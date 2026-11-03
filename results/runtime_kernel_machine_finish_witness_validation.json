@@ -16,7 +16,7 @@
       "accepted": true,
       "boundary_events": 2,
       "entrypoint": "classify(uint256)",
-      "gas_used": 4096,
+      "gas_used": 2086,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -211,7 +211,7 @@
       "accepted": true,
       "boundary_events": 2,
       "entrypoint": "classify(uint256)",
-      "gas_used": 4096,
+      "gas_used": 2086,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -406,7 +406,7 @@
       "accepted": true,
       "boundary_events": 2,
       "entrypoint": "auth(bytes32)",
-      "gas_used": 8192,
+      "gas_used": 2446,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -804,7 +804,7 @@
       "accepted": true,
       "boundary_events": 2,
       "entrypoint": "auth(bytes32)",
-      "gas_used": 8192,
+      "gas_used": 2446,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -1202,7 +1202,7 @@
       "accepted": true,
       "boundary_events": 2,
       "entrypoint": "upsert(bytes32,uint256)",
-      "gas_used": 12288,
+      "gas_used": 2264,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -1559,7 +1559,7 @@
       "accepted": true,
       "boundary_events": 2,
       "entrypoint": "upsert(bytes32,uint256)",
-      "gas_used": 12288,
+      "gas_used": 2264,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -1916,7 +1916,7 @@
       "accepted": true,
       "boundary_events": 2,
       "entrypoint": "deposit(bytes32,uint256)",
-      "gas_used": 16384,
+      "gas_used": 2371,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -2357,7 +2357,7 @@
       "accepted": true,
       "boundary_events": 2,
       "entrypoint": "deposit(bytes32,uint256)",
-      "gas_used": 16384,
+      "gas_used": 2371,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -2798,7 +2798,7 @@
       "accepted": true,
       "boundary_events": 2,
       "entrypoint": "approve(address,address,uint256)",
-      "gas_used": 20480,
+      "gas_used": 2528,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           2
@@ -3385,7 +3385,7 @@
       "accepted": true,
       "boundary_events": 2,
       "entrypoint": "approve(address,address,uint256)",
-      "gas_used": 20480,
+      "gas_used": 2528,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           2
@@ -7486,7 +7486,7 @@
       "accepted": true,
       "boundary_events": 6,
       "entrypoint": "deposit(bytes32,uint256)",
-      "gas_used": 12288,
+      "gas_used": 3531,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -10207,7 +10207,7 @@
       "accepted": true,
       "boundary_events": 14,
       "entrypoint": "transferFrom(address,address,address,uint256)",
-      "gas_used": 16384,
+      "gas_used": 7485,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,

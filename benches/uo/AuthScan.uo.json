@@ -5,13 +5,13 @@
     "source_language": "uo-solidity-like-dsl-v1",
     "semantics_profile": "uo-evm-modular256-v1",
     "source_sha256": "fa6bceebfe68a1f2d6ff0e7a59ec7523f3441907bd7191999974dca405589548",
-    "metadata_sha256": "63a0d025439c8be843275eb9d8134b17795bb96635496df213cbafcc9dfcd7e3",
-    "raw_metadata_sha256": "2e2649c5dc37f9f60e14eaa7736a8e73b9ed7b2bfbc24359d7d3f12800af48ed",
-    "metadata_canonicalization_sha256": "219e42a69487391c8377e4b6f4798cd62d190a1108d4187cd10c102b20ef9038",
+    "metadata_sha256": "6cb41c271e14649c5ab2d44027ea730a6e179fc2d69b3dc9e89b9a14e0d4945e",
+    "raw_metadata_sha256": "280f46ccbc7b4c4f7106618c6e23186fd921c17edd013dd86a4aad9f111a603d",
+    "metadata_canonicalization_sha256": "5a1c871cc1633a670095791d6295926e0b93fef06b992e2e2ba863cdc1cb7517",
     "compilation_mode": "uo",
     "compiler_version": "0.1.0",
-    "toolchain_manifest_sha256": "81a1a552da93aeb36b466cbeb978c650ac5dbeb3bbc57b8a9cc2cae08e3b5550",
-    "package_sha256": "1557e2d7396c70bcf97ff8534ddc2bb3ac63890cadde38bb3a2dd90ca760656d"
+    "toolchain_manifest_sha256": "0e7f80a1da02fdf34842a26b9abe21a31f9a7e35f0aabeaed20c4486c145722a",
+    "package_sha256": "c2d4426398c5ac2f0ea8d6ca55cbba64c8dd4c3f2a348334231959ca098844fb"
   },
   "contract": {
     "contract": "AuthScan",
@@ -760,7 +760,7 @@
             "token"
           ],
           "entry_input_len": 32,
-          "public_gas_budget": 8192,
+          "public_gas_budget": 2446,
           "arena_bytes": 4160,
           "max_stack_words": 65,
           "max_hash_part_bytes": 0,

@@ -83,7 +83,7 @@
       "uo": {
         "aborted": false,
         "executable": true,
-        "gas_used": 4096,
+        "gas_used": 2086,
         "getters": [
           "1"
         ],
@@ -111,7 +111,7 @@
       "uo": {
         "aborted": false,
         "executable": true,
-        "gas_used": 8192,
+        "gas_used": 2446,
         "getters": [
           "1"
         ],
@@ -127,7 +127,7 @@
       "oram": {
         "aborted": false,
         "executable": true,
-        "gas_used": 12288,
+        "gas_used": 3588,
         "getters": [
           "3",
           "3"
@@ -153,7 +153,7 @@
       "uo": {
         "aborted": false,
         "executable": true,
-        "gas_used": 16384,
+        "gas_used": 2428,
         "getters": [
           "3",
           "3"
@@ -170,7 +170,7 @@
       "oram": {
         "aborted": false,
         "executable": true,
-        "gas_used": 16384,
+        "gas_used": 7485,
         "getters": [
           "7",
           "3",
@@ -198,7 +198,7 @@
       "uo": {
         "aborted": false,
         "executable": true,
-        "gas_used": 24576,
+        "gas_used": 3019,
         "getters": [
           "7",
           "3",
@@ -228,7 +228,7 @@
       "uo": {
         "aborted": false,
         "executable": true,
-        "gas_used": 12288,
+        "gas_used": 2392,
         "getters": [
           "0"
         ],
