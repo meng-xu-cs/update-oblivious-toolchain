@@ -92,6 +92,17 @@ jobs:
         run: cargo run -q -p mplus-probe -- --only claim-consistency --out-dir results
       - name: Claim artifact manifest coverage
         run: cargo run -q -p mplus-probe -- --only claim-status --out-dir results
+      # The steps above regenerate their reports into results/. They are
+      # deterministic and checkout-independent, so any difference means the
+      # committed results are stale (regenerate with scripts/run_validation.sh)
+      # or a report started depending on the build machine.
+      - name: Regenerated reports match the committed results
+        run: |
+          if ! git diff --quiet -- results; then
+            git diff --stat -- results
+            git diff -- results | head -200
+            exit 1
+          fi
 
   full-validation:
     # Heavy end-to-end validation. Manual or nightly only.

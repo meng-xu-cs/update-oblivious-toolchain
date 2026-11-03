@@ -99,6 +99,12 @@ checks are updated in the same change.
 Generated markdown under `results/` is probe output. Do not hand-maintain it;
 update `probe/mplus-probe` and regenerate.
 
+The toolchain manifest digest hashes the runtime, `uo-core`, and Lean sources
+(tests included), so changing any of them changes every artifact identity:
+regenerate with `./scripts/run_validation.sh` in the same change. CI's
+`probe-validation` job regenerates its reports and fails if they differ from
+the committed `results/`.
+
 ## Working Practices
 
 - Prefer small, reviewable patches.

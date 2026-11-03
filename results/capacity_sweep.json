@@ -15,7 +15,7 @@
   },
   "rows": [
     {
-      "artifact_json_bytes": 11241,
+      "artifact_json_bytes": 11177,
       "backend": "full_scan",
       "bytes_read": 190,
       "bytes_written": 190,
@@ -23,8 +23,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2061,
-      "p50_latency": 2227391,
-      "p95_latency": 2242414,
+      "p50_latency": 1989930,
+      "p95_latency": 2315023,
       "physical_reads": 1,
       "physical_writes": 1,
       "proof_object_bytes": 72,
@@ -35,7 +35,7 @@
       "validation_time_ms": 2
     },
     {
-      "artifact_json_bytes": 11241,
+      "artifact_json_bytes": 11177,
       "backend": "full_scan",
       "bytes_read": 190,
       "bytes_written": 190,
@@ -43,8 +43,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2061,
-      "p50_latency": 2221153,
-      "p95_latency": 2237433,
+      "p50_latency": 2802222,
+      "p95_latency": 3786602,
       "physical_reads": 1,
       "physical_writes": 1,
       "proof_object_bytes": 65,
@@ -55,7 +55,7 @@
       "validation_time_ms": 2
     },
     {
-      "artifact_json_bytes": 11241,
+      "artifact_json_bytes": 11177,
       "backend": "full_scan",
       "bytes_read": 190,
       "bytes_written": 190,
@@ -63,8 +63,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2054,
-      "p50_latency": 2215256,
-      "p95_latency": 2258476,
+      "p50_latency": 2278752,
+      "p95_latency": 3451382,
       "physical_reads": 1,
       "physical_writes": 1,
       "proof_object_bytes": 65,
@@ -75,7 +75,7 @@
       "validation_time_ms": 2
     },
     {
-      "artifact_json_bytes": 11503,
+      "artifact_json_bytes": 11439,
       "backend": "oram",
       "bytes_read": 4624,
       "bytes_written": 4624,
@@ -83,8 +83,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2177,
-      "p50_latency": 10258089,
-      "p95_latency": 10996536,
+      "p50_latency": 9504749,
+      "p95_latency": 13581162,
       "physical_reads": 5,
       "physical_writes": 5,
       "proof_object_bytes": 264,
@@ -95,7 +95,7 @@
       "validation_time_ms": 1
     },
     {
-      "artifact_json_bytes": 11503,
+      "artifact_json_bytes": 11439,
       "backend": "oram",
       "bytes_read": 4624,
       "bytes_written": 4624,
@@ -103,8 +103,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2177,
-      "p50_latency": 10180186,
-      "p95_latency": 10277143,
+      "p50_latency": 9252175,
+      "p95_latency": 9510929,
       "physical_reads": 5,
       "physical_writes": 5,
       "proof_object_bytes": 257,
@@ -115,7 +115,7 @@
       "validation_time_ms": 1
     },
     {
-      "artifact_json_bytes": 11503,
+      "artifact_json_bytes": 11439,
       "backend": "oram",
       "bytes_read": 4624,
       "bytes_written": 4624,
@@ -123,8 +123,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2170,
-      "p50_latency": 10032192,
-      "p95_latency": 10276782,
+      "p50_latency": 11684204,
+      "p95_latency": 12813028,
       "physical_reads": 5,
       "physical_writes": 5,
       "proof_object_bytes": 257,
@@ -135,7 +135,7 @@
       "validation_time_ms": 1
     },
     {
-      "artifact_json_bytes": 11241,
+      "artifact_json_bytes": 11177,
       "backend": "full_scan",
       "bytes_read": 380,
       "bytes_written": 380,
@@ -143,8 +143,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2090,
-      "p50_latency": 2546561,
-      "p95_latency": 2550981,
+      "p50_latency": 3130377,
+      "p95_latency": 3348289,
       "physical_reads": 2,
       "physical_writes": 2,
       "proof_object_bytes": 72,
@@ -152,10 +152,10 @@
       "stash_bound": 0,
       "status": "ok",
       "trace_json_bytes": 10760,
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
-      "artifact_json_bytes": 11241,
+      "artifact_json_bytes": 11177,
       "backend": "full_scan",
       "bytes_read": 380,
       "bytes_written": 380,
@@ -163,8 +163,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2090,
-      "p50_latency": 2541591,
-      "p95_latency": 2612393,
+      "p50_latency": 2087131,
+      "p95_latency": 2302316,
       "physical_reads": 2,
       "physical_writes": 2,
       "proof_object_bytes": 65,
@@ -172,10 +172,10 @@
       "stash_bound": 0,
       "status": "ok",
       "trace_json_bytes": 10760,
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
-      "artifact_json_bytes": 11241,
+      "artifact_json_bytes": 11177,
       "backend": "full_scan",
       "bytes_read": 380,
       "bytes_written": 380,
@@ -183,8 +183,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2083,
-      "p50_latency": 2523561,
-      "p95_latency": 2532857,
+      "p50_latency": 2149974,
+      "p95_latency": 2441632,
       "physical_reads": 2,
       "physical_writes": 2,
       "proof_object_bytes": 65,
@@ -192,10 +192,10 @@
       "stash_bound": 0,
       "status": "ok",
       "trace_json_bytes": 10597,
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
-      "artifact_json_bytes": 11503,
+      "artifact_json_bytes": 11439,
       "backend": "oram",
       "bytes_read": 4624,
       "bytes_written": 4624,
@@ -203,8 +203,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2177,
-      "p50_latency": 10593480,
-      "p95_latency": 10889260,
+      "p50_latency": 9203088,
+      "p95_latency": 14112848,
       "physical_reads": 5,
       "physical_writes": 5,
       "proof_object_bytes": 264,
@@ -215,7 +215,7 @@
       "validation_time_ms": 1
     },
     {
-      "artifact_json_bytes": 11503,
+      "artifact_json_bytes": 11439,
       "backend": "oram",
       "bytes_read": 4624,
       "bytes_written": 4624,
@@ -223,8 +223,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2177,
-      "p50_latency": 10587262,
-      "p95_latency": 11332752,
+      "p50_latency": 8951805,
+      "p95_latency": 10280990,
       "physical_reads": 5,
       "physical_writes": 5,
       "proof_object_bytes": 257,
@@ -235,7 +235,7 @@
       "validation_time_ms": 1
     },
     {
-      "artifact_json_bytes": 11503,
+      "artifact_json_bytes": 11439,
       "backend": "oram",
       "bytes_read": 4624,
       "bytes_written": 4624,
@@ -243,8 +243,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2170,
-      "p50_latency": 10426416,
-      "p95_latency": 10521495,
+      "p50_latency": 9657911,
+      "p95_latency": 10705046,
       "physical_reads": 5,
       "physical_writes": 5,
       "proof_object_bytes": 257,
@@ -255,7 +255,7 @@
       "validation_time_ms": 1
     },
     {
-      "artifact_json_bytes": 11241,
+      "artifact_json_bytes": 11177,
       "backend": "full_scan",
       "bytes_read": 760,
       "bytes_written": 760,
@@ -263,8 +263,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2148,
-      "p50_latency": 3157395,
-      "p95_latency": 3259176,
+      "p50_latency": 2902067,
+      "p95_latency": 3002660,
       "physical_reads": 4,
       "physical_writes": 4,
       "proof_object_bytes": 72,
@@ -275,7 +275,7 @@
       "validation_time_ms": 1
     },
     {
-      "artifact_json_bytes": 11241,
+      "artifact_json_bytes": 11177,
       "backend": "full_scan",
       "bytes_read": 760,
       "bytes_written": 760,
@@ -283,8 +283,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2148,
-      "p50_latency": 3160320,
-      "p95_latency": 3436452,
+      "p50_latency": 2925865,
+      "p95_latency": 3041926,
       "physical_reads": 4,
       "physical_writes": 4,
       "proof_object_bytes": 65,
@@ -295,7 +295,7 @@
       "validation_time_ms": 1
     },
     {
-      "artifact_json_bytes": 11241,
+      "artifact_json_bytes": 11177,
       "backend": "full_scan",
       "bytes_read": 760,
       "bytes_written": 760,
@@ -303,8 +303,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2141,
-      "p50_latency": 3129540,
-      "p95_latency": 3171385,
+      "p50_latency": 2793129,
+      "p95_latency": 2973014,
       "physical_reads": 4,
       "physical_writes": 4,
       "proof_object_bytes": 65,
@@ -315,7 +315,7 @@
       "validation_time_ms": 1
     },
     {
-      "artifact_json_bytes": 11503,
+      "artifact_json_bytes": 11439,
       "backend": "oram",
       "bytes_read": 5542,
       "bytes_written": 5542,
@@ -323,8 +323,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2206,
-      "p50_latency": 16477410,
-      "p95_latency": 16552238,
+      "p50_latency": 13897472,
+      "p95_latency": 15718659,
       "physical_reads": 6,
       "physical_writes": 6,
       "proof_object_bytes": 264,
@@ -335,7 +335,7 @@
       "validation_time_ms": 1
     },
     {
-      "artifact_json_bytes": 11503,
+      "artifact_json_bytes": 11439,
       "backend": "oram",
       "bytes_read": 5542,
       "bytes_written": 5542,
@@ -343,8 +343,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2206,
-      "p50_latency": 16469072,
-      "p95_latency": 16595581,
+      "p50_latency": 13992317,
+      "p95_latency": 18766972,
       "physical_reads": 6,
       "physical_writes": 6,
       "proof_object_bytes": 257,
@@ -355,7 +355,7 @@
       "validation_time_ms": 1
     },
     {
-      "artifact_json_bytes": 11503,
+      "artifact_json_bytes": 11439,
       "backend": "oram",
       "bytes_read": 5542,
       "bytes_written": 5542,
@@ -363,8 +363,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2199,
-      "p50_latency": 16237781,
-      "p95_latency": 16533874,
+      "p50_latency": 14585970,
+      "p95_latency": 15859965,
       "physical_reads": 6,
       "physical_writes": 6,
       "proof_object_bytes": 257,
@@ -375,7 +375,7 @@
       "validation_time_ms": 1
     },
     {
-      "artifact_json_bytes": 11241,
+      "artifact_json_bytes": 11177,
       "backend": "full_scan",
       "bytes_read": 1520,
       "bytes_written": 1520,
@@ -383,8 +383,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2264,
-      "p50_latency": 4511271,
-      "p95_latency": 4606602,
+      "p50_latency": 5573024,
+      "p95_latency": 8089306,
       "physical_reads": 8,
       "physical_writes": 8,
       "proof_object_bytes": 72,
@@ -395,7 +395,7 @@
       "validation_time_ms": 1
     },
     {
-      "artifact_json_bytes": 11241,
+      "artifact_json_bytes": 11177,
       "backend": "full_scan",
       "bytes_read": 1520,
       "bytes_written": 1520,
@@ -403,8 +403,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2264,
-      "p50_latency": 4510634,
-      "p95_latency": 4540132,
+      "p50_latency": 4593445,
+      "p95_latency": 5082883,
       "physical_reads": 8,
       "physical_writes": 8,
       "proof_object_bytes": 65,
@@ -415,7 +415,7 @@
       "validation_time_ms": 1
     },
     {
-      "artifact_json_bytes": 11241,
+      "artifact_json_bytes": 11177,
       "backend": "full_scan",
       "bytes_read": 1520,
       "bytes_written": 1520,
@@ -423,8 +423,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2257,
-      "p50_latency": 4457455,
-      "p95_latency": 4554012,
+      "p50_latency": 4413116,
+      "p95_latency": 4991081,
       "physical_reads": 8,
       "physical_writes": 8,
       "proof_object_bytes": 65,
@@ -435,7 +435,7 @@
       "validation_time_ms": 1
     },
     {
-      "artifact_json_bytes": 11504,
+      "artifact_json_bytes": 11440,
       "backend": "oram",
       "bytes_read": 6460,
       "bytes_written": 6460,
@@ -443,8 +443,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2235,
-      "p50_latency": 27792447,
-      "p95_latency": 27998597,
+      "p50_latency": 23492498,
+      "p95_latency": 30694757,
       "physical_reads": 7,
       "physical_writes": 7,
       "proof_object_bytes": 264,
@@ -455,7 +455,7 @@
       "validation_time_ms": 1
     },
     {
-      "artifact_json_bytes": 11504,
+      "artifact_json_bytes": 11440,
       "backend": "oram",
       "bytes_read": 6460,
       "bytes_written": 6460,
@@ -463,8 +463,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2235,
-      "p50_latency": 27786081,
-      "p95_latency": 28894991,
+      "p50_latency": 23202924,
+      "p95_latency": 24927542,
       "physical_reads": 7,
       "physical_writes": 7,
       "proof_object_bytes": 257,
@@ -475,7 +475,7 @@
       "validation_time_ms": 1
     },
     {
-      "artifact_json_bytes": 11504,
+      "artifact_json_bytes": 11440,
       "backend": "oram",
       "bytes_read": 6460,
       "bytes_written": 6460,
@@ -483,8 +483,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2228,
-      "p50_latency": 27425966,
-      "p95_latency": 27932941,
+      "p50_latency": 23573112,
+      "p95_latency": 25504999,
       "physical_reads": 7,
       "physical_writes": 7,
       "proof_object_bytes": 257,
@@ -495,7 +495,7 @@
       "validation_time_ms": 1
     },
     {
-      "artifact_json_bytes": 11247,
+      "artifact_json_bytes": 11183,
       "backend": "full_scan",
       "bytes_read": 3040,
       "bytes_written": 3040,
@@ -503,8 +503,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2496,
-      "p50_latency": 7001188,
-      "p95_latency": 7191243,
+      "p50_latency": 7049811,
+      "p95_latency": 7417351,
       "physical_reads": 16,
       "physical_writes": 16,
       "proof_object_bytes": 73,
@@ -515,7 +515,7 @@
       "validation_time_ms": 1
     },
     {
-      "artifact_json_bytes": 11247,
+      "artifact_json_bytes": 11183,
       "backend": "full_scan",
       "bytes_read": 3040,
       "bytes_written": 3040,
@@ -523,8 +523,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2496,
-      "p50_latency": 6997592,
-      "p95_latency": 7476210,
+      "p50_latency": 6533587,
+      "p95_latency": 7964561,
       "physical_reads": 16,
       "physical_writes": 16,
       "proof_object_bytes": 66,
@@ -535,7 +535,7 @@
       "validation_time_ms": 1
     },
     {
-      "artifact_json_bytes": 11247,
+      "artifact_json_bytes": 11183,
       "backend": "full_scan",
       "bytes_read": 3040,
       "bytes_written": 3040,
@@ -543,8 +543,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2489,
-      "p50_latency": 6918108,
-      "p95_latency": 7008922,
+      "p50_latency": 6510284,
+      "p95_latency": 6767777,
       "physical_reads": 16,
       "physical_writes": 16,
       "proof_object_bytes": 66,
@@ -555,7 +555,7 @@
       "validation_time_ms": 1
     },
     {
-      "artifact_json_bytes": 11510,
+      "artifact_json_bytes": 11446,
       "backend": "oram",
       "bytes_read": 10090,
       "bytes_written": 10090,
@@ -563,8 +563,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2322,
-      "p50_latency": 58151093,
-      "p95_latency": 59072676,
+      "p50_latency": 47726827,
+      "p95_latency": 72221777,
       "physical_reads": 10,
       "physical_writes": 10,
       "proof_object_bytes": 268,
@@ -575,7 +575,7 @@
       "validation_time_ms": 1
     },
     {
-      "artifact_json_bytes": 11510,
+      "artifact_json_bytes": 11446,
       "backend": "oram",
       "bytes_read": 10090,
       "bytes_written": 10090,
@@ -583,8 +583,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2322,
-      "p50_latency": 58086898,
-      "p95_latency": 58279677,
+      "p50_latency": 48340711,
+      "p95_latency": 52370558,
       "physical_reads": 10,
       "physical_writes": 10,
       "proof_object_bytes": 261,
@@ -595,7 +595,7 @@
       "validation_time_ms": 1
     },
     {
-      "artifact_json_bytes": 11510,
+      "artifact_json_bytes": 11446,
       "backend": "oram",
       "bytes_read": 10090,
       "bytes_written": 10090,
@@ -603,8 +603,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2315,
-      "p50_latency": 57546940,
-      "p95_latency": 57758624,
+      "p50_latency": 51021837,
+      "p95_latency": 64069526,
       "physical_reads": 10,
       "physical_writes": 10,
       "proof_object_bytes": 261,
@@ -615,7 +615,7 @@
       "validation_time_ms": 1
     },
     {
-      "artifact_json_bytes": 11247,
+      "artifact_json_bytes": 11183,
       "backend": "full_scan",
       "bytes_read": 6080,
       "bytes_written": 6080,
@@ -623,8 +623,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2960,
-      "p50_latency": 11881930,
-      "p95_latency": 11990284,
+      "p50_latency": 11809778,
+      "p95_latency": 33437664,
       "physical_reads": 32,
       "physical_writes": 32,
       "proof_object_bytes": 73,
@@ -635,7 +635,7 @@
       "validation_time_ms": 1
     },
     {
-      "artifact_json_bytes": 11247,
+      "artifact_json_bytes": 11183,
       "backend": "full_scan",
       "bytes_read": 6080,
       "bytes_written": 6080,
@@ -643,8 +643,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2960,
-      "p50_latency": 11878475,
-      "p95_latency": 11888685,
+      "p50_latency": 11106826,
+      "p95_latency": 11600866,
       "physical_reads": 32,
       "physical_writes": 32,
       "proof_object_bytes": 66,
@@ -655,7 +655,7 @@
       "validation_time_ms": 1
     },
     {
-      "artifact_json_bytes": 11247,
+      "artifact_json_bytes": 11183,
       "backend": "full_scan",
       "bytes_read": 6080,
       "bytes_written": 6080,
@@ -663,8 +663,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2953,
-      "p50_latency": 11718660,
-      "p95_latency": 11809939,
+      "p50_latency": 11362807,
+      "p95_latency": 11534492,
       "physical_reads": 32,
       "physical_writes": 32,
       "proof_object_bytes": 66,
@@ -675,7 +675,7 @@
       "validation_time_ms": 1
     },
     {
-      "artifact_json_bytes": 11510,
+      "artifact_json_bytes": 11446,
       "backend": "oram",
       "bytes_read": 16432,
       "bytes_written": 16432,
@@ -683,8 +683,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2467,
-      "p50_latency": 142086281,
-      "p95_latency": 142501440,
+      "p50_latency": 118675067,
+      "p95_latency": 160834088,
       "physical_reads": 15,
       "physical_writes": 15,
       "proof_object_bytes": 268,
@@ -695,7 +695,7 @@
       "validation_time_ms": 1
     },
     {
-      "artifact_json_bytes": 11510,
+      "artifact_json_bytes": 11446,
       "backend": "oram",
       "bytes_read": 16432,
       "bytes_written": 16432,
@@ -703,8 +703,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2467,
-      "p50_latency": 141848385,
-      "p95_latency": 142460200,
+      "p50_latency": 126360875,
+      "p95_latency": 167977099,
       "physical_reads": 15,
       "physical_writes": 15,
       "proof_object_bytes": 261,
@@ -715,7 +715,7 @@
       "validation_time_ms": 1
     },
     {
-      "artifact_json_bytes": 11510,
+      "artifact_json_bytes": 11446,
       "backend": "oram",
       "bytes_read": 16432,
       "bytes_written": 16432,
@@ -723,8 +723,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2460,
-      "p50_latency": 141303728,
-      "p95_latency": 141538835,
+      "p50_latency": 120284855,
+      "p95_latency": 168468729,
       "physical_reads": 15,
       "physical_writes": 15,
       "proof_object_bytes": 261,
@@ -735,7 +735,7 @@
       "validation_time_ms": 1
     },
     {
-      "artifact_json_bytes": 11247,
+      "artifact_json_bytes": 11183,
       "backend": "full_scan",
       "bytes_read": 12160,
       "bytes_written": 12160,
@@ -743,8 +743,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 3888,
-      "p50_latency": 21631033,
-      "p95_latency": 21811536,
+      "p50_latency": 22298767,
+      "p95_latency": 26097052,
       "physical_reads": 64,
       "physical_writes": 64,
       "proof_object_bytes": 73,
@@ -755,7 +755,7 @@
       "validation_time_ms": 1
     },
     {
-      "artifact_json_bytes": 11247,
+      "artifact_json_bytes": 11183,
       "backend": "full_scan",
       "bytes_read": 12160,
       "bytes_written": 12160,
@@ -763,8 +763,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 3888,
-      "p50_latency": 21623673,
-      "p95_latency": 21715762,
+      "p50_latency": 23028844,
+      "p95_latency": 30514692,
       "physical_reads": 64,
       "physical_writes": 64,
       "proof_object_bytes": 66,
@@ -775,7 +775,7 @@
       "validation_time_ms": 1
     },
     {
-      "artifact_json_bytes": 11247,
+      "artifact_json_bytes": 11183,
       "backend": "full_scan",
       "bytes_read": 12160,
       "bytes_written": 12160,
@@ -783,8 +783,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 3881,
-      "p50_latency": 21293503,
-      "p95_latency": 21315555,
+      "p50_latency": 21213366,
+      "p95_latency": 25689160,
       "physical_reads": 64,
       "physical_writes": 64,
       "proof_object_bytes": 66,
@@ -795,7 +795,7 @@
       "validation_time_ms": 1
     },
     {
-      "artifact_json_bytes": 11513,
+      "artifact_json_bytes": 11449,
       "backend": "oram",
       "bytes_read": 28198,
       "bytes_written": 28198,
@@ -803,8 +803,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2728,
-      "p50_latency": 408635345,
-      "p95_latency": 409445400,
+      "p50_latency": 336206756,
+      "p95_latency": 363419776,
       "physical_reads": 24,
       "physical_writes": 24,
       "proof_object_bytes": 270,
@@ -815,7 +815,7 @@
       "validation_time_ms": 1
     },
     {
-      "artifact_json_bytes": 11513,
+      "artifact_json_bytes": 11449,
       "backend": "oram",
       "bytes_read": 28198,
       "bytes_written": 28198,
@@ -823,8 +823,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2728,
-      "p50_latency": 408677591,
-      "p95_latency": 411611709,
+      "p50_latency": 352963484,
+      "p95_latency": 383906523,
       "physical_reads": 24,
       "physical_writes": 24,
       "proof_object_bytes": 263,
@@ -835,7 +835,7 @@
       "validation_time_ms": 1
     },
     {
-      "artifact_json_bytes": 11513,
+      "artifact_json_bytes": 11449,
       "backend": "oram",
       "bytes_read": 28198,
       "bytes_written": 28198,
@@ -843,8 +843,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2721,
-      "p50_latency": 408074783,
-      "p95_latency": 408631931,
+      "p50_latency": 331611945,
+      "p95_latency": 369896667,
       "physical_reads": 24,
       "physical_writes": 24,
       "proof_object_bytes": 263,
@@ -855,7 +855,7 @@
       "validation_time_ms": 1
     },
     {
-      "artifact_json_bytes": 11253,
+      "artifact_json_bytes": 11189,
       "backend": "full_scan",
       "bytes_read": 24320,
       "bytes_written": 24320,
@@ -863,8 +863,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 5744,
-      "p50_latency": 41097494,
-      "p95_latency": 41560483,
+      "p50_latency": 41291371,
+      "p95_latency": 42355802,
       "physical_reads": 128,
       "physical_writes": 128,
       "proof_object_bytes": 74,
@@ -875,7 +875,7 @@
       "validation_time_ms": 1
     },
     {
-      "artifact_json_bytes": 11253,
+      "artifact_json_bytes": 11189,
       "backend": "full_scan",
       "bytes_read": 24320,
       "bytes_written": 24320,
@@ -883,8 +883,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 5744,
-      "p50_latency": 40945604,
-      "p95_latency": 41016003,
+      "p50_latency": 47828979,
+      "p95_latency": 54033683,
       "physical_reads": 128,
       "physical_writes": 128,
       "proof_object_bytes": 67,
@@ -895,7 +895,7 @@
       "validation_time_ms": 1
     },
     {
-      "artifact_json_bytes": 11253,
+      "artifact_json_bytes": 11189,
       "backend": "full_scan",
       "bytes_read": 24320,
       "bytes_written": 24320,
@@ -903,8 +903,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 5737,
-      "p50_latency": 40315269,
-      "p95_latency": 40422490,
+      "p50_latency": 46063838,
+      "p95_latency": 58508246,
       "physical_reads": 128,
       "physical_writes": 128,
       "proof_object_bytes": 67,
@@ -915,7 +915,7 @@
       "validation_time_ms": 1
     },
     {
-      "artifact_json_bytes": 11516,
+      "artifact_json_bytes": 11452,
       "backend": "oram",
       "bytes_read": 50812,
       "bytes_written": 50812,
@@ -923,8 +923,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 3221,
-      "p50_latency": 1342677927,
-      "p95_latency": 1345622149,
+      "p50_latency": 1188509233,
+      "p95_latency": 1292987830,
       "physical_reads": 41,
       "physical_writes": 41,
       "proof_object_bytes": 271,
@@ -932,10 +932,10 @@
       "stash_bound": 128,
       "status": "ok",
       "trace_json_bytes": 211355,
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
-      "artifact_json_bytes": 11516,
+      "artifact_json_bytes": 11452,
       "backend": "oram",
       "bytes_read": 50812,
       "bytes_written": 50812,
@@ -943,8 +943,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 3221,
-      "p50_latency": 1343672911,
-      "p95_latency": 1345762614,
+      "p50_latency": 1134616179,
+      "p95_latency": 1386584938,
       "physical_reads": 41,
       "physical_writes": 41,
       "proof_object_bytes": 264,
@@ -952,10 +952,10 @@
       "stash_bound": 128,
       "status": "ok",
       "trace_json_bytes": 211355,
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
-      "artifact_json_bytes": 11516,
+      "artifact_json_bytes": 11452,
       "backend": "oram",
       "bytes_read": 50812,
       "bytes_written": 50812,
@@ -963,8 +963,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 3214,
-      "p50_latency": 1339451927,
-      "p95_latency": 1340419301,
+      "p50_latency": 1189860862,
+      "p95_latency": 1249164671,
       "physical_reads": 41,
       "physical_writes": 41,
       "proof_object_bytes": 264,
@@ -972,10 +972,10 @@
       "stash_bound": 128,
       "status": "ok",
       "trace_json_bytes": 211188,
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
-      "artifact_json_bytes": 11253,
+      "artifact_json_bytes": 11189,
       "backend": "full_scan",
       "bytes_read": 48640,
       "bytes_written": 48640,
@@ -983,8 +983,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 9456,
-      "p50_latency": 79721761,
-      "p95_latency": 82073093,
+      "p50_latency": 81135917,
+      "p95_latency": 91606439,
       "physical_reads": 256,
       "physical_writes": 256,
       "proof_object_bytes": 74,
@@ -995,7 +995,7 @@
       "validation_time_ms": 1
     },
     {
-      "artifact_json_bytes": 11253,
+      "artifact_json_bytes": 11189,
       "backend": "full_scan",
       "bytes_read": 48640,
       "bytes_written": 48640,
@@ -1003,8 +1003,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 9456,
-      "p50_latency": 79576107,
-      "p95_latency": 80793725,
+      "p50_latency": 79186649,
+      "p95_latency": 91278443,
       "physical_reads": 256,
       "physical_writes": 256,
       "proof_object_bytes": 67,
@@ -1015,7 +1015,7 @@
       "validation_time_ms": 1
     },
     {
-      "artifact_json_bytes": 11253,
+      "artifact_json_bytes": 11189,
       "backend": "full_scan",
       "bytes_read": 48640,
       "bytes_written": 48640,
@@ -1023,8 +1023,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 9449,
-      "p50_latency": 78666552,
-      "p95_latency": 80396770,
+      "p50_latency": 80502504,
+      "p95_latency": 116175915,
       "physical_reads": 256,
       "physical_writes": 256,
       "proof_object_bytes": 67,
@@ -1041,7 +1041,7 @@
       "error": "path_oram_local_posmap_v1 supports capacities up to 128 in the current proof-grade route; use a recursive/private position map before admitting capacity 256",
       "read_fraction": 0.0,
       "status": "error",
-      "validation_time_ms": 0
+      "validation_time_ms": 1
     },
     {
       "backend": "oram",
@@ -1050,7 +1050,7 @@
       "error": "path_oram_local_posmap_v1 supports capacities up to 128 in the current proof-grade route; use a recursive/private position map before admitting capacity 256",
       "read_fraction": 0.5,
       "status": "error",
-      "validation_time_ms": 0
+      "validation_time_ms": 1
     },
     {
       "backend": "oram",
@@ -1059,7 +1059,7 @@
       "error": "path_oram_local_posmap_v1 supports capacities up to 128 in the current proof-grade route; use a recursive/private position map before admitting capacity 256",
       "read_fraction": 1.0,
       "status": "error",
-      "validation_time_ms": 0
+      "validation_time_ms": 1
     }
   ],
   "trials": 10,
