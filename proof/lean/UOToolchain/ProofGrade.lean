@@ -605,20 +605,21 @@ theorem proofGrade_ir_to_kernel_pure_expr_preservation
 kernel statement evaluator agree on every kernel-lowerable
 statement. -/
 theorem proofGrade_ir_to_kernel_statement_preservation
+    (confidential : Bool)
     (cfg : IR.OperationalConfig) (env : IR.LocalEnv) (oc : IR.Outcome)
     (s : IR.Statement) (ks : IR.KernelStatement)
     (h : IR.lowerStatement s = Except.ok ks) :
-    IR.evalStatement cfg env oc s = IR.evalKernelStatement cfg env oc ks :=
-  IR.lowerStatement_preserves_semantics cfg env oc s ks h
+    IR.evalStatement confidential cfg env oc s = IR.evalKernelStatement cfg env oc ks :=
+  IR.lowerStatement_preserves_semantics confidential cfg env oc s ks h
 
 /-- Body-level preservation: when a list of statements lowers to a
-list of kernel statements, body evaluation agrees outcome-for-
-outcome. -/
+list of kernel statements, confidential body evaluation (which, like
+the kernel, continues past aborts) agrees outcome-for-outcome. -/
 theorem proofGrade_ir_to_kernel_body_preservation
     (cfg : IR.OperationalConfig) (env : IR.LocalEnv) (oc : IR.Outcome)
     (stmts : List IR.Statement) (kstmts : List IR.KernelStatement)
     (h : IR.lowerStatements stmts = Except.ok kstmts) :
-    IR.evalBody cfg env oc stmts = IR.evalKernelBody cfg env oc kstmts :=
+    IR.evalBody true cfg env oc stmts = IR.evalKernelBody cfg env oc kstmts :=
   IR.lowerStatements_preserves_semantics cfg env oc stmts kstmts h
 
 /-- Program-level preservation: the IR `evalContract` agrees with the
@@ -638,9 +639,10 @@ theorem proofGrade_ir_to_kernel_program_preservation
     (cfg : IR.OperationalConfig) (fn : IR.CompiledFunction)
     (kp : IR.KernelProgram)
     (hLow : IR.lowerCompiledFunction fn = Except.ok kp)
-    (hEntry : cfg.entrypointFn? = some fn) :
+    (hEntry : cfg.entrypointFn? = some fn)
+    (hConf : fn.confidential = true) :
     IR.evalContract cfg = IR.evalKernelProgram kp cfg :=
-  IR.lowerCompiledFunction_preserves_semantics cfg fn kp hLow hEntry
+  IR.lowerCompiledFunction_preserves_semantics cfg fn kp hLow hEntry hConf
 
 /-! ## W4.2: Sol-to-IR preservation (paper facade)
 
@@ -668,18 +670,20 @@ theorem proofGrade_sol_to_ir_expr_preservation
   Sol.lowerExpr_preserves_semantics cfg env e
 
 theorem proofGrade_sol_to_ir_statement_preservation
+    (confidential : Bool)
     (cfg : IR.OperationalConfig) (env : IR.LocalEnv) (oc : IR.Outcome)
     (s : Sol.Statement) :
-    Sol.evalStatement cfg env oc s =
-      IR.evalStatement cfg env oc (Sol.lowerStatement s) :=
-  Sol.lowerStatement_preserves_semantics cfg env oc s
+    Sol.evalStatement confidential cfg env oc s =
+      IR.evalStatement confidential cfg env oc (Sol.lowerStatement s) :=
+  Sol.lowerStatement_preserves_semantics confidential cfg env oc s
 
 theorem proofGrade_sol_to_ir_body_preservation
+    (confidential : Bool)
     (cfg : IR.OperationalConfig) (env : IR.LocalEnv) (oc : IR.Outcome)
     (stmts : List Sol.Statement) :
-    Sol.evalBody cfg env oc stmts =
-      IR.evalBody cfg env oc (Sol.lowerStatementList stmts) :=
-  Sol.lowerStatementList_preserves_semantics cfg env oc stmts
+    Sol.evalBody confidential cfg env oc stmts =
+      IR.evalBody confidential cfg env oc (Sol.lowerStatementList stmts) :=
+  Sol.lowerStatementList_preserves_semantics confidential cfg env oc stmts
 
 /-- Program-level preservation: the Sol-side `evalFunction` agrees
 with the IR-side `evalContract` whenever the IR config's entrypoint
@@ -707,7 +711,8 @@ lowering to a kernel program `kp` succeeds (`lowerCompiledFunction
 (lowerFunction fn) = .ok kp`) and every IR `OperationalConfig`
 whose entrypoint resolves to the lowered function, the Sol-side
 `evalFunction` and the kernel-side `evalKernelProgram` produce
-identical outcomes.
+identical outcomes for confidential functions (which, like the kernel,
+run the whole linearized schedule and record aborts).
 
 This is the **W4.5 enabling theorem**: every manifest field that is
 a function of the runtime outcome (`kernelSteps`, `publicResult`,
@@ -721,11 +726,12 @@ theorem proofGrade_sol_to_kernel_outcome_preservation
     (fn : Sol.Function) (kp : IR.KernelProgram)
     (cfg : IR.OperationalConfig)
     (hLow : IR.lowerCompiledFunction (Sol.lowerFunction fn) = .ok kp)
-    (hEntry : cfg.entrypointFn? = some (Sol.lowerFunction fn)) :
+    (hEntry : cfg.entrypointFn? = some (Sol.lowerFunction fn))
+    (hConf : fn.confidential = true) :
     Sol.evalFunction fn cfg = IR.evalKernelProgram kp cfg := by
   rw [Sol.lowerFunction_preserves_semantics fn cfg hEntry]
   exact IR.lowerCompiledFunction_preserves_semantics cfg
-    (Sol.lowerFunction fn) kp hLow hEntry
+    (Sol.lowerFunction fn) kp hLow hEntry hConf
 
 /-! ### W4.5 main body: per-field manifest-exactness lifts
 
@@ -981,12 +987,51 @@ theorem proofGrade_sol_to_kernel_runtime_kernel_steps_eq_expected
     (cfg : IR.OperationalConfig)
     (hLow : IR.lowerCompiledFunction (Sol.lowerFunction fn) = .ok kp)
     (hEntry : cfg.entrypointFn? = some (Sol.lowerFunction fn))
+    (hConf : fn.confidential = true)
     (hStatus : (Sol.evalFunction fn cfg).status = .completed)
     (hPub : (Sol.evalFunction fn cfg).publicResult = none) :
     (Sol.evalFunction fn cfg).kernelSteps = kp.expectedKernelSteps := by
-  rw [proofGrade_sol_to_kernel_outcome_preservation fn kp cfg hLow hEntry] at *
+  rw [proofGrade_sol_to_kernel_outcome_preservation fn kp cfg hLow hEntry hConf] at *
   exact IR.evalKernelProgram_kernelSteps_eq_expectedKernelSteps_of_completed
     kp cfg hStatus hPub
+
+/-- Source-side schedule for every error-free confidential run: the
+`Sol.evalFunction` kernel steps equal the kernel program's static expected
+schedule whether or not the run aborts. Confidential bodies record aborts
+instead of exiting early (as the generated runtime kernel does), so the step
+schedule cannot reveal whether, or at which guard, a run aborted. -/
+theorem proofGrade_sol_to_kernel_runtime_kernel_steps_eq_expected_of_continues
+    (fn : Sol.Function) (kp : IR.KernelProgram)
+    (cfg : IR.OperationalConfig)
+    (hLow : IR.lowerCompiledFunction (Sol.lowerFunction fn) = .ok kp)
+    (hEntry : cfg.entrypointFn? = some (Sol.lowerFunction fn))
+    (hConf : fn.confidential = true)
+    (hStatus : (Sol.evalFunction fn cfg).status.continuesBody true = true)
+    (hPub : (Sol.evalFunction fn cfg).publicResult = none) :
+    (Sol.evalFunction fn cfg).kernelSteps = kp.expectedKernelSteps := by
+  rw [proofGrade_sol_to_kernel_outcome_preservation fn kp cfg hLow hEntry hConf] at *
+  exact IR.evalKernelProgram_kernelSteps_eq_expectedKernelSteps_of_continues
+    kp cfg hStatus hPub
+
+/-- Schedule noninterference for error-free confidential runs: two runs of
+the same confidential function emit the same kernel steps, whatever their
+secret inputs and whether either run aborts. -/
+theorem proofGrade_sol_kernel_steps_eq_of_continues
+    (fn : Sol.Function) (kp : IR.KernelProgram)
+    (cfg₁ cfg₂ : IR.OperationalConfig)
+    (hLow : IR.lowerCompiledFunction (Sol.lowerFunction fn) = .ok kp)
+    (hEntry₁ : cfg₁.entrypointFn? = some (Sol.lowerFunction fn))
+    (hEntry₂ : cfg₂.entrypointFn? = some (Sol.lowerFunction fn))
+    (hConf : fn.confidential = true)
+    (hStatus₁ : (Sol.evalFunction fn cfg₁).status.continuesBody true = true)
+    (hStatus₂ : (Sol.evalFunction fn cfg₂).status.continuesBody true = true)
+    (hPub₁ : (Sol.evalFunction fn cfg₁).publicResult = none)
+    (hPub₂ : (Sol.evalFunction fn cfg₂).publicResult = none) :
+    (Sol.evalFunction fn cfg₁).kernelSteps = (Sol.evalFunction fn cfg₂).kernelSteps := by
+  rw [proofGrade_sol_to_kernel_runtime_kernel_steps_eq_expected_of_continues
+      fn kp cfg₁ hLow hEntry₁ hConf hStatus₁ hPub₁,
+    proofGrade_sol_to_kernel_runtime_kernel_steps_eq_expected_of_continues
+      fn kp cfg₂ hLow hEntry₂ hConf hStatus₂ hPub₂]
 
 /-! ### W4.4 reverse iff: lowering succeeds → precondition holds (paper facades)
 
@@ -1064,7 +1109,8 @@ theorem proofGrade_compiler_correctness_supersedes_artifact_checker
     (fn : Sol.Function) (kp : IR.KernelProgram)
     (cfg : IR.OperationalConfig)
     (hLow : IR.lowerCompiledFunction (Sol.lowerFunction fn) = .ok kp)
-    (hEntry : cfg.entrypointFn? = some (Sol.lowerFunction fn)) :
+    (hEntry : cfg.entrypointFn? = some (Sol.lowerFunction fn))
+    (hConf : fn.confidential = true) :
     -- (a) Source-side and kernel-side outcomes coincide (W4.2 + W4.4):
     Sol.evalFunction fn cfg = IR.evalKernelProgram kp cfg ∧
     -- (b) The lowering precondition is decided by the iff (W4.4 reverse):
@@ -1075,12 +1121,12 @@ theorem proofGrade_compiler_correctness_supersedes_artifact_checker
       (Sol.evalFunction fn cfg).publicResult = none →
       (Sol.evalFunction fn cfg).kernelSteps = kp.expectedKernelSteps) := by
   refine ⟨?_, ?_, ?_⟩
-  · exact proofGrade_sol_to_kernel_outcome_preservation fn kp cfg hLow hEntry
+  · exact proofGrade_sol_to_kernel_outcome_preservation fn kp cfg hLow hEntry hConf
   · exact IR.lowerCompiledFunction_ok_implies_kernelLowerable
       (Sol.lowerFunction fn) kp hLow
   · intro hStatus hPub
     exact proofGrade_sol_to_kernel_runtime_kernel_steps_eq_expected
-      fn kp cfg hLow hEntry hStatus hPub
+      fn kp cfg hLow hEntry hConf hStatus hPub
 
 /-! ### WP5 Paper-Facing Backend Codec Surface Facades
 

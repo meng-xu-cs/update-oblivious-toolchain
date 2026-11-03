@@ -24,6 +24,18 @@ correctness is represented by Lean theorems over the admitted post-resolution
 DSL, while parser/preprocessing remains the explicit front-end trust
 surface.
 
+The Sol, IR, and kernel evaluators share one abort rule
+(`EvalStatus.continuesBody`). Confidential entrypoints run their whole
+linearized schedule: `require`, `abortIf`, and bounded-map capacity overflow
+record the abort, and the commit boundary rolls the candidate state back,
+exactly as the generated runtime kernel does. Public entrypoints stop at the
+first abort, as the runtime shell does, and evaluation errors always stop.
+Consequently the kernel-step schedule of every error-free confidential run,
+aborted or not, is the program's static expected schedule
+(`evalKernelProgram_kernelSteps_eq_expectedKernelSteps_of_continues`), and
+`proofGrade_sol_kernel_steps_eq_of_continues` states that two such runs emit
+the same kernel steps whatever their secret inputs.
+
 ## Runtime Bridge
 
 Runtime execution emits or supports these proof-facing objects:

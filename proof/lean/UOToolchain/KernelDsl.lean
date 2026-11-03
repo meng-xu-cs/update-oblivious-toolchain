@@ -481,11 +481,10 @@ def evalKernelBody
   | [] => (cfg, env, oc)
   | stmt :: rest =>
       let (cfg', env', oc') := evalKernelStatement cfg env oc stmt
-      match oc'.status with
-      | .completed =>
-          if oc'.publicResult.isSome then (cfg', env', oc')
-          else evalKernelBody cfg' env' oc' rest
-      | _ => (cfg', env', oc')
+      if oc'.status.continuesBody true then
+        if oc'.publicResult.isSome then (cfg', env', oc')
+        else evalKernelBody cfg' env' oc' rest
+      else (cfg', env', oc')
 
 end
 
@@ -1608,11 +1607,11 @@ on the predicate option (`none` vs `some p`) and on the evaluated
 predicate boolean (`true` vs `false`) to align both evaluators'
 masked-store semantics. -/
 
-theorem lowerStatement_preserves_semantics
+theorem lowerStatement_preserves_semantics (confidential : Bool)
     (cfg : OperationalConfig) (env : LocalEnv) (oc : Outcome) :
     ∀ (s : Statement) (ks : KernelStatement),
       lowerStatement s = .ok ks →
-        evalStatement cfg env oc s = evalKernelStatement cfg env oc ks
+        evalStatement confidential cfg env oc s = evalKernelStatement cfg env oc ks
   | .declare name ty value, ks, h => by
       cases hV : lowerExpr value with
       | error err =>
@@ -1833,7 +1832,7 @@ theorem lowerStatementsAux_preserves_semantics :
       (index : Nat) (sawReturn : Bool)
       (cfg : OperationalConfig) (env : LocalEnv) (oc : Outcome),
       lowerStatementsAux stmts index sawReturn = .ok kstmts →
-        evalBody cfg env oc stmts = evalKernelBody cfg env oc kstmts
+        evalBody true cfg env oc stmts = evalKernelBody cfg env oc kstmts
   | [], _, _, _, _, _, _, h => by
       simp only [lowerStatementsAux] at h
       cases h
@@ -1864,7 +1863,7 @@ theorem lowerStatementsAux_preserves_semantics :
                   have hkstmts : kstmts = ks :: krest := (Except.ok.inj h).symm
                   subst hkstmts
                   have ihStmt :=
-                    lowerStatement_preserves_semantics cfg env oc stmt ks hS
+                    lowerStatement_preserves_semantics true cfg env oc stmt ks hS
                   simp only [evalBody, evalKernelBody]
                   rw [ihStmt]
                   generalize hStep : evalKernelStatement cfg env oc ks = step
@@ -1873,14 +1872,13 @@ theorem lowerStatementsAux_preserves_semantics :
                       cases rest' with
                       | mk env' oc' =>
                           simp only []
-                          cases hStatus : oc'.status with
-                          | completed =>
-                              by_cases hRet : oc'.publicResult.isSome
-                              · simp [hRet]
-                              · simp [hRet]
-                                exact lowerStatementsAux_preserves_semantics
-                                  rest krest (index + 1) stmt.isReturn cfg' env' oc' hRest
-                          | _ => simp
+                          by_cases hCont : oc'.status.continuesBody true = true
+                          · by_cases hRet : oc'.publicResult.isSome
+                            · simp [hCont, hRet]
+                            · simp [hCont, hRet]
+                              exact lowerStatementsAux_preserves_semantics
+                                rest krest (index + 1) stmt.isReturn cfg' env' oc' hRest
+                          · simp [hCont]
 
 /-- Wrapper: `lowerStatements` (which is `lowerStatementsAux _ 0
 false`) preserves semantics. -/
@@ -1888,7 +1886,7 @@ theorem lowerStatements_preserves_semantics
     (cfg : OperationalConfig) (env : LocalEnv) (oc : Outcome)
     (stmts : List Statement) (kstmts : List KernelStatement)
     (h : lowerStatements stmts = .ok kstmts) :
-    evalBody cfg env oc stmts = evalKernelBody cfg env oc kstmts :=
+    evalBody true cfg env oc stmts = evalKernelBody cfg env oc kstmts :=
   lowerStatementsAux_preserves_semantics stmts kstmts 0 false cfg env oc h
 
 /-! ### W4.4 Session B-2: program-level (`evalContract`) preservation -/
@@ -1905,14 +1903,16 @@ theorem KernelProgram.initialEnv_eq_of_params_eq
   unfold KernelProgram.initialEnv OperationalConfig.initialEnv
   rw [hParams]
 
-/-- Program-level preservation: when the lowering succeeds and the IR
-configuration's entrypoint resolves to the function being lowered,
-the IR contract evaluator and the kernel program evaluator agree on
-the outcome. -/
+/-- Program-level preservation: when the lowering succeeds, the IR
+configuration's entrypoint resolves to the function being lowered, and
+that function is confidential, the IR contract evaluator and the kernel
+program evaluator agree on the outcome. Both then run the whole
+linearized schedule, recording aborts instead of stopping at them. -/
 theorem lowerCompiledFunction_preserves_semantics
     (cfg : OperationalConfig) (fn : CompiledFunction) (kp : KernelProgram)
     (hLow : lowerCompiledFunction fn = .ok kp)
-    (hEntry : cfg.entrypointFn? = some fn) :
+    (hEntry : cfg.entrypointFn? = some fn)
+    (hConf : fn.confidential = true) :
     evalContract cfg = evalKernelProgram kp cfg := by
   -- Extract kp's structure from the lowering hypothesis.
   cases hBody : lowerStatements fn.body with
@@ -1944,7 +1944,7 @@ theorem lowerCompiledFunction_preserves_semantics
           -- Use the list-level preservation theorem.
           have ihBody := lowerStatements_preserves_semantics
             cfg env Outcome.empty fn.body ks hBody
-          rw [ihBody]
+          rw [hConf, ihBody]
 
 mutual
 
@@ -2392,16 +2392,24 @@ non-`.completed` status (`.evalError` or `.unsupported`), and
 forwarded `.status` values from sub-expressions inherit the invariant
 by induction. -/
 
-private theorem EvalStatus_evalError_ne_completed (msg : String) :
-    EvalStatus.evalError msg ≠ EvalStatus.completed := by
-  intro h; cases h
+/-! ### Expression statuses never continue a confidential body
+
+Expression evaluation only reports evaluation errors: aborts come from
+statements (`require`, `abortIf`, bounded-map capacity overflow). So a
+statement that adopts an expression's status always stops the body. This
+strengthens `evalKernelExpr_status_ne_completed` and is what lets the
+kernel-step schedule be characterized for every error-free run,
+including runs that abort. -/
+
+private theorem EvalStatus_evalError_stops (msg : String) :
+    (EvalStatus.evalError msg).continuesBody true = false := rfl
 
 mutual
 
-theorem evalKernelExpr_status_ne_completed
+theorem evalKernelExpr_status_stops
     (cfg : OperationalConfig) (env : LocalEnv) :
     ∀ (e : KernelExpr) (s : EvalStatus),
-      evalKernelExpr cfg env e = .status s → s ≠ .completed
+      evalKernelExpr cfg env e = .status s → s.continuesBody true = false
   | .literal _, _, h => by simp [evalKernelExpr] at h
   | .var name, _, h => by
       unfold evalKernelExpr at h
@@ -2411,7 +2419,7 @@ theorem evalKernelExpr_status_ne_completed
           rw [hLook] at h
           simp at h
           rw [← h]
-          exact EvalStatus_evalError_ne_completed _
+          exact EvalStatus_evalError_stops _
   | .unary op e', s, h => by
       unfold evalKernelExpr at h
       cases hRec : evalKernelExpr cfg env e' with
@@ -2422,12 +2430,12 @@ theorem evalKernelExpr_status_ne_completed
           | none =>
               simp [hOp] at h
               rw [← h]
-              exact EvalStatus_evalError_ne_completed _
+              exact EvalStatus_evalError_stops _
       | status s' =>
           rw [hRec] at h
           have heq : s' = s := by injection h
           rw [← heq]
-          exact evalKernelExpr_status_ne_completed cfg env e' s' hRec
+          exact evalKernelExpr_status_stops cfg env e' s' hRec
   | .binary op lhs rhs, s, h => by
       unfold evalKernelExpr at h
       cases hL : evalKernelExpr cfg env lhs with
@@ -2435,7 +2443,7 @@ theorem evalKernelExpr_status_ne_completed
           simp only [hL] at h
           have heq : s' = s := by injection h
           rw [← heq]
-          exact evalKernelExpr_status_ne_completed cfg env lhs s' hL
+          exact evalKernelExpr_status_stops cfg env lhs s' hL
       | value lv =>
           simp only [hL] at h
           cases hR : evalKernelExpr cfg env rhs with
@@ -2443,7 +2451,7 @@ theorem evalKernelExpr_status_ne_completed
               simp only [hR] at h
               have heq : s' = s := by injection h
               rw [← heq]
-              exact evalKernelExpr_status_ne_completed cfg env rhs s' hR
+              exact evalKernelExpr_status_stops cfg env rhs s' hR
           | value rv =>
               simp only [hR] at h
               cases hOp : op.eval lv rv with
@@ -2451,7 +2459,7 @@ theorem evalKernelExpr_status_ne_completed
               | none =>
                   simp [hOp] at h
                   rw [← h]
-                  exact EvalStatus_evalError_ne_completed _
+                  exact EvalStatus_evalError_stops _
   | .select cond wt wf, s, h => by
       unfold evalKernelExpr at h
       cases hC : evalKernelExpr cfg env cond with
@@ -2459,7 +2467,7 @@ theorem evalKernelExpr_status_ne_completed
           simp only [hC] at h
           have heq : s' = s := by injection h
           rw [← heq]
-          exact evalKernelExpr_status_ne_completed cfg env cond s' hC
+          exact evalKernelExpr_status_stops cfg env cond s' hC
       | value cv =>
           simp only [hC] at h
           cases cv with
@@ -2467,22 +2475,22 @@ theorem evalKernelExpr_status_ne_completed
               cases b with
               | true =>
                   simp at h
-                  exact evalKernelPureExpr_status_ne_completed cfg env wt s h
+                  exact evalKernelPureExpr_status_stops cfg env wt s h
               | false =>
                   simp at h
-                  exact evalKernelPureExpr_status_ne_completed cfg env wf s h
+                  exact evalKernelPureExpr_status_stops cfg env wf s h
           | uint _ =>
-              simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+              simp at h; rw [← h]; exact EvalStatus_evalError_stops _
           | bytes32 _ =>
-              simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+              simp at h; rw [← h]; exact EvalStatus_evalError_stops _
           | address _ =>
-              simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+              simp at h; rw [← h]; exact EvalStatus_evalError_stops _
           | structValue _ =>
-              simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+              simp at h; rw [← h]; exact EvalStatus_evalError_stops _
           | array _ =>
-              simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+              simp at h; rw [← h]; exact EvalStatus_evalError_stops _
           | map _ =>
-              simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+              simp at h; rw [← h]; exact EvalStatus_evalError_stops _
   | .cellGet objectId, _, h => by
       unfold evalKernelExpr at h
       cases hRead : cfg.readObject objectId with
@@ -2491,13 +2499,13 @@ theorem evalKernelExpr_status_ne_completed
           simp only [hRead] at h
           simp at h
           rw [← h]
-          exact EvalStatus_evalError_ne_completed _
+          exact EvalStatus_evalError_stops _
   | .arrayGet objectId indexExpr, s, h => by
       unfold evalKernelExpr at h
       cases hI : evalKernelExpr cfg env indexExpr with
       | status s' =>
           simp [hI] at h
-          have hRec := evalKernelExpr_status_ne_completed cfg env indexExpr s' hI
+          have hRec := evalKernelExpr_status_stops cfg env indexExpr s' hI
           cases h
           exact hRec
       | value iv =>
@@ -2508,7 +2516,7 @@ theorem evalKernelExpr_status_ne_completed
               | none =>
                   simp [hObj] at h
                   cases h
-                  exact EvalStatus_evalError_ne_completed _
+                  exact EvalStatus_evalError_stops _
               | some object =>
                   simp [hObj] at h
                   cases hRead : cfg.readObject objectId with
@@ -2518,47 +2526,47 @@ theorem evalKernelExpr_status_ne_completed
                       · simp [hKind] at h
                       · simp [hKind] at h
                         cases h
-                        exact EvalStatus_evalError_ne_completed _
+                        exact EvalStatus_evalError_stops _
                   | some objVal =>
                       cases objVal with
                       | bool _ =>
                           simp [hRead] at h
                           cases h
-                          exact EvalStatus_evalError_ne_completed _
+                          exact EvalStatus_evalError_stops _
                       | uint _ =>
                           simp [hRead] at h
                           cases h
-                          exact EvalStatus_evalError_ne_completed _
+                          exact EvalStatus_evalError_stops _
                       | bytes32 _ =>
                           simp [hRead] at h
                           cases h
-                          exact EvalStatus_evalError_ne_completed _
+                          exact EvalStatus_evalError_stops _
                       | address _ =>
                           simp [hRead] at h
                           cases h
-                          exact EvalStatus_evalError_ne_completed _
+                          exact EvalStatus_evalError_stops _
                       | structValue _ =>
                           simp [hRead] at h
                           cases h
-                          exact EvalStatus_evalError_ne_completed _
+                          exact EvalStatus_evalError_stops _
                       | array values =>
                           simp [hRead, Value.arrayGetD] at h
                       | map _ =>
                           simp [hRead] at h
                           cases h
-                          exact EvalStatus_evalError_ne_completed _
-          | bool _ => simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
-          | bytes32 _ => simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
-          | address _ => simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
-          | structValue _ => simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
-          | array _ => simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
-          | map _ => simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                          exact EvalStatus_evalError_stops _
+          | bool _ => simp at h; rw [← h]; exact EvalStatus_evalError_stops _
+          | bytes32 _ => simp at h; rw [← h]; exact EvalStatus_evalError_stops _
+          | address _ => simp at h; rw [← h]; exact EvalStatus_evalError_stops _
+          | structValue _ => simp at h; rw [← h]; exact EvalStatus_evalError_stops _
+          | array _ => simp at h; rw [← h]; exact EvalStatus_evalError_stops _
+          | map _ => simp at h; rw [← h]; exact EvalStatus_evalError_stops _
   | .mapGet objectId keyExpr, s, h => by
       unfold evalKernelExpr at h
       cases hK : evalKernelExpr cfg env keyExpr with
       | status s' =>
           simp [hK] at h
-          have hRec := evalKernelExpr_status_ne_completed cfg env keyExpr s' hK
+          have hRec := evalKernelExpr_status_stops cfg env keyExpr s' hK
           cases h
           exact hRec
       | value kv =>
@@ -2567,7 +2575,7 @@ theorem evalKernelExpr_status_ne_completed
           | none =>
               simp [hObj] at h
               cases h
-              exact EvalStatus_evalError_ne_completed _
+              exact EvalStatus_evalError_stops _
           | some object =>
               simp [hObj] at h
               cases hRead : cfg.readObject objectId with
@@ -2577,33 +2585,33 @@ theorem evalKernelExpr_status_ne_completed
                   · simp [hKind] at h
                   · simp [hKind] at h
                     cases h
-                    exact EvalStatus_evalError_ne_completed _
+                    exact EvalStatus_evalError_stops _
               | some objVal =>
                   cases objVal with
                   | bool _ =>
                       simp [hRead] at h
                       cases h
-                      exact EvalStatus_evalError_ne_completed _
+                      exact EvalStatus_evalError_stops _
                   | uint _ =>
                       simp [hRead] at h
                       cases h
-                      exact EvalStatus_evalError_ne_completed _
+                      exact EvalStatus_evalError_stops _
                   | bytes32 _ =>
                       simp [hRead] at h
                       cases h
-                      exact EvalStatus_evalError_ne_completed _
+                      exact EvalStatus_evalError_stops _
                   | address _ =>
                       simp [hRead] at h
                       cases h
-                      exact EvalStatus_evalError_ne_completed _
+                      exact EvalStatus_evalError_stops _
                   | structValue _ =>
                       simp [hRead] at h
                       cases h
-                      exact EvalStatus_evalError_ne_completed _
+                      exact EvalStatus_evalError_stops _
                   | array _ =>
                       simp [hRead] at h
                       cases h
-                      exact EvalStatus_evalError_ne_completed _
+                      exact EvalStatus_evalError_stops _
                   | map entries =>
                       simp [hRead, Value.mapLookupD] at h
   | .structField base field, s, h => by
@@ -2613,7 +2621,7 @@ theorem evalKernelExpr_status_ne_completed
             simp only [hB] at h
             have heq : s' = s := by injection h
             rw [← heq]
-            exact evalKernelExpr_status_ne_completed cfg env base s' hB
+            exact evalKernelExpr_status_stops cfg env base s' hB
         | value bv =>
             simp only [hB] at h
             cases bv with
@@ -2623,19 +2631,19 @@ theorem evalKernelExpr_status_ne_completed
                 | none =>
                     simp [hField] at h
                     rw [← h]
-                    exact EvalStatus_evalError_ne_completed _
+                    exact EvalStatus_evalError_stops _
             | bool _ =>
-                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                simp at h; rw [← h]; exact EvalStatus_evalError_stops _
             | uint _ =>
-                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                simp at h; rw [← h]; exact EvalStatus_evalError_stops _
             | bytes32 _ =>
-                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                simp at h; rw [← h]; exact EvalStatus_evalError_stops _
             | address _ =>
-                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                simp at h; rw [← h]; exact EvalStatus_evalError_stops _
             | array _ =>
-                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                simp at h; rw [← h]; exact EvalStatus_evalError_stops _
             | map _ =>
-                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                simp at h; rw [← h]; exact EvalStatus_evalError_stops _
   | .arrayIndex base indexExpr, s, h => by
       unfold evalKernelExpr at h
       cases hB : evalKernelExpr cfg env base with
@@ -2643,7 +2651,7 @@ theorem evalKernelExpr_status_ne_completed
             simp only [hB] at h
             have heq : s' = s := by injection h
             rw [← heq]
-            exact evalKernelExpr_status_ne_completed cfg env base s' hB
+            exact evalKernelExpr_status_stops cfg env base s' hB
         | value bv =>
             simp only [hB] at h
             cases bv with
@@ -2652,7 +2660,7 @@ theorem evalKernelExpr_status_ne_completed
                 | status s' =>
                     simp [hI] at h
                     rw [← h]
-                    exact evalKernelExpr_status_ne_completed cfg env indexExpr s' hI
+                    exact evalKernelExpr_status_stops cfg env indexExpr s' hI
                 | value iv =>
                     simp [hI] at h
                     cases iv with
@@ -2662,31 +2670,31 @@ theorem evalKernelExpr_status_ne_completed
                         | none =>
                             simp [hValue] at h
                             rw [← h]
-                            exact EvalStatus_evalError_ne_completed _
+                            exact EvalStatus_evalError_stops _
                     | bool _ =>
-                        simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                        simp at h; rw [← h]; exact EvalStatus_evalError_stops _
                     | bytes32 _ =>
-                        simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                        simp at h; rw [← h]; exact EvalStatus_evalError_stops _
                     | address _ =>
-                        simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                        simp at h; rw [← h]; exact EvalStatus_evalError_stops _
                     | structValue _ =>
-                        simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                        simp at h; rw [← h]; exact EvalStatus_evalError_stops _
                     | array _ =>
-                        simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                        simp at h; rw [← h]; exact EvalStatus_evalError_stops _
                     | map _ =>
-                        simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                        simp at h; rw [← h]; exact EvalStatus_evalError_stops _
             | bool _ =>
-                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                simp at h; rw [← h]; exact EvalStatus_evalError_stops _
             | uint _ =>
-                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                simp at h; rw [← h]; exact EvalStatus_evalError_stops _
             | bytes32 _ =>
-                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                simp at h; rw [← h]; exact EvalStatus_evalError_stops _
             | address _ =>
-                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                simp at h; rw [← h]; exact EvalStatus_evalError_stops _
             | structValue _ =>
-                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                simp at h; rw [← h]; exact EvalStatus_evalError_stops _
             | map _ =>
-                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                simp at h; rw [← h]; exact EvalStatus_evalError_stops _
   | .keccak256 parts, s, h => by
       unfold evalKernelExpr at h
       cases hList : evalKernelExprList cfg env parts with
@@ -2694,13 +2702,13 @@ theorem evalKernelExpr_status_ne_completed
           rw [hList] at h
           have heq : s' = s := by injection h
           rw [← heq]
-          exact evalKernelExprList_status_ne_completed cfg env parts s' hList
+          exact evalKernelExprList_status_stops cfg env parts s' hList
       | ok vs => rw [hList] at h; simp at h
 
-theorem evalKernelExprList_status_ne_completed
+theorem evalKernelExprList_status_stops
     (cfg : OperationalConfig) (env : LocalEnv) :
     ∀ (es : List KernelExpr) (s : EvalStatus),
-      evalKernelExprList cfg env es = .error s → s ≠ .completed
+      evalKernelExprList cfg env es = .error s → s.continuesBody true = false
   | [], _, h => by simp [evalKernelExprList] at h
   | e :: rest, s, h => by
       unfold evalKernelExprList at h
@@ -2709,7 +2717,7 @@ theorem evalKernelExprList_status_ne_completed
           rw [hHead] at h
           have heq : s' = s := by injection h
           rw [← heq]
-          exact evalKernelExpr_status_ne_completed cfg env e s' hHead
+          exact evalKernelExpr_status_stops cfg env e s' hHead
       | value v =>
           rw [hHead] at h
           cases hTail : evalKernelExprList cfg env rest with
@@ -2718,12 +2726,12 @@ theorem evalKernelExprList_status_ne_completed
               rw [hTail] at h
               have heq : s' = s := by injection h
               rw [← heq]
-              exact evalKernelExprList_status_ne_completed cfg env rest s' hTail
+              exact evalKernelExprList_status_stops cfg env rest s' hTail
 
-theorem evalKernelPureExpr_status_ne_completed
+theorem evalKernelPureExpr_status_stops
     (cfg : OperationalConfig) (env : LocalEnv) :
     ∀ (e : KernelPureExpr) (s : EvalStatus),
-      evalKernelPureExpr cfg env e = .status s → s ≠ .completed
+      evalKernelPureExpr cfg env e = .status s → s.continuesBody true = false
   | .literal _, _, h => by simp [evalKernelPureExpr] at h
   | .var name, _, h => by
       unfold evalKernelPureExpr at h
@@ -2733,7 +2741,7 @@ theorem evalKernelPureExpr_status_ne_completed
           rw [hLook] at h
           simp at h
           rw [← h]
-          exact EvalStatus_evalError_ne_completed _
+          exact EvalStatus_evalError_stops _
   | .unary op e', s, h => by
       unfold evalKernelPureExpr at h
       cases hRec : evalKernelPureExpr cfg env e' with
@@ -2744,12 +2752,12 @@ theorem evalKernelPureExpr_status_ne_completed
           | none =>
               simp [hOp] at h
               rw [← h]
-              exact EvalStatus_evalError_ne_completed _
+              exact EvalStatus_evalError_stops _
       | status s' =>
           rw [hRec] at h
           have heq : s' = s := by injection h
           rw [← heq]
-          exact evalKernelPureExpr_status_ne_completed cfg env e' s' hRec
+          exact evalKernelPureExpr_status_stops cfg env e' s' hRec
   | .binary op lhs rhs, s, h => by
       unfold evalKernelPureExpr at h
       cases hL : evalKernelPureExpr cfg env lhs with
@@ -2757,7 +2765,7 @@ theorem evalKernelPureExpr_status_ne_completed
           rw [hL] at h
           have heq : s' = s := by injection h
           rw [← heq]
-          exact evalKernelPureExpr_status_ne_completed cfg env lhs s' hL
+          exact evalKernelPureExpr_status_stops cfg env lhs s' hL
       | value lv =>
           simp only [hL] at h
           cases hR : evalKernelPureExpr cfg env rhs with
@@ -2765,7 +2773,7 @@ theorem evalKernelPureExpr_status_ne_completed
               simp only [hR] at h
               have heq : s' = s := by injection h
               rw [← heq]
-              exact evalKernelPureExpr_status_ne_completed cfg env rhs s' hR
+              exact evalKernelPureExpr_status_stops cfg env rhs s' hR
           | value rv =>
               simp only [hR] at h
               cases hOp : op.eval lv rv with
@@ -2773,7 +2781,7 @@ theorem evalKernelPureExpr_status_ne_completed
               | none =>
                   simp [hOp] at h
                   rw [← h]
-                  exact EvalStatus_evalError_ne_completed _
+                  exact EvalStatus_evalError_stops _
   | .select cond wt wf, s, h => by
       unfold evalKernelPureExpr at h
       cases hC : evalKernelPureExpr cfg env cond with
@@ -2781,7 +2789,7 @@ theorem evalKernelPureExpr_status_ne_completed
           rw [hC] at h
           have heq : s' = s := by injection h
           rw [← heq]
-          exact evalKernelPureExpr_status_ne_completed cfg env cond s' hC
+          exact evalKernelPureExpr_status_stops cfg env cond s' hC
       | value cv =>
           rw [hC] at h
           cases cv with
@@ -2789,22 +2797,22 @@ theorem evalKernelPureExpr_status_ne_completed
               cases b with
               | true =>
                   simp at h
-                  exact evalKernelPureExpr_status_ne_completed cfg env wt s h
+                  exact evalKernelPureExpr_status_stops cfg env wt s h
               | false =>
                   simp at h
-                  exact evalKernelPureExpr_status_ne_completed cfg env wf s h
+                  exact evalKernelPureExpr_status_stops cfg env wf s h
           | uint _ =>
-              simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+              simp at h; rw [← h]; exact EvalStatus_evalError_stops _
           | bytes32 _ =>
-              simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+              simp at h; rw [← h]; exact EvalStatus_evalError_stops _
           | address _ =>
-              simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+              simp at h; rw [← h]; exact EvalStatus_evalError_stops _
           | structValue _ =>
-              simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+              simp at h; rw [← h]; exact EvalStatus_evalError_stops _
           | array _ =>
-              simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+              simp at h; rw [← h]; exact EvalStatus_evalError_stops _
           | map _ =>
-              simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+              simp at h; rw [← h]; exact EvalStatus_evalError_stops _
   | .structField base field, s, h => by
       unfold evalKernelPureExpr at h
       cases hB : evalKernelPureExpr cfg env base with
@@ -2812,7 +2820,7 @@ theorem evalKernelPureExpr_status_ne_completed
             rw [hB] at h
             have heq : s' = s := by injection h
             rw [← heq]
-            exact evalKernelPureExpr_status_ne_completed cfg env base s' hB
+            exact evalKernelPureExpr_status_stops cfg env base s' hB
         | value bv =>
             rw [hB] at h
             cases bv with
@@ -2822,19 +2830,19 @@ theorem evalKernelPureExpr_status_ne_completed
                 | none =>
                     simp [hField] at h
                     rw [← h]
-                    exact EvalStatus_evalError_ne_completed _
+                    exact EvalStatus_evalError_stops _
             | bool _ =>
-                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                simp at h; rw [← h]; exact EvalStatus_evalError_stops _
             | uint _ =>
-                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                simp at h; rw [← h]; exact EvalStatus_evalError_stops _
             | bytes32 _ =>
-                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                simp at h; rw [← h]; exact EvalStatus_evalError_stops _
             | address _ =>
-                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                simp at h; rw [← h]; exact EvalStatus_evalError_stops _
             | array _ =>
-                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                simp at h; rw [← h]; exact EvalStatus_evalError_stops _
             | map _ =>
-                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                simp at h; rw [← h]; exact EvalStatus_evalError_stops _
   | .arrayIndex base indexExpr, s, h => by
       unfold evalKernelPureExpr at h
       cases hB : evalKernelPureExpr cfg env base with
@@ -2842,7 +2850,7 @@ theorem evalKernelPureExpr_status_ne_completed
             rw [hB] at h
             have heq : s' = s := by injection h
             rw [← heq]
-            exact evalKernelPureExpr_status_ne_completed cfg env base s' hB
+            exact evalKernelPureExpr_status_stops cfg env base s' hB
         | value bv =>
             rw [hB] at h
             cases bv with
@@ -2851,7 +2859,7 @@ theorem evalKernelPureExpr_status_ne_completed
                 | status s' =>
                     simp [hI] at h
                     rw [← h]
-                    exact evalKernelPureExpr_status_ne_completed cfg env indexExpr s' hI
+                    exact evalKernelPureExpr_status_stops cfg env indexExpr s' hI
                 | value iv =>
                     simp [hI] at h
                     cases iv with
@@ -2861,31 +2869,31 @@ theorem evalKernelPureExpr_status_ne_completed
                         | none =>
                             simp [hValue] at h
                             rw [← h]
-                            exact EvalStatus_evalError_ne_completed _
+                            exact EvalStatus_evalError_stops _
                     | bool _ =>
-                        simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                        simp at h; rw [← h]; exact EvalStatus_evalError_stops _
                     | bytes32 _ =>
-                        simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                        simp at h; rw [← h]; exact EvalStatus_evalError_stops _
                     | address _ =>
-                        simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                        simp at h; rw [← h]; exact EvalStatus_evalError_stops _
                     | structValue _ =>
-                        simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                        simp at h; rw [← h]; exact EvalStatus_evalError_stops _
                     | array _ =>
-                        simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                        simp at h; rw [← h]; exact EvalStatus_evalError_stops _
                     | map _ =>
-                        simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                        simp at h; rw [← h]; exact EvalStatus_evalError_stops _
             | bool _ =>
-                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                simp at h; rw [← h]; exact EvalStatus_evalError_stops _
             | uint _ =>
-                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                simp at h; rw [← h]; exact EvalStatus_evalError_stops _
             | bytes32 _ =>
-                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                simp at h; rw [← h]; exact EvalStatus_evalError_stops _
             | address _ =>
-                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                simp at h; rw [← h]; exact EvalStatus_evalError_stops _
             | structValue _ =>
-                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                simp at h; rw [← h]; exact EvalStatus_evalError_stops _
             | map _ =>
-                simp at h; rw [← h]; exact EvalStatus_evalError_ne_completed _
+                simp at h; rw [← h]; exact EvalStatus_evalError_stops _
   | .keccak256 parts, s, h => by
       unfold evalKernelPureExpr at h
       cases hList : evalKernelPureExprList cfg env parts with
@@ -2893,13 +2901,13 @@ theorem evalKernelPureExpr_status_ne_completed
           rw [hList] at h
           have heq : s' = s := by injection h
           rw [← heq]
-          exact evalKernelPureExprList_status_ne_completed cfg env parts s' hList
+          exact evalKernelPureExprList_status_stops cfg env parts s' hList
       | ok vs => rw [hList] at h; simp at h
 
-theorem evalKernelPureExprList_status_ne_completed
+theorem evalKernelPureExprList_status_stops
     (cfg : OperationalConfig) (env : LocalEnv) :
     ∀ (es : List KernelPureExpr) (s : EvalStatus),
-      evalKernelPureExprList cfg env es = .error s → s ≠ .completed
+      evalKernelPureExprList cfg env es = .error s → s.continuesBody true = false
   | [], _, h => by simp [evalKernelPureExprList] at h
   | e :: rest, s, h => by
       unfold evalKernelPureExprList at h
@@ -2908,7 +2916,7 @@ theorem evalKernelPureExprList_status_ne_completed
           rw [hHead] at h
           have heq : s' = s := by injection h
           rw [← heq]
-          exact evalKernelPureExpr_status_ne_completed cfg env e s' hHead
+          exact evalKernelPureExpr_status_stops cfg env e s' hHead
       | value v =>
           rw [hHead] at h
           cases hTail : evalKernelPureExprList cfg env rest with
@@ -2917,9 +2925,43 @@ theorem evalKernelPureExprList_status_ne_completed
               rw [hTail] at h
               have heq : s' = s := by injection h
               rw [← heq]
-              exact evalKernelPureExprList_status_ne_completed cfg env rest s' hTail
+              exact evalKernelPureExprList_status_stops cfg env rest s' hTail
 
 end
+
+/-! The weaker invariant used by the completed-run lifts follows directly:
+a status that stops a confidential body is never `completed`. -/
+
+private theorem ne_completed_of_stops {s : EvalStatus}
+    (h : s.continuesBody true = false) : s ≠ .completed := by
+  intro hs
+  rw [hs] at h
+  simp at h
+
+theorem evalKernelExpr_status_ne_completed
+    (cfg : OperationalConfig) (env : LocalEnv) :
+    ∀ (e : KernelExpr) (s : EvalStatus),
+      evalKernelExpr cfg env e = .status s → s ≠ .completed :=
+  fun e s h => ne_completed_of_stops (evalKernelExpr_status_stops cfg env e s h)
+
+theorem evalKernelExprList_status_ne_completed
+    (cfg : OperationalConfig) (env : LocalEnv) :
+    ∀ (es : List KernelExpr) (s : EvalStatus),
+      evalKernelExprList cfg env es = .error s → s ≠ .completed :=
+  fun es s h => ne_completed_of_stops (evalKernelExprList_status_stops cfg env es s h)
+
+theorem evalKernelPureExpr_status_ne_completed
+    (cfg : OperationalConfig) (env : LocalEnv) :
+    ∀ (e : KernelPureExpr) (s : EvalStatus),
+      evalKernelPureExpr cfg env e = .status s → s ≠ .completed :=
+  fun e s h => ne_completed_of_stops (evalKernelPureExpr_status_stops cfg env e s h)
+
+theorem evalKernelPureExprList_status_ne_completed
+    (cfg : OperationalConfig) (env : LocalEnv) :
+    ∀ (es : List KernelPureExpr) (s : EvalStatus),
+      evalKernelPureExprList cfg env es = .error s → s ≠ .completed :=
+  fun es s h => ne_completed_of_stops (evalKernelPureExprList_status_stops cfg env es s h)
+
 
 /-! ### W4.5: Per-statement runtime-vs-static `kernelSteps` lift
 
@@ -3192,6 +3234,48 @@ value set; the program-level theorem
 (`evalKernelProgram_kernelSteps_eq_expectedKernelSteps_of_completed`)
 discharges this precondition by starting from `Outcome.empty`. -/
 
+/-- A kernel statement never turns a non-`completed` outcome back into
+`completed`: it keeps the incoming status or records an abort or error.
+With confidential bodies continuing past aborts, an abort recorded by any
+statement therefore remains visible in the final status. -/
+theorem evalKernelStatement_status_completed
+    (cfg : OperationalConfig) (env : LocalEnv) (oc : Outcome)
+    (stmt : KernelStatement)
+    (h : (evalKernelStatement cfg env oc stmt).snd.snd.status = .completed) :
+    oc.status = .completed := by
+  cases stmt <;> simp only [evalKernelStatement] at h <;> (repeat' split at h) <;>
+    (try simp_all) <;>
+    -- Remaining branches record an expression-evaluation status, never
+    -- `completed`, either directly or through a masked-store predicate.
+    first
+      | (rename_i hEval
+         exact absurd rfl (evalKernelExpr_status_ne_completed cfg env _ _ hEval))
+      | (rename_i hEval
+         (repeat' split at hEval) <;> (try simp_all) <;>
+           (rename_i hPred
+            exact absurd rfl (evalKernelExpr_status_ne_completed cfg env _ _ hPred)))
+
+/-- Body-level stickiness: a body that ends `completed` started `completed`. -/
+theorem evalKernelBody_status_completed
+    (cfg : OperationalConfig) (env : LocalEnv) (oc : Outcome) :
+    ∀ (body : List KernelStatement),
+      (evalKernelBody cfg env oc body).snd.snd.status = .completed →
+      oc.status = .completed
+  | [], h => by simpa [evalKernelBody] using h
+  | stmt :: rest, h => by
+      simp only [evalKernelBody] at h
+      generalize hStep : evalKernelStatement cfg env oc stmt = step at *
+      obtain ⟨cfg', env', oc'⟩ := step
+      simp only at h
+      have hOc' : oc'.status = .completed := by
+        by_cases hCont : oc'.status.continuesBody true = true
+        · by_cases hRet : oc'.publicResult.isSome
+          · simpa [hCont, hRet] using h
+          · simp only [hCont, hRet, if_true] at h
+            exact evalKernelBody_status_completed cfg' env' oc' rest (by simpa using h)
+        · simpa [hCont] using h
+      exact evalKernelStatement_status_completed cfg env oc stmt (by rw [hStep]; exact hOc')
+
 theorem evalKernelBody_kernelSteps_eq_expected_of_completed
     (cfg : OperationalConfig) (env : LocalEnv) (oc : Outcome)
     (hOcPub : oc.publicResult = none) :
@@ -3206,41 +3290,39 @@ theorem evalKernelBody_kernelSteps_eq_expected_of_completed
       generalize hStep : evalKernelStatement cfg env oc stmt = step at *
       obtain ⟨cfg', env', oc'⟩ := step
       simp only at hStatus hPub ⊢
-      cases hSt' : oc'.status with
-      | completed =>
-          simp only [hSt'] at hStatus hPub ⊢
-          by_cases hRet : oc'.publicResult.isSome
-          · -- Early return: body returns oc' immediately. We have
-            -- hPub : oc'.publicResult = none, but hRet : oc'.publicResult.isSome.
-            -- Contradiction.
-            simp only [hRet, if_true] at hStatus hPub ⊢
-            rw [hPub] at hRet
-            exact absurd hRet (by simp)
-          · -- oc'.publicResult must be `none` (from hRet : ¬ isSome)
-            have hOcPubNone : oc'.publicResult = none := by
-              cases hOPR : oc'.publicResult with
-              | none => rfl
-              | some v => rw [hOPR] at hRet; exact absurd (by simp) hRet
-            simp only [hOcPubNone, Option.isSome_none, Bool.false_eq_true,
-              if_false] at hStatus hPub ⊢
-            have h1 : (evalKernelStatement cfg env oc stmt).snd.snd.status = .completed := by
-              rw [hStep]; exact hSt'
-            have h2 : (evalKernelStatement cfg env oc stmt).snd.snd.publicResult =
+      by_cases hCont : oc'.status.continuesBody true = true
+      · by_cases hRet : oc'.publicResult.isSome
+        · -- An early return stops the body with `oc'`, whose public result is
+          -- `none` by `hPub`: contradiction.
+          simp only [hCont, hRet, if_true] at hPub
+          rw [hPub] at hRet
+          exact absurd hRet (by simp)
+        · have hOcPubNone : oc'.publicResult = none := by
+            cases hOPR : oc'.publicResult with
+            | none => rfl
+            | some v => rw [hOPR] at hRet; exact absurd (by simp) hRet
+          simp only [hCont, hRet, if_true, Bool.false_eq_true, if_false] at hStatus hPub ⊢
+          -- The rest ended `completed`, so `oc'` was `completed` as well.
+          have hSt' : oc'.status = .completed :=
+            evalKernelBody_status_completed cfg' env' oc' rest hStatus
+          have h1 : (evalKernelStatement cfg env oc stmt).snd.snd.status = .completed := by
+            rw [hStep]; exact hSt'
+          have h2 : (evalKernelStatement cfg env oc stmt).snd.snd.publicResult =
               oc.publicResult := by
-              rw [hStep, hOcPubNone, hOcPub]
-            have hKsEqStmt := evalKernelStatement_kernelSteps_eq_expected_of_completed
-              cfg env oc stmt h1 h2
-            rw [hStep] at hKsEqStmt
-            simp only at hKsEqStmt
-            have hKsEqRest := evalKernelBody_kernelSteps_eq_expected_of_completed
-              cfg' env' oc' hOcPubNone rest hStatus hPub
-            rw [hKsEqRest, hKsEqStmt]
-            simp [List.flatMap, List.append_assoc]
-      | requireFailed => simp only [hSt'] at hStatus; cases hStatus
-      | abortedByUser => simp only [hSt'] at hStatus; cases hStatus
-      | capacityOverflow => simp only [hSt'] at hStatus; cases hStatus
-      | unsupported _ => simp only [hSt'] at hStatus; cases hStatus
-      | evalError _ => simp only [hSt'] at hStatus; cases hStatus
+            rw [hStep, hOcPubNone, hOcPub]
+          have hKsEqStmt := evalKernelStatement_kernelSteps_eq_expected_of_completed
+            cfg env oc stmt h1 h2
+          rw [hStep] at hKsEqStmt
+          simp only at hKsEqStmt
+          have hKsEqRest := evalKernelBody_kernelSteps_eq_expected_of_completed
+            cfg' env' oc' hOcPubNone rest hStatus hPub
+          rw [hKsEqRest, hKsEqStmt]
+          simp [List.flatMap, List.append_assoc]
+      · -- The body stopped at `stmt` with a status that does not continue,
+        -- so the final status is `oc'.status`, which cannot be `completed`.
+        simp only [hCont, Bool.false_eq_true, if_false] at hStatus
+        rw [hStatus] at hCont
+        simp at hCont
 
 /-! ### W4.5: Program-level runtime-vs-static `kernelSteps` lift
 
@@ -3267,6 +3349,111 @@ theorem evalKernelProgram_kernelSteps_eq_expectedKernelSteps_of_completed
       simp [Outcome.withPublicStateTransition] at hStatus hPub ⊢
       have hOcPub : (Outcome.empty : Outcome).publicResult = none := rfl
       have hBodyEq := evalKernelBody_kernelSteps_eq_expected_of_completed
+        cfg env Outcome.empty hOcPub kp.body hStatus hPub
+      simp only [KernelProgram.expectedKernelSteps]
+      have hOcKs : (Outcome.empty : Outcome).kernelSteps = [] := rfl
+      rw [hOcKs] at hBodyEq
+      simp at hBodyEq
+      exact hBodyEq
+
+
+/-! ### Kernel-step schedule of every error-free confidential run
+
+The completed-run lift above covers runs that neither abort nor return a
+value. Confidential bodies continue past aborts, so the static schedule
+also describes every run that only records aborts: as long as no
+statement raises an evaluation error, the kernel steps are exactly the
+program's static expected schedule, whatever the secret inputs are. -/
+
+/-- Per-statement step lift for every outcome that lets a confidential body
+continue (completed or aborted): the statement emitted exactly its static
+expected step. -/
+theorem evalKernelStatement_kernelSteps_eq_expected_of_continues
+    (cfg : OperationalConfig) (env : LocalEnv) (oc : Outcome)
+    (stmt : KernelStatement)
+    (hCont : (evalKernelStatement cfg env oc stmt).snd.snd.status.continuesBody true = true)
+    (hPub : (evalKernelStatement cfg env oc stmt).snd.snd.publicResult =
+      oc.publicResult) :
+    (evalKernelStatement cfg env oc stmt).snd.snd.kernelSteps =
+      oc.kernelSteps ++ stmt.expectedStep := by
+  cases stmt <;> simp only [evalKernelStatement, KernelStatement.expectedStep] at hCont hPub ⊢ <;>
+    (repeat' split) <;> (try simp_all [EvalStatus.continuesBody]) <;>
+    (try (have hStop := evalKernelExpr_status_stops cfg env _ _
+            ‹evalKernelExpr cfg env _ = ExprResult.status _›
+          simp_all [EvalStatus.continuesBody])) <;>
+    -- Masked stores: a predicate that fails to evaluate to a boolean is an
+    -- evaluation error, never an abort.
+    (rename_i hShould
+     repeat' split at hShould
+     all_goals (try simp_all [EvalStatus.continuesBody])
+     all_goals (try (have h2 := hShould ▸ hCont; simp at h2))
+     all_goals (try (have hStop := evalKernelExpr_status_stops cfg env _ _
+                       ‹evalKernelExpr cfg env _ = ExprResult.status _›
+                     have h3 := hShould ▸ hStop
+                     simp_all [EvalStatus.continuesBody])))
+
+/-- Body-level schedule: an error-free run of a confidential body (it may
+abort) emits exactly the static expected steps of the body. -/
+theorem evalKernelBody_kernelSteps_eq_expected_of_continues
+    (cfg : OperationalConfig) (env : LocalEnv) (oc : Outcome)
+    (hOcPub : oc.publicResult = none) :
+    ∀ (body : List KernelStatement),
+      (evalKernelBody cfg env oc body).snd.snd.status.continuesBody true = true →
+      (evalKernelBody cfg env oc body).snd.snd.publicResult = none →
+      (evalKernelBody cfg env oc body).snd.snd.kernelSteps =
+        oc.kernelSteps ++ body.flatMap KernelStatement.expectedStep
+  | [], _, _ => by simp [evalKernelBody]
+  | stmt :: rest, hStatus, hPub => by
+      simp only [evalKernelBody] at hStatus hPub ⊢
+      generalize hStep : evalKernelStatement cfg env oc stmt = step at *
+      obtain ⟨cfg', env', oc'⟩ := step
+      simp only at hStatus hPub ⊢
+      by_cases hCont : oc'.status.continuesBody true = true
+      · by_cases hRet : oc'.publicResult.isSome
+        · simp only [hCont, hRet, if_true] at hPub
+          rw [hPub] at hRet
+          exact absurd hRet (by simp)
+        · have hOcPubNone : oc'.publicResult = none := by
+            cases hOPR : oc'.publicResult with
+            | none => rfl
+            | some v => rw [hOPR] at hRet; exact absurd (by simp) hRet
+          simp only [hCont, hRet, if_true, Bool.false_eq_true, if_false] at hStatus hPub ⊢
+          have h1 : (evalKernelStatement cfg env oc stmt).snd.snd.status.continuesBody true
+              = true := by
+            rw [hStep]; exact hCont
+          have h2 : (evalKernelStatement cfg env oc stmt).snd.snd.publicResult =
+              oc.publicResult := by
+            rw [hStep, hOcPubNone, hOcPub]
+          have hKsEqStmt := evalKernelStatement_kernelSteps_eq_expected_of_continues
+            cfg env oc stmt h1 h2
+          rw [hStep] at hKsEqStmt
+          simp only at hKsEqStmt
+          have hKsEqRest := evalKernelBody_kernelSteps_eq_expected_of_continues
+            cfg' env' oc' hOcPubNone rest hStatus hPub
+          rw [hKsEqRest, hKsEqStmt]
+          simp [List.flatMap, List.append_assoc]
+      · simp [hCont] at hStatus
+
+/-- Program-level schedule: every error-free run of a confidential kernel
+program that does not return a value emits exactly the program's static
+expected kernel steps, so two such runs emit the same steps whatever their
+secret inputs, including runs where one aborts and the other does not. -/
+theorem evalKernelProgram_kernelSteps_eq_expectedKernelSteps_of_continues
+    (kp : KernelProgram) (cfg : OperationalConfig)
+    (hStatus : (evalKernelProgram kp cfg).status.continuesBody true = true)
+    (hPub : (evalKernelProgram kp cfg).publicResult = none) :
+    (evalKernelProgram kp cfg).kernelSteps = kp.expectedKernelSteps := by
+  unfold evalKernelProgram at hStatus hPub ⊢
+  cases hEnv : kp.initialEnv cfg.declaredArgs with
+  | none =>
+      simp [hEnv, Outcome.withPublicStateTransition, Outcome.toPublicStateTransition,
+        Outcome.committedPublicState, EvalStatus.commitsCandidate,
+        EvalStatus.continuesBody] at hStatus
+  | some env =>
+      simp only [hEnv] at hStatus hPub ⊢
+      simp [Outcome.withPublicStateTransition] at hStatus hPub ⊢
+      have hOcPub : (Outcome.empty : Outcome).publicResult = none := rfl
+      have hBodyEq := evalKernelBody_kernelSteps_eq_expected_of_continues
         cfg env Outcome.empty hOcPub kp.body hStatus hPub
       simp only [KernelProgram.expectedKernelSteps]
       have hOcKs : (Outcome.empty : Outcome).kernelSteps = [] := rfl

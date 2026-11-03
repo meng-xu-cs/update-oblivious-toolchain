@@ -4090,6 +4090,7 @@ fn run_static_checks(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<J
             .context("reading proof-grade axiom report checker")?;
     let proofgrade_axiom_report_theorem_checks = [
         "UOToolchain.proofGrade_compiler_correctness_supersedes_artifact_checker",
+        "UOToolchain.proofGrade_sol_kernel_steps_eq_of_continues",
         "UOToolchain.RuntimeImplementationKernelMachineConfinementBoundary.paperEndToEndConfinementWithPublicOnlyHandwrittenShell",
         "UOToolchain.RuntimePaperNativeKernelAssumptions.paperEndToEndConfinementWithPublicOnlyHandwrittenShell",
     ]

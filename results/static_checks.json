@@ -60,6 +60,10 @@
     },
     {
       "print_axioms_present": true,
+      "theorem": "UOToolchain.proofGrade_sol_kernel_steps_eq_of_continues"
+    },
+    {
+      "print_axioms_present": true,
       "theorem": "UOToolchain.RuntimeImplementationKernelMachineConfinementBoundary.paperEndToEndConfinementWithPublicOnlyHandwrittenShell"
     },
     {

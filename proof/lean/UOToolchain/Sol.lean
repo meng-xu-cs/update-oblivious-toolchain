@@ -259,7 +259,7 @@ mutual
 
 /-- Big-step Sol statement evaluator. Mirrors `IR.evalStatement` on
 the Sol AST. -/
-def evalStatement
+def evalStatement (confidential : Bool)
     (cfg : OperationalConfig) (env : LocalEnv) (oc : Outcome) :
     Statement → OperationalConfig × LocalEnv × Outcome
   | .declare name _ value =>
@@ -412,8 +412,8 @@ def evalStatement
   | .ifStmt cond thenBody elseBody =>
       match evalExpr cfg env cond with
       | .status s => (cfg, env, { oc with status := s })
-      | .value (.bool true) => evalBody cfg env oc thenBody
-      | .value (.bool false) => evalBody cfg env oc elseBody
+      | .value (.bool true) => evalBody confidential cfg env oc thenBody
+      | .value (.bool false) => evalBody confidential cfg env oc elseBody
       | .value _ => (cfg, env, { oc with status := .evalError "if condition not boolean" })
   | .forLoop _loopId indexVar startExpr endExpr body =>
       match evalExpr cfg env startExpr with
@@ -424,7 +424,7 @@ def evalStatement
           | .value endVal =>
               match startVal, endVal with
               | .uint startN, .uint endN =>
-                  evalForLoop cfg env oc indexVar startN endN body
+                  evalForLoop confidential cfg env oc indexVar startN endN body
               | _, _ =>
                   (cfg, env, { oc with status := .evalError "for-loop bounds not uint" })
   | .retStmt none => (cfg, env, oc)
@@ -434,32 +434,30 @@ def evalStatement
       | .status s => (cfg, env, { oc with status := s })
 termination_by s => (sizeOf s, 0)
 
-def evalBody
+def evalBody (confidential : Bool)
     (cfg : OperationalConfig) (env : LocalEnv) (oc : Outcome) :
     List Statement → OperationalConfig × LocalEnv × Outcome
   | [] => (cfg, env, oc)
   | stmt :: rest =>
-      let (cfg', env', oc') := evalStatement cfg env oc stmt
-      match oc'.status with
-      | .completed =>
-          if oc'.publicResult.isSome then (cfg', env', oc')
-          else evalBody cfg' env' oc' rest
-      | _ => (cfg', env', oc')
+      let (cfg', env', oc') := evalStatement confidential cfg env oc stmt
+      if oc'.status.continuesBody confidential then
+        if oc'.publicResult.isSome then (cfg', env', oc')
+        else evalBody confidential cfg' env' oc' rest
+      else (cfg', env', oc')
 termination_by stmts => (sizeOf stmts, 0)
 
-def evalForLoop
+def evalForLoop (confidential : Bool)
     (cfg : OperationalConfig) (env : LocalEnv) (oc : Outcome)
     (indexVar : String) (i endN : Nat) (body : List Statement) :
     OperationalConfig × LocalEnv × Outcome :=
   if i ≥ endN then (cfg, env, oc)
   else
     let env' := env.insert indexVar (.uint i)
-    let (cfg', env'', oc') := evalBody cfg env' oc body
-    match oc'.status with
-    | .completed =>
-        if oc'.publicResult.isSome then (cfg', env'', oc')
-        else evalForLoop cfg' env'' oc' indexVar (i + 1) endN body
-    | _ => (cfg', env'', oc')
+    let (cfg', env'', oc') := evalBody confidential cfg env' oc body
+    if oc'.status.continuesBody confidential then
+      if oc'.publicResult.isSome then (cfg', env'', oc')
+      else evalForLoop confidential cfg' env'' oc' indexVar (i + 1) endN body
+    else (cfg', env'', oc')
 termination_by (sizeOf body, endN - i)
 
 end
@@ -484,7 +482,7 @@ def evalFunction (fn : Function) (cfg : OperationalConfig) : Outcome :=
       Outcome.withPublicStateTransition outcome
         (Outcome.toPublicStateTransition outcome cfg.publicState cfg.publicState)
   | some env =>
-      let (cfg', _env', outcome) := evalBody cfg env Outcome.empty fn.body
+      let (cfg', _env', outcome) := evalBody fn.confidential cfg env Outcome.empty fn.body
       Outcome.withPublicStateTransition outcome
         (Outcome.toPublicStateTransition outcome cfg.publicState cfg'.publicState)
 
@@ -648,10 +646,10 @@ end
 
 mutual
 
-theorem lowerStatement_preserves_semantics
+theorem lowerStatement_preserves_semantics (confidential : Bool)
     (cfg : OperationalConfig) (env : LocalEnv) (oc : Outcome) :
     ∀ (s : Statement),
-      evalStatement cfg env oc s = IR.evalStatement cfg env oc (lowerStatement s)
+      evalStatement confidential cfg env oc s = IR.evalStatement confidential cfg env oc (lowerStatement s)
   | .declare name ty value => by
       simp only [evalStatement, lowerStatement, IR.evalStatement]
       simp only [lowerExpr_preserves_semantics cfg env value]
@@ -733,8 +731,8 @@ theorem lowerStatement_preserves_semantics
           cases v with
           | bool b =>
               cases b
-              · exact lowerStatementList_preserves_semantics cfg env oc elseBody
-              · exact lowerStatementList_preserves_semantics cfg env oc thenBody
+              · exact lowerStatementList_preserves_semantics confidential cfg env oc elseBody
+              · exact lowerStatementList_preserves_semantics confidential cfg env oc thenBody
           | uint _ => rfl
           | bytes32 _ => rfl
           | address _ => rfl
@@ -756,7 +754,7 @@ theorem lowerStatement_preserves_semantics
               | uint sn =>
                   cases ev with
                   | uint en =>
-                      exact lowerForLoop_preserves_semantics cfg env oc indexVar sn en body
+                      exact lowerForLoop_preserves_semantics confidential cfg env oc indexVar sn en body
                   | bool _ => rfl
                   | bytes32 _ => rfl
                   | address _ => rfl
@@ -777,56 +775,54 @@ theorem lowerStatement_preserves_semantics
       rfl
 termination_by s => (sizeOf s, 0, 0)
 
-theorem lowerStatementList_preserves_semantics
+theorem lowerStatementList_preserves_semantics (confidential : Bool)
     (cfg : OperationalConfig) (env : LocalEnv) (oc : Outcome) :
     ∀ (stmts : List Statement),
-      evalBody cfg env oc stmts =
-        IR.evalBody cfg env oc (lowerStatementList stmts)
+      evalBody confidential cfg env oc stmts =
+        IR.evalBody confidential cfg env oc (lowerStatementList stmts)
   | [] => by
       simp only [evalBody, lowerStatementList, IR.evalBody]
   | stmt :: rest => by
       simp only [evalBody, lowerStatementList, IR.evalBody]
-      rw [lowerStatement_preserves_semantics cfg env oc stmt]
-      generalize hStep : IR.evalStatement cfg env oc (lowerStatement stmt) = step
+      rw [lowerStatement_preserves_semantics confidential cfg env oc stmt]
+      generalize hStep : IR.evalStatement confidential cfg env oc (lowerStatement stmt) = step
       cases step with
       | mk cfg' rest' =>
           cases rest' with
           | mk env' oc' =>
               simp only []
-              cases hStatus : oc'.status with
-              | completed =>
-                  by_cases hRet : oc'.publicResult.isSome
-                  · simp [hRet]
-                  · simp only [hRet]
-                    exact lowerStatementList_preserves_semantics cfg' env' oc' rest
-              | _ => simp
+              by_cases hCont : oc'.status.continuesBody confidential = true
+              · by_cases hRet : oc'.publicResult.isSome
+                · simp [hCont, hRet]
+                · simp only [hCont, hRet, if_true]
+                  exact lowerStatementList_preserves_semantics confidential cfg' env' oc' rest
+              · simp [hCont]
 termination_by stmts => (sizeOf stmts, 0, 0)
 
-theorem lowerForLoop_preserves_semantics
+theorem lowerForLoop_preserves_semantics (confidential : Bool)
     (cfg : OperationalConfig) (env : LocalEnv) (oc : Outcome)
     (indexVar : String) (i endN : Nat) (body : List Statement) :
-    evalForLoop cfg env oc indexVar i endN body =
-      IR.evalForLoop cfg env oc indexVar i endN (lowerStatementList body) := by
+    evalForLoop confidential cfg env oc indexVar i endN body =
+      IR.evalForLoop confidential cfg env oc indexVar i endN (lowerStatementList body) := by
   unfold evalForLoop IR.evalForLoop
   by_cases h : i ≥ endN
   · simp [h]
   · simp only [h, if_false]
-    rw [lowerStatementList_preserves_semantics cfg (env.insert indexVar (.uint i)) oc body]
-    generalize hStep : IR.evalBody cfg (env.insert indexVar (.uint i)) oc
+    rw [lowerStatementList_preserves_semantics confidential cfg (env.insert indexVar (.uint i)) oc body]
+    generalize hStep : IR.evalBody confidential cfg (env.insert indexVar (.uint i)) oc
       (lowerStatementList body) = step
     cases step with
     | mk cfg' rest' =>
         cases rest' with
         | mk env'' oc' =>
             simp only []
-            cases hStatus : oc'.status with
-            | completed =>
-                by_cases hRet : oc'.publicResult.isSome
-                · simp [hRet]
-                · simp only [hRet]
-                  exact lowerForLoop_preserves_semantics cfg' env'' oc'
-                    indexVar (i + 1) endN body
-            | _ => simp
+            by_cases hCont : oc'.status.continuesBody confidential = true
+            · by_cases hRet : oc'.publicResult.isSome
+              · simp [hCont, hRet]
+              · simp only [hCont, hRet, if_true]
+                exact lowerForLoop_preserves_semantics confidential cfg' env'' oc'
+                  indexVar (i + 1) endN body
+            · simp [hCont]
 termination_by (sizeOf body, endN - i, 1)
 
 end
@@ -860,7 +856,7 @@ theorem lowerFunction_preserves_semantics
   | some env =>
       simp only []
       have ihBody := lowerStatementList_preserves_semantics
-        cfg env Outcome.empty fn.body
+        fn.confidential cfg env Outcome.empty fn.body
       rw [ihBody]
       rfl
 

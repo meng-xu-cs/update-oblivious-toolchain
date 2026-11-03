@@ -315,6 +315,25 @@ def EvalStatus.commitsCandidate : EvalStatus → Bool
   | .completed => true
   | _ => false
 
+/-- Whether a body keeps executing after a statement leaves outcome status
+`status`. Public entrypoints stop at the first non-`completed` status.
+Confidential entrypoints are linearized and run their whole public schedule:
+`require`, `abortIf`, and bounded-map capacity overflow only record the abort,
+and the commit boundary rolls the candidate state back. This is what the
+generated confidential kernel does at runtime (`note_abort_generated`).
+Evaluation errors and unsupported features always stop. -/
+def EvalStatus.continuesBody (confidential : Bool) : EvalStatus → Bool
+  | .completed => true
+  | .requireFailed | .abortedByUser | .capacityOverflow => confidential
+  | .unsupported _ | .evalError _ => false
+
+@[simp] theorem EvalStatus.continuesBody_completed (confidential : Bool) :
+    EvalStatus.continuesBody confidential .completed = true := rfl
+
+@[simp] theorem EvalStatus.continuesBody_public (status : EvalStatus) :
+    EvalStatus.continuesBody false status = decide (status = .completed) := by
+  cases status <;> rfl
+
 /-- Per-object ORAM access count: pair `(objectId, accesses)` matching the
 manifest-facing `oramAccesses` view. -/
 abbrev OramAccessCounts := List (Nat × Nat)
@@ -1185,7 +1204,7 @@ statements observe the new store.
 `evalStatement` and `evalBody` are mutually recursive so that
 `Statement.ifStmt` and `Statement.forLoop` can recurse into nested
 statement bodies via `evalBody`. -/
-def evalStatement
+def evalStatement (confidential : Bool)
     (cfg : OperationalConfig) (env : LocalEnv) (oc : Outcome) :
     Statement → OperationalConfig × LocalEnv × Outcome
   | .declare name _ value =>
@@ -1346,8 +1365,8 @@ def evalStatement
       -- recurse into the chosen branch via `evalBody`.
       match evalExpr cfg env cond with
       | .status s => (cfg, env, { oc with status := s })
-      | .value (.bool true) => evalBody cfg env oc thenBody
-      | .value (.bool false) => evalBody cfg env oc elseBody
+      | .value (.bool true) => evalBody confidential cfg env oc thenBody
+      | .value (.bool false) => evalBody confidential cfg env oc elseBody
       | .value _ => (cfg, env, { oc with status := .evalError "if condition not boolean" })
   | .forLoop _loopId indexVar startExpr endExpr body =>
       -- Bounded loop: the admitted fragment requires `start` and `end`
@@ -1361,7 +1380,7 @@ def evalStatement
           | .value endVal =>
               match startVal, endVal with
               | .uint startN, .uint endN =>
-                  evalForLoop cfg env oc indexVar startN endN body
+                  evalForLoop confidential cfg env oc indexVar startN endN body
               | _, _ =>
                   (cfg, env, { oc with status := .evalError "for-loop bounds not uint" })
   | .retStmt none => (cfg, env, oc)
@@ -1371,36 +1390,34 @@ def evalStatement
       | .status s => (cfg, env, { oc with status := s })
 termination_by s => (sizeOf s, 0)
 
-def evalBody
+def evalBody (confidential : Bool)
     (cfg : OperationalConfig) (env : LocalEnv) (oc : Outcome) :
     List Statement → OperationalConfig × LocalEnv × Outcome
   | [] => (cfg, env, oc)
   | stmt :: rest =>
-      let (cfg', env', oc') := evalStatement cfg env oc stmt
-      match oc'.status with
-      | .completed =>
-          if oc'.publicResult.isSome then (cfg', env', oc')
-          else evalBody cfg' env' oc' rest
-      | _ => (cfg', env', oc')
+      let (cfg', env', oc') := evalStatement confidential cfg env oc stmt
+      if oc'.status.continuesBody confidential then
+        if oc'.publicResult.isSome then (cfg', env', oc')
+        else evalBody confidential cfg' env' oc' rest
+      else (cfg', env', oc')
 termination_by stmts => (sizeOf stmts, 0)
 
 /-- Bounded for-loop helper. The loop runs from `i` (inclusive) to `endN`
 (exclusive). Each iteration binds `indexVar` to `Value.uint i` and
 walks `body` via `evalBody`, threading the updated config through. The
 loop exits early on a `retStmt` or any non-`completed` status. -/
-def evalForLoop
+def evalForLoop (confidential : Bool)
     (cfg : OperationalConfig) (env : LocalEnv) (oc : Outcome)
     (indexVar : String) (i endN : Nat) (body : List Statement) :
     OperationalConfig × LocalEnv × Outcome :=
   if i ≥ endN then (cfg, env, oc)
   else
     let env' := env.insert indexVar (.uint i)
-    let (cfg', env'', oc') := evalBody cfg env' oc body
-    match oc'.status with
-    | .completed =>
-        if oc'.publicResult.isSome then (cfg', env'', oc')
-        else evalForLoop cfg' env'' oc' indexVar (i + 1) endN body
-    | _ => (cfg', env'', oc')
+    let (cfg', env'', oc') := evalBody confidential cfg env' oc body
+    if oc'.status.continuesBody confidential then
+      if oc'.publicResult.isSome then (cfg', env'', oc')
+      else evalForLoop confidential cfg' env'' oc' indexVar (i + 1) endN body
+    else (cfg', env'', oc')
 termination_by (sizeOf body, endN - i)
 
 end
@@ -1471,7 +1488,7 @@ def evalContract (cfg : OperationalConfig) : Outcome :=
           outcome.withPublicStateTransition
             (outcome.toPublicStateTransition cfg.publicState cfg.publicState)
       | some env =>
-          let (cfg', _env', outcome) := evalBody cfg env Outcome.empty fn.body
+          let (cfg', _env', outcome) := evalBody fn.confidential cfg env Outcome.empty fn.body
           outcome.withPublicStateTransition
             (outcome.toPublicStateTransition cfg.publicState cfg'.publicState)
 
@@ -1482,7 +1499,7 @@ theorem evalContract_commits_initial_publicState_on_aborted_body
   (outcome : Outcome)
   (hEntry : cfg.entrypointFn? = some fn)
   (hEnv : cfg.initialEnv fn = some env)
-  (hEval : evalBody cfg env Outcome.empty fn.body = (cfg', env', outcome))
+  (hEval : evalBody fn.confidential cfg env Outcome.empty fn.body = (cfg', env', outcome))
   (hStatus : outcome.status = EvalStatus.abortedByUser) :
   (evalContract cfg).finalPublicState = some cfg.publicState := by
   unfold evalContract
@@ -1497,7 +1514,7 @@ theorem evalContract_commits_initial_publicState_on_requireFailed_body
   (outcome : Outcome)
   (hEntry : cfg.entrypointFn? = some fn)
   (hEnv : cfg.initialEnv fn = some env)
-  (hEval : evalBody cfg env Outcome.empty fn.body = (cfg', env', outcome))
+  (hEval : evalBody fn.confidential cfg env Outcome.empty fn.body = (cfg', env', outcome))
   (hStatus : outcome.status = EvalStatus.requireFailed) :
   (evalContract cfg).finalPublicState = some cfg.publicState := by
   unfold evalContract
@@ -1512,7 +1529,7 @@ theorem evalContract_commits_initial_publicState_on_capacityOverflow_body
   (outcome : Outcome)
   (hEntry : cfg.entrypointFn? = some fn)
   (hEnv : cfg.initialEnv fn = some env)
-  (hEval : evalBody cfg env Outcome.empty fn.body = (cfg', env', outcome))
+  (hEval : evalBody fn.confidential cfg env Outcome.empty fn.body = (cfg', env', outcome))
   (hStatus : outcome.status = EvalStatus.capacityOverflow) :
   (evalContract cfg).finalPublicState = some cfg.publicState := by
   unfold evalContract

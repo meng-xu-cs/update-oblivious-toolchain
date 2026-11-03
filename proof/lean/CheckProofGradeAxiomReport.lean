@@ -30,4 +30,10 @@ info: 'UOToolchain.RuntimePaperNativeKernelAssumptions.paperEndToEndConfinementW
 #guard_msgs in
 #print axioms UOToolchain.RuntimePaperNativeKernelAssumptions.paperEndToEndConfinementWithPublicOnlyHandwrittenShell
 
+/--
+info: 'UOToolchain.proofGrade_sol_kernel_steps_eq_of_continues' depends on axioms: [propext, Quot.sound]
+-/
+#guard_msgs in
+#print axioms UOToolchain.proofGrade_sol_kernel_steps_eq_of_continues
+
 def main : IO UInt32 := pure 0
