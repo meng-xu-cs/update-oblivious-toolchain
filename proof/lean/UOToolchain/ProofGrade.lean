@@ -24,6 +24,7 @@ import UOToolchain.RuntimeImplementationInterface
 import UOToolchain.ConfidentialKernelDsl
 import UOToolchain.ConfidentialFragment
 import UOToolchain.KernelDsl
+import UOToolchain.KernelTyping
 import UOToolchain.Sol
 import UOToolchain.RuntimeConfidentialCoreAssurance
 import UOToolchain.RuntimeCoins
@@ -1032,6 +1033,32 @@ theorem proofGrade_sol_kernel_steps_eq_of_continues
       fn kp cfg₁ hLow hEntry₁ hConf hStatus₁ hPub₁,
     proofGrade_sol_to_kernel_runtime_kernel_steps_eq_expected_of_continues
       fn kp cfg₂ hLow hEntry₂ hConf hStatus₂ hPub₂]
+
+/-- Schedule noninterference for admitted confidential functions. When the
+lowered kernel program is well typed and returns only as its last statement,
+two runs over stores that conform to the state layout, with arguments of the
+parameter types, emit the same kernel steps, whatever their secret inputs,
+aborts, or return values. The kernel type checker
+(`IR.KernelProgram.wellTyped`) discharges the error-freedom premise of
+`proofGrade_sol_kernel_steps_eq_of_continues`. -/
+theorem proofGrade_sol_kernel_steps_eq_of_wellTyped
+    (fn : Sol.Function) (kp : IR.KernelProgram)
+    (cfg₁ cfg₂ : IR.OperationalConfig)
+    (hLow : IR.lowerCompiledFunction (Sol.lowerFunction fn) = .ok kp)
+    (hEntry₁ : cfg₁.entrypointFn? = some (Sol.lowerFunction fn))
+    (hEntry₂ : cfg₂.entrypointFn? = some (Sol.lowerFunction fn))
+    (hConf : fn.confidential = true)
+    (hTy₁ : kp.wellTyped cfg₁.contract.state = true)
+    (hTy₂ : kp.wellTyped cfg₂.contract.state = true)
+    (hRet : IR.KernelStatement.returnsOnlyLast kp.body = true)
+    (hArgs₁ : IR.ArgsConform kp.params cfg₁.declaredArgs)
+    (hArgs₂ : IR.ArgsConform kp.params cfg₂.declaredArgs)
+    (hStore₁ : IR.StoreConforms cfg₁) (hStore₂ : IR.StoreConforms cfg₂) :
+    (Sol.evalFunction fn cfg₁).kernelSteps = (Sol.evalFunction fn cfg₂).kernelSteps := by
+  rw [proofGrade_sol_to_kernel_outcome_preservation fn kp cfg₁ hLow hEntry₁ hConf,
+    proofGrade_sol_to_kernel_outcome_preservation fn kp cfg₂ hLow hEntry₂ hConf]
+  exact IR.evalKernelProgram_kernelSteps_eq_of_wellTyped kp cfg₁ cfg₂ hTy₁ hTy₂ hRet
+    hArgs₁ hArgs₂ hStore₁ hStore₂
 
 /-! ### W4.4 reverse iff: lowering succeeds → precondition holds (paper facades)
 

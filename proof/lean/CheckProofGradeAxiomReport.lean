@@ -80,4 +80,16 @@ info: 'UOToolchain.acceptedPrivatePosmapPathOramPackageCapstone_noninterference_
 #guard_msgs in
 #print axioms UOToolchain.acceptedPrivatePosmapPathOramPackageCapstone_noninterference_moduloReleases
 
+/--
+info: 'UOToolchain.proofGrade_sol_kernel_steps_eq_of_wellTyped' depends on axioms: [propext, Classical.choice, Quot.sound]
+-/
+#guard_msgs in
+#print axioms UOToolchain.proofGrade_sol_kernel_steps_eq_of_wellTyped
+
+/--
+info: 'UOToolchain.IR.evalKernelProgram_continues_of_wellTyped' depends on axioms: [propext, Classical.choice, Quot.sound]
+-/
+#guard_msgs in
+#print axioms UOToolchain.IR.evalKernelProgram_continues_of_wellTyped
+
 def main : IO UInt32 := pure 0

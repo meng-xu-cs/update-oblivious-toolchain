@@ -4060,6 +4060,7 @@ fn run_static_checks(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<J
         "proof/lean/UOToolchain/RuntimeCoins.lean",
         "proof/lean/UOToolchain/PathOramLocalPosmapV1.lean",
         "proof/lean/UOToolchain/PaperMainReleases.lean",
+        "proof/lean/UOToolchain/KernelTyping.lean",
     ]
     .into_iter()
     .map(|relative_path| {
@@ -4098,6 +4099,8 @@ fn run_static_checks(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<J
         "UOToolchain.acceptedExactPackageCapstone_noninterference_moduloReleases",
         "UOToolchain.acceptedPathOramPackageCapstone_noninterference_moduloReleases",
         "UOToolchain.acceptedPrivatePosmapPathOramPackageCapstone_noninterference_moduloReleases",
+        "UOToolchain.proofGrade_sol_kernel_steps_eq_of_wellTyped",
+        "UOToolchain.IR.evalKernelProgram_continues_of_wellTyped",
         "UOToolchain.RuntimeImplementationKernelMachineConfinementBoundary.paperEndToEndConfinementWithPublicOnlyHandwrittenShell",
         "UOToolchain.RuntimePaperNativeKernelAssumptions.paperEndToEndConfinementWithPublicOnlyHandwrittenShell",
     ]

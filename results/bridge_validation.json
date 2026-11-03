@@ -849751,6 +849751,14 @@
       },
       {
         "print_axioms_present": true,
+        "theorem": "UOToolchain.proofGrade_sol_kernel_steps_eq_of_wellTyped"
+      },
+      {
+        "print_axioms_present": true,
+        "theorem": "UOToolchain.IR.evalKernelProgram_continues_of_wellTyped"
+      },
+      {
+        "print_axioms_present": true,
         "theorem": "UOToolchain.RuntimeImplementationKernelMachineConfinementBoundary.paperEndToEndConfinementWithPublicOnlyHandwrittenShell"
       },
       {
@@ -850270,6 +850278,11 @@
       },
       {
         "file": "proof/lean/UOToolchain/PaperMainReleases.lean",
+        "forbidden_import_hits": [],
+        "restricted": true
+      },
+      {
+        "file": "proof/lean/UOToolchain/KernelTyping.lean",
         "forbidden_import_hits": [],
         "restricted": true
       }

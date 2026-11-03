@@ -36,6 +36,23 @@ aborted or not, is the program's static expected schedule
 `proofGrade_sol_kernel_steps_eq_of_continues` states that two such runs emit
 the same kernel steps whatever their secret inputs.
 
+`UOToolchain.KernelTyping` discharges the error-freedom premise.
+`KernelProgram.wellTyped` type-checks a kernel program against the contract's
+state layout: operators receive operands of their types, `select` arms agree,
+struct fields exist, every index into a local or parameter array is a
+compile-time constant below the array's length (the rule `uo-solc` enforces for
+confidential entrypoints), and every write stores a value of the object's
+declared type. `evalKernelProgram_continues_of_wellTyped` proves that a
+well-typed program, run on arguments of its parameter types over a store that
+holds every declared object with values of its type (`StoreConforms`), never
+reports an evaluation error. With the schedule lemma above this gives
+`evalKernelProgram_kernelSteps_eq_of_wellTyped`: two such runs emit the same
+kernel steps, including programs whose only return is their last statement.
+Through the Sol-to-kernel preservation theorem, the same holds for the source
+function (`proofGrade_sol_kernel_steps_eq_of_wellTyped`). Running the type
+checker on the kernel programs of concrete admitted artifacts is not yet part
+of the proof-grade checker.
+
 ## Runtime Bridge
 
 Runtime execution emits or supports these proof-facing objects:
