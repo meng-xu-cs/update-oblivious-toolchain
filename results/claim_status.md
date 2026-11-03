@@ -6,7 +6,7 @@ Generated from `docs/claim-boundary.md` by `mplus-probe --only claim-status`. Do
 
 | id | status | claim |
 | --- | --- | --- |
-| `paper-update-obliviousness-theorem` | Lean-proved | For every admitted package the execution's normalized hostile-host observer satisfies the paper update-obliviousness theorem against the stated observer and the artifact-declared declassification policy. |
+| `paper-update-obliviousness-theorem` | Lean-proved | For every admitted package, two executions with the same public projection have equal normalized hostile-host observations outside the artifact-declared releases (status, plaintext return, encrypted-return ciphertext): exactly for the exact backends, and up to the Path ORAM storage relation on the proof-grade Path ORAM routes. |
 | `deployment-acceptance-theorem` | Lean-proved | A production runtime result is accepted only under a current admitted-package identity, runtime proof-bundle hash, deployment policy hash match, return-channel session match, and freshness evidence. |
 | `exact-uo-backends` | Lean-proved | Exact-UO is claimed for the exact backends on the instrumented abstract/runtime model: UOCell, UOArray, and full-scan UOMap. |
 | `computational-uo-path-oram-local` | Lean-proved | The bounded local-position-map Path ORAM route path_oram_local_posmap_v1 (capacity 128) is a theorem-facing computational-UO path in the proof-grade import closure. |

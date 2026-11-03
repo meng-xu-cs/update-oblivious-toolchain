@@ -2251,6 +2251,7 @@
     "lean_accepted_package_capstone": "proof/lean/UOToolchain/AcceptedPackageCapstone.lean",
     "lean_confidential_kernel_dsl": "proof/lean/UOToolchain/ConfidentialKernelDsl.lean",
     "lean_confidential_kernel_rust_generator": "proof/lean/.lake/build/bin/generateConfidentialKernelRust",
+    "lean_paper_main_releases": "proof/lean/UOToolchain/PaperMainReleases.lean",
     "lean_path_oram_private_posmap": "proof/lean/UOToolchain/PathOramPrivatePosmapV1.lean",
     "lean_runtime_array_access_model": "proof/lean/UOToolchain/RuntimeArrayAccessDiscipline.lean",
     "lean_runtime_coins_json": "proof/lean/UOToolchain/RuntimeCoinsJson.lean",

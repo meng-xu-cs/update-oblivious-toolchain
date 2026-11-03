@@ -72,6 +72,7 @@ import UOToolchain.SgxExactProjection
 import UOToolchain.SgxJointProjection
 import UOToolchain.PaperMainTheorem
 import UOToolchain.AcceptedPackageCapstone
+import UOToolchain.PaperMainReleases
 import UOToolchain.ProofGrade
 
 /-!

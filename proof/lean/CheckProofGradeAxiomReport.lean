@@ -36,4 +36,48 @@ info: 'UOToolchain.proofGrade_sol_kernel_steps_eq_of_continues' depends on axiom
 #guard_msgs in
 #print axioms UOToolchain.proofGrade_sol_kernel_steps_eq_of_continues
 
+/--
+info: 'UOToolchain.paperMain_exact_backend_noninterference_moduloReleases' depends on axioms: [propext]
+-/
+#guard_msgs in
+#print axioms UOToolchain.paperMain_exact_backend_noninterference_moduloReleases
+
+/--
+info: 'UOToolchain.paperMain_pathOramLocalPosmapV1_noninterference_moduloReleases' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+-/
+#guard_msgs in
+#print axioms UOToolchain.paperMain_pathOramLocalPosmapV1_noninterference_moduloReleases
+
+/--
+info: 'UOToolchain.paperMain_pathOramPrivatePosmapV1_noninterference_moduloReleases' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+-/
+#guard_msgs in
+#print axioms UOToolchain.paperMain_pathOramPrivatePosmapV1_noninterference_moduloReleases
+
+/--
+info: 'UOToolchain.acceptedExactPackageCapstone_noninterference_moduloReleases' depends on axioms: [propext]
+-/
+#guard_msgs in
+#print axioms UOToolchain.acceptedExactPackageCapstone_noninterference_moduloReleases
+
+/--
+info: 'UOToolchain.acceptedPathOramPackageCapstone_noninterference_moduloReleases' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+-/
+#guard_msgs in
+#print axioms UOToolchain.acceptedPathOramPackageCapstone_noninterference_moduloReleases
+
+/--
+info: 'UOToolchain.acceptedPrivatePosmapPathOramPackageCapstone_noninterference_moduloReleases' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+-/
+#guard_msgs in
+#print axioms UOToolchain.acceptedPrivatePosmapPathOramPackageCapstone_noninterference_moduloReleases
+
 def main : IO UInt32 := pure 0

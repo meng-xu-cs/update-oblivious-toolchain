@@ -74,6 +74,12 @@ The proof development is organized around these layers:
 - SGX/TEE observer: `SgxBoundary`, `SgxRelation`, `SgxController`,
   `SgxControllerTrace`, `SgxMicroModel`, `SgxObserverFreeze`,
   `TeeDeployment`, `DeploymentAcceptance`.
+- Paper-main theorem: `PaperMainTheorem`, `AcceptedPackageCapstone`, and
+  `PaperMainReleases`. `PaperMainReleases` states the paper-main theorem and
+  the accepted-package capstones modulo the declared releases
+  (`View_SGX ∖ rel`) for the exact backend and both proof-grade Path ORAM
+  routes; the release semantics is documented in
+  [`claim-boundary.md`](./claim-boundary.md#declared-releases).
 
 The default `UOToolchain` umbrella imports `UOToolchain.ProofGradeRoot`.
 Legacy axiom-backed demonstrations are isolated behind `UOToolchain.LegacyRoot`

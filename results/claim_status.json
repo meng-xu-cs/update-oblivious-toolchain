@@ -452,6 +452,11 @@
       "ok": true
     },
     {
+      "detail": "artifact proof/lean/UOToolchain/PaperMainReleases.lean referenced by paper-update-obliviousness-theorem exists",
+      "name": "file-exists:paper-update-obliviousness-theorem:proof/lean/UOToolchain/PaperMainReleases.lean",
+      "ok": true
+    },
+    {
       "detail": "artifact runtime/uo-evm/src/lib.rs referenced by paper-update-obliviousness-theorem exists",
       "name": "file-exists:paper-update-obliviousness-theorem:runtime/uo-evm/src/lib.rs",
       "ok": true
@@ -783,7 +788,7 @@
       "category": "claim",
       "id": "paper-update-obliviousness-theorem",
       "status": "Lean-proved",
-      "text": "For every admitted package the execution's normalized hostile-host observer satisfies the paper update-obliviousness theorem against the stated observer and the artifact-declared declassification policy.",
+      "text": "For every admitted package, two executions with the same public projection have equal normalized hostile-host observations outside the artifact-declared releases (status, plaintext return, encrypted-return ciphertext): exactly for the exact backends, and up to the Path ORAM storage relation on the proof-grade Path ORAM routes.",
       "validation_command": "lake build UOToolchain.ProofGradeRoot"
     },
     {

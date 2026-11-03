@@ -4059,6 +4059,7 @@ fn run_static_checks(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<J
         "proof/lean/UOToolchain/RuntimeRefinement.lean",
         "proof/lean/UOToolchain/RuntimeCoins.lean",
         "proof/lean/UOToolchain/PathOramLocalPosmapV1.lean",
+        "proof/lean/UOToolchain/PaperMainReleases.lean",
     ]
     .into_iter()
     .map(|relative_path| {
@@ -4091,6 +4092,12 @@ fn run_static_checks(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<J
     let proofgrade_axiom_report_theorem_checks = [
         "UOToolchain.proofGrade_compiler_correctness_supersedes_artifact_checker",
         "UOToolchain.proofGrade_sol_kernel_steps_eq_of_continues",
+        "UOToolchain.paperMain_exact_backend_noninterference_moduloReleases",
+        "UOToolchain.paperMain_pathOramLocalPosmapV1_noninterference_moduloReleases",
+        "UOToolchain.paperMain_pathOramPrivatePosmapV1_noninterference_moduloReleases",
+        "UOToolchain.acceptedExactPackageCapstone_noninterference_moduloReleases",
+        "UOToolchain.acceptedPathOramPackageCapstone_noninterference_moduloReleases",
+        "UOToolchain.acceptedPrivatePosmapPathOramPackageCapstone_noninterference_moduloReleases",
         "UOToolchain.RuntimeImplementationKernelMachineConfinementBoundary.paperEndToEndConfinementWithPublicOnlyHandwrittenShell",
         "UOToolchain.RuntimePaperNativeKernelAssumptions.paperEndToEndConfinementWithPublicOnlyHandwrittenShell",
     ]
@@ -26631,6 +26638,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         repo_root().join("proof/lean/UOToolchain/PathOramPrivatePosmapV1.lean");
     let lean_accepted_package_capstone_path =
         repo_root().join("proof/lean/UOToolchain/AcceptedPackageCapstone.lean");
+    let lean_paper_main_releases_path =
+        repo_root().join("proof/lean/UOToolchain/PaperMainReleases.lean");
     let lean_toolchain_path = repo_root().join("proof/lean/lean-toolchain");
     let lean_proofgrade_root_path = repo_root().join("proof/lean/UOToolchain/ProofGradeRoot.lean");
     let lean_runtime_implementation_interface_checker_path =
@@ -26952,6 +26961,13 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             format!(
                 "reading {}",
                 display_report_path(&lean_accepted_package_capstone_path)
+            )
+        })?;
+    let lean_paper_main_releases_source = fs::read_to_string(&lean_paper_main_releases_path)
+        .with_context(|| {
+            format!(
+                "reading {}",
+                display_report_path(&lean_paper_main_releases_path)
             )
         })?;
     let lean_toolchain_pin = fs::read_to_string(&lean_toolchain_path)
@@ -30107,7 +30123,15 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && lean_accepted_package_capstone_source
             .contains("AcceptedPrivatePosmapPathOramPackageCapstoneEvidence")
         && lean_accepted_package_capstone_source
-            .contains("acceptedPrivatePosmapPathOramPackageCapstone_noninterference");
+            .contains("acceptedPrivatePosmapPathOramPackageCapstone_noninterference")
+        && lean_proofgrade_root_source.contains("import UOToolchain.PaperMainReleases")
+        && lean_paper_main_releases_source.contains("def SGXPublicOutcome.withoutReleases")
+        && lean_paper_main_releases_source.contains("def PaperMainViewSGX.withoutReleases")
+        && lean_paper_main_releases_source
+            .contains("theorem paperMain_pathOramPrivatePosmapV1_noninterference_moduloReleases")
+        && lean_paper_main_releases_source.contains(
+            "theorem acceptedPrivatePosmapPathOramPackageCapstone_noninterference_moduloReleases",
+        );
     let scalable_path_oram_symbolic_route_proof_grade_present =
         lean_scalable_path_oram_evidence_source
             .contains("def scalablePathOramProofBundleBudgetBytes")
@@ -36772,6 +36796,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
                 display_report_path(&lean_path_oram_private_posmap_path),
             "lean_accepted_package_capstone":
                 display_report_path(&lean_accepted_package_capstone_path),
+            "lean_paper_main_releases": display_report_path(&lean_paper_main_releases_path),
             "lean_toolchain": display_report_path(&lean_toolchain_path),
             "lean_runtime_coins_json": display_report_path(&lean_runtime_coins_json_path),
             "lean_runtime_confidential_core":

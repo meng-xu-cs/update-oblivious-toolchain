@@ -14,8 +14,18 @@ hash, the Lean source/artifact checker accepts the pair, the real runtime
 executes `A` and emits proof objects accepted by Lean, and the explicit
 backend, cryptographic, and TEE deployment assumptions hold, then the
 execution's normalized hostile-host observer satisfies the paper
-update-obliviousness theorem against the stated observer and the
-artifact-declared return/status/public-state declassification policy.
+update-obliviousness theorem modulo the artifact-declared releases: two
+executions with the same public projection (admitted package, public
+arguments, public environment, and initial public state) have equal
+observations once the declared releases are erased,
+
+```text
+View_SGX(c₁) ∖ rel = View_SGX(c₂) ∖ rel
+```
+
+exactly for the exact backends, and with the storage component related by the
+Path ORAM storage relation on the proof-grade Path ORAM routes. The released
+values themselves may differ between the two executions.
 
 The compiler-side trust story starts at the post-resolution Sol AST / UO IR
 consumed by Lean. The active source theorem is for `uo-solidity-like-dsl-v1`,
@@ -35,6 +45,48 @@ profile. It is checked for equality by the proof-grade translation bundle. It is
 not by itself a deployment attestation hash; the production deployment theorem
 binds it to the runtime binary hash, proof-root hash, SGX quote, return-channel
 session transcript, and freshness counters.
+
+### Declared Releases
+
+`∖ rel` erases exactly what the entrypoint's sidecar policies release. The
+policies are carried in every public outcome, and the erasure is
+`PaperMainViewSGX.withoutReleases` in `UOToolchain/PaperMainReleases.lean`:
+
+- `status: declassified` releases whether the call completed or aborted: the
+  termination status and the fields the runtime derives from it alone, namely
+  the abort/rollback flag of the final public-state record, the output shape,
+  and whether a plaintext or encrypted return payload is present.
+- `returns: declassified` releases the plaintext return payload.
+- `returns: encrypted_to_client` releases only the AEAD output bytes, the
+  ciphertext and its tag; the session binding, AAD hash, nonce, and lengths
+  stay constrained.
+
+Every other component must be equal: the storage trace, boundary schedule,
+normalized micro trace, modeled gas, the declared policies and
+declassification labels, the final public-state digests, and the declared
+release functions. For example, `ConfidentialMixer.withdraw` declares
+`status: declassified` and `returns: declassified`. A withdrawal that
+completes and returns 5 and one that aborts on an insufficient secret balance
+must have the same storage trace, schedule, and gas; only the released status
+and return value may differ.
+
+The theorems are `paperMain_exact_backend_noninterference_moduloReleases`,
+`paperMain_pathOramLocalPosmapV1_noninterference_moduloReleases`, and
+`paperMain_pathOramPrivatePosmapV1_noninterference_moduloReleases`, with the
+accepted-package capstones
+`acceptedExactPackageCapstone_noninterference_moduloReleases`,
+`acceptedPathOramPackageCapstone_noninterference_moduloReleases`, and
+`acceptedPrivatePosmapPathOramPackageCapstone_noninterference_moduloReleases`.
+Each capstone takes the per-component safety premises (outcome and final
+public state modulo releases, boundary schedule, controller shape, release
+functions) as fields of its accepted-package evidence. The earlier
+full-`View_SGX` theorems (`paperMain_exact_backend_noninterference` and the
+capstones without the `_moduloReleases` suffix) assume every component,
+released or not, is determined by the public projection, so they cover only
+entrypoints without releases. Their evidence converts to the release form
+(`AcceptedExactPackageCapstoneEvidence.moduloReleases` and its Path ORAM
+analogues), and without declared releases the erasure is the identity
+(`PaperMainViewSGX.withoutReleases_eq_self`).
 
 ## Deployment Theorem
 
@@ -82,23 +134,29 @@ View_SGX(c) =
   ( public_outcome(c),
     boundary_schedule(c),
     storage_trace(c),
-    micro_trace(c) )
+    micro_trace(c),
+    final_public_state_rollback(c),
+    release_functions(c) )
 ```
 
 The components are interpreted as follows:
 
-- `public_outcome` is exact: entrypoint id, public arguments, termination
-  status, declared status policy, return shape, return policy, any public or
-  declassified return payload, encrypted-return ciphertext evidence,
-  declassification labels, public-state declassification labels, and modeled
-  public gas (cost model `uo-modeled-resource-cost-v1`: a modeled resource cost,
-  not stock EVM gas; there is no EVM gas schedule or bytecode backend).
+- `public_outcome` is exact: entrypoint id, public arguments, public
+  environment, termination status, declared status policy, return shape,
+  return policy, any public or declassified return payload, encrypted-return
+  ciphertext evidence, declassification labels, and modeled public gas (cost
+  model `uo-modeled-resource-cost-v1`: a modeled resource cost, not stock EVM
+  gas; there is no EVM gas schedule or bytecode backend).
 - `boundary_schedule` is the exact enclave boundary sequence.
 - `storage_trace` is exact for exact backends and related through the
   proof-grade Path ORAM route.
 - `micro_trace` is SGX-specific and is normalized/simulated from
   `L_sgx_micro`; the theorem does not claim raw page-id or full micro-event
   equality.
+- `final_public_state_rollback` holds the initial, candidate, and committed
+  public-state digests, the public delta digest, and the abort/rollback flag.
+- `release_functions` names the declared release functions of the admitted
+  package.
 
 The concrete SGX/TEE observer pins live in
 [`runtime/tee-observer.md`](./runtime/tee-observer.md).

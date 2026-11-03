@@ -65,13 +65,14 @@ const CLAIM_ENTRIES: &[ClaimEntry] = &[
     ClaimEntry {
         id: "paper-update-obliviousness-theorem",
         category: "claim",
-        text: "For every admitted package the execution's normalized hostile-host observer satisfies the paper update-obliviousness theorem against the stated observer and the artifact-declared declassification policy.",
+        text: "For every admitted package, two executions with the same public projection have equal normalized hostile-host observations outside the artifact-declared releases (status, plaintext return, encrypted-return ciphertext): exactly for the exact backends, and up to the Path ORAM storage relation on the proof-grade Path ORAM routes.",
         status: STATUS_LEAN_PROVED,
         doc_anchor: "update-obliviousness theorem",
         source_files: &["crates/uo-core/src/lib.rs"],
         lean_modules: &[
             "proof/lean/UOToolchain/ProofGradeRoot.lean",
             "proof/lean/UOToolchain/PaperMainTheorem.lean",
+            "proof/lean/UOToolchain/PaperMainReleases.lean",
         ],
         runtime_compiler_files: &["runtime/uo-evm/src/lib.rs"],
         benchmark_result_files: &["results/bridge_validation.json", "results/trace_equivalence.json"],
