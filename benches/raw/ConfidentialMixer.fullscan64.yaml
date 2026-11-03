@@ -4,7 +4,8 @@ entrypoints:
     secret_args: [commitment, amount]
     confidential: true
     returns: forbidden
-    status: public
+    status: declassified
+    declassifies: [success]
   withdraw(bytes32,uint256):
     secret_args: [commitment, amount]
     confidential: true

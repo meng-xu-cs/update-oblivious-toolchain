@@ -39,6 +39,13 @@ Rejected:
 - multi-expression internal functions beyond single-expression pure/view helpers
 - multiple return values
 - integer widths other than `uint256`
+- in confidential entrypoints, indexing a local or parameter array with
+  anything but a compile-time constant below its length. An out-of-bounds read
+  of such an array fails the whole call, so a secret index would reveal
+  whether it is in bounds. Loops unroll to constant indices, so loops over
+  arrays are accepted; selecting an element by a secret index needs an explicit
+  loop. State arrays are not affected: an out-of-bounds state-array read
+  yields the zero value
 
 The accepted and rejected lists above are exercised by an executable admission
 matrix: `results/admission_matrix.json` compiles and runs a case for every
@@ -62,6 +69,11 @@ Sidecar metadata requirements:
 - every entrypoint must declare `status` as `public` or `declassified`
 - `returns: declassified` requires `declassifies: [return]`, and
   `status: declassified` requires `declassifies: [success]`
+- an entrypoint whose success/abort status depends on secrets must declare
+  `status: declassified`. Besides `require`/`abortIf` on secret-dependent
+  conditions, this includes every write to a confidential map: a full bounded
+  map aborts a write of a new key, and whether a key is new depends on the
+  map's confidential contents, even when the key itself is public
 - `returns: encrypted_to_client` must not declare `declassifies: [return]`;
   the host-visible outcome contains ciphertext, nonce, AAD hash, and session
   binding evidence, not the plaintext return

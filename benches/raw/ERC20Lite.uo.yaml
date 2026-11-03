@@ -3,12 +3,14 @@ entrypoints:
   mint(address,uint256):
     confidential: true
     returns: forbidden
-    status: public
+    status: declassified
+    declassifies: [success]
   approve(address,address,uint256):
     secret_args: [owner, spender, amount]
     confidential: true
     returns: forbidden
-    status: public
+    status: declassified
+    declassifies: [success]
   transfer(address,address,uint256):
     secret_args: [from, to, amount]
     confidential: true

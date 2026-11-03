@@ -1,6 +1,6 @@
 {
   "accepted": true,
-  "accepted_feature_count": 12,
+  "accepted_feature_count": 13,
   "accepted_features": [
     {
       "category": "scalar",
@@ -80,6 +80,17 @@
       "runs": true
     },
     {
+      "category": "fixed-array",
+      "compiles": true,
+      "detail": "",
+      "entrypoint": "f(uint256[4])",
+      "expectation": "accepted",
+      "feature": "fixed-size local array read with constant or loop-unrolled indices",
+      "matches_expectation": true,
+      "mode": "uo",
+      "runs": true
+    },
+    {
       "category": "struct",
       "compiles": true,
       "detail": "",
@@ -135,7 +146,7 @@
       "runs": true
     }
   ],
-  "rejected_feature_count": 23,
+  "rejected_feature_count": 24,
   "rejected_features": [
     {
       "category": "inline-assembly",
@@ -377,6 +388,17 @@
       "feature": "unsupported lvalue / assignment target",
       "matches_expectation": true,
       "mode": "raw",
+      "rejected": true
+    },
+    {
+      "category": "local-array-index",
+      "diagnostic": "entrypoint f(uint256[4],uint256) indexes local array xs with i, which is not a compile-time constant below its length 4; in a confidential entrypoint an out-of-bounds index fails the call and would reveal a secret index (loop indices unroll to constants; select by a secret index with an explicit loop)",
+      "diagnostic_names_feature": true,
+      "expectation": "rejected",
+      "expected_diagnostic_substring": "not a compile-time constant below its length",
+      "feature": "non-constant local array index in a confidential entrypoint",
+      "matches_expectation": true,
+      "mode": "uo",
       "rejected": true
     },
     {

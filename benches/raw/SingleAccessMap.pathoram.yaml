@@ -4,17 +4,20 @@ entrypoints:
     secret_args: [key, value]
     confidential: true
     returns: forbidden
-    status: public
+    status: declassified
+    declassifies: [success]
   clear(bytes32):
     secret_args: [key]
     confidential: true
     returns: forbidden
-    status: public
+    status: declassified
+    declassifies: [success]
   add(bytes32,uint256):
     secret_args: [key, delta]
     confidential: true
     returns: forbidden
-    status: public
+    status: declassified
+    declassifies: [success]
   read(bytes32):
     secret_args: [key]
     confidential: true

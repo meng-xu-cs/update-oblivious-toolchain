@@ -5,13 +5,13 @@
     "source_language": "uo-solidity-like-dsl-v1",
     "semantics_profile": "uo-evm-modular256-v1",
     "source_sha256": "189206eda78843b786e1835056ddce154d2784db22bc36a427f784e1fbcf4b84",
-    "metadata_sha256": "ef27bce9448440afadc40409ea50ade9d09a71aac668f8357cfb318987ed70c3",
-    "raw_metadata_sha256": "44010bef4165a6a2e176a62766528d71f3d4ba146ed5a195b2b3ab00b64e8767",
-    "metadata_canonicalization_sha256": "f0077e128cc0ff19ef9169fc2872b968e5e3f653bcfe0f07d113816a647ff086",
+    "metadata_sha256": "7243632b9454979d64fdd778a342928427e317985247adf326ca34b18eb9cb56",
+    "raw_metadata_sha256": "e22476725da2f90bec1b871ae13f245936de63563f99d2af0dbaa30cc5850dc6",
+    "metadata_canonicalization_sha256": "fbf9767001ffba5f6dedd2456767f2da4785be497f4d0a8778a5f52bafd2dcc7",
     "compilation_mode": "uo",
     "compiler_version": "0.1.0",
     "toolchain_manifest_sha256": "9de15f6bbcb99dceca503fa32167048fdada0537f6c3ec1389363f301ddbb651",
-    "package_sha256": "ea4a572d7120256a2d3e3c8c499abd9ff4f507bf07e264c5b4c5180e014e6e52"
+    "package_sha256": "a872a19df4ea04179be3fbf2901c55e6b55724a5bf2c4c20f1157fdd7215830c"
   },
   "contract": {
     "contract": "ERC20Lite",
@@ -1846,8 +1846,10 @@
           "max_stack_words": 65,
           "max_hash_part_bytes": 20,
           "returns": "forbidden",
-          "status": "public",
-          "declassifies": [],
+          "status": "declassified",
+          "declassifies": [
+            "success"
+          ],
           "public_state_declassifies": [],
           "confidential_program": {
             "entrypoint_id": "approve(address,address,uint256)",
@@ -2105,8 +2107,10 @@
           "max_stack_words": 64,
           "max_hash_part_bytes": 0,
           "returns": "forbidden",
-          "status": "public",
-          "declassifies": [],
+          "status": "declassified",
+          "declassifies": [
+            "success"
+          ],
           "public_state_declassifies": [],
           "confidential_program": {
             "entrypoint_id": "mint(address,uint256)",

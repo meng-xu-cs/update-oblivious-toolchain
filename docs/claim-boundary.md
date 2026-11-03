@@ -70,6 +70,14 @@ completes and returns 5 and one that aborts on an insufficient secret balance
 must have the same storage trace, schedule, and gas; only the released status
 and return value may differ.
 
+Which statuses are released is checked by the compiler, not left to the
+sidecar author: an entrypoint whose success/abort status depends on secrets
+must declare `status: declassified`. That includes every entrypoint that writes
+a confidential map, because a full bounded map aborts a write of a new key and
+whether a key is new depends on the map's confidential contents; for example,
+`ConfidentialMixer.deposit` declares `status: declassified` for this reason
+(see [`supported-subset.md`](./supported-subset.md)).
+
 The theorems are `paperMain_exact_backend_noninterference_moduloReleases`,
 `paperMain_pathOramLocalPosmapV1_noninterference_moduloReleases`, and
 `paperMain_pathOramPrivatePosmapV1_noninterference_moduloReleases`, with the

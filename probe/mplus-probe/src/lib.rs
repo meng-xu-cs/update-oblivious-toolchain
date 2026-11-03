@@ -49063,6 +49063,51 @@ bounds:
         },
     });
     cases.push(AdmissionCase {
+        feature: "fixed-size local array read with constant or loop-unrolled indices",
+        category: "fixed-array",
+        mode: ProgramMode::Uo,
+        source: r#"pragma solidity ^0.8.0;
+contract C {
+    uint256 private last;
+    function f(uint256[4] memory xs) public {
+        uint256 acc = xs[3];
+        for (uint256 j = 0; j < 3; j++) {
+            acc = acc + xs[j];
+        }
+        last = acc;
+    }
+}
+"#,
+        metadata: r#"contract: C
+entrypoints:
+  f(uint256[4]):
+    secret_args: [xs]
+    confidential: true
+    returns: forbidden
+    status: public
+state:
+  last:
+    kind: cell
+    value: uint256
+    backend: full_scan
+    confidential: true
+bounds:
+  loops: {}
+"#,
+        expectation: AcceptedRuns {
+            entrypoint: "f(uint256[4])",
+            args: vec![Value::Array(
+                vec![
+                    Value::uint(1),
+                    Value::uint(2),
+                    Value::uint(3),
+                    Value::uint(4),
+                ]
+                .into_boxed_slice(),
+            )],
+        },
+    });
+    cases.push(AdmissionCase {
         feature: "fixed-size struct of scalar fields (state projection)",
         category: "struct",
         mode: ProgramMode::Raw,
@@ -49109,13 +49154,16 @@ contract C {
     function f(bytes32 k, uint256 v) public { m[k] = v; }
 }
 "#,
+        // A full map aborts a write of a new key, so a confidential map write
+        // has a secret-dependent status and must declassify it.
         metadata: r#"contract: C
 entrypoints:
   f(bytes32,uint256):
     secret_args: [k, v]
     confidential: true
     returns: forbidden
-    status: public
+    status: declassified
+    declassifies: [success]
 state:
   m:
     kind: map
@@ -49621,6 +49669,36 @@ contract C {
         metadata: ADMISSION_CELL_META,
         expectation: Rejected {
             names: "assignment target",
+        },
+    });
+    cases.push(AdmissionCase {
+        feature: "non-constant local array index in a confidential entrypoint",
+        category: "local-array-index",
+        mode: ProgramMode::Uo,
+        source: r#"pragma solidity ^0.8.0;
+contract C {
+    uint256 private last;
+    function f(uint256[4] memory xs, uint256 i) public { last = xs[i]; }
+}
+"#,
+        metadata: r#"contract: C
+entrypoints:
+  f(uint256[4],uint256):
+    secret_args: [xs, i]
+    confidential: true
+    returns: forbidden
+    status: public
+state:
+  last:
+    kind: cell
+    value: uint256
+    backend: full_scan
+    confidential: true
+bounds:
+  loops: {}
+"#,
+        expectation: Rejected {
+            names: "not a compile-time constant below its length",
         },
     });
     cases.push(AdmissionCase {

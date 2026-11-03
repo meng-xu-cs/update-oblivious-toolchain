@@ -74,7 +74,7 @@
   "scenarios": [
     {
       "accepted": false,
-      "artifact_json_bytes": 11446,
+      "artifact_json_bytes": 11491,
       "artifact_kind": "proofgrade_translation_artifacts",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -83,11 +83,11 @@
       "mutation": "increment manifest public_gas_budget while keeping source artifact fixed",
       "rejected": true,
       "scenario": "translation/public_gas_budget_drift",
-      "source_artifact_json_bytes": 11446
+      "source_artifact_json_bytes": 11491
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 11190,
+      "artifact_json_bytes": 11235,
       "artifact_kind": "proofgrade_translation_artifacts",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -97,7 +97,7 @@
       "object_id": 1,
       "rejected": true,
       "scenario": "translation/confidential_raw_kernel_target",
-      "source_artifact_json_bytes": 11190
+      "source_artifact_json_bytes": 11235
     },
     {
       "accepted": false,
@@ -112,7 +112,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 3565,
+      "artifact_json_bytes": 3580,
       "artifact_kind": "runtime_controller_observer_certificate",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -139,7 +139,7 @@
         },
         {
           "accepted": false,
-          "artifact_json_bytes": 3230,
+          "artifact_json_bytes": 3245,
           "field": "boundary_schedule",
           "lean_stderr": "uncaught exception: failed to validate runtime controller observer certificate: UOToolchain.ImportedRuntimeControllerObserverCertificate.boundary_schedule: expected JSON array, got 'null'",
           "lean_stdout": "",
@@ -147,7 +147,7 @@
         },
         {
           "accepted": false,
-          "artifact_json_bytes": 2896,
+          "artifact_json_bytes": 2911,
           "field": "controller_shape",
           "lean_stderr": "uncaught exception: failed to validate runtime controller observer certificate: UOToolchain.ImportedRuntimeControllerObserverCertificate.controller_shape: UOToolchain.ImportedSgxControllerShapeTrace.boundary_event_budget: Natural number expected",
           "lean_stdout": "",
@@ -155,7 +155,7 @@
         },
         {
           "accepted": false,
-          "artifact_json_bytes": 1539,
+          "artifact_json_bytes": 1554,
           "field": "normalized_micro_trace",
           "lean_stderr": "uncaught exception: failed to validate runtime controller observer certificate: UOToolchain.ImportedRuntimeControllerObserverCertificate.normalized_micro_trace: UOToolchain.ImportedNormalizedMicroTrace.page_trace: expected JSON array, got 'null'",
           "lean_stdout": "",
@@ -163,7 +163,7 @@
         },
         {
           "accepted": false,
-          "artifact_json_bytes": 3347,
+          "artifact_json_bytes": 3362,
           "field": "controller_certificate",
           "lean_stderr": "uncaught exception: failed to validate runtime controller observer certificate: UOToolchain.ImportedRuntimeControllerObserverCertificate.controller_certificate: UOToolchain.ImportedRuntimeControllerCertificate.entry_input_len: Natural number expected",
           "lean_stdout": "",
@@ -171,7 +171,7 @@
         },
         {
           "accepted": false,
-          "artifact_json_bytes": 3526,
+          "artifact_json_bytes": 3541,
           "field": "public_outcome.entrypoint_id",
           "lean_stderr": "uncaught exception: failed to validate runtime controller observer certificate: UOToolchain.ImportedRuntimeControllerObserverCertificate.public_outcome: JSON object fields mismatch: missing=entrypoint_id; unknown=",
           "lean_stdout": "",
@@ -179,7 +179,7 @@
         },
         {
           "accepted": false,
-          "artifact_json_bytes": 3548,
+          "artifact_json_bytes": 3563,
           "field": "public_outcome.public_args",
           "lean_stderr": "uncaught exception: failed to validate runtime controller observer certificate: UOToolchain.ImportedRuntimeControllerObserverCertificate.public_outcome: JSON object fields mismatch: missing=public_args; unknown=",
           "lean_stdout": "",
@@ -187,7 +187,7 @@
         },
         {
           "accepted": false,
-          "artifact_json_bytes": 3549,
+          "artifact_json_bytes": 3564,
           "field": "public_outcome.public_env",
           "lean_stderr": "uncaught exception: failed to validate runtime controller observer certificate: UOToolchain.ImportedRuntimeControllerObserverCertificate.public_outcome: JSON object fields mismatch: missing=public_env; unknown=",
           "lean_stdout": "",
@@ -195,7 +195,7 @@
         },
         {
           "accepted": false,
-          "artifact_json_bytes": 3539,
+          "artifact_json_bytes": 3554,
           "field": "public_outcome.termination_status",
           "lean_stderr": "uncaught exception: failed to validate runtime controller observer certificate: UOToolchain.ImportedRuntimeControllerObserverCertificate.public_outcome: JSON object fields mismatch: missing=termination_status; unknown=",
           "lean_stdout": "",
@@ -203,7 +203,7 @@
         },
         {
           "accepted": false,
-          "artifact_json_bytes": 3540,
+          "artifact_json_bytes": 3549,
           "field": "public_outcome.status_policy",
           "lean_stderr": "uncaught exception: failed to validate runtime controller observer certificate: UOToolchain.ImportedRuntimeControllerObserverCertificate.public_outcome: JSON object fields mismatch: missing=status_policy; unknown=",
           "lean_stdout": "",
@@ -211,7 +211,7 @@
         },
         {
           "accepted": false,
-          "artifact_json_bytes": 3507,
+          "artifact_json_bytes": 3522,
           "field": "public_outcome.output_shape",
           "lean_stderr": "uncaught exception: failed to validate runtime controller observer certificate: UOToolchain.ImportedRuntimeControllerObserverCertificate.public_outcome: JSON object fields mismatch: missing=output_shape; unknown=",
           "lean_stdout": "",
@@ -219,7 +219,7 @@
         },
         {
           "accepted": false,
-          "artifact_json_bytes": 3537,
+          "artifact_json_bytes": 3552,
           "field": "public_outcome.return_policy",
           "lean_stderr": "uncaught exception: failed to validate runtime controller observer certificate: UOToolchain.ImportedRuntimeControllerObserverCertificate.public_outcome: JSON object fields mismatch: missing=return_policy; unknown=",
           "lean_stdout": "",
@@ -227,7 +227,7 @@
         },
         {
           "accepted": false,
-          "artifact_json_bytes": 3543,
+          "artifact_json_bytes": 3558,
           "field": "public_outcome.return_payload",
           "lean_stderr": "uncaught exception: failed to validate runtime controller observer certificate: UOToolchain.ImportedRuntimeControllerObserverCertificate.public_outcome: JSON object fields mismatch: missing=return_payload; unknown=",
           "lean_stdout": "",
@@ -235,7 +235,7 @@
         },
         {
           "accepted": false,
-          "artifact_json_bytes": 3533,
+          "artifact_json_bytes": 3548,
           "field": "public_outcome.encrypted_return_payload",
           "lean_stderr": "uncaught exception: failed to validate runtime controller observer certificate: UOToolchain.ImportedRuntimeControllerObserverCertificate.public_outcome: JSON object fields mismatch: missing=encrypted_return_payload; unknown=",
           "lean_stdout": "",
@@ -243,7 +243,7 @@
         },
         {
           "accepted": false,
-          "artifact_json_bytes": 3547,
+          "artifact_json_bytes": 3553,
           "field": "public_outcome.declassifies",
           "lean_stderr": "uncaught exception: failed to validate runtime controller observer certificate: UOToolchain.ImportedRuntimeControllerObserverCertificate.public_outcome: JSON object fields mismatch: missing=declassifies; unknown=",
           "lean_stdout": "",
@@ -251,7 +251,7 @@
         },
         {
           "accepted": false,
-          "artifact_json_bytes": 3549,
+          "artifact_json_bytes": 3564,
           "field": "public_outcome.gas_used",
           "lean_stderr": "uncaught exception: failed to validate runtime controller observer certificate: UOToolchain.ImportedRuntimeControllerObserverCertificate.public_outcome: JSON object fields mismatch: missing=gas_used; unknown=",
           "lean_stdout": "",
@@ -675,7 +675,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 17134,
+      "artifact_json_bytes": 17149,
       "artifact_kind": "proofgrade_runtime_confidential_core_bundle",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -689,7 +689,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 17072,
+      "artifact_json_bytes": 17087,
       "artifact_kind": "proofgrade_runtime_confidential_core_slot_bundle",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -703,7 +703,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 17440,
+      "artifact_json_bytes": 17455,
       "artifact_kind": "proofgrade_runtime_confidential_core_lowering_bundle",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -717,7 +717,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 27925,
+      "artifact_json_bytes": 27940,
       "artifact_kind": "proofgrade_runtime_confidential_core_shell_boundary_lowering_bundle",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -731,7 +731,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 27557,
+      "artifact_json_bytes": 27572,
       "artifact_kind": "proofgrade_runtime_confidential_core_shell_boundary_slot_bundle",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -745,7 +745,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 28012,
+      "artifact_json_bytes": 28027,
       "artifact_kind": "proofgrade_runtime_confidential_core_kernel_interface_slot_bundle",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -759,7 +759,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 28012,
+      "artifact_json_bytes": 28027,
       "artifact_kind": "proofgrade_runtime_confidential_core_kernel_interface_slot_finish_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1614,7 +1614,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 28160,
+      "artifact_json_bytes": 28175,
       "artifact_kind": "proofgrade_runtime_kernel_slot_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1626,7 +1626,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 236387,
+      "artifact_json_bytes": 236552,
       "artifact_kind": "proofgrade_runtime_confidential_proof_bundle_family",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1640,7 +1640,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 236387,
+      "artifact_json_bytes": 236552,
       "artifact_kind": "proofgrade_runtime_confidential_proof_bundle_family",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1654,7 +1654,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 236547,
+      "artifact_json_bytes": 236712,
       "artifact_kind": "proofgrade_runtime_confidential_proof_bundle_family",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1666,7 +1666,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 236536,
+      "artifact_json_bytes": 236701,
       "artifact_kind": "proofgrade_runtime_confidential_proof_bundle_family_assurance",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1678,7 +1678,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 236224,
+      "artifact_json_bytes": 236389,
       "artifact_kind": "proofgrade_runtime_confidential_proof_bundle_family_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1690,7 +1690,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 236535,
+      "artifact_json_bytes": 236700,
       "artifact_kind": "proofgrade_runtime_confidential_proof_bundle_family_kernel_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1702,7 +1702,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 236526,
+      "artifact_json_bytes": 236691,
       "artifact_kind": "proofgrade_runtime_confidential_proof_bundle_family_slot_assurance",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1714,7 +1714,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 236387,
+      "artifact_json_bytes": 236552,
       "artifact_kind": "proofgrade_runtime_confidential_proof_bundle_family_slot_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1728,7 +1728,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 236387,
+      "artifact_json_bytes": 236552,
       "artifact_kind": "proofgrade_runtime_confidential_proof_bundle_family_finish_slot_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1742,7 +1742,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 236535,
+      "artifact_json_bytes": 236700,
       "artifact_kind": "proofgrade_runtime_confidential_proof_bundle_family_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1754,7 +1754,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 16903,
+      "artifact_json_bytes": 16918,
       "artifact_kind": "proofgrade_runtime_refinement_witness",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1766,7 +1766,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 16903,
+      "artifact_json_bytes": 16918,
       "artifact_kind": "proofgrade_runtime_kernel_interface_witness",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1778,7 +1778,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 16903,
+      "artifact_json_bytes": 16918,
       "artifact_kind": "proofgrade_runtime_kernel_interface_confinement_boundary_witness",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5332,7 +5332,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 16727,
+      "artifact_json_bytes": 16742,
       "artifact_kind": "proofgrade_runtime_trusted_kernel_bundle",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5344,7 +5344,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 16738,
+      "artifact_json_bytes": 16753,
       "artifact_kind": "proofgrade_runtime_trusted_kernel_bundle",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5356,7 +5356,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 135174,
+      "artifact_json_bytes": 135294,
       "artifact_kind": "runtime_seeded_pathoram_witness_family",
       "benchmark": "SingleAccessMap/pathoram/put-seeded",
       "entrypoint": "put(bytes32,uint256)",
@@ -5368,7 +5368,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 135835,
+      "artifact_json_bytes": 135970,
       "artifact_kind": "proofgrade_seeded_runtime_paper_main_family_bundle",
       "benchmark": "SingleAccessMap/pathoram/put-seeded",
       "entrypoint": "put(bytes32,uint256)",
@@ -5380,7 +5380,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 135835,
+      "artifact_json_bytes": 135970,
       "artifact_kind": "proofgrade_seeded_runtime_paper_main_family_boundary",
       "benchmark": "SingleAccessMap/pathoram/put-seeded",
       "entrypoint": "put(bytes32,uint256)",
@@ -5399,7 +5399,7 @@
       "field_checks": [
         {
           "accepted": false,
-          "artifact_json_bytes": 652,
+          "artifact_json_bytes": 667,
           "field": "family",
           "lean_stderr": "uncaught exception: failed to validate proof-grade seeded runtime paper-main family bundle: UOToolchain.ImportedSeededRuntimePaperMainFamilyBundle.family: UOToolchain.ImportedSeededRuntimePathOramWitnessFamily.seed_count: Natural number expected",
           "lean_stdout": "",
@@ -5407,7 +5407,7 @@
         },
         {
           "accepted": false,
-          "artifact_json_bytes": 135519,
+          "artifact_json_bytes": 135639,
           "field": "public_outcome",
           "lean_stderr": "uncaught exception: failed to validate proof-grade seeded runtime paper-main family bundle: UOToolchain.ImportedSeededRuntimePaperMainFamilyBundle.public_outcome: expected JSON object",
           "lean_stdout": "",
@@ -5415,7 +5415,7 @@
         },
         {
           "accepted": false,
-          "artifact_json_bytes": 135500,
+          "artifact_json_bytes": 135635,
           "field": "boundary_schedule",
           "lean_stderr": "uncaught exception: failed to validate proof-grade seeded runtime paper-main family bundle: UOToolchain.ImportedSeededRuntimePaperMainFamilyBundle.boundary_schedule: expected JSON array, got 'null'",
           "lean_stdout": "",
@@ -5423,7 +5423,7 @@
         },
         {
           "accepted": false,
-          "artifact_json_bytes": 135796,
+          "artifact_json_bytes": 135931,
           "field": "public_outcome.entrypoint_id",
           "lean_stderr": "uncaught exception: failed to validate proof-grade seeded runtime paper-main family bundle: UOToolchain.ImportedSeededRuntimePaperMainFamilyBundle.public_outcome: JSON object fields mismatch: missing=entrypoint_id; unknown=",
           "lean_stdout": "",
@@ -5431,7 +5431,7 @@
         },
         {
           "accepted": false,
-          "artifact_json_bytes": 135818,
+          "artifact_json_bytes": 135953,
           "field": "public_outcome.public_args",
           "lean_stderr": "uncaught exception: failed to validate proof-grade seeded runtime paper-main family bundle: UOToolchain.ImportedSeededRuntimePaperMainFamilyBundle.public_outcome: JSON object fields mismatch: missing=public_args; unknown=",
           "lean_stdout": "",
@@ -5439,7 +5439,7 @@
         },
         {
           "accepted": false,
-          "artifact_json_bytes": 135819,
+          "artifact_json_bytes": 135954,
           "field": "public_outcome.public_env",
           "lean_stderr": "uncaught exception: failed to validate proof-grade seeded runtime paper-main family bundle: UOToolchain.ImportedSeededRuntimePaperMainFamilyBundle.public_outcome: JSON object fields mismatch: missing=public_env; unknown=",
           "lean_stdout": "",
@@ -5447,7 +5447,7 @@
         },
         {
           "accepted": false,
-          "artifact_json_bytes": 135809,
+          "artifact_json_bytes": 135944,
           "field": "public_outcome.termination_status",
           "lean_stderr": "uncaught exception: failed to validate proof-grade seeded runtime paper-main family bundle: UOToolchain.ImportedSeededRuntimePaperMainFamilyBundle.public_outcome: JSON object fields mismatch: missing=termination_status; unknown=",
           "lean_stdout": "",
@@ -5455,7 +5455,7 @@
         },
         {
           "accepted": false,
-          "artifact_json_bytes": 135810,
+          "artifact_json_bytes": 135939,
           "field": "public_outcome.status_policy",
           "lean_stderr": "uncaught exception: failed to validate proof-grade seeded runtime paper-main family bundle: UOToolchain.ImportedSeededRuntimePaperMainFamilyBundle.public_outcome: JSON object fields mismatch: missing=status_policy; unknown=",
           "lean_stdout": "",
@@ -5463,7 +5463,7 @@
         },
         {
           "accepted": false,
-          "artifact_json_bytes": 135777,
+          "artifact_json_bytes": 135912,
           "field": "public_outcome.output_shape",
           "lean_stderr": "uncaught exception: failed to validate proof-grade seeded runtime paper-main family bundle: UOToolchain.ImportedSeededRuntimePaperMainFamilyBundle.public_outcome: JSON object fields mismatch: missing=output_shape; unknown=",
           "lean_stdout": "",
@@ -5471,7 +5471,7 @@
         },
         {
           "accepted": false,
-          "artifact_json_bytes": 135807,
+          "artifact_json_bytes": 135942,
           "field": "public_outcome.return_policy",
           "lean_stderr": "uncaught exception: failed to validate proof-grade seeded runtime paper-main family bundle: UOToolchain.ImportedSeededRuntimePaperMainFamilyBundle.public_outcome: JSON object fields mismatch: missing=return_policy; unknown=",
           "lean_stdout": "",
@@ -5479,7 +5479,7 @@
         },
         {
           "accepted": false,
-          "artifact_json_bytes": 135813,
+          "artifact_json_bytes": 135948,
           "field": "public_outcome.return_payload",
           "lean_stderr": "uncaught exception: failed to validate proof-grade seeded runtime paper-main family bundle: UOToolchain.ImportedSeededRuntimePaperMainFamilyBundle.public_outcome: JSON object fields mismatch: missing=return_payload; unknown=",
           "lean_stdout": "",
@@ -5487,7 +5487,7 @@
         },
         {
           "accepted": false,
-          "artifact_json_bytes": 135803,
+          "artifact_json_bytes": 135938,
           "field": "public_outcome.encrypted_return_payload",
           "lean_stderr": "uncaught exception: failed to validate proof-grade seeded runtime paper-main family bundle: UOToolchain.ImportedSeededRuntimePaperMainFamilyBundle.public_outcome: JSON object fields mismatch: missing=encrypted_return_payload; unknown=",
           "lean_stdout": "",
@@ -5495,7 +5495,7 @@
         },
         {
           "accepted": false,
-          "artifact_json_bytes": 135817,
+          "artifact_json_bytes": 135943,
           "field": "public_outcome.declassifies",
           "lean_stderr": "uncaught exception: failed to validate proof-grade seeded runtime paper-main family bundle: UOToolchain.ImportedSeededRuntimePaperMainFamilyBundle.public_outcome: JSON object fields mismatch: missing=declassifies; unknown=",
           "lean_stdout": "",
@@ -5503,7 +5503,7 @@
         },
         {
           "accepted": false,
-          "artifact_json_bytes": 135819,
+          "artifact_json_bytes": 135954,
           "field": "public_outcome.gas_used",
           "lean_stderr": "uncaught exception: failed to validate proof-grade seeded runtime paper-main family bundle: UOToolchain.ImportedSeededRuntimePaperMainFamilyBundle.public_outcome: JSON object fields mismatch: missing=gas_used; unknown=",
           "lean_stdout": "",
@@ -5532,7 +5532,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 136160,
+      "artifact_json_bytes": 136295,
       "artifact_kind": "proofgrade_seeded_runtime_paper_main_slot_family_bundle",
       "benchmark": "SingleAccessMap/pathoram/put-seeded",
       "entrypoint": "put(bytes32,uint256)",
@@ -5544,7 +5544,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 136160,
+      "artifact_json_bytes": 136295,
       "artifact_kind": "proofgrade_seeded_runtime_paper_main_slot_boundary",
       "benchmark": "SingleAccessMap/pathoram/put-seeded",
       "entrypoint": "put(bytes32,uint256)",
@@ -5556,7 +5556,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 136171,
+      "artifact_json_bytes": 136306,
       "artifact_kind": "proofgrade_seeded_runtime_paper_main_slot_family_bundle",
       "benchmark": "SingleAccessMap/pathoram/put-seeded",
       "entrypoint": "put(bytes32,uint256)",
@@ -5568,7 +5568,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 136171,
+      "artifact_json_bytes": 136306,
       "artifact_kind": "proofgrade_seeded_runtime_paper_main_slot_boundary",
       "benchmark": "SingleAccessMap/pathoram/put-seeded",
       "entrypoint": "put(bytes32,uint256)",
@@ -5580,7 +5580,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 136011,
+      "artifact_json_bytes": 136146,
       "artifact_kind": "proofgrade_seeded_runtime_paper_main_slot_family_bundle",
       "benchmark": "SingleAccessMap/pathoram/put-seeded",
       "entrypoint": "put(bytes32,uint256)",
@@ -5599,7 +5599,7 @@
       "field_checks": [
         {
           "accepted": false,
-          "artifact_json_bytes": 977,
+          "artifact_json_bytes": 992,
           "field": "family",
           "lean_stderr": "uncaught exception: failed to validate proof-grade seeded runtime paper-main slot family bundle: UOToolchain.ImportedSeededRuntimePaperMainSlotFamilyBundle.family: UOToolchain.ImportedSeededRuntimePathOramWitnessFamily.seed_count: Natural number expected",
           "lean_stdout": "",
@@ -5607,7 +5607,7 @@
         },
         {
           "accepted": false,
-          "artifact_json_bytes": 135844,
+          "artifact_json_bytes": 135964,
           "field": "public_outcome",
           "lean_stderr": "uncaught exception: failed to validate proof-grade seeded runtime paper-main slot family bundle: UOToolchain.ImportedSeededRuntimePaperMainSlotFamilyBundle.public_outcome: expected JSON object",
           "lean_stdout": "",
@@ -5615,7 +5615,7 @@
         },
         {
           "accepted": false,
-          "artifact_json_bytes": 135825,
+          "artifact_json_bytes": 135960,
           "field": "boundary_schedule",
           "lean_stderr": "uncaught exception: failed to validate proof-grade seeded runtime paper-main slot family bundle: UOToolchain.ImportedSeededRuntimePaperMainSlotFamilyBundle.boundary_schedule: expected JSON array, got 'null'",
           "lean_stdout": "",
@@ -5623,7 +5623,7 @@
         },
         {
           "accepted": false,
-          "artifact_json_bytes": 136133,
+          "artifact_json_bytes": 136268,
           "field": "opcode_trace",
           "lean_stderr": "uncaught exception: failed to validate proof-grade seeded runtime paper-main slot family bundle: UOToolchain.ImportedSeededRuntimePaperMainSlotFamilyBundle.opcode_trace: expected JSON array, got 'null'",
           "lean_stdout": "",
@@ -5631,7 +5631,7 @@
         },
         {
           "accepted": false,
-          "artifact_json_bytes": 135862,
+          "artifact_json_bytes": 135997,
           "field": "confidential_slot_program",
           "lean_stderr": "uncaught exception: failed to validate proof-grade seeded runtime paper-main slot family bundle: UOToolchain.ImportedSeededRuntimePaperMainSlotFamilyBundle.confidential_slot_program: UOToolchain.ImportedConfidentialKernelSlotProgram.entrypoint_id: String expected",
           "lean_stdout": "",
@@ -5651,7 +5651,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 4322150,
+      "artifact_json_bytes": 4325990,
       "artifact_kind": "runtime_canonical_fresh_coin_witness_family",
       "benchmark": "SingleAccessMap/pathoram/put-fresh-coins",
       "entrypoint": "put(bytes32,uint256)",
@@ -5663,7 +5663,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 17178,
+      "artifact_json_bytes": 17193,
       "artifact_kind": "runtime_canonical_fresh_coin_theorem_input",
       "benchmark": "SingleAccessMap/pathoram/put-fresh-coins",
       "entrypoint": "put(bytes32,uint256)",
@@ -5675,7 +5675,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 276390,
+      "artifact_json_bytes": 276645,
       "artifact_kind": "runtime_seeded_pathoram_pair_certificate",
       "benchmark": "SingleAccessMap/pathoram/put-pair",
       "entrypoint": "put(bytes32,uint256)",
@@ -5687,7 +5687,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 8650343,
+      "artifact_json_bytes": 8658038,
       "artifact_kind": "runtime_canonical_pathoram_pair_certificate",
       "benchmark": "SingleAccessMap/pathoram/put-canonical-pair",
       "entrypoint": "put(bytes32,uint256)",
@@ -5699,7 +5699,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 8650343,
+      "artifact_json_bytes": 8658038,
       "artifact_kind": "runtime_canonical_pathoram_paper_pair_certificate",
       "benchmark": "SingleAccessMap/pathoram/put-canonical-pair",
       "entrypoint": "put(bytes32,uint256)",
@@ -5711,7 +5711,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 40395,
+      "artifact_json_bytes": 40440,
       "artifact_kind": "runtime_canonical_pathoram_pair_theorem_input",
       "benchmark": "SingleAccessMap/pathoram/put-canonical-pair",
       "entrypoint": "put(bytes32,uint256)",

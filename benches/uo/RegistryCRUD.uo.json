@@ -5,13 +5,13 @@
     "source_language": "uo-solidity-like-dsl-v1",
     "semantics_profile": "uo-evm-modular256-v1",
     "source_sha256": "c4bce1c020f6ec45575cdd30211d39a50374b557d0afa607415e7c0288466e70",
-    "metadata_sha256": "8ff9791b299f01a7722f2db94a0bb1435a02c16303b23ae972d8caad24aa3518",
-    "raw_metadata_sha256": "0479da13e0eb51b71f5ad126ddc121820dab213f73e63c4d80beb13fc5c09a85",
-    "metadata_canonicalization_sha256": "10b34e6f5a9cce8df4cf9bfadb7d808055aff4754998de152e034bd7077fa072",
+    "metadata_sha256": "756e50a7a6484cb60761e3826c076d95ab7d1707b74f0c12d97e3d5287934487",
+    "raw_metadata_sha256": "3e783f383e57c5ea00d9d5b325e76da7af359dc2faa1088a7e7a65e7e530b96d",
+    "metadata_canonicalization_sha256": "546b515536984f2a68d1f4546092449b9056586ee7d8ddacbd663879fb9eab4e",
     "compilation_mode": "uo",
     "compiler_version": "0.1.0",
     "toolchain_manifest_sha256": "9de15f6bbcb99dceca503fa32167048fdada0537f6c3ec1389363f301ddbb651",
-    "package_sha256": "9ab2512f5e18d1670a939b499ecc2e3ea814015a53c9d22658c751511a294c19"
+    "package_sha256": "de7f2f173375d5a3f1df81f93900f2d10314c5832781ac21ceb77059587724be"
   },
   "contract": {
     "contract": "RegistryCRUD",
@@ -721,8 +721,10 @@
           "max_stack_words": 64,
           "max_hash_part_bytes": 0,
           "returns": "forbidden",
-          "status": "public",
-          "declassifies": [],
+          "status": "declassified",
+          "declassifies": [
+            "success"
+          ],
           "public_state_declassifies": [],
           "confidential_program": {
             "entrypoint_id": "clear(bytes32)",
@@ -835,9 +837,10 @@
           "max_hash_part_bytes": 0,
           "return_canonical_len": 32,
           "returns": "declassified",
-          "status": "public",
+          "status": "declassified",
           "declassifies": [
-            "return"
+            "return",
+            "success"
           ],
           "public_state_declassifies": [],
           "confidential_program": {
@@ -1208,8 +1211,10 @@
           "max_stack_words": 64,
           "max_hash_part_bytes": 0,
           "returns": "forbidden",
-          "status": "public",
-          "declassifies": [],
+          "status": "declassified",
+          "declassifies": [
+            "success"
+          ],
           "public_state_declassifies": [],
           "confidential_program": {
             "entrypoint_id": "upsert(bytes32,uint256)",

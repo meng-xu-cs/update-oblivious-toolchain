@@ -5,13 +5,13 @@
     "source_language": "uo-solidity-like-dsl-v1",
     "semantics_profile": "uo-evm-modular256-v1",
     "source_sha256": "234fe8ee8ec1332afc02b3f7446ef82d93ed2c0d62180b88012be70e98a57262",
-    "metadata_sha256": "11c8313b114b27a33e2dcf6b6780a3e314f22a4fc6b4961b5c53f919d86b5495",
-    "raw_metadata_sha256": "1467e1514680888dd5ccb2442cfa9148bb35ed611e9524657a61c2bc10f30bb6",
-    "metadata_canonicalization_sha256": "53a9c58b301be4d380229e480fe63601767a90742cbd8583f160896a0442648d",
+    "metadata_sha256": "55d9e54b2ac2317946a532d0502884a56382338616ea85c942e9425e9f52b2c1",
+    "raw_metadata_sha256": "569e61e2c3b3dfe0a6730199a5ad363a098f4638526ca7c28b339b643d2dd996",
+    "metadata_canonicalization_sha256": "69a175b06b63a3f18b6423bc3783dc8cd50ed73b21ffdca623f6c1fc399eb272",
     "compilation_mode": "uo",
     "compiler_version": "0.1.0",
     "toolchain_manifest_sha256": "9de15f6bbcb99dceca503fa32167048fdada0537f6c3ec1389363f301ddbb651",
-    "package_sha256": "0d1e7dddda1d06339477f6f50d80b457162d85a46f4d49455461b2f47814db4d"
+    "package_sha256": "cee9df41ddc49afc20d6afc18c271b9e5aab19e0a7e4ecf3e000134d24d26532"
   },
   "contract": {
     "contract": "ConfidentialMixer",
@@ -955,8 +955,10 @@
           "max_stack_words": 65,
           "max_hash_part_bytes": 0,
           "returns": "forbidden",
-          "status": "public",
-          "declassifies": [],
+          "status": "declassified",
+          "declassifies": [
+            "success"
+          ],
           "public_state_declassifies": [],
           "confidential_program": {
             "entrypoint_id": "deposit(bytes32,uint256)",

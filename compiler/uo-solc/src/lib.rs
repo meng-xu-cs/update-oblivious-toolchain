@@ -510,6 +510,7 @@ fn lower_function(
             &Expr::Literal(Value::Bool(true)),
             &BTreeMap::new(),
         )?;
+        validate_confidential_local_array_indices(&signature, &lowered, &ctx.locals)?;
     }
     let secret_args = entry_meta
         .secret_args
@@ -2457,11 +2458,22 @@ fn collect_policy_sensitivity(
                 }
             }
             Statement::MapPut {
-                object_id: _,
+                object_id,
                 key,
                 value,
                 predicate,
             } => {
+                // A bounded map aborts a write of a new key when it is full,
+                // and whether a key is new depends on the map's confidential
+                // contents. Any write to a confidential map therefore makes
+                // the success/abort status secret-dependent.
+                if frontend
+                    .state_by_name
+                    .values()
+                    .any(|state| state.id == *object_id && state.confidential)
+                {
+                    sensitivity.status_sensitive = true;
+                }
                 collect_confidential_reads_in_expr(
                     key,
                     frontend,
@@ -3273,6 +3285,168 @@ fn render_statement(statement: &Statement) -> String {
     }
 }
 
+/// Indexing a local or parameter array with an out-of-bounds index is an
+/// evaluation error that fails the whole call. In a confidential entrypoint a
+/// secret index would therefore reveal, through the call's success, whether
+/// it is in bounds. After loop unrolling every such index must be a
+/// compile-time constant below the array's length. State arrays are not
+/// affected: an out-of-bounds state-array read yields the zero value.
+fn validate_confidential_local_array_indices(
+    signature: &str,
+    statements: &[Statement],
+    locals: &BTreeMap<String, Type>,
+) -> Result<()> {
+    for statement in statements {
+        match statement {
+            Statement::Declare { value, .. } | Statement::Assign { value, .. } => {
+                validate_local_array_indices_in_expr(signature, value, locals)?;
+            }
+            Statement::Require { cond } | Statement::AbortIf { cond } => {
+                validate_local_array_indices_in_expr(signature, cond, locals)?;
+            }
+            Statement::If {
+                cond,
+                then_body,
+                else_body,
+            } => {
+                validate_local_array_indices_in_expr(signature, cond, locals)?;
+                validate_confidential_local_array_indices(signature, then_body, locals)?;
+                validate_confidential_local_array_indices(signature, else_body, locals)?;
+            }
+            Statement::For {
+                start, end, body, ..
+            } => {
+                validate_local_array_indices_in_expr(signature, start, locals)?;
+                validate_local_array_indices_in_expr(signature, end, locals)?;
+                validate_confidential_local_array_indices(signature, body, locals)?;
+            }
+            Statement::CellSet {
+                value, predicate, ..
+            } => {
+                validate_local_array_indices_in_expr(signature, value, locals)?;
+                if let Some(predicate) = predicate {
+                    validate_local_array_indices_in_expr(signature, predicate, locals)?;
+                }
+            }
+            Statement::ArraySet {
+                index,
+                value,
+                predicate,
+                ..
+            } => {
+                validate_local_array_indices_in_expr(signature, index, locals)?;
+                validate_local_array_indices_in_expr(signature, value, locals)?;
+                if let Some(predicate) = predicate {
+                    validate_local_array_indices_in_expr(signature, predicate, locals)?;
+                }
+            }
+            Statement::MapPut {
+                key,
+                value,
+                predicate,
+                ..
+            } => {
+                validate_local_array_indices_in_expr(signature, key, locals)?;
+                validate_local_array_indices_in_expr(signature, value, locals)?;
+                if let Some(predicate) = predicate {
+                    validate_local_array_indices_in_expr(signature, predicate, locals)?;
+                }
+            }
+            Statement::Return { value } => {
+                if let Some(value) = value {
+                    validate_local_array_indices_in_expr(signature, value, locals)?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_local_array_indices_in_expr(
+    signature: &str,
+    expr: &Expr,
+    locals: &BTreeMap<String, Type>,
+) -> Result<()> {
+    match expr {
+        Expr::Literal(_) | Expr::Var(_) | Expr::CellGet { .. } => Ok(()),
+        Expr::Unary { expr, .. } => validate_local_array_indices_in_expr(signature, expr, locals),
+        Expr::Binary { lhs, rhs, .. } => {
+            validate_local_array_indices_in_expr(signature, lhs, locals)?;
+            validate_local_array_indices_in_expr(signature, rhs, locals)
+        }
+        Expr::Select {
+            cond,
+            when_true,
+            when_false,
+        } => {
+            validate_local_array_indices_in_expr(signature, cond, locals)?;
+            validate_local_array_indices_in_expr(signature, when_true, locals)?;
+            validate_local_array_indices_in_expr(signature, when_false, locals)
+        }
+        Expr::ArrayGet { index, .. } => {
+            validate_local_array_indices_in_expr(signature, index, locals)
+        }
+        Expr::MapGet { key, .. } => validate_local_array_indices_in_expr(signature, key, locals),
+        Expr::StructField { base, .. } => {
+            validate_local_array_indices_in_expr(signature, base, locals)
+        }
+        Expr::Keccak256 { parts } => parts
+            .iter()
+            .try_for_each(|part| validate_local_array_indices_in_expr(signature, part, locals)),
+        Expr::ArrayIndex { base, index } => {
+            validate_local_array_indices_in_expr(signature, base, locals)?;
+            validate_local_array_indices_in_expr(signature, index, locals)?;
+            let length = match static_expr_type(base, locals) {
+                Some(Type::Array(_, length)) => length,
+                _ => bail!(
+                    "entrypoint {} indexes {} whose array length is not known at compile time; confidential entrypoints may index only local or parameter arrays of fixed length",
+                    signature,
+                    render_expr(base)
+                ),
+            };
+            let in_bounds = compile_time_loop_bound_uint(index, &BTreeMap::new())
+                .is_some_and(|value| value < Uint256::from(length));
+            if !in_bounds {
+                bail!(
+                    "entrypoint {} indexes local array {} with {}, which is not a compile-time constant below its length {}; in a confidential entrypoint an out-of-bounds index fails the call and would reveal a secret index (loop indices unroll to constants; select by a secret index with an explicit loop)",
+                    signature,
+                    render_expr(base),
+                    render_expr(index),
+                    length
+                );
+            }
+            Ok(())
+        }
+    }
+}
+
+/// Static type of the expressions that can denote a local or parameter array.
+fn static_expr_type(expr: &Expr, locals: &BTreeMap<String, Type>) -> Option<Type> {
+    match expr {
+        Expr::Var(name) => locals.get(name).cloned(),
+        Expr::ArrayIndex { base, .. } => match static_expr_type(base, locals)? {
+            Type::Array(element, _) => Some(*element),
+            _ => None,
+        },
+        Expr::StructField { base, field } => match static_expr_type(base, locals)? {
+            Type::Struct(fields) => fields
+                .into_iter()
+                .find(|candidate| &candidate.name == field)
+                .map(|candidate| candidate.ty),
+            _ => None,
+        },
+        Expr::Select {
+            when_true,
+            when_false,
+            ..
+        } => {
+            let ty = static_expr_type(when_true, locals)?;
+            (static_expr_type(when_false, locals)? == ty).then_some(ty)
+        }
+        _ => None,
+    }
+}
+
 fn render_expr(expr: &Expr) -> String {
     match expr {
         Expr::Literal(value) => value.to_string(),
@@ -3616,7 +3790,8 @@ entrypoints:
     confidential: true
     secret_args: [owner, amount]
     returns: forbidden
-    status: public
+    status: declassified
+    declassifies: [success]
 state:
   balances:
     kind: map
@@ -4257,6 +4432,140 @@ bounds:
         assert!(err
             .to_string()
             .contains("secret-dependent success/abort status"));
+    }
+
+    #[test]
+    fn rejects_non_constant_local_array_index_in_confidential_entrypoint() {
+        // With i >= 4 the read fails the call, so a secret i would reveal
+        // through the call's success whether it is in bounds.
+        let source = write_temp(
+            "secret-local-index",
+            r#"
+            contract C {
+                uint256 private last;
+                function pick(uint256[4] memory xs, uint256 i) public { last = xs[i]; }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  pick(uint256[4],uint256):
+    secret_args: [xs, i]
+    confidential: true
+    returns: forbidden
+    status: public
+state:
+  last:
+    kind: cell
+    value: uint256
+    backend: full_scan
+    confidential: true
+bounds:
+  loops: {}
+"#,
+        );
+        let err = compile(source.to_str().unwrap(), &meta, ProgramMode::Uo).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("indexes local array xs with i, which is not a compile-time constant below its length 4"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn accepts_constant_and_loop_unrolled_local_array_indices() {
+        let source = write_temp(
+            "loop-local-index",
+            r#"
+            contract C {
+                uint256 private last;
+                function sum(uint256[4] memory xs) public {
+                    uint256 acc = xs[3];
+                    for (uint256 j = 0; j < 3; j++) {
+                        acc = acc + xs[j];
+                    }
+                    last = acc;
+                }
+            }
+            "#,
+        );
+        let meta = parse_metadata(
+            r#"
+contract: C
+entrypoints:
+  sum(uint256[4]):
+    secret_args: [xs]
+    confidential: true
+    returns: forbidden
+    status: public
+state:
+  last:
+    kind: cell
+    value: uint256
+    backend: full_scan
+    confidential: true
+bounds:
+  loops: {}
+"#,
+        );
+        compile(source.to_str().unwrap(), &meta, ProgramMode::Uo).unwrap();
+    }
+
+    #[test]
+    fn confidential_map_write_requires_declassified_status() {
+        // A full map aborts a write of a new key, and whether a key is new
+        // depends on the map's confidential contents, even for a public key.
+        let source = write_temp(
+            "map-write-status",
+            r#"
+            contract C {
+                mapping(bytes32 => uint256) private balances;
+                function put(bytes32 key, uint256 value) public { balances[key] = value; }
+            }
+            "#,
+        );
+        let metadata = |status: &str| {
+            parse_metadata(&format!(
+                r#"
+contract: C
+entrypoints:
+  put(bytes32,uint256):
+    secret_args: [value]
+    confidential: true
+    returns: forbidden
+    {status}
+state:
+  balances:
+    kind: map
+    key: bytes32
+    value: uint256
+    capacity: 4
+    backend: full_scan
+    confidential: true
+bounds:
+  loops: {{}}
+"#
+            ))
+        };
+        let err = compile(
+            source.to_str().unwrap(),
+            &metadata("status: public"),
+            ProgramMode::Uo,
+        )
+        .unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("put(bytes32,uint256) has secret-dependent success/abort status"),
+            "{err}"
+        );
+        compile(
+            source.to_str().unwrap(),
+            &metadata("status: declassified\n    declassifies: [success]"),
+            ProgramMode::Uo,
+        )
+        .unwrap();
     }
 
     #[test]
@@ -5269,7 +5578,8 @@ entrypoints:
     confidential: true
     secret_args: [key, value]
     returns: forbidden
-    status: public
+    status: declassified
+    declassifies: [success]
 state:
   balances:
     kind: map
@@ -5335,7 +5645,8 @@ entrypoints:
     confidential: true
     secret_args: [value]
     returns: forbidden
-    status: public
+    status: declassified
+    declassifies: [success]
 state:
   balances:
     kind: map
@@ -5402,7 +5713,8 @@ entrypoints:
     confidential: true
     secret_args: [value]
     returns: forbidden
-    status: public
+    status: declassified
+    declassifies: [success]
 state:
   balances:
     kind: map
@@ -5553,7 +5865,8 @@ entrypoints:
     confidential: true
     secret_args: [key, value]
     returns: forbidden
-    status: public
+    status: declassified
+    declassifies: [success]
 state:
   balances:
     kind: map
