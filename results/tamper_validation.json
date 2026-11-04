@@ -1,6 +1,7 @@
 {
   "benchmark": "SingleAccessMap/pathoram/put",
   "checkers": {
+    "kernel_admission": "proof/lean/.lake/build/bin/checkKernelAdmission",
     "proofgrade_runtime_confidential_core_bundle": "proof/lean/.lake/build/bin/checkProofGradeRuntimeConfidentialCore",
     "proofgrade_runtime_confidential_core_kernel_finish_slot_bundle": "proof/lean/.lake/build/bin/checkProofGradeRuntimeConfidentialCoreKernelFinishSlot",
     "proofgrade_runtime_confidential_core_kernel_interface_slot_bundle": "proof/lean/.lake/build/bin/checkProofGradeRuntimeConfidentialCoreKernelInterfaceSlot",
@@ -70,7 +71,7 @@
     "page_model": "page_v1",
     "shared_resource_model": "shared_v1"
   },
-  "scenario_count": 387,
+  "scenario_count": 390,
   "scenarios": [
     {
       "accepted": false,
@@ -5720,6 +5721,42 @@
       "mutation": "set rhs representative_seed just outside the canonical seed space",
       "rejected": true,
       "scenario": "canonical_pathoram_pair_theorem_input/representative_seed_drift"
+    },
+    {
+      "accepted": false,
+      "artifact_json_bytes": 16069,
+      "artifact_kind": "uo_compiled_artifact",
+      "benchmark": "ConfidentialMixer/uo",
+      "entrypoint": "withdraw(bytes32,uint256)",
+      "lean_stderr": "",
+      "lean_stdout": "{\"entrypoints\":\n [{\"writes_only_confidential\": true,\n   \"well_typed\": true,\n   \"trace_route\": \"exact\",\n   \"status_policy\": \"public\",\n   \"secret_args_match_manifest\": true,\n   \"returns_only_last\": true,\n   \"return_policy\": \"declassified\",\n   \"program_matches_function\": true,\n   \"policy_agrees_with_flow\": true,\n   \"flow_status\": \"public\",\n   \"flow_return\": \"secret\",\n   \"entrypoint\": \"balanceOf(bytes32)\",\n   \"admitted\": true},\n  {\"writes_only_confidential\": true,\n   \"well_typed\": true,\n   \"trace_route\": \"exact\",\n   \"status_policy\": \"declassified\",\n   \"secret_args_match_manifest\": true,\n   \"returns_only_last\": true,\n   \"return_policy\": \"forbidden\",\n   \"program_matches_function\": true,\n   \"policy_agrees_with_flow\": true,\n   \"flow_status\": \"secret\",\n   \"flow_return\": \"public\",\n   \"entrypoint\": \"deposit(bytes32,uint256)\",\n   \"admitted\": true},\n  {\"writes_only_confidential\": true,\n   \"well_typed\": true,\n   \"trace_route\": \"exact\",\n   \"status_policy\": \"public\",\n   \"secret_args_match_manifest\": true,\n   \"returns_only_last\": true,\n   \"return_policy\": \"declassified\",\n   \"program_matches_function\": true,\n   \"policy_agrees_with_flow\": true,\n   \"flow_status\": \"public\",\n   \"flow_return\": \"secret\",\n   \"entrypoint\": \"totalValue()\",\n   \"admitted\": true},\n  {\"writes_only_confidential\": true,\n   \"well_typed\": true,\n   \"trace_route\": \"exact\",\n   \"status_policy\": \"public\",\n   \"secret_args_match_manifest\": true,\n   \"returns_only_last\": true,\n   \"return_policy\": \"declassified\",\n   \"program_matches_function\": true,\n   \"policy_agrees_with_flow\": false,\n   \"flow_status\": \"secret\",\n   \"flow_return\": \"secret\",\n   \"entrypoint\": \"withdraw(bytes32,uint256)\",\n   \"admitted\": false}],\n \"entrypoint_count\": 4,\n \"contract\": \"ConfidentialMixer\",\n \"all_admitted\": false}",
+      "mutation": "declare the withdrawal's status public although it tests the secret balance and writes a map",
+      "rejected": true,
+      "scenario": "kernel_admission/status_policy_relabel"
+    },
+    {
+      "accepted": false,
+      "artifact_json_bytes": 16069,
+      "artifact_kind": "uo_compiled_artifact",
+      "benchmark": "ConfidentialMixer/uo",
+      "entrypoint": "withdraw(bytes32,uint256)",
+      "lean_stderr": "",
+      "lean_stdout": "{\"entrypoints\":\n [{\"writes_only_confidential\": true,\n   \"well_typed\": true,\n   \"trace_route\": \"exact\",\n   \"status_policy\": \"public\",\n   \"secret_args_match_manifest\": true,\n   \"returns_only_last\": true,\n   \"return_policy\": \"declassified\",\n   \"program_matches_function\": true,\n   \"policy_agrees_with_flow\": true,\n   \"flow_status\": \"public\",\n   \"flow_return\": \"secret\",\n   \"entrypoint\": \"balanceOf(bytes32)\",\n   \"admitted\": true},\n  {\"writes_only_confidential\": true,\n   \"well_typed\": true,\n   \"trace_route\": \"exact\",\n   \"status_policy\": \"declassified\",\n   \"secret_args_match_manifest\": true,\n   \"returns_only_last\": true,\n   \"return_policy\": \"forbidden\",\n   \"program_matches_function\": true,\n   \"policy_agrees_with_flow\": true,\n   \"flow_status\": \"secret\",\n   \"flow_return\": \"public\",\n   \"entrypoint\": \"deposit(bytes32,uint256)\",\n   \"admitted\": true},\n  {\"writes_only_confidential\": true,\n   \"well_typed\": true,\n   \"trace_route\": \"exact\",\n   \"status_policy\": \"public\",\n   \"secret_args_match_manifest\": true,\n   \"returns_only_last\": true,\n   \"return_policy\": \"declassified\",\n   \"program_matches_function\": true,\n   \"policy_agrees_with_flow\": true,\n   \"flow_status\": \"public\",\n   \"flow_return\": \"secret\",\n   \"entrypoint\": \"totalValue()\",\n   \"admitted\": true},\n  {\"writes_only_confidential\": true,\n   \"well_typed\": true,\n   \"trace_route\": \"exact\",\n   \"status_policy\": \"declassified\",\n   \"secret_args_match_manifest\": true,\n   \"returns_only_last\": true,\n   \"return_policy\": \"public\",\n   \"program_matches_function\": true,\n   \"policy_agrees_with_flow\": false,\n   \"flow_status\": \"secret\",\n   \"flow_return\": \"secret\",\n   \"entrypoint\": \"withdraw(bytes32,uint256)\",\n   \"admitted\": false}],\n \"entrypoint_count\": 4,\n \"contract\": \"ConfidentialMixer\",\n \"all_admitted\": false}",
+      "mutation": "declare the withdrawal's return public although it returns the secret amount",
+      "rejected": true,
+      "scenario": "kernel_admission/return_policy_relabel"
+    },
+    {
+      "accepted": false,
+      "artifact_json_bytes": 16076,
+      "artifact_kind": "uo_compiled_artifact",
+      "benchmark": "ConfidentialMixer/uo",
+      "entrypoint": "withdraw(bytes32,uint256)",
+      "lean_stderr": "",
+      "lean_stdout": "{\"entrypoints\":\n [{\"writes_only_confidential\": true,\n   \"well_typed\": true,\n   \"trace_route\": \"exact\",\n   \"status_policy\": \"public\",\n   \"secret_args_match_manifest\": true,\n   \"returns_only_last\": true,\n   \"return_policy\": \"declassified\",\n   \"program_matches_function\": true,\n   \"policy_agrees_with_flow\": true,\n   \"flow_status\": \"public\",\n   \"flow_return\": \"secret\",\n   \"entrypoint\": \"balanceOf(bytes32)\",\n   \"admitted\": true},\n  {\"writes_only_confidential\": false,\n   \"well_typed\": true,\n   \"trace_route\": \"exact\",\n   \"status_policy\": \"declassified\",\n   \"secret_args_match_manifest\": true,\n   \"returns_only_last\": true,\n   \"return_policy\": \"forbidden\",\n   \"program_matches_function\": true,\n   \"policy_agrees_with_flow\": true,\n   \"flow_status\": \"secret\",\n   \"flow_return\": \"public\",\n   \"entrypoint\": \"deposit(bytes32,uint256)\",\n   \"admitted\": false},\n  {\"writes_only_confidential\": true,\n   \"well_typed\": true,\n   \"trace_route\": \"exact\",\n   \"status_policy\": \"public\",\n   \"secret_args_match_manifest\": true,\n   \"returns_only_last\": true,\n   \"return_policy\": \"declassified\",\n   \"program_matches_function\": true,\n   \"policy_agrees_with_flow\": true,\n   \"flow_status\": \"public\",\n   \"flow_return\": \"secret\",\n   \"entrypoint\": \"totalValue()\",\n   \"admitted\": true},\n  {\"writes_only_confidential\": false,\n   \"well_typed\": true,\n   \"trace_route\": \"exact\",\n   \"status_policy\": \"declassified\",\n   \"secret_args_match_manifest\": true,\n   \"returns_only_last\": true,\n   \"return_policy\": \"declassified\",\n   \"program_matches_function\": true,\n   \"policy_agrees_with_flow\": true,\n   \"flow_status\": \"secret\",\n   \"flow_return\": \"secret\",\n   \"entrypoint\": \"withdraw(bytes32,uint256)\",\n   \"admitted\": false}],\n \"entrypoint_count\": 4,\n \"contract\": \"ConfidentialMixer\",\n \"all_admitted\": false}",
+      "mutation": "mark the `total` cell, which the withdrawal writes, as a public object",
+      "rejected": true,
+      "scenario": "kernel_admission/public_object_write"
     }
   ]
 }

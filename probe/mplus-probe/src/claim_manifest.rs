@@ -73,9 +73,15 @@ const CLAIM_ENTRIES: &[ClaimEntry] = &[
             "proof/lean/UOToolchain/ProofGradeRoot.lean",
             "proof/lean/UOToolchain/PaperMainTheorem.lean",
             "proof/lean/UOToolchain/PaperMainReleases.lean",
+            "proof/lean/UOToolchain/KernelPaperMain.lean",
+            "proof/lean/UOToolchain/KernelAdmission.lean",
         ],
         runtime_compiler_files: &["runtime/uo-evm/src/lib.rs"],
-        benchmark_result_files: &["results/bridge_validation.json", "results/trace_equivalence.json"],
+        benchmark_result_files: &[
+            "results/bridge_validation.json",
+            "results/trace_equivalence.json",
+            "results/static_checks.json",
+        ],
         validation_command: "lake build UOToolchain.ProofGradeRoot",
     },
     ClaimEntry {

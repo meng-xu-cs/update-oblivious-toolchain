@@ -823,6 +823,7 @@ false_paths:
 ## results/static_checks.json
 false_count: 0
 top_level_booleans:
+  kernel_admission_all_admitted: true
   legacy_axiom_definition_surface_restricted: true
   legacy_theorem_symbol_surface_restricted: true
   proofgrade_axiom_report_legacy_symbols_absent: true

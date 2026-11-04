@@ -112,4 +112,32 @@ info: 'UOToolchain.IR.evalKernelProgram_flow_ni' depends on axioms: [propext, Cl
 #guard_msgs in
 #print axioms UOToolchain.IR.evalKernelProgram_flow_ni
 
+/--
+info: 'UOToolchain.IR.kernelPublicOutcome_safe' depends on axioms: [propext, Classical.choice, Quot.sound]
+-/
+#guard_msgs in
+#print axioms UOToolchain.IR.kernelPublicOutcome_safe
+
+/--
+info: 'UOToolchain.paperMain_admittedKernelRun_exact_noninterference_moduloReleases' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+-/
+#guard_msgs in
+#print axioms UOToolchain.paperMain_admittedKernelRun_exact_noninterference_moduloReleases
+
+/--
+info: 'UOToolchain.IR.KernelProgram.admissionCheck_sound' depends on axioms: [propext]
+-/
+#guard_msgs in
+#print axioms UOToolchain.IR.KernelProgram.admissionCheck_sound
+
+/--
+info: 'UOToolchain.paperMain_checkedKernel_exact_noninterference_moduloReleases' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+-/
+#guard_msgs in
+#print axioms UOToolchain.paperMain_checkedKernel_exact_noninterference_moduloReleases
+
 def main : IO UInt32 := pure 0

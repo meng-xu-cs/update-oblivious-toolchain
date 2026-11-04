@@ -73,7 +73,10 @@ Sidecar metadata requirements:
   `status: declassified`. Besides `require`/`abortIf` on secret-dependent
   conditions, this includes every write to a confidential map: a full bounded
   map aborts a write of a new key, and whether a key is new depends on the
-  map's confidential contents, even when the key itself is public
+  map's confidential contents, even when the key itself is public. The Lean
+  admission checker (`checkKernelAdmission`) re-decides this rule, and the
+  matching rule for returns, on every emitted kernel program with the flow
+  analysis proved sound in `UOToolchain/KernelFlow.lean`
 - `returns: encrypted_to_client` must not declare `declassifies: [return]`;
   the host-visible outcome contains ciphertext, nonce, AAD hash, and session
   binding evidence, not the plaintext return

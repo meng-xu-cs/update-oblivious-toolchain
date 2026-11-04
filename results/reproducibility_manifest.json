@@ -19,8 +19,8 @@
     },
     {
       "path": "acceptance.json",
-      "bytes": 152300,
-      "sha256": "4da28569f97d71152b0a9ae836e00cdf620f1e090597d674dfb3fc03f0fa8570"
+      "bytes": 152724,
+      "sha256": "bbb65e07b51012cc9332ac575db69d7d7a02ebb05b28fbfdeccfb4eb09fc8373"
     },
     {
       "path": "admission_matrix.json",
@@ -39,8 +39,8 @@
     },
     {
       "path": "bridge_validation.json",
-      "bytes": 25654308,
-      "sha256": "63a1c9c9f785add1bdec6ac886038e22bbfadc996ce476086f24dd1f34c6ec96"
+      "bytes": 25684260,
+      "sha256": "55f7b2b2cfbcb5d4ffcd5bd7972b8d1b6afc898d5803ee2dc9ffdd305a23baf4"
     },
     {
       "path": "canonical_pathoram_pair_validation.json",
@@ -49,13 +49,13 @@
     },
     {
       "path": "capacity_sweep.json",
-      "bytes": 27477,
-      "sha256": "c31315a0491d428b6154159be0a9de4fca8a9c4b3fe75c518a80ddef1945d78e"
+      "bytes": 27464,
+      "sha256": "cd2a52ecb8ea0f1979321dafc5f96e2bf653ae698eae128af89e1c9cd4e72320"
     },
     {
       "path": "claim_artifact_manifest.json",
-      "bytes": 55732,
-      "sha256": "f170cbd7cc219f0d9056bbb087d6f675e602aa97bdb9f1966b39631923788cbf"
+      "bytes": 56412,
+      "sha256": "ad670bc448607d3558ee4dbe6af5d162835667a58d620ecd45cc6dcc10c73140"
     },
     {
       "path": "claim_consistency.json",
@@ -64,8 +64,8 @@
     },
     {
       "path": "claim_status.json",
-      "bytes": 45601,
-      "sha256": "4b7ef807d632906312ffc3123fd427fb75784e87a3f18bd4f066daf6384cc35e"
+      "bytes": 46133,
+      "sha256": "17cbe98cbd04255246a13b76ffe1b5294361a812f38e50fdc79577cdb8f07301"
     },
     {
       "path": "claim_status.md",
@@ -279,13 +279,13 @@
     },
     {
       "path": "reviewer_summary.json",
-      "bytes": 109299,
-      "sha256": "5ad69bb7b8fa123a18d2a7ffc88892fa01c8e69a3d5e9dd1048467cf79374a62"
+      "bytes": 109639,
+      "sha256": "6c6ca3b5064ccd98686680e0017a9295715b722355a3cd13ee19116245c64f82"
     },
     {
       "path": "reviewer_summary.md",
-      "bytes": 28568,
-      "sha256": "d303efef5c3282877d0866574f501509672acb36e51386bab694daef26641726"
+      "bytes": 28567,
+      "sha256": "a32af141758a7fad04a3570d85bad456b48a4c8f0161c1ef1b504c75c385bbb9"
     },
     {
       "path": "runtime_boundary_validation.json",
@@ -414,13 +414,13 @@
     },
     {
       "path": "static_checks.json",
-      "bytes": 31138,
-      "sha256": "d5bf51c0103c02f3053f74b14eead54002f004fab2ac90ace7e8e676bedb5997"
+      "bytes": 52478,
+      "sha256": "d0baa15b5390746dc737098427987361f5178a7f223118092e9adffd8eecce7b"
     },
     {
       "path": "tamper_validation.json",
-      "bytes": 672798,
-      "sha256": "dfcddd1d319eb62aa8b5281ec65f0d3007609b1228ac5d0966d6b43cfb9498d6"
+      "bytes": 680146,
+      "sha256": "13b0ec47d151fa1b984df555c6499380fbddc0680882dc73dfc21fc2888bd24e"
     },
     {
       "path": "targeted-tamper/tamper_validation.json",
@@ -429,8 +429,8 @@
     },
     {
       "path": "trace_equivalence.json",
-      "bytes": 2908,
-      "sha256": "c563771e506ace35c956ea4eb35d982d5324b570f33a3fa5103e5f3d6e6c85d5"
+      "bytes": 3167,
+      "sha256": "47c7a752a37cb949042dce33ba97ba1940565677af0032331928d5173e4e150d"
     },
     {
       "path": "trusted_kernel_validation.json",

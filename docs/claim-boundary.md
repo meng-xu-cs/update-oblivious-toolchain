@@ -55,7 +55,9 @@ policies are carried in every public outcome, and the erasure is
 - `status: declassified` releases whether the call completed or aborted: the
   termination status and the fields the runtime derives from it alone, namely
   the abort/rollback flag of the final public-state record, the output shape,
-  and whether a plaintext or encrypted return payload is present.
+  the output length of the enclave exit event (the return length, zero for an
+  aborted call), and whether a plaintext or encrypted return payload is
+  present.
 - `returns: declassified` releases the plaintext return payload.
 - `returns: encrypted_to_client` releases only the AEAD output bytes, the
   ciphertext and its tag; the session binding, AAD hash, nonce, and lengths
@@ -81,6 +83,26 @@ this analysis over kernel programs (`KernelProgram.flowSummary` in
 `UOToolchain/KernelFlow.lean`) is proved sound: when it reports a public status
 or return, runs that agree on public inputs end with the same status or return
 value (`evalKernelProgram_flow_ni`).
+
+For exact-backend entrypoints the per-component premises are discharged, not
+assumed. `paperMain_admittedKernelRun_exact_noninterference_moduloReleases`
+(`UOToolchain/KernelPaperMain.lean`) proves the theorem for every run of an
+entrypoint whose kernel program is well typed over the state layout, returns
+only as its last statement, writes only confidential objects, and declares
+policies that agree with the flow analysis. The view is built from Lean models
+of the runtime's public observables: the exact store's trace, the public
+outcome, the boundary schedule, and the final public-state record. These four
+conditions are decided per entrypoint on the compiled artifacts by
+`checkKernelAdmission` (`UOToolchain/KernelAdmission.lean`). Every confidential
+entrypoint of the benchmark artifacts is admitted
+(`kernel_admission_*` in `results/static_checks.json`). Entrypoints that access
+an ORAM map are reported on the `path_oram` route, which this exact theorem does
+not cover. That the runtime emits the modeled observables is a refinement
+obligation, not proved. The probe checks the storage trace, public outcome, and
+boundary schedule of every exact-route experiment run against the models
+(`exact_encoding_matches` and `outcome_model_matches` in
+`results/trace_equivalence.json`); the final public-state record is not
+checked against the runtime.
 
 The theorems are `paperMain_exact_backend_noninterference_moduloReleases`,
 `paperMain_pathOramLocalPosmapV1_noninterference_moduloReleases`, and

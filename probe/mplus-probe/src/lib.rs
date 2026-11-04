@@ -4064,6 +4064,8 @@ fn run_static_checks(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<J
         "proof/lean/UOToolchain/KernelTyping.lean",
         "proof/lean/UOToolchain/KernelExactTrace.lean",
         "proof/lean/UOToolchain/KernelFlow.lean",
+        "proof/lean/UOToolchain/KernelPaperMain.lean",
+        "proof/lean/UOToolchain/KernelAdmission.lean",
     ]
     .into_iter()
     .map(|relative_path| {
@@ -4107,6 +4109,10 @@ fn run_static_checks(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<J
         "UOToolchain.IR.admittedKernel_exactUO",
         "UOToolchain.paperMain_admittedKernel_exact_noninterference_moduloReleases",
         "UOToolchain.IR.evalKernelProgram_flow_ni",
+        "UOToolchain.IR.kernelPublicOutcome_safe",
+        "UOToolchain.paperMain_admittedKernelRun_exact_noninterference_moduloReleases",
+        "UOToolchain.IR.KernelProgram.admissionCheck_sound",
+        "UOToolchain.paperMain_checkedKernel_exact_noninterference_moduloReleases",
         "UOToolchain.RuntimeImplementationKernelMachineConfinementBoundary.paperEndToEndConfinementWithPublicOnlyHandwrittenShell",
         "UOToolchain.RuntimePaperNativeKernelAssumptions.paperEndToEndConfinementWithPublicOnlyHandwrittenShell",
     ]
@@ -4128,8 +4134,43 @@ fn run_static_checks(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<J
     let proofgrade_axiom_report_legacy_symbols_absent = !proofgrade_axiom_report_source
         .contains("legacyOramLocalTheorem")
         && !proofgrade_axiom_report_source.contains("legacySgxMicroLocalTheorem");
+    let admission_checker = lean_kernel_admission_checker_path()?;
+    let mut admission_counts = BTreeMap::new();
     let mut reports = Vec::new();
     for (name, artifacts) in suite {
+        let uo_kernel_admission = check_kernel_admission(
+            &format!("{name}-uo-admission"),
+            &artifacts.uo,
+            &admission_checker,
+        )?;
+        let oram_kernel_admission = artifacts
+            .oram
+            .as_ref()
+            .map(|artifact| {
+                check_kernel_admission(
+                    &format!("{name}-oram-admission"),
+                    artifact,
+                    &admission_checker,
+                )
+            })
+            .transpose()?;
+        let fullscan64_kernel_admission = artifacts
+            .fullscan64
+            .as_ref()
+            .map(|artifact| {
+                check_kernel_admission(
+                    &format!("{name}-fullscan64-admission"),
+                    artifact,
+                    &admission_checker,
+                )
+            })
+            .transpose()?;
+        for report in std::iter::once(&uo_kernel_admission)
+            .chain(oram_kernel_admission.as_ref())
+            .chain(fullscan64_kernel_admission.as_ref())
+        {
+            tally_kernel_admission(report, &mut admission_counts);
+        }
         let source = format!("benches/raw/{name}.sol");
         let source_path = workspace_path(&source);
         let raw_meta = format!("benches/raw/{name}.raw.yaml");
@@ -4192,8 +4233,12 @@ fn run_static_checks(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<J
                     )
                 })
                 .transpose()?,
+            "uo_kernel_admission": uo_kernel_admission,
+            "oram_kernel_admission": oram_kernel_admission,
+            "fullscan64_kernel_admission": fullscan64_kernel_admission,
         }));
     }
+    let admission_count = |key: &str| admission_counts.get(key).copied().unwrap_or(0usize);
     Ok(json!({
         "checker": display_report_path(&checker),
         "legacy_axiom_definition_checks": legacy_axiom_definition_checks,
@@ -4221,8 +4266,53 @@ fn run_static_checks(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<J
             proofgrade_axiom_report_theorem_checks_present,
         "proofgrade_axiom_report_legacy_symbols_absent":
             proofgrade_axiom_report_legacy_symbols_absent,
+        "kernel_admission_checker": display_report_path(&admission_checker),
+        "kernel_admission_entrypoint_count": admission_count("entrypoints"),
+        "kernel_admission_exact_route_count": admission_count("exact"),
+        "kernel_admission_path_oram_route_count": admission_count("path_oram"),
+        "kernel_admission_all_admitted": true,
         "reports": reports,
     }))
+}
+
+/// Run the Lean kernel-admission checker over a compiled UO artifact. For every
+/// confidential entrypoint it decides the program-side premises of
+/// `paperMain_checkedKernel_exact_noninterference_moduloReleases`: the program
+/// is well typed over the state layout, returns only as its last statement,
+/// writes only confidential objects, and its declared status and return
+/// policies agree with the information-flow analysis. Any entrypoint that is
+/// not admitted fails the static checks.
+fn check_kernel_admission(
+    case_name: &str,
+    artifact: &CompiledArtifact,
+    checker: &Path,
+) -> Result<JsonValue> {
+    let (artifact_path, _) = write_temp_json(case_name, artifact)?;
+    let output = Command::new(checker)
+        .arg(&artifact_path)
+        .output()
+        .with_context(|| format!("running the Lean kernel admission checker for {case_name}"))?;
+    let _ = fs::remove_file(&artifact_path);
+    if !output.status.success() {
+        return Err(anyhow!(
+            "Lean kernel admission check failed for {}: {}\n{}",
+            case_name,
+            String::from_utf8_lossy(&output.stderr).trim(),
+            String::from_utf8_lossy(&output.stdout).trim(),
+        ));
+    }
+    serde_json::from_slice(&output.stdout)
+        .with_context(|| format!("parsing the kernel admission report for {case_name}"))
+}
+
+/// Count admitted entrypoints, in total and per trace route.
+fn tally_kernel_admission(report: &JsonValue, counts: &mut BTreeMap<String, usize>) {
+    for entrypoint in report["entrypoints"].as_array().into_iter().flatten() {
+        *counts.entry("entrypoints".to_owned()).or_default() += 1;
+        if let Some(route) = entrypoint["trace_route"].as_str() {
+            *counts.entry(route.to_owned()).or_default() += 1;
+        }
+    }
 }
 
 fn validate_translation_artifacts_against_source(
@@ -15525,6 +15615,70 @@ fn run_tamper_validation() -> Result<JsonValue> {
         }),
     )?);
 
+    // Kernel admission: the checker must reject declared policies that disagree
+    // with the information-flow analysis, and a write to a public object.
+    let kernel_admission_checker = lean_kernel_admission_checker_path()?;
+    let mixer = serde_json::to_value(compile_artifact(
+        "benches/raw/ConfidentialMixer.sol",
+        "benches/raw/ConfidentialMixer.uo.yaml",
+        ProgramMode::Uo,
+    )?)?;
+    let withdraw = "withdraw(bytes32,uint256)";
+    type ArtifactTamper = fn(&mut JsonValue, &str);
+    let kernel_admission_tampers: [(&str, &str, ArtifactTamper); 3] = [
+        (
+            "kernel_admission/status_policy_relabel",
+            "declare the withdrawal's status public although it tests the secret balance and writes a map",
+            |artifact, entrypoint| {
+                artifact["contract"]["manifest"]["entrypoints"][entrypoint]["status"] =
+                    json!("public");
+            },
+        ),
+        (
+            "kernel_admission/return_policy_relabel",
+            "declare the withdrawal's return public although it returns the secret amount",
+            |artifact, entrypoint| {
+                artifact["contract"]["manifest"]["entrypoints"][entrypoint]["returns"] =
+                    json!("public");
+            },
+        ),
+        (
+            "kernel_admission/public_object_write",
+            "mark the `total` cell, which the withdrawal writes, as a public object",
+            |artifact, _| {
+                for object in artifact["contract"]["state"]
+                    .as_array_mut()
+                    .into_iter()
+                    .flatten()
+                {
+                    if object["name"] == json!("total") {
+                        object["confidential"] = json!(false);
+                    }
+                }
+            },
+        ),
+    ];
+    for (scenario, mutation, tamper) in kernel_admission_tampers {
+        let mut tampered = mixer.clone();
+        tamper(&mut tampered, withdraw);
+        scenarios.push(validate_tampered_json_case(
+            scenario,
+            &tampered,
+            |artifact_path| {
+                Ok(Command::new(&kernel_admission_checker)
+                    .arg(artifact_path)
+                    .output()?)
+            },
+            json!({
+                "scenario": scenario,
+                "artifact_kind": "uo_compiled_artifact",
+                "benchmark": "ConfidentialMixer/uo",
+                "entrypoint": withdraw,
+                "mutation": mutation,
+            }),
+        )?);
+    }
+
     Ok(json!({
         "benchmark": "SingleAccessMap/pathoram/put",
         "model_tags": {
@@ -15657,6 +15811,7 @@ fn run_tamper_validation() -> Result<JsonValue> {
                 display_report_path(&canonical_pathoram_paper_instantiation_checker),
             "runtime_canonical_pathoram_pair_theorem_input":
                 display_report_path(&canonical_pathoram_pair_theorem_input_checker),
+            "kernel_admission": display_report_path(&kernel_admission_checker),
         },
         "scenario_count": scenarios.len(),
         "scenarios": scenarios,
@@ -47044,6 +47199,10 @@ fn lean_proofgrade_translation_artifacts_checker_path() -> Result<PathBuf> {
     )
 }
 
+fn lean_kernel_admission_checker_path() -> Result<PathBuf> {
+    ensure_lean_checker("checkKernelAdmission", "kernel admission")
+}
+
 fn lean_controller_certificate_checker_path() -> Result<PathBuf> {
     ensure_lean_checker(
         "checkRuntimeControllerCertificate",
@@ -50997,6 +51156,9 @@ struct ExperimentOutcome {
     /// encoding predicts (`None` when an accessed object is not on an exact
     /// backend, e.g. the ORAM route).
     exact_encoding_matches: Option<bool>,
+    /// Whether every run's public outcome and enclave-boundary schedule are the
+    /// ones the Lean models predict (`None` off the exact route).
+    outcome_model_matches: Option<bool>,
 }
 
 enum OptionalExperimentOutcome {
@@ -51377,6 +51539,65 @@ fn trace_matches_exact_encoding(
         && lengths_consistent
 }
 
+/// What the Lean models of an exact-route run's public observables
+/// (`kernelPublicOutcome` and `kernelBoundarySchedule` in
+/// `UOToolchain/KernelPaperMain.lean`) take from the artifact.
+struct KernelOutcomeModel {
+    entry_input_len: usize,
+    return_length: usize,
+    returns_value: bool,
+    gas: u64,
+}
+
+fn kernel_outcome_model(
+    artifact: &CompiledArtifact,
+    entrypoint: &str,
+) -> Option<KernelOutcomeModel> {
+    let entry = artifact.contract.manifest.entrypoints.get(entrypoint)?;
+    let program = entry.confidential_program.as_ref()?;
+    Some(KernelOutcomeModel {
+        entry_input_len: entry.entry_input_len,
+        return_length: entry.return_canonical_len.unwrap_or(0),
+        returns_value: matches!(
+            program.body.last(),
+            Some(ConfidentialKernelStatement::Return { value: Some(_) })
+        ),
+        gas: entry.public_gas_budget,
+    })
+}
+
+/// Whether a run's public outcome and boundary schedule are the modeled ones.
+/// A run that completes with a return value has the declared return length as
+/// its output shape and exit length; any other run, an abort or a completed
+/// call without a return value, has the empty output shape and exits with
+/// nothing. The gas is the entrypoint's modeled cost either way.
+fn run_matches_outcome_model(
+    trace: &uo_core::ExecutionTrace,
+    entrypoint: &str,
+    model: &KernelOutcomeModel,
+) -> bool {
+    let Ok(certificate) = trace.runtime_controller_observer_certificate() else {
+        return false;
+    };
+    let outcome = certificate.public_outcome();
+    let returned = outcome.termination_status && model.returns_value;
+    let shape = if returned {
+        uo_core::OutputShape::returned(model.return_length)
+    } else {
+        uo_core::OutputShape::default()
+    };
+    let schedule = [
+        BoundaryEvent::enter(entrypoint, model.entry_input_len),
+        BoundaryEvent::exit(entrypoint, shape.return_length),
+    ];
+    outcome.entrypoint_id == entrypoint
+        && outcome.output_shape == shape
+        && outcome.return_payload.is_some() == returned
+        && outcome.encrypted_return_payload.is_none()
+        && outcome.gas_used == model.gas
+        && certificate.boundary_schedule() == schedule
+}
+
 fn run_binary_experiment(
     artifact: &CompiledArtifact,
     setup: &[CallSpec],
@@ -51390,12 +51611,21 @@ fn run_binary_experiment(
     let mut class1_hashes = Vec::new();
     let prediction = exact_encoding_prediction(artifact, entrypoint);
     let mut exact_encoding_matches = prediction.as_ref().map(|_| true);
+    let outcome_model = prediction
+        .as_ref()
+        .and_then(|_| kernel_outcome_model(artifact, entrypoint));
+    let mut outcome_model_matches = prediction.as_ref().map(|_| outcome_model.is_some());
     for args in class0 {
         let result = run_target_call_with_diagnostics(artifact, setup, entrypoint, args)?;
         if let (Some(prediction), Some(matches)) =
             (prediction.as_ref(), exact_encoding_matches.as_mut())
         {
             *matches &= trace_matches_exact_encoding(&result.call.trace, prediction);
+        }
+        if let (Some(model), Some(matches)) =
+            (outcome_model.as_ref(), outcome_model_matches.as_mut())
+        {
+            *matches &= run_matches_outcome_model(&result.call.trace, entrypoint, model);
         }
         class0_hashes.push(result.call.trace.hashes()?);
         class0_metrics.push(extract_metrics(&result));
@@ -51407,11 +51637,17 @@ fn run_binary_experiment(
         {
             *matches &= trace_matches_exact_encoding(&result.call.trace, prediction);
         }
+        if let (Some(model), Some(matches)) =
+            (outcome_model.as_ref(), outcome_model_matches.as_mut())
+        {
+            *matches &= run_matches_outcome_model(&result.call.trace, entrypoint, model);
+        }
         class1_hashes.push(result.call.trace.hashes()?);
         class1_metrics.push(extract_metrics(&result));
     }
     Ok(ExperimentOutcome {
         exact_encoding_matches,
+        outcome_model_matches,
         opcode_equal: hashes_equal(&class0_hashes, &class1_hashes, |hash| {
             &hash.opcode_trace_hash
         }),
@@ -51932,6 +52168,7 @@ fn trace_summary(benchmark: &str, mode: &str, outcome: &ExperimentOutcome) -> Js
         "physical_read_equal": outcome.physical_read_equal,
         "physical_trace_equal": outcome.physical_equal,
         "exact_encoding_matches": outcome.exact_encoding_matches,
+        "outcome_model_matches": outcome.outcome_model_matches,
     })
 }
 
@@ -53138,7 +53375,10 @@ mod tests {
     };
     // Only used by the strict-default-build tests below, which the
     // insecure-eval-raw feature compiles out.
-    use super::{b32, exact_encoding_prediction, trace_matches_exact_encoding, PROBE_DEPLOY_SEED};
+    use super::{
+        b32, exact_encoding_prediction, kernel_outcome_model, run_matches_outcome_model,
+        trace_matches_exact_encoding, KernelOutcomeModel, PROBE_DEPLOY_SEED,
+    };
     #[cfg(not(feature = "insecure-eval-raw"))]
     use super::{
         check_authscan_correctness, compile_suite, run_auc_reports, run_mutual_information_reports,
@@ -53186,6 +53426,55 @@ mod tests {
         reads.pop();
         shortened.physical_reads = reads.into_boxed_slice();
         assert!(!trace_matches_exact_encoding(&shortened, &prediction));
+    }
+
+    #[test]
+    fn outcome_model_matches_runtime_for_completed_and_aborted_calls() {
+        let artifact = compile_artifact(
+            "benches/raw/ConfidentialMixer.sol",
+            "benches/raw/ConfidentialMixer.uo.yaml",
+            ProgramMode::Uo,
+        )
+        .unwrap();
+        let entrypoint = "withdraw(bytes32,uint256)";
+        let model = kernel_outcome_model(&artifact, entrypoint).unwrap();
+        assert!(model.returns_value);
+        let mut instance =
+            ContractInstance::deploy_with_seed(artifact.clone(), PROBE_DEPLOY_SEED).unwrap();
+        instance
+            .call("deposit(bytes32,uint256)", vec![b32(7), Value::uint(5)])
+            .unwrap();
+        // A withdrawal within the balance completes and returns the amount; one
+        // beyond it aborts and returns nothing. Both follow the model, and their
+        // exit events differ only in the output length that the status release
+        // erases.
+        let completed = instance
+            .call(entrypoint, vec![b32(7), Value::uint(3)])
+            .unwrap()
+            .trace;
+        let aborted = instance
+            .call(entrypoint, vec![b32(7), Value::uint(9)])
+            .unwrap()
+            .trace;
+        assert!(run_matches_outcome_model(&completed, entrypoint, &model));
+        assert!(run_matches_outcome_model(&aborted, entrypoint, &model));
+        let exit_len = |trace: &uo_core::ExecutionTrace| {
+            trace
+                .runtime_controller_observer_certificate()
+                .unwrap()
+                .boundary_schedule()
+                .last()
+                .unwrap()
+                .output_len
+        };
+        assert_eq!(exit_len(&completed), 32);
+        assert_eq!(exit_len(&aborted), 0);
+
+        let drifted = KernelOutcomeModel {
+            return_length: 64,
+            ..model
+        };
+        assert!(!run_matches_outcome_model(&completed, entrypoint, &drifted));
     }
 
     #[test]

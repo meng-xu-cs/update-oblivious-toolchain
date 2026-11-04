@@ -338,6 +338,11 @@ theorem sgxViewOfTrace_eq_sgxViewOfRunTrace (cfg : Config)
     sgxViewOfTrace cfg publicOutcome boundarySchedule microTrace trace =
       sgxViewOfRunTrace publicOutcome boundarySchedule microTrace trace := rfl
 
+@[simp] theorem sgxViewOfRunTrace_boundarySchedule (publicOutcome : SGXPublicOutcome)
+    (boundarySchedule : List BoundaryEvent) (microTrace : SGXMicroTrace) (trace : Trace) :
+    (sgxViewOfRunTrace publicOutcome boundarySchedule microTrace trace).boundarySchedule =
+      boundarySchedule := rfl
+
 theorem sgxPublicOutcome_sgxViewOfRunTrace (publicOutcome : SGXPublicOutcome)
     (boundarySchedule : List BoundaryEvent) (microTrace : SGXMicroTrace) (trace : Trace) :
     sgxPublicOutcome (sgxViewOfRunTrace publicOutcome boundarySchedule microTrace trace) =
@@ -390,7 +395,7 @@ theorem paperMain_noninterference_moduloReleases_of_publicTrace {κ : Type}
     {releaseFunctions : κ → PaperMainDeclaredReleaseFunctions}
     (hTrace : PaperMainPublicFieldSafe samePublic run)
     (hOutcome : PublicOutcomeSafeModuloReleases samePublic publicOutcome)
-    (hBoundary : PaperMainPublicFieldSafe samePublic boundarySchedule)
+    (hBoundary : BoundarySafeModuloReleases samePublic publicOutcome boundarySchedule)
     (hController : PaperMainPublicFieldSafe samePublic controllerShape)
     (hFinal :
       FinalPublicStateSafeModuloReleases samePublic publicOutcome finalPublicStateRollback)
@@ -404,7 +409,10 @@ theorem paperMain_noninterference_moduloReleases_of_publicTrace {κ : Type}
   have hOutcomeEq :
       (publicOutcome cfg₁).withoutReleases = (publicOutcome cfg₂).withoutReleases :=
     hOutcome cfg₁ cfg₂ hPublic
-  have hBoundaryEq : boundarySchedule cfg₁ = boundarySchedule cfg₂ :=
+  have hBoundaryEq :
+      boundaryWithoutStatusRelease (publicOutcome cfg₁).statusReleased (boundarySchedule cfg₁) =
+        boundaryWithoutStatusRelease (publicOutcome cfg₂).statusReleased
+          (boundarySchedule cfg₂) :=
     hBoundary cfg₁ cfg₂ hPublic
   have hControllerEq : controllerShape cfg₁ = controllerShape cfg₂ :=
     hController cfg₁ cfg₂ hPublic
@@ -417,7 +425,7 @@ theorem paperMain_noninterference_moduloReleases_of_publicTrace {κ : Type}
   have hReleaseEq : releaseFunctions cfg₁ = releaseFunctions cfg₂ :=
     hRelease cfg₁ cfg₂ hPublic
   unfold paperMainViewOfRun paperMainViewOfSGX PaperMainViewSGX.withoutReleases
-  simp only [sgxPublicOutcome_sgxViewOfRunTrace]
+  simp only [sgxPublicOutcome_sgxViewOfRunTrace, sgxViewOfRunTrace_boundarySchedule]
   rw [hOutcomeEq, hFinalEq, hReleaseEq, hBoundaryEq, hControllerEq, hTraceEq]
   rfl
 
@@ -436,7 +444,9 @@ theorem paperMain_admittedKernel_exact_noninterference_moduloReleases
     {releaseFunctions : IR.AdmittedKernelConfig kp → PaperMainDeclaredReleaseFunctions}
     (hOutcome :
       PublicOutcomeSafeModuloReleases IR.AdmittedKernelConfig.samePublic publicOutcome)
-    (hBoundary : PaperMainPublicFieldSafe IR.AdmittedKernelConfig.samePublic boundarySchedule)
+    (hBoundary :
+      BoundarySafeModuloReleases IR.AdmittedKernelConfig.samePublic publicOutcome
+        boundarySchedule)
     (hController : PaperMainPublicFieldSafe IR.AdmittedKernelConfig.samePublic controllerShape)
     (hFinal :
       FinalPublicStateSafeModuloReleases IR.AdmittedKernelConfig.samePublic publicOutcome

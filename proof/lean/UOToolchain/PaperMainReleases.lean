@@ -25,7 +25,8 @@ outcome carries (`statusPolicy`, `returnPolicy`):
 - `status: declassified` releases whether the call completed or aborted. The
   release covers the termination status and the fields the runtime derives
   from it alone: the abort/rollback flag of the final public-state record, the
-  output shape, and whether a plaintext or encrypted return payload is present.
+  output shape and the output length of the enclave exit event, and whether a
+  plaintext or encrypted return payload is present.
 - `returns: declassified` releases the plaintext return payload.
 - `returns: encrypted_to_client` releases only the AEAD output bytes, i.e. the
   ciphertext and its tag. The session binding, AAD hash, nonce, and lengths
@@ -87,11 +88,33 @@ def PaperMainFinalPublicStateRollback.withoutStatusRelease
     PaperMainFinalPublicStateRollback :=
   if statusReleased then { rollback with aborted := false } else rollback
 
+/-- Erase what an enclave-boundary event reveals about the status: the output
+length of the exit event is the output shape's return length, present exactly
+when the call completed with a return value. -/
+def BoundaryEvent.withoutStatusRelease (statusReleased : Bool) (event : BoundaryEvent) :
+    BoundaryEvent :=
+  if statusReleased && event.direction == .exit then { event with outputLen := 0 }
+  else event
+
+/-- The enclave-boundary schedule outside the status release. -/
+def boundaryWithoutStatusRelease (statusReleased : Bool) (schedule : List BoundaryEvent) :
+    List BoundaryEvent :=
+  schedule.map (BoundaryEvent.withoutStatusRelease statusReleased)
+
+@[simp] theorem boundaryWithoutStatusRelease_false (schedule : List BoundaryEvent) :
+    boundaryWithoutStatusRelease false schedule = schedule := by
+  unfold boundaryWithoutStatusRelease
+  induction schedule with
+  | nil => rfl
+  | cons event rest ih => simp [BoundaryEvent.withoutStatusRelease, ih]
+
 /-- `View_SGX ∖ rel`: the paper-main observation outside the declared
 releases. -/
 def PaperMainViewSGX.withoutReleases (view : View_SGX) : View_SGX :=
   { view with
     publicOutcome := view.publicOutcome.withoutReleases
+    boundarySchedule :=
+      boundaryWithoutStatusRelease view.publicOutcome.statusReleased view.boundarySchedule
     finalPublicStateRollback :=
       view.finalPublicStateRollback.withoutStatusRelease
         view.publicOutcome.statusReleased }
@@ -151,7 +174,7 @@ theorem PaperMainViewSGX.withoutReleases_eq_self
     SGXPublicOutcome.withoutReleases_eq_self view.publicOutcome hStatus hReturn
       hEncrypted,
     PaperMainFinalPublicStateRollback.withoutStatusRelease, hStatus,
-    Bool.false_eq_true, if_false]
+    boundaryWithoutStatusRelease_false, Bool.false_eq_true, if_false]
 
 /-! ## Safety premises modulo releases -/
 
@@ -174,6 +197,31 @@ def FinalPublicStateSafeModuloReleases
     (fun cfg =>
       (finalPublicStateRollback cfg).withoutStatusRelease
         (publicOutcome cfg).statusReleased)
+
+/-- The enclave-boundary schedule is public-determined outside the status
+release of the corresponding outcome. -/
+def BoundarySafeModuloReleases
+    {κ : Type}
+    (samePublic : κ → κ → Prop)
+    (publicOutcome : κ → SGXPublicOutcome)
+    (boundarySchedule : κ → List BoundaryEvent) : Prop :=
+  PaperMainPublicFieldSafe samePublic
+    (fun cfg =>
+      boundaryWithoutStatusRelease (publicOutcome cfg).statusReleased (boundarySchedule cfg))
+
+theorem BoundarySafeModuloReleases.of_publicFieldSafe
+    {κ : Type}
+    {samePublic : κ → κ → Prop}
+    {publicOutcome : κ → SGXPublicOutcome}
+    {boundarySchedule : κ → List BoundaryEvent}
+    (hOutcome : PaperMainPublicFieldSafe samePublic publicOutcome)
+    (hBoundary : PaperMainPublicFieldSafe samePublic boundarySchedule) :
+    BoundarySafeModuloReleases samePublic publicOutcome boundarySchedule := by
+  intro cfg₁ cfg₂ hPublic
+  show
+    boundaryWithoutStatusRelease (publicOutcome cfg₁).statusReleased (boundarySchedule cfg₁) =
+      boundaryWithoutStatusRelease (publicOutcome cfg₂).statusReleased (boundarySchedule cfg₂)
+  rw [hOutcome cfg₁ cfg₂ hPublic, hBoundary cfg₁ cfg₂ hPublic]
 
 theorem PublicOutcomeSafeModuloReleases.of_publicFieldSafe
     {κ : Type}
@@ -232,6 +280,15 @@ theorem sgxPublicOutcome_sgxViewOfTrace
   cases outcome
   rfl
 
+theorem sgxViewOfTrace_boundarySchedule
+    (cfg : Config)
+    (outcome : SGXPublicOutcome)
+    (boundarySchedule : List BoundaryEvent)
+    (microTrace : SGXMicroTrace)
+    (trace : Trace) :
+    (sgxViewOfTrace cfg outcome boundarySchedule microTrace trace).boundarySchedule =
+      boundarySchedule := rfl
+
 /-- Exact-backend paper-main theorem modulo declared releases. Two runs of the
 same admitted package with equal public inputs, public environment, and initial
 public state have equal `View_SGX ∖ rel`, even when their released status,
@@ -247,7 +304,8 @@ theorem paperMain_exact_backend_noninterference_moduloReleases
   (hExact : ExactUO run)
   (hOutcome :
     PublicOutcomeSafeModuloReleases samePublicProjection publicOutcome)
-  (hBoundary : PublicBoundarySafe boundarySchedule)
+  (hBoundary :
+    BoundarySafeModuloReleases samePublicProjection publicOutcome boundarySchedule)
   (hController : PublicControllerShapeSafe controllerShape)
   (hFinal :
     FinalPublicStateSafeModuloReleases
@@ -271,7 +329,10 @@ theorem paperMain_exact_backend_noninterference_moduloReleases
       (publicOutcome cfg₁).withoutReleases =
         (publicOutcome cfg₂).withoutReleases :=
     hOutcome cfg₁ cfg₂ hPublic
-  have hBoundaryEq : boundarySchedule cfg₁ = boundarySchedule cfg₂ :=
+  have hBoundaryEq :
+      boundaryWithoutStatusRelease (publicOutcome cfg₁).statusReleased (boundarySchedule cfg₁) =
+        boundaryWithoutStatusRelease (publicOutcome cfg₂).statusReleased
+          (boundarySchedule cfg₂) :=
     hBoundary cfg₁ cfg₂ hPublic
   have hControllerEq : controllerShape cfg₁ = controllerShape cfg₂ :=
     hController cfg₁ cfg₂ hPublic
@@ -284,7 +345,7 @@ theorem paperMain_exact_backend_noninterference_moduloReleases
   have hReleaseEq : releaseFunctions cfg₁ = releaseFunctions cfg₂ :=
     hRelease cfg₁ cfg₂ hPublic
   unfold paperMainExactView paperMainViewOfSGX PaperMainViewSGX.withoutReleases
-  simp only [sgxPublicOutcome_sgxViewOfTrace]
+  simp only [sgxPublicOutcome_sgxViewOfTrace, sgxViewOfTrace_boundarySchedule]
   rw [hOutcomeEq, hFinalEq, hReleaseEq, hBoundaryEq, hControllerEq, hTrace]
   -- The boundary, storage, and micro components read only the boundary
   -- schedule, the trace, and the controller shape.
@@ -340,7 +401,11 @@ def SGXViewRelationModuloReleases
   (microLeakage : SGXMicroLeakage) : Prop :=
   ExactProjectionRelation
       (fun view => (sgxPublicOutcome view).withoutReleases) views₁ views₂ ∧
-    ExactProjectionRelation (fun view => view.boundarySchedule) views₁ views₂ ∧
+    ExactProjectionRelation
+      (fun view =>
+        boundaryWithoutStatusRelease (sgxPublicOutcome view).statusReleased
+          view.boundarySchedule)
+      views₁ views₂ ∧
     R.storageRel
       (sgxStorageDistribution views₁)
       (sgxStorageDistribution views₂)
@@ -361,7 +426,8 @@ theorem computationalUOWith_projects_to_sgxView_moduloReleases
   (hOram : ComputationalUOWith security run)
   (hOutcome :
     PublicOutcomeSafeModuloReleases sameOramPublicProjection publicOutcome)
-  (hBoundary : OramPublicBoundarySafe boundarySchedule)
+  (hBoundary :
+    BoundarySafeModuloReleases sameOramPublicProjection publicOutcome boundarySchedule)
   {cfg₁ cfg₂ : OramConfig}
   (hPublic : sameOramPublicProjection cfg₁ cfg₂) :
   SGXViewRelationModuloReleases
@@ -387,14 +453,20 @@ theorem computationalUOWith_projects_to_sgxView_moduloReleases
   · apply exactProjectionRelation_of_constant (hBoundary cfg₁ cfg₂ hPublic)
     · refine
         constantProjection_map_of_const
-          (fun view : SGXView => view.boundarySchedule)
-          (boundarySchedule cfg₁) _ (run cfg₁) ?_
+          (fun view : SGXView =>
+            boundaryWithoutStatusRelease (sgxPublicOutcome view).statusReleased
+              view.boundarySchedule)
+          (boundaryWithoutStatusRelease (publicOutcome cfg₁).statusReleased
+            (boundarySchedule cfg₁)) _ (run cfg₁) ?_
       intro view _hMem
       simp
     · refine
         constantProjection_map_of_const
-          (fun view : SGXView => view.boundarySchedule)
-          (boundarySchedule cfg₂) _ (run cfg₂) ?_
+          (fun view : SGXView =>
+            boundaryWithoutStatusRelease (sgxPublicOutcome view).statusReleased
+              view.boundarySchedule)
+          (boundaryWithoutStatusRelease (publicOutcome cfg₂).statusReleased
+            (boundarySchedule cfg₂)) _ (run cfg₂) ?_
       intro view _hMem
       simp
   · simpa [oramToSGXSemantics, sgxStorageDistribution] using
@@ -438,7 +510,10 @@ structure PaperMainPathOramReleaseConclusion
       (run cfg₁)
       (run cfg₂)
   boundarySchedule :
-    ExactProjectionRelation (fun view : SGXView => view.boundarySchedule)
+    ExactProjectionRelation
+      (fun view : SGXView =>
+        boundaryWithoutStatusRelease (sgxPublicOutcome view).statusReleased
+          view.boundarySchedule)
       (run cfg₁)
       (run cfg₂)
   storageTrace :
@@ -476,7 +551,8 @@ theorem paperMain_pathOramLocalPosmapV1_noninterference_moduloReleases
       run)
   (hOutcome :
     PublicOutcomeSafeModuloReleases sameOramPublicProjection publicOutcome)
-  (hBoundary : OramPublicBoundarySafe boundarySchedule)
+  (hBoundary :
+    BoundarySafeModuloReleases sameOramPublicProjection publicOutcome boundarySchedule)
   (hFinal :
     FinalPublicStateSafeModuloReleases
       sameOramPublicProjection
@@ -538,7 +614,8 @@ theorem paperMain_pathOramPrivatePosmapV1_noninterference_moduloReleases
       run)
   (hOutcome :
     PublicOutcomeSafeModuloReleases sameOramPublicProjection publicOutcome)
-  (hBoundary : OramPublicBoundarySafe boundarySchedule)
+  (hBoundary :
+    BoundarySafeModuloReleases sameOramPublicProjection publicOutcome boundarySchedule)
   (hFinal :
     FinalPublicStateSafeModuloReleases
       sameOramPublicProjection
@@ -596,9 +673,8 @@ structure SeededRuntimePaperMainReleaseBundle (modelTags : SGXModelTags)
   boundaryExact :
     ∀ cfg seed, seed < (family cfg).seedCount →
       ((family cfg).witnessAt seed).boundarySchedule = boundarySchedule cfg
-  boundarySafe :
-    ∀ cfg₁ cfg₂, sameOramPublicProjection cfg₁ cfg₂ →
-      boundarySchedule cfg₁ = boundarySchedule cfg₂
+  boundarySafeModuloReleases :
+    BoundarySafeModuloReleases sameOramPublicProjection publicOutcome boundarySchedule
 
 /-- Every full-equality paper-main bundle is a release bundle. -/
 def SeededRuntimePaperMainBundle.toReleaseBundle
@@ -612,7 +688,10 @@ def SeededRuntimePaperMainBundle.toReleaseBundle
       OramPublicOutcomeSafe.moduloReleases bundle.publicOutcomeSafe
   , boundarySchedule := bundle.boundarySchedule
   , boundaryExact := bundle.boundaryExact
-  , boundarySafe := bundle.boundarySafe
+  , boundarySafeModuloReleases :=
+      BoundarySafeModuloReleases.of_publicFieldSafe
+        (samePublic := sameOramPublicProjection)
+        bundle.publicOutcomeSafe bundle.boundarySafe
   }
 
 theorem SeededRuntimePaperMainReleaseBundle.pathOramLocalPosmapV1_paperMain_noninterference_moduloReleases
@@ -654,7 +733,7 @@ theorem SeededRuntimePaperMainReleaseBundle.pathOramLocalPosmapV1_paperMain_noni
     (bundle.toSeededRuntimePathOramProofBundle.pathOramLocalPosmapV1_computationalUOWith
       assumptions)
     bundle.publicOutcomeSafeModuloReleases
-    bundle.boundarySafe
+    bundle.boundarySafeModuloReleases
     hFinal
     hRelease
     hPublic
@@ -705,7 +784,7 @@ theorem SeededRuntimePaperMainReleaseBundle.pathOramPrivatePosmapV1_paperMain_no
         assumptions
         certificate)
     bundle.publicOutcomeSafeModuloReleases
-    bundle.boundarySafe
+    bundle.boundarySafeModuloReleases
     hFinal
     hRelease
     hPublic
@@ -730,7 +809,8 @@ structure AcceptedExactPackageReleaseCapstoneEvidence
   backendExact : ExactUO run
   publicOutcomeSafe :
     PublicOutcomeSafeModuloReleases samePublicProjection publicOutcome
-  boundarySafe : PublicBoundarySafe boundarySchedule
+  boundarySafe :
+    BoundarySafeModuloReleases samePublicProjection publicOutcome boundarySchedule
   controllerShapeSafe : PublicControllerShapeSafe controllerShape
   finalPublicStateSafe :
     FinalPublicStateSafeModuloReleases
@@ -766,7 +846,10 @@ theorem AcceptedExactPackageCapstoneEvidence.moduloReleases
   , deploymentAccepted := accepted.deploymentAccepted
   , backendExact := accepted.backendExact
   , publicOutcomeSafe := PublicOutcomeSafe.moduloReleases accepted.publicOutcomeSafe
-  , boundarySafe := accepted.boundarySafe
+  , boundarySafe :=
+      BoundarySafeModuloReleases.of_publicFieldSafe
+        (samePublic := samePublicProjection)
+        accepted.publicOutcomeSafe accepted.boundarySafe
   , controllerShapeSafe := accepted.controllerShapeSafe
   , finalPublicStateSafe :=
       FinalPublicStateSafeModuloReleases.of_publicFieldSafe

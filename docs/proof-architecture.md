@@ -49,9 +49,9 @@ reports an evaluation error. With the schedule lemma above this gives
 `evalKernelProgram_kernelSteps_eq_of_wellTyped`: two such runs emit the same
 kernel steps, including programs whose only return is their last statement.
 Through the Sol-to-kernel preservation theorem, the same holds for the source
-function (`proofGrade_sol_kernel_steps_eq_of_wellTyped`). Running the type
-checker on the kernel programs of concrete admitted artifacts is not yet part
-of the proof-grade checker.
+function (`proofGrade_sol_kernel_steps_eq_of_wellTyped`). The admission
+checker below runs the type checker on the kernel programs of the compiled
+artifacts.
 
 `UOToolchain.KernelExactTrace` turns the schedule result into exact
 update-obliviousness of the storage trace. `evalKernelBodyExecuted` lists the
@@ -82,6 +82,46 @@ that agree at public parameter positions, end with the same status when the
 analysis reports a public status, and return the same value when it reports a
 public return. `publicArgsAgree_of_layout` derives the argument agreement from
 equal public arguments and the declared argument layout.
+
+`UOToolchain.KernelPaperMain` discharges the remaining premises for
+exact-backend entrypoints. It models the runtime's public observables of a
+run: the public outcome (`kernelPublicOutcome`; an aborted call returns
+nothing, so its output shape is erased), the final public-state record
+(`kernelFinalPublicState`), and the enclave boundary schedule
+(`kernelBoundarySchedule`: enter with the entry input, exit with the output
+shape's return length). An `AdmittedKernelRun` is an admitted configuration
+whose arguments have the declared layout, whose public store holds only public
+objects, and whose program writes only confidential objects; such a program
+leaves the public store unchanged (`evalKernelProgram_publicStateTransition`).
+When the entrypoint's declared policies agree with the flow analysis
+(`PolicyAgreesWithFlow`: a status that is not declassified is public, and a
+return that is not declassified is public), each modeled observable is
+public-determined outside its releases, and
+`paperMain_admittedKernelRun_exact_noninterference_moduloReleases` proves the
+paper-main theorem modulo releases with every premise discharged. The exit
+event's output length is the return length, so it reveals whether the call
+completed; the release erasure therefore clears it when the status is
+released (`boundaryWithoutStatusRelease`). Encrypted returns are outside the
+model. The probe checks the runtime's public outcomes and boundary schedules
+against these models on every exact-route experiment run, completed or aborted
+(`outcome_model_matches` in `trace_equivalence.json`).
+
+`UOToolchain.KernelAdmission` makes the program-side premises checkable.
+`KernelProgram.admissionCheck` decides well-typedness, return placement,
+confidential-only writes, and policy agreement with the definitions the
+theorem uses (`admissionCheck_sound`), so
+`paperMain_checkedKernel_exact_noninterference_moduloReleases` needs only a
+passing check, and `AdmittedKernelRun.ofAdmission` makes every run the runtime
+sets up over the checked layout an admitted run. `checkKernelAdmission`
+decodes a `uo-solc` artifact (the state layout, and each manifest entrypoint's
+confidential program and policies) and reports the check per entrypoint. The
+static checks run it on every compiled benchmark artifact and fail unless
+every confidential entrypoint is admitted, and the tamper validation confirms
+that it rejects a status or return relabelled public and a write to a public
+object. An entrypoint that accesses an ORAM map is reported on the `path_oram`
+route: the exact theorem covers neither its storage trace nor its boundary
+schedule, which include the Path ORAM accesses. An entrypoint that accesses a
+raw object is on no supported route and is not admitted.
 
 ## Runtime Bridge
 

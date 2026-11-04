@@ -328,3 +328,7 @@ lean_exe checkCanonicalPathOramPairTheoremInput where
 @[default_target]
 lean_exe checkCanonicalPathOramPaperInstantiation where
   root := `CheckCanonicalPathOramPaperInstantiation
+
+@[default_target]
+lean_exe checkKernelAdmission where
+  root := `CheckKernelAdmission

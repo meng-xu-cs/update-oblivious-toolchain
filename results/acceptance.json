@@ -1,10 +1,10 @@
 {
   "accepted": true,
   "class_counts": {
-    "advisory_nonclaim": 565,
+    "advisory_nonclaim": 567,
     "deprecated_report": 0,
     "expected_computational_difference": 98,
-    "expected_negative": 1008,
+    "expected_negative": 1014,
     "required_failure": 0,
     "unclassified": 0
   },
@@ -254,13 +254,14 @@
         "static_checks.proofgrade_checker_import_surface_checks.68.uses_legacy_umbrella",
         "static_checks.proofgrade_checker_import_surface_checks.69.uses_legacy_umbrella",
         "static_checks.proofgrade_checker_import_surface_checks.70.uses_legacy_umbrella",
-        "static_checks.proofgrade_checker_import_surface_checks.71.uses_legacy_umbrella"
+        "static_checks.proofgrade_checker_import_surface_checks.71.uses_legacy_umbrella",
+        "static_checks.proofgrade_checker_import_surface_checks.72.uses_legacy_umbrella"
       ],
       "class_counts": {
-        "advisory_nonclaim": 162,
+        "advisory_nonclaim": 163,
         "deprecated_report": 0,
         "expected_computational_difference": 48,
-        "expected_negative": 504,
+        "expected_negative": 507,
         "required_failure": 0,
         "unclassified": 0
       },
@@ -817,10 +818,13 @@
         "tamper_validation.scenarios.383.accepted",
         "tamper_validation.scenarios.384.accepted",
         "tamper_validation.scenarios.385.accepted",
-        "tamper_validation.scenarios.386.accepted"
+        "tamper_validation.scenarios.386.accepted",
+        "tamper_validation.scenarios.387.accepted",
+        "tamper_validation.scenarios.388.accepted",
+        "tamper_validation.scenarios.389.accepted"
       ],
-      "false_count": 714,
-      "false_paths": 714,
+      "false_count": 718,
+      "false_paths": 718,
       "mode": "proof_grade",
       "report": "bridge_validation",
       "required": true,
@@ -2896,10 +2900,11 @@
         "proofgrade_checker_import_surface_checks.68.uses_legacy_umbrella",
         "proofgrade_checker_import_surface_checks.69.uses_legacy_umbrella",
         "proofgrade_checker_import_surface_checks.70.uses_legacy_umbrella",
-        "proofgrade_checker_import_surface_checks.71.uses_legacy_umbrella"
+        "proofgrade_checker_import_surface_checks.71.uses_legacy_umbrella",
+        "proofgrade_checker_import_surface_checks.72.uses_legacy_umbrella"
       ],
       "class_counts": {
-        "advisory_nonclaim": 72,
+        "advisory_nonclaim": 73,
         "deprecated_report": 0,
         "expected_computational_difference": 0,
         "expected_negative": 13,
@@ -2922,8 +2927,8 @@
         "reports.4.raw_artifact.accepted",
         "reports.4.uo_artifact.accepted"
       ],
-      "false_count": 85,
-      "false_paths": 85,
+      "false_count": 86,
+      "false_paths": 86,
       "mode": "proof_grade",
       "report": "static_checks",
       "required": true,
@@ -2938,7 +2943,7 @@
         "advisory_nonclaim": 0,
         "deprecated_report": 0,
         "expected_computational_difference": 0,
-        "expected_negative": 491,
+        "expected_negative": 494,
         "required_failure": 0,
         "unclassified": 0
       },
@@ -3434,10 +3439,13 @@
         "scenarios.383.accepted",
         "scenarios.384.accepted",
         "scenarios.385.accepted",
-        "scenarios.386.accepted"
+        "scenarios.386.accepted",
+        "scenarios.387.accepted",
+        "scenarios.388.accepted",
+        "scenarios.389.accepted"
       ],
-      "false_count": 491,
-      "false_paths": 491,
+      "false_count": 494,
+      "false_paths": 494,
       "mode": "expected_negative",
       "report": "tamper_validation",
       "required": false,

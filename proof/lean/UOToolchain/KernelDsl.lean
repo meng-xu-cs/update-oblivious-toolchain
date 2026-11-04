@@ -3385,7 +3385,7 @@ theorem evalKernelStatement_kernelSteps_eq_expected_of_continues
     -- evaluation error, never an abort.
     (rename_i hShould
      repeat' split at hShould
-     all_goals (try simp_all [EvalStatus.continuesBody])
+     all_goals (try simp_all)
      all_goals (try (have h2 := hShould ▸ hCont; simp at h2))
      all_goals (try (have hStop := evalKernelExpr_status_stops cfg env _ _
                        ‹evalKernelExpr cfg env _ = ExprResult.status _›

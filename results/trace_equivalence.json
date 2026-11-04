@@ -9,6 +9,7 @@
       "logical_write_equal": true,
       "mode": "oram",
       "opcode_equal": true,
+      "outcome_model_matches": null,
       "physical_read_equal": true,
       "physical_trace_equal": true
     },
@@ -21,6 +22,7 @@
       "logical_write_equal": true,
       "mode": "oram",
       "opcode_equal": true,
+      "outcome_model_matches": null,
       "physical_read_equal": true,
       "physical_trace_equal": true
     }
@@ -35,6 +37,7 @@
       "logical_write_equal": true,
       "mode": "uo",
       "opcode_equal": true,
+      "outcome_model_matches": true,
       "physical_read_equal": true,
       "physical_trace_equal": true
     },
@@ -47,6 +50,7 @@
       "logical_write_equal": true,
       "mode": "uo",
       "opcode_equal": true,
+      "outcome_model_matches": true,
       "physical_read_equal": true,
       "physical_trace_equal": true
     },
@@ -59,6 +63,7 @@
       "logical_write_equal": true,
       "mode": "uo",
       "opcode_equal": true,
+      "outcome_model_matches": true,
       "physical_read_equal": true,
       "physical_trace_equal": true
     },
@@ -71,6 +76,7 @@
       "logical_write_equal": true,
       "mode": "uo",
       "opcode_equal": true,
+      "outcome_model_matches": true,
       "physical_read_equal": true,
       "physical_trace_equal": true
     },
@@ -83,6 +89,7 @@
       "logical_write_equal": true,
       "mode": "uo",
       "opcode_equal": true,
+      "outcome_model_matches": true,
       "physical_read_equal": true,
       "physical_trace_equal": true
     }

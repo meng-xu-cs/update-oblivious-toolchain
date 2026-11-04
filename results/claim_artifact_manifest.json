@@ -457,6 +457,16 @@
       "ok": true
     },
     {
+      "detail": "artifact proof/lean/UOToolchain/KernelPaperMain.lean referenced by paper-update-obliviousness-theorem exists",
+      "name": "file-exists:paper-update-obliviousness-theorem:proof/lean/UOToolchain/KernelPaperMain.lean",
+      "ok": true
+    },
+    {
+      "detail": "artifact proof/lean/UOToolchain/KernelAdmission.lean referenced by paper-update-obliviousness-theorem exists",
+      "name": "file-exists:paper-update-obliviousness-theorem:proof/lean/UOToolchain/KernelAdmission.lean",
+      "ok": true
+    },
+    {
       "detail": "artifact runtime/uo-evm/src/lib.rs referenced by paper-update-obliviousness-theorem exists",
       "name": "file-exists:paper-update-obliviousness-theorem:runtime/uo-evm/src/lib.rs",
       "ok": true
@@ -791,7 +801,8 @@
     {
       "benchmark_result_files": [
         "results/bridge_validation.json",
-        "results/trace_equivalence.json"
+        "results/trace_equivalence.json",
+        "results/static_checks.json"
       ],
       "category": "claim",
       "doc_anchor": "update-obliviousness theorem",
@@ -799,7 +810,9 @@
       "lean_modules": [
         "proof/lean/UOToolchain/ProofGradeRoot.lean",
         "proof/lean/UOToolchain/PaperMainTheorem.lean",
-        "proof/lean/UOToolchain/PaperMainReleases.lean"
+        "proof/lean/UOToolchain/PaperMainReleases.lean",
+        "proof/lean/UOToolchain/KernelPaperMain.lean",
+        "proof/lean/UOToolchain/KernelAdmission.lean"
       ],
       "runtime_compiler_files": [
         "runtime/uo-evm/src/lib.rs"
