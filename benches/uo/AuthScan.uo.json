@@ -10,8 +10,8 @@
     "metadata_canonicalization_sha256": "5a1c871cc1633a670095791d6295926e0b93fef06b992e2e2ba863cdc1cb7517",
     "compilation_mode": "uo",
     "compiler_version": "0.1.0",
-    "toolchain_manifest_sha256": "180d1fe2827feefcd99ecf3722e9588c82289c7734efd7a2f10ab7aef4d8489f",
-    "package_sha256": "4f4d765a560903ee12119e86aa7e35d2e71f46ce9fe39a2d6c5ca48bd65f64f5"
+    "toolchain_manifest_sha256": "8f3488cafcf7ff86edf77d611698269baf63aa3030210f4c20d61861bf5e286f",
+    "package_sha256": "85bc8def64f4f69deaa6949cd25e3390459a8941aafb60ceeaa73a5deba5003c"
   },
   "contract": {
     "contract": "AuthScan",

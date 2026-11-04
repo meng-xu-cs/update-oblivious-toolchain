@@ -28189,7 +28189,11 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && generated_object_helpers_source.contains("pub(super) fn update_small_map_entries_for_put(")
         && generated_object_helpers_source.contains("object_name: &str,\n) -> Result<bool> {")
         && generated_object_helpers_source
-            .contains("let capacity_overflowed = apply & !value_is_zero & !matched_any & !inserted_any;")
+            .contains("let capacity_overflowed = apply & !value_is_zero & !key_present & !inserted_any;")
+        && generated_object_helpers_source.contains("key_present |= entry.matches_key(&key);")
+        && !generated_object_helpers_source.contains(
+            "apply & !value_is_zero & !matched_any & !inserted_any & !entry.is_occupied();",
+        )
         && generated_object_helpers_source.contains("Ok(capacity_overflowed)")
         && !generated_object_helpers_source
             .contains("bail!(\"map {} exceeded public capacity\", object_name);")
@@ -28835,7 +28839,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         )
         && generated_oram_codecs_source
             .contains("update_failed |= working_stash.len() > state.parameters.stash_bound;")
-			        && generated_oram_codecs_source.contains("Ok((transcript, update_failed))")
+			        && generated_oram_codecs_source.contains("Ok((transcript, update_failed | capacity_overflowed))")
 		        && generated_oram_codecs_source.contains("slot_index: transition_slot.to_witness(),")
 		        && generated_oram_codecs_source.contains("next_leaf: transition_next_leaf.to_witness(),")
 		        && !generated_oram_codecs_source
@@ -44329,7 +44333,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             "pub(crate) fn select(cond: bool, when_true: Self, when_false: Self) -> Result<Self> {",
         )
         && !generated_oram_codecs_source.contains("MapEntry::select(write_here, candidate.clone(), entry.clone())?;")
-        && generated_object_helpers_source.contains("!entry.is_occupied()")
+        && generated_object_helpers_source.contains("let was_occupied = entry.is_occupied();")
         && generated_object_helpers_source.contains("Ok(MapEntry::new(occupied, key, value))")
         && generated_object_helpers_source.contains("entry.overwrite(")
         && !generated_object_helpers_source.contains("if occupied {")

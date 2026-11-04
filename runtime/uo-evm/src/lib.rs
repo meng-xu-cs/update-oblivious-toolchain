@@ -952,6 +952,109 @@ bounds:
         assert_ne!(path_buckets(&noop.trace), path_buckets(&read.trace));
     }
 
+    fn read_registry(instance: &mut ContractInstance, key: &Value) -> Option<Value> {
+        instance
+            .call("read(bytes32)", vec![key.clone()])
+            .unwrap()
+            .return_value
+    }
+
+    fn upsert_registry(instance: &mut ContractInstance, key: &Value, value: u64) -> bool {
+        instance
+            .call(
+                "upsert(bytes32,uint256)",
+                vec![key.clone(), Value::uint(value)],
+            )
+            .unwrap()
+            .aborted
+    }
+
+    #[test]
+    fn full_scan_map_update_after_a_vacated_slot_keeps_one_entry_per_key() {
+        // Capacity 2. Clearing k1 vacates slot 0 while k2 stays in slot 1.
+        // Updating k2 must rewrite slot 1, not put a second copy of k2 into
+        // slot 0: with the copy the map is full, and inserting k3 aborts
+        // although the map holds one key.
+        let metadata =
+            include_str!(bench_raw!("RegistryCRUD.uo.yaml")).replace("capacity: 8", "capacity: 2");
+        let artifact = compile_bench(bench_raw!("RegistryCRUD.sol"), &metadata, ProgramMode::Uo);
+        let mut instance = ContractInstance::deploy(artifact).unwrap();
+        let (k1, k2, k3) = (
+            Value::Bytes32([1u8; 32]),
+            Value::Bytes32([2u8; 32]),
+            Value::Bytes32([3u8; 32]),
+        );
+        assert!(!upsert_registry(&mut instance, &k1, 1));
+        assert!(!upsert_registry(&mut instance, &k2, 2));
+        let clear = instance.call("clear(bytes32)", vec![k1.clone()]).unwrap();
+        assert!(!clear.aborted);
+        assert!(!upsert_registry(&mut instance, &k2, 3));
+        assert!(!upsert_registry(&mut instance, &k3, 4));
+        assert_eq!(read_registry(&mut instance, &k1), Some(Value::uint(0)));
+        assert_eq!(read_registry(&mut instance, &k2), Some(Value::uint(3)));
+        assert_eq!(read_registry(&mut instance, &k3), Some(Value::uint(4)));
+    }
+
+    #[test]
+    fn full_scan_map_zero_write_deletes_and_never_overflows() {
+        // A map does not tell zero from an absent key: clearing k1 frees its
+        // slot for k2, and writing zero to an absent key in a full map is a
+        // no-op rather than an overflow. The Lean map semantics agree
+        // (`Value.mapInsertBounded_zeroLike`).
+        let metadata =
+            include_str!(bench_raw!("RegistryCRUD.uo.yaml")).replace("capacity: 8", "capacity: 1");
+        let artifact = compile_bench(bench_raw!("RegistryCRUD.sol"), &metadata, ProgramMode::Uo);
+        let mut instance = ContractInstance::deploy(artifact).unwrap();
+        let (k1, k2, k3) = (
+            Value::Bytes32([1u8; 32]),
+            Value::Bytes32([2u8; 32]),
+            Value::Bytes32([3u8; 32]),
+        );
+        assert!(!upsert_registry(&mut instance, &k1, 5));
+        let clear = instance.call("clear(bytes32)", vec![k1.clone()]).unwrap();
+        assert!(!clear.aborted);
+        assert!(!upsert_registry(&mut instance, &k2, 7));
+        assert!(!upsert_registry(&mut instance, &k3, 0));
+        assert!(upsert_registry(&mut instance, &k3, 9));
+        assert_eq!(read_registry(&mut instance, &k1), Some(Value::uint(0)));
+        assert_eq!(read_registry(&mut instance, &k2), Some(Value::uint(7)));
+        assert_eq!(read_registry(&mut instance, &k3), Some(Value::uint(0)));
+    }
+
+    #[test]
+    fn path_oram_write_of_a_new_key_to_a_full_map_is_not_dropped() {
+        // Capacity 2 holds k1 and k2, so writing k3 must abort, as on the
+        // full-scan route; the Path ORAM put used to drop the write and commit
+        // the call. The runtime does not yet run aborted calls on this route
+        // and rejects the call instead, leaving the committed state unchanged.
+        let metadata = include_str!(bench_raw!("SingleAccessMap.pathoram.yaml"))
+            .replace("capacity: 16", "capacity: 2");
+        let artifact = compile_bench(
+            bench_raw!("SingleAccessMap.sol"),
+            &metadata,
+            ProgramMode::Uo,
+        );
+        let mut instance = ContractInstance::deploy(artifact).unwrap();
+        let key = |byte: u8| Value::Bytes32([byte; 32]);
+        for (byte, value) in [(1u8, 5u64), (2, 6)] {
+            let put = instance
+                .call("put(bytes32,uint256)", vec![key(byte), Value::uint(value)])
+                .unwrap();
+            assert!(!put.aborted);
+        }
+        let overflow = instance.call("put(bytes32,uint256)", vec![key(3), Value::uint(7)]);
+        if let Ok(result) = overflow {
+            assert!(
+                result.aborted,
+                "a write of a new key to a full map committed"
+            );
+        }
+        for (byte, value) in [(1u8, 5u64), (2, 6), (3, 0)] {
+            let read = instance.call("read(bytes32)", vec![key(byte)]).unwrap();
+            assert_eq!(read.return_value, Some(Value::uint(value)));
+        }
+    }
+
     #[test]
     fn private_posmap_path_oram_supports_multi_access_entrypoints() {
         // SingleAccessMap with its map on the scalable private-position-map

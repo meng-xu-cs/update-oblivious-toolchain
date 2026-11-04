@@ -1160,6 +1160,35 @@ structure Value.BoundedMapInsertResult where
   entries : List (Value × Value)
   overflowed : Bool
 
+mutual
+
+/-- Whether a value is its type's zero: `false`, `0`, all-zero bytes, or a
+struct or array whose components are all zero. Mirrors the runtime's
+`Value::confidential_is_zero_like`. -/
+def Value.isZeroLike : Value → Bool
+  | .bool b => !b
+  | .uint n => n == 0
+  | .bytes32 bytes => bytes.all (· == 0)
+  | .address bytes => bytes.all (· == 0)
+  | .structValue fields => Value.fieldsAreZeroLike fields
+  | .array values => Value.valuesAreZeroLike values
+  | .map entries => entries.isEmpty
+
+def Value.fieldsAreZeroLike : List (String × Value) → Bool
+  | [] => true
+  | (_, value) :: rest => Value.isZeroLike value && Value.fieldsAreZeroLike rest
+
+def Value.valuesAreZeroLike : List Value → Bool
+  | [] => true
+  | value :: rest => Value.isZeroLike value && Value.valuesAreZeroLike rest
+
+end
+
+/-- Remove the entries whose key matches `key` (by `Value.beq`). -/
+def Value.mapErase (entries : List (Value × Value)) (key : Value) :
+    List (Value × Value) :=
+  entries.filter (fun entry => !Value.beq entry.fst key)
+
 /-- Insert or update a `(key, value)` entry in a map's entry list. If a
 matching key exists (by `Value.beq`), replace its value; otherwise
 prepend a new entry. -/
@@ -1171,10 +1200,18 @@ def Value.mapInsert (entries : List (Value × Value)) (key value : Value) :
   else
     (key, value) :: entries
 
+/-- Write `value` at `key` in a map bounded by `capacity`. As in Solidity, a
+map does not tell a zero value from an absent key, and neither does the
+runtime: writing the zero value removes the key and never overflows, so the
+capacity bounds the keys with nonzero values. A nonzero write updates a
+present key, inserts an absent one while fewer than `capacity` keys are
+present, and overflows otherwise. -/
 def Value.mapInsertBounded
     (entries : List (Value × Value)) (key value : Value)
     (capacity : Option Nat) : Value.BoundedMapInsertResult :=
-  if entries.any (fun entry => Value.beq entry.fst key) then
+  if value.isZeroLike then
+    { entries := Value.mapErase entries key, overflowed := false }
+  else if entries.any (fun entry => Value.beq entry.fst key) then
     { entries := Value.mapInsert entries key value, overflowed := false }
   else
     match capacity with
@@ -1188,11 +1225,47 @@ def Value.mapInsertBounded
 
 theorem Value.mapInsertBounded_overflow_keeps_entries
     (entries : List (Value × Value)) (key value : Value) (cap : Nat)
+    (hNonzero : value.isZeroLike = false)
     (hMissing : entries.any (fun entry => Value.beq entry.fst key) = false)
     (hFull : ¬ entries.length < cap) :
     Value.mapInsertBounded entries key value (some cap) =
       { entries := entries, overflowed := true } := by
-  simp [Value.mapInsertBounded, hMissing, hFull]
+  simp [Value.mapInsertBounded, hNonzero, hMissing, hFull]
+
+/-- A zero write removes the key and does not overflow, whatever the
+capacity. -/
+theorem Value.mapInsertBounded_zeroLike
+    (entries : List (Value × Value)) (key value : Value) (capacity : Option Nat)
+    (hZero : value.isZeroLike = true) :
+    Value.mapInsertBounded entries key value capacity =
+      { entries := Value.mapErase entries key, overflowed := false } := by
+  simp [Value.mapInsertBounded, hZero]
+
+theorem Value.mapLookup_mapErase (entries : List (Value × Value)) (key : Value) :
+    Value.mapLookup (Value.mapErase entries key) key = none := by
+  have hNone : (Value.mapErase entries key).find?
+      (fun entry => Value.beq entry.fst key) = none := by
+    rw [List.find?_eq_none]
+    intro entry hEntry
+    simp only [Value.mapErase, List.mem_filter] at hEntry
+    simpa using hEntry.2
+  simp [Value.mapLookup, hNone]
+
+/-- After a zero write the key reads as its type's zero. -/
+theorem Value.mapLookupD_after_zero_write
+    (entries : List (Value × Value)) (key value : Value) (capacity : Option Nat)
+    (valueType : Ty) (hZero : value.isZeroLike = true) :
+    Value.mapLookupD (Value.mapInsertBounded entries key value capacity).entries key
+        valueType =
+      Value.zeroForType valueType := by
+  rw [Value.mapInsertBounded_zeroLike entries key value capacity hZero]
+  exact Value.mapLookupD_missing_returns_zero _ key valueType
+    (Value.mapLookup_mapErase entries key)
+
+/-- Erasing never grows a map. -/
+theorem Value.mapErase_length_le (entries : List (Value × Value)) (key : Value) :
+    (Value.mapErase entries key).length ≤ entries.length :=
+  List.length_filter_le _ _
 
 mutual
 

@@ -984,6 +984,9 @@ theorem Value.mapInsertBounded_mem {entries : List (Value × Value)} {key value 
     entry ∈ entries ∨ entry.snd = value := by
   unfold Value.mapInsertBounded at h
   split at h
+  · simp only [Value.mapErase, List.mem_filter] at h
+    exact Or.inl h.1
+  split at h
   · exact Value.mapInsert_mem h
   · split at h
     · split at h

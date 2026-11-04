@@ -88,7 +88,12 @@ Sidecar metadata requirements:
   the `returns`/`status` declassification or the `encrypted_to_client` channel.
   The `public_state_declassifies` sidecar field is rejected (it conflicted with
   the confidential-object targeting restriction)
-- every map must declare a public `capacity`
+- every map must declare a public `capacity`. As in Solidity, a map does not
+  tell a zero value from an absent key: writing the zero value deletes the key
+  and never overflows, so the capacity bounds the keys with nonzero values,
+  and a nonzero write of a new key to a full map aborts the call. The runtime
+  routes and the Lean semantics (`Value.mapInsertBounded` in
+  `UOToolchain/IRSemantics.lean`) agree on this rule
 - map and array capacities must be positive
 - confidential entrypoints must declare `secret_args`
 - `oram_scheme` must be set explicitly when a proof-grade ORAM path is

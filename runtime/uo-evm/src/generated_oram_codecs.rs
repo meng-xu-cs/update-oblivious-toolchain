@@ -1770,6 +1770,9 @@ pub(super) fn run_path_put(
     let no_insert_slot = MaskedUsizeOption::none();
     let insert_slot = masked_select_option_usize(request_insert, &vacant_slot, &no_insert_slot);
     let insert_slot_present = insert_slot.is_some();
+    // A write of a new key to a full map aborts the call, as on the other
+    // map routes; the access itself proceeds as a no-op.
+    let capacity_overflowed = request_insert & !insert_slot_present;
     let update_existing = apply & slot_present & !value_is_zero;
     let delete_existing = apply & slot_present & value_is_zero;
     let insert_new = apply & !slot_present & !value_is_zero & insert_slot_present;
@@ -1837,7 +1840,7 @@ pub(super) fn run_path_put(
     let mut transcript = path_access_transcript(state, spec, access_leaf)?;
     transcript.physical_writes = writes;
     transcript.path_transition = Some(transition);
-    Ok((transcript, update_failed))
+    Ok((transcript, update_failed | capacity_overflowed))
 }
 
 pub(super) fn empty_map_entry(spec: &StateObject) -> Result<MapEntry> {

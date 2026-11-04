@@ -2567,21 +2567,22 @@ def RuntimeImplementationInterface.sharedConfidentialSmallMapUsesMaskedFullScanU
       , ") -> Result<bool> {"
       , "let value_is_zero = value.confidential_is_zero_like();"
       , "let zero_value = Value::zero_for_type(value_type);"
-      , "let mut matched_any = false;"
+      , "let mut key_present = false;"
+      , "key_present |= entry.matches_key(&key);"
       , "let mut inserted_any = false;"
       , "let key_match = was_occupied & Value::confidential_eq(entry.key(), &key);"
-      , "let insert_here ="
-      , "apply & !value_is_zero & !matched_any & !inserted_any & !entry.is_occupied();"
+      , "let insert_here = apply & !value_is_zero & !key_present & !inserted_any & !was_occupied;"
       , "let write_here = apply & !value_is_zero & (key_match | insert_here);"
       , "entry.overwrite(next_occupied, next_key, next_value);"
-      , "matched_any |= key_match;"
       , "inserted_any |= insert_here;"
-      , "let capacity_overflowed = apply & !value_is_zero & !matched_any & !inserted_any;"
+      , "let capacity_overflowed = apply & !value_is_zero & !key_present & !inserted_any;"
       , "Ok(capacity_overflowed)"
       ] ∧
     sourceLacksAll iface.generatedObjectHelpersProductionSource
       [ "bail!(\"map {} exceeded public capacity\", object_name);"
       , "if apply & !value_is_zero & !matched_any & !inserted_any {"
+      , "if apply & !value_is_zero & !key_present & !inserted_any {"
+      , "apply & !value_is_zero & !matched_any & !inserted_any & !entry.is_occupied();"
       ] ∧
     sourceContainsAll iface.generatedOramCodecsProductionSource
       [ "impl MapEntry {"
@@ -2627,21 +2628,22 @@ def RuntimeImplementationInterface.checkSharedConfidentialSmallMapUsesMaskedFull
       , ") -> Result<bool> {"
       , "let value_is_zero = value.confidential_is_zero_like();"
       , "let zero_value = Value::zero_for_type(value_type);"
-      , "let mut matched_any = false;"
+      , "let mut key_present = false;"
+      , "key_present |= entry.matches_key(&key);"
       , "let mut inserted_any = false;"
       , "let key_match = was_occupied & Value::confidential_eq(entry.key(), &key);"
-      , "let insert_here ="
-      , "apply & !value_is_zero & !matched_any & !inserted_any & !entry.is_occupied();"
+      , "let insert_here = apply & !value_is_zero & !key_present & !inserted_any & !was_occupied;"
       , "let write_here = apply & !value_is_zero & (key_match | insert_here);"
       , "entry.overwrite(next_occupied, next_key, next_value);"
-      , "matched_any |= key_match;"
       , "inserted_any |= insert_here;"
-      , "let capacity_overflowed = apply & !value_is_zero & !matched_any & !inserted_any;"
+      , "let capacity_overflowed = apply & !value_is_zero & !key_present & !inserted_any;"
       , "Ok(capacity_overflowed)"
       ] &&
     checkSourceLacksAll iface.generatedObjectHelpersProductionSource
       [ "bail!(\"map {} exceeded public capacity\", object_name);"
       , "if apply & !value_is_zero & !matched_any & !inserted_any {"
+      , "if apply & !value_is_zero & !key_present & !inserted_any {"
+      , "apply & !value_is_zero & !matched_any & !inserted_any & !entry.is_occupied();"
       ] &&
     checkSourceContainsAll iface.generatedOramCodecsProductionSource
       [ "impl MapEntry {"
@@ -6662,6 +6664,7 @@ def RuntimeImplementationInterface.pathOramPutUsesMaskedFullScanStateUpdates
       , "let insert_slot = masked_select_option_usize(request_insert, &vacant_slot, &no_insert_slot);"
       , "let update_existing = apply & slot_present & !value_is_zero;"
       , "let delete_existing = apply & slot_present & value_is_zero;"
+      , "let capacity_overflowed = request_insert & !insert_slot_present;"
       , "let insert_new = apply & !slot_present & !value_is_zero & insert_slot_present;"
       , "let transition_slot = masked_select_option_usize(insert_new, &insert_slot, &slot);"
       , "let (writes, update_failed) = rewrite_path_for_access("
@@ -6692,7 +6695,7 @@ def RuntimeImplementationInterface.pathOramPutUsesMaskedFullScanStateUpdates
       , "pub(super) fn apply_surrogate_put_update("
       , "let capacity_overflowed = request_insert & !insert_slot_present;"
       , "Ok(capacity_overflowed)"
-      , "Ok((transcript, update_failed))"
+      , "Ok((transcript, update_failed | capacity_overflowed))"
       ] ∧
     sourceLacksAll iface.generatedOramCodecsProductionSource
       [ "if (update_existing | delete_existing) && !matched_slot {"
@@ -6744,6 +6747,7 @@ def RuntimeImplementationInterface.checkPathOramPutUsesMaskedFullScanStateUpdate
       , "let insert_slot = masked_select_option_usize(request_insert, &vacant_slot, &no_insert_slot);"
       , "let update_existing = apply & slot_present & !value_is_zero;"
       , "let delete_existing = apply & slot_present & value_is_zero;"
+      , "let capacity_overflowed = request_insert & !insert_slot_present;"
       , "let insert_new = apply & !slot_present & !value_is_zero & insert_slot_present;"
       , "let transition_slot = masked_select_option_usize(insert_new, &insert_slot, &slot);"
       , "let (writes, update_failed) = rewrite_path_for_access("
@@ -6774,7 +6778,7 @@ def RuntimeImplementationInterface.checkPathOramPutUsesMaskedFullScanStateUpdate
       , "pub(super) fn apply_surrogate_put_update("
       , "let capacity_overflowed = request_insert & !insert_slot_present;"
       , "Ok(capacity_overflowed)"
-      , "Ok((transcript, update_failed))"
+      , "Ok((transcript, update_failed | capacity_overflowed))"
       ] &&
     checkSourceLacksAll iface.generatedOramCodecsProductionSource
       [ "if (update_existing | delete_existing) && !matched_slot {"

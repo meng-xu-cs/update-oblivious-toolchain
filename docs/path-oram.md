@@ -21,7 +21,9 @@ The Lean development states more than it currently proves for Path ORAM:
   validated through compact theorem inputs, which check a representative
   witness and derive no theorem.
 - A call that aborts on the local route is rejected by the runtime
-  (`rejected_by_proof_grade_route` in `results/abort_rollback.json`).
+  (`rejected_by_proof_grade_route` in `results/abort_rollback.json`). This
+  includes a write of a new key to a full map, which aborts the call as on the
+  full-scan route; the runtime used to drop such a write and commit the call.
 - `path_oram_private_posmap_v1` executes, including several accesses to one
   map per call, but it is not yet covered by a theorem. The runtime has no
   recursive position map; both schemes share one data path, a flat position
