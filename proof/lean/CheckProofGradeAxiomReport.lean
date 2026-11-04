@@ -106,4 +106,10 @@ info: 'UOToolchain.paperMain_admittedKernel_exact_noninterference_moduloReleases
 #guard_msgs in
 #print axioms UOToolchain.paperMain_admittedKernel_exact_noninterference_moduloReleases
 
+/--
+info: 'UOToolchain.IR.evalKernelProgram_flow_ni' depends on axioms: [propext, Classical.choice, Quot.sound]
+-/
+#guard_msgs in
+#print axioms UOToolchain.IR.evalKernelProgram_flow_ni
+
 def main : IO UInt32 := pure 0

@@ -74,6 +74,7 @@ import UOToolchain.PaperMainTheorem
 import UOToolchain.AcceptedPackageCapstone
 import UOToolchain.PaperMainReleases
 import UOToolchain.KernelExactTrace
+import UOToolchain.KernelFlow
 import UOToolchain.ProofGrade
 
 /-!

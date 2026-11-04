@@ -76,7 +76,11 @@ must declare `status: declassified`. That includes every entrypoint that writes
 a confidential map, because a full bounded map aborts a write of a new key and
 whether a key is new depends on the map's confidential contents; for example,
 `ConfidentialMixer.deposit` declares `status: declassified` for this reason
-(see [`supported-subset.md`](./supported-subset.md)).
+(see [`supported-subset.md`](./supported-subset.md)). The Lean counterpart of
+this analysis over kernel programs (`KernelProgram.flowSummary` in
+`UOToolchain/KernelFlow.lean`) is proved sound: when it reports a public status
+or return, runs that agree on public inputs end with the same status or return
+value (`evalKernelProgram_flow_ni`).
 
 The theorems are `paperMain_exact_backend_noninterference_moduloReleases`,
 `paperMain_pathOramLocalPosmapV1_noninterference_moduloReleases`, and

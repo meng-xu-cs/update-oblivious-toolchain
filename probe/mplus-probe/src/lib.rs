@@ -4063,6 +4063,7 @@ fn run_static_checks(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<J
         "proof/lean/UOToolchain/PaperMainReleases.lean",
         "proof/lean/UOToolchain/KernelTyping.lean",
         "proof/lean/UOToolchain/KernelExactTrace.lean",
+        "proof/lean/UOToolchain/KernelFlow.lean",
     ]
     .into_iter()
     .map(|relative_path| {
@@ -4105,6 +4106,7 @@ fn run_static_checks(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<J
         "UOToolchain.IR.evalKernelProgram_continues_of_wellTyped",
         "UOToolchain.IR.admittedKernel_exactUO",
         "UOToolchain.paperMain_admittedKernel_exact_noninterference_moduloReleases",
+        "UOToolchain.IR.evalKernelProgram_flow_ni",
         "UOToolchain.RuntimeImplementationKernelMachineConfinementBoundary.paperEndToEndConfinementWithPublicOnlyHandwrittenShell",
         "UOToolchain.RuntimePaperNativeKernelAssumptions.paperEndToEndConfinementWithPublicOnlyHandwrittenShell",
     ]

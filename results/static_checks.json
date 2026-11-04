@@ -104,6 +104,10 @@
     },
     {
       "print_axioms_present": true,
+      "theorem": "UOToolchain.IR.evalKernelProgram_flow_ni"
+    },
+    {
+      "print_axioms_present": true,
       "theorem": "UOToolchain.RuntimeImplementationKernelMachineConfinementBoundary.paperEndToEndConfinementWithPublicOnlyHandwrittenShell"
     },
     {
@@ -633,6 +637,11 @@
     },
     {
       "file": "proof/lean/UOToolchain/KernelExactTrace.lean",
+      "forbidden_import_hits": [],
+      "restricted": true
+    },
+    {
+      "file": "proof/lean/UOToolchain/KernelFlow.lean",
       "forbidden_import_hits": [],
       "restricted": true
     }

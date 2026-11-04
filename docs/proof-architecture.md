@@ -70,6 +70,19 @@ schedule, controller shape, final public state, and release functions. The
 probe checks that the runtime's traces are exactly the encoding's prediction
 (`exact_encoding_matches` in `trace_equivalence.json`).
 
+`UOToolchain.KernelFlow` is the Lean counterpart of the compiler's policy
+analysis. Variables carry a public or secret label (parameters by
+`secretArgs`; every storage read is secret, since a confidential kernel
+targets only confidential objects), and `KernelProgram.flowSummary` reports
+whether the status or the return value may depend on secrets: a `require` or
+`abortIf` on a secret condition, or any map write (capacity overflow), makes
+the status secret. `evalKernelProgram_flow_ni` proves the analysis sound: two
+conforming runs of a well-typed program over the same contract, with arguments
+that agree at public parameter positions, end with the same status when the
+analysis reports a public status, and return the same value when it reports a
+public return. `publicArgsAgree_of_layout` derives the argument agreement from
+equal public arguments and the declared argument layout.
+
 ## Runtime Bridge
 
 Runtime execution emits or supports these proof-facing objects:
