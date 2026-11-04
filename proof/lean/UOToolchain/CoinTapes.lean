@@ -2,10 +2,11 @@
 # Uniform coin tapes
 
 `coinTapes L m` lists every tape of `m` coins below `L`, the uniform
-distribution over such tapes. Reading uniform tapes at `n` distinct
-coordinates gives uniform tapes of length `n`, each `L ^ (m - n)` times
-(`map_readAt_coinTapes_perm`). `PathOramFreshLeaves` uses this to show that a
-Path ORAM leaf schedule is uniform whatever the accesses are.
+distribution over such tapes; `boundedTapes bounds` lets each coordinate have
+its own bound. Reading such tapes at `n` distinct coordinates gives the tapes
+of those coordinates, each equally often (`map_readAt_coinTapes_perm`,
+`map_readAt_boundedTapes_perm`). `PathOramFreshLeaves` uses this to show that
+a Path ORAM leaf schedule is uniform whatever the accesses are.
 -/
 
 namespace UOToolchain
@@ -297,6 +298,231 @@ theorem map_readAt_coinTapes_perm {L m : Nat} {ps : List Nat}
   refine ((map_readAt_perm_coinTapes hOrder).map _).trans ?_
   have hm : m = ps.length + (m - ps.length) := by omega
   rw [hm, map_take_coinTapes, ← hm]
+
+/-! ## Coins with a bound per coordinate -/
+
+/-- Every tape whose `j`-th coin is below `bounds[j]`, in lexicographic
+order: the uniform distribution over independent coins with those ranges. -/
+def boundedTapes : List Nat → List (List Nat)
+  | [] => [[]]
+  | L :: bounds => (List.range L).flatMap fun x => (boundedTapes bounds).map (x :: ·)
+
+/-- Coins below their bounds. -/
+def WithinBounds (bounds t : List Nat) : Prop :=
+  t.length = bounds.length ∧ ∀ i (hi : i < t.length) (hb : i < bounds.length), t[i] < bounds[i]
+
+theorem mem_boundedTapes {bounds t : List Nat} :
+    t ∈ boundedTapes bounds ↔ WithinBounds bounds t := by
+  induction bounds generalizing t with
+  | nil =>
+      cases t with
+      | nil => simp [boundedTapes, WithinBounds]
+      | cons x t => simp [boundedTapes, WithinBounds]
+  | cons L bounds ih =>
+      cases t with
+      | nil => simp [boundedTapes, WithinBounds]
+      | cons x t =>
+          simp only [boundedTapes, List.mem_flatMap, List.mem_range, List.mem_map,
+            List.cons.injEq]
+          constructor
+          · rintro ⟨y, hy, r, hr, rfl, rfl⟩
+            have := ih.mp hr
+            refine ⟨by simp [this.1], ?_⟩
+            intro i hi hb
+            cases i with
+            | zero => simpa using hy
+            | succ i =>
+                simp only [List.getElem_cons_succ]
+                exact this.2 i (by simpa using hi) (by simpa using hb)
+          · rintro ⟨hLen, hLt⟩
+            refine ⟨x, by simpa using hLt 0 (by simp) (by simp), t, ih.mpr ⟨by simpa using hLen, ?_⟩,
+              rfl, rfl⟩
+            intro i hi hb
+            simpa using hLt (i + 1) (by simpa using hi) (by simpa using hb)
+
+theorem nodup_boundedTapes (bounds : List Nat) : (boundedTapes bounds).Nodup := by
+  induction bounds with
+  | nil => simp [boundedTapes]
+  | cons L bounds ih =>
+      simp only [boundedTapes]
+      unfold List.Nodup
+      rw [List.pairwise_flatMap]
+      refine ⟨?_, ?_⟩
+      · intro x _
+        exact nodup_map_of_injOn ih (fun a _ b _ h => by simpa using h)
+      · refine List.nodup_range.imp ?_
+        intro x y hxy
+        simp only [List.mem_map]
+        rintro t ⟨a, _, rfl⟩ s ⟨b, _, rfl⟩ hts
+        exact hxy (List.cons.inj hts).1
+
+theorem boundedTapes_append (as bs : List Nat) :
+    boundedTapes (as ++ bs) =
+      (boundedTapes as).flatMap fun v => (boundedTapes bs).map (v ++ ·) := by
+  induction as with
+  | nil => simp [boundedTapes]
+  | cons a as ih =>
+      simp only [List.cons_append, boundedTapes, ih, List.map_flatMap, List.flatMap_assoc,
+        List.flatMap_map, List.map_map]
+      rfl
+
+theorem coinTapes_eq_boundedTapes (L m : Nat) : coinTapes L m = boundedTapes (List.replicate m L) := by
+  induction m with
+  | zero => rfl
+  | succ m ih => simp [coinTapes, boundedTapes, List.replicate_succ, ih]
+
+theorem getElem_idxOf_of_mem' {l : List Nat} {a : Nat} (h : a ∈ l) :
+    l[l.idxOf a]'(List.idxOf_lt_length_of_mem h) = a := by
+  induction l with
+  | nil => simp at h
+  | cons b l ih =>
+      by_cases hb : b = a
+      · subst hb
+        simp [List.idxOf_cons_self]
+      · have ha : a ∈ l := by
+          rcases List.mem_cons.mp h with h | h
+          · exact absurd h.symm hb
+          · exact h
+        have hne : (b == a) = false := by simpa using hb
+        have hidx : (b :: l).idxOf a = l.idxOf a + 1 := by
+          rw [List.idxOf_cons, hne, cond_false]
+        simp only [hidx, List.getElem_cons_succ]
+        exact ih ha
+
+theorem readAt_withinBounds {bounds order t : List Nat}
+    (hBound : ∀ p ∈ order, p < bounds.length) (ht : WithinBounds bounds t) :
+    WithinBounds (readAt order bounds) (readAt order t) := by
+  refine ⟨by simp [readAt], ?_⟩
+  intro i hi hb
+  have hio : i < order.length := by simpa [readAt] using hi
+  have hp : order[i] < bounds.length := hBound _ (List.getElem_mem hio)
+  have hpt : order[i] < t.length := by rw [ht.1]; exact hp
+  simp only [readAt, List.getElem_map]
+  rw [getD_of_lt hpt, getD_of_lt hp]
+  exact ht.2 _ hpt hp
+
+/-- Reading tapes through a permutation of their coordinates permutes the
+tapes with the correspondingly permuted bounds. -/
+theorem map_readAt_perm_boundedTapes {bounds order : List Nat}
+    (hOrder : order.Perm (List.range bounds.length)) :
+    ((boundedTapes bounds).map (readAt order)).Perm (boundedTapes (readAt order bounds)) := by
+  have hLen : order.length = bounds.length := by simpa using hOrder.length_eq
+  have hNodup : order.Nodup := hOrder.nodup_iff.mpr List.nodup_range
+  have hBound : ∀ p ∈ order, p < bounds.length :=
+    fun p hp => List.mem_range.mp (hOrder.mem_iff.mp hp)
+  have hCover : ∀ q < bounds.length, q ∈ order :=
+    fun q hq => hOrder.mem_iff.mpr (List.mem_range.mpr hq)
+  apply perm_of_nodup_of_mem_iff
+  · refine nodup_map_of_injOn (nodup_boundedTapes bounds) ?_
+    intro t ht s hs hts
+    have ht' := (mem_boundedTapes.mp ht).1
+    have hs' := (mem_boundedTapes.mp hs).1
+    apply List.ext_getElem (by rw [ht', hs'])
+    intro i hi _
+    have hiOrder : i ∈ order := hCover i (ht' ▸ hi)
+    obtain ⟨j, hj, hji⟩ := List.mem_iff_getElem.mp hiOrder
+    have h1 := congrArg (fun r => r.getD j 0) hts
+    have his : i < s.length := by rw [hs', ← ht']; exact hi
+    simp only [readAt, List.getD_eq_getElem?_getD, List.getElem?_map,
+      List.getElem?_eq_getElem hj, Option.map_some, Option.getD_some, hji,
+      List.getElem?_eq_getElem hi, List.getElem?_eq_getElem his] at h1
+    exact h1
+  · exact nodup_boundedTapes _
+  · intro a
+    constructor
+    · intro hm
+      obtain ⟨t, ht, rfl⟩ := List.mem_map.mp hm
+      exact mem_boundedTapes.mpr (readAt_withinBounds hBound (mem_boundedTapes.mp ht))
+    · intro ha
+      have ha' := mem_boundedTapes.mp ha
+      have haLen : a.length = bounds.length := by rw [ha'.1]; simp [readAt, hLen]
+      let t := (List.range bounds.length).map fun q => a.getD (order.idxOf q) 0
+      have htLen : t.length = bounds.length := by simp [t]
+      refine List.mem_map.mpr ⟨t, mem_boundedTapes.mpr ⟨htLen, ?_⟩, ?_⟩
+      · intro q hq hqb
+        have hqo : q ∈ order := hCover q hqb
+        have hIdx : order.idxOf q < order.length := List.idxOf_lt_length_of_mem hqo
+        have hIdxA : order.idxOf q < a.length := by rw [haLen, ← hLen]; exact hIdx
+        have hIdxB : order.idxOf q < (readAt order bounds).length := by simp [readAt]; exact hIdx
+        simp only [t, List.getElem_map, List.getElem_range]
+        rw [getD_of_lt hIdxA]
+        have hA := ha'.2 _ hIdxA hIdxB
+        simp only [readAt, List.getElem_map] at hA
+        have hEq : bounds.getD (order[order.idxOf q]) 0 = bounds[q] := by
+          simp only [getElem_idxOf_of_mem' hqo]
+          exact getD_of_lt hqb
+        rw [hEq] at hA
+        exact hA
+      · apply List.ext_getElem (by simp [readAt, hLen, haLen])
+        intro j hj hja
+        have hjo : j < order.length := by simpa [readAt] using hj
+        have hp : order[j] < t.length := by rw [htLen]; exact hBound _ (List.getElem_mem hjo)
+        simp only [readAt, List.getElem_map]
+        rw [getD_of_lt hp]
+        simp only [t, List.getElem_map, List.getElem_range]
+        rw [idxOf_getElem_of_nodup hNodup hjo, getD_of_lt hja]
+
+theorem map_take_boundedTapes (as bs : List Nat) :
+    (boundedTapes (as ++ bs)).map (List.take as.length) =
+      (boundedTapes as).flatMap fun v => List.replicate (boundedTapes bs).length v := by
+  rw [boundedTapes_append, List.map_flatMap]
+  apply flatMap_congr_mem
+  intro v hv
+  have hLen : v.length = as.length := (mem_boundedTapes.mp hv).1
+  rw [List.map_map]
+  have : ((fun w => List.take as.length w) ∘ fun w => v ++ w) = fun _ => v := by
+    funext w
+    exact List.take_left' hLen
+  rw [this, List.map_const']
+
+/-- Reading independent coins at distinct coordinates gives independent coins
+with the bounds of those coordinates, each tape as often as there are tapes of
+the remaining coordinates. -/
+theorem map_readAt_boundedTapes_perm {bounds ps : List Nat}
+    (hNodup : ps.Nodup) (hBound : ∀ p ∈ ps, p < bounds.length) :
+    ∃ rest : List Nat,
+      ((boundedTapes bounds).map (readAt ps)).Perm
+        ((boundedTapes (readAt ps bounds)).flatMap fun v =>
+          List.replicate (boundedTapes (readAt rest bounds)).length v) := by
+  let rest := (List.range bounds.length).filter fun q => !(ps.contains q)
+  refine ⟨rest, ?_⟩
+  have hRestNodup : rest.Nodup := (List.filter_sublist).nodup List.nodup_range
+  have hOrder : (ps ++ rest).Perm (List.range bounds.length) := by
+    apply perm_of_nodup_of_mem_iff
+    · rw [List.nodup_append]
+      refine ⟨hNodup, hRestNodup, ?_⟩
+      intro a ha b hb hab
+      subst hab
+      simp [rest, ha] at hb
+    · exact List.nodup_range
+    · intro q
+      simp only [List.mem_append, List.mem_range, rest, List.mem_filter,
+        Bool.not_eq_eq_eq_not, Bool.not_true]
+      constructor
+      · rintro (h | ⟨h, _⟩)
+        · exact hBound q h
+        · exact h
+      · intro hq
+        by_cases h : q ∈ ps
+        · exact Or.inl h
+        · exact Or.inr ⟨hq, by simpa using h⟩
+  have hTake : ∀ t, readAt ps t = (readAt (ps ++ rest) t).take (readAt ps bounds).length := by
+    intro t
+    simp only [readAt, List.map_append, List.length_map]
+    exact (List.take_left' (by simp)).symm
+  have hMap : (boundedTapes bounds).map (readAt ps) =
+      ((boundedTapes bounds).map (readAt (ps ++ rest))).map
+        (List.take (readAt ps bounds).length) := by
+    rw [List.map_map]
+    apply List.map_congr_left
+    intro t _
+    exact hTake t
+  rw [hMap]
+  refine ((map_readAt_perm_boundedTapes hOrder).map _).trans ?_
+  have hSplit : readAt (ps ++ rest) bounds = readAt ps bounds ++ readAt rest bounds := by
+    simp [readAt]
+  rw [hSplit, map_take_boundedTapes]
+
 
 end CoinTape
 

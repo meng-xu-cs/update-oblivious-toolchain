@@ -15,9 +15,12 @@ schedule (`observedLeaves_uniform`, `observedLeaves_canonical`), and the
 leaves left behind are uniform and independent of it
 (`observedLeaves_finalLeaves_uniform`), which is what the next call needs.
 
-Scope: one map. Several maps interleave by the public schedule, each with its
-own coins; that product is not stated here.
+Several maps: the model is generic in the slot type, so a call on several
+maps runs it on `(map, slot)` keys, each map's coins below its own leaf count
+(`multiObservedLeaves_uniform`, `multiObservedLeaves_canonical`).
 -/
+
+set_option autoImplicit false
 
 namespace UOToolchain
 
@@ -25,28 +28,29 @@ namespace PathOramFreshLeaves
 
 open CoinTape
 
+variable {σ : Type} [DecidableEq σ]
+
 /-- One access to a Path ORAM map, by what it does to the accessed key's leaf:
 `remap` (read hit, update, or masked write on a present key) reads the key's
 path and gives the key a fresh leaf; `miss` (read miss, or masked write on an
 absent key) reads a fresh random path; `insert` reads a fresh random path and
 gives the new key a fresh leaf; `delete` reads the key's path and drops it. -/
-inductive LeafStep
-  | remap (slot : Nat)
+inductive LeafStep (σ : Type)
+  | remap (slot : σ)
   | miss
-  | insert (slot : Nat)
-  | delete (slot : Nat)
-deriving Repr, DecidableEq
+  | insert (slot : σ)
+  | delete (slot : σ)
 
 /-- A partial map from slots, updated at one slot. -/
-def setAt (m : Nat → Option Nat) (slot : Nat) (v : Option Nat) : Nat → Option Nat :=
+def setAt (m : σ → Option Nat) (slot : σ) (v : Option Nat) : σ → Option Nat :=
   fun s => if s = slot then v else m s
 
 /-! ## Leaves: what the runtime computes from its coins -/
 
 /-- One access on leaf values: the observed leaf, and the new position map.
 `missCoin` is the access's random path, `nextCoin` its fresh leaf. -/
-def stepLeaves (missCoin nextCoin : Nat) (leaves : Nat → Option Nat) :
-    LeafStep → Nat × (Nat → Option Nat)
+def stepLeaves (missCoin nextCoin : Nat) (leaves : σ → Option Nat) :
+    LeafStep σ → Nat × (σ → Option Nat)
   | .remap s =>
       match leaves s with
       | some l => (l, setAt leaves s (some nextCoin))
@@ -60,7 +64,7 @@ def stepLeaves (missCoin nextCoin : Nat) (leaves : Nat → Option Nat) :
 
 /-- Run accesses, drawing two coins per access (the random path, then the
 fresh leaf), as the runtime does. -/
-def runLeaves (leaves : Nat → Option Nat) : List LeafStep → List Nat → List Nat × (Nat → Option Nat)
+def runLeaves (leaves : σ → Option Nat) : List (LeafStep σ) → List Nat → List Nat × (σ → Option Nat)
   | [], _ => ([], leaves)
   | step :: steps, coins =>
       let r := stepLeaves (coins.getD 0 0) (coins.getD 1 0) leaves step
@@ -71,7 +75,7 @@ def runLeaves (leaves : Nat → Option Nat) : List LeafStep → List Nat → Lis
 
 /-- One access on tape coordinates: `base` is the coordinate of the access's
 random path and `base + 1` that of its fresh leaf. -/
-def stepVars (base : Nat) (vars : Nat → Option Nat) : LeafStep → Nat × (Nat → Option Nat)
+def stepVars (base : Nat) (vars : σ → Option Nat) : LeafStep σ → Nat × (σ → Option Nat)
   | .remap s =>
       match vars s with
       | some v => (v, setAt vars s (some (base + 1)))
@@ -83,31 +87,31 @@ def stepVars (base : Nat) (vars : Nat → Option Nat) : LeafStep → Nat × (Nat
       | some v => (v, setAt vars s none)
       | none => (base, vars)
 
-def runVars (start : Nat) (vars : Nat → Option Nat) : List LeafStep → List Nat × (Nat → Option Nat)
+def runVars (start : Nat) (vars : σ → Option Nat) : List (LeafStep σ) → List Nat × (σ → Option Nat)
   | [] => ([], vars)
   | step :: steps =>
       let r := stepVars start vars step
       let rest := runVars (start + 2) r.2 steps
       (r.1 :: rest.1, rest.2)
 
-theorem length_runVars (start : Nat) (vars : Nat → Option Nat) (steps : List LeafStep) :
+theorem length_runVars (start : Nat) (vars : σ → Option Nat) (steps : List (LeafStep σ)) :
     (runVars start vars steps).1.length = steps.length := by
   induction steps generalizing start vars with
   | nil => rfl
   | cons step steps ih => simp [runVars, ih]
 
 /-- Reading a tape through a coordinate map. -/
-def readVars (tape : List Nat) (vars : Nat → Option Nat) : Nat → Option Nat :=
+def readVars (tape : List Nat) (vars : σ → Option Nat) : σ → Option Nat :=
   fun s => (vars s).map fun v => tape.getD v 0
 
-theorem readVars_setAt (tape : List Nat) (vars : Nat → Option Nat) (s : Nat) (v : Option Nat) :
+theorem readVars_setAt (tape : List Nat) (vars : σ → Option Nat) (s : σ) (v : Option Nat) :
     readVars tape (setAt vars s v) = setAt (readVars tape vars) s (v.map fun v => tape.getD v 0) := by
   funext s'
   simp only [readVars, setAt]
   split <;> rfl
 
-theorem stepLeaves_readVars (tape : List Nat) (base : Nat) (vars : Nat → Option Nat)
-    (step : LeafStep) :
+theorem stepLeaves_readVars (tape : List Nat) (base : Nat) (vars : σ → Option Nat)
+    (step : LeafStep σ) :
     stepLeaves (tape.getD base 0) (tape.getD (base + 1) 0) (readVars tape vars) step =
       ((stepVars base vars step).1 |> fun v => tape.getD v 0,
         readVars tape (stepVars base vars step).2) := by
@@ -124,8 +128,8 @@ theorem stepLeaves_readVars (tape : List Nat) (base : Nat) (vars : Nat → Optio
 /-- The runtime's leaves are the tape read at the coordinates the accesses
 touch: the observed schedule is the tape at `(runVars …).1`, whatever the
 tape is. -/
-theorem runLeaves_readVars (tape : List Nat) (start : Nat) (vars : Nat → Option Nat)
-    (steps : List LeafStep) :
+theorem runLeaves_readVars (tape : List Nat) (start : Nat) (vars : σ → Option Nat)
+    (steps : List (LeafStep σ)) :
     runLeaves (readVars tape vars) steps (tape.drop start) =
       ((runVars start vars steps).1.map fun v => tape.getD v 0,
         readVars tape (runVars start vars steps).2) := by
@@ -144,12 +148,12 @@ theorem runLeaves_readVars (tape : List Nat) (start : Nat) (vars : Nat → Optio
 
 /-- Coordinate maps whose coordinates are below `start` and distinct across
 slots. -/
-def Fresh (start : Nat) (vars : Nat → Option Nat) : Prop :=
+def Fresh (start : Nat) (vars : σ → Option Nat) : Prop :=
   (∀ s v, vars s = some v → v < start) ∧
     (∀ s s' v, vars s = some v → vars s' = some v → s = s')
 
-theorem stepVars_spec {start : Nat} {vars : Nat → Option Nat} (hFresh : Fresh start vars)
-    (step : LeafStep) :
+theorem stepVars_spec {start : Nat} {vars : σ → Option Nat} (hFresh : Fresh start vars)
+    (step : LeafStep σ) :
     let r := stepVars start vars step
     Fresh (start + 2) r.2 ∧ r.1 < start + 2 ∧ (∀ s, r.2 s ≠ some r.1) ∧
       ((∃ s, vars s = some r.1) ∨ r.1 = start) ∧
@@ -260,8 +264,8 @@ theorem stepVars_spec {start : Nat} {vars : Nat → Option Nat} (hFresh : Fresh 
             · cases h
             · exact Or.inl ⟨s, h⟩
 
-theorem runVars_spec {start : Nat} {vars : Nat → Option Nat} (hFresh : Fresh start vars)
-    (steps : List LeafStep) :
+theorem runVars_spec {start : Nat} {vars : σ → Option Nat} (hFresh : Fresh start vars)
+    (steps : List (LeafStep σ)) :
     let r := runVars start vars steps
     r.1.Nodup ∧ (∀ o ∈ r.1, o < start + 2 * steps.length) ∧
       (∀ o ∈ r.1, ∀ s, r.2 s ≠ some o) ∧ Fresh (start + 2 * steps.length) r.2 ∧
@@ -316,7 +320,7 @@ theorem runVars_spec {start : Nat} {vars : Nat → Option Nat} (hFresh : Fresh s
 
 /-! ## The schedule is uniform, whatever the accesses -/
 
-theorem getElem_idxOf_of_mem {l : List Nat} {a : Nat} (h : a ∈ l) :
+theorem getElem_idxOf_of_mem {l : List σ} {a : σ} (h : a ∈ l) :
     l[l.idxOf a]'(List.idxOf_lt_length_of_mem h) = a := by
   induction l with
   | nil => simp at h
@@ -336,10 +340,19 @@ theorem getElem_idxOf_of_mem {l : List Nat} {a : Nat} (h : a ∈ l) :
 
 /-- The coordinates of a call's starting keys: the `i`-th key of `present`
 (distinct slots) has its leaf at tape coordinate `i`. -/
-def initialVars (present : List Nat) : Nat → Option Nat :=
+def initialVars (present : List σ) : σ → Option Nat :=
   fun s => if s ∈ present then some (present.idxOf s) else none
 
-theorem fresh_initialVars (present : List Nat) : Fresh present.length (initialVars present) := by
+theorem initialVars_eq_some {present : List σ} {s : σ} {v : Nat}
+    (h : initialVars present s = some v) : ∃ hv : v < present.length, present[v] = s := by
+  simp only [initialVars] at h
+  split at h
+  · rename_i hMem
+    cases h
+    exact ⟨List.idxOf_lt_length_of_mem hMem, getElem_idxOf_of_mem hMem⟩
+  · cases h
+
+theorem fresh_initialVars (present : List σ) : Fresh present.length (initialVars present) := by
   refine ⟨?_, ?_⟩
   · intro s v h
     simp only [initialVars] at h
@@ -351,13 +364,12 @@ theorem fresh_initialVars (present : List Nat) : Fresh present.length (initialVa
     split at h <;> split at h'
     · rename_i hs hs'
       cases h
-      have := congrArg (fun i => present.getD i 0) (Option.some.inj h')
+      have := congrArg (fun i => present[i]?) (Option.some.inj h')
       simp only at this
-      rw [List.getD_eq_getElem?_getD, List.getElem?_eq_getElem (List.idxOf_lt_length_of_mem hs'),
-        List.getD_eq_getElem?_getD, List.getElem?_eq_getElem (List.idxOf_lt_length_of_mem hs),
-        Option.getD_some, Option.getD_some, getElem_idxOf_of_mem hs, getElem_idxOf_of_mem hs']
-        at this
-      exact this.symm
+      rw [List.getElem?_eq_getElem (List.idxOf_lt_length_of_mem hs'),
+        List.getElem?_eq_getElem (List.idxOf_lt_length_of_mem hs),
+        getElem_idxOf_of_mem hs, getElem_idxOf_of_mem hs'] at this
+      exact (Option.some.inj this).symm
     · cases h'
     · cases h
     · cases h
@@ -366,16 +378,16 @@ theorem fresh_initialVars (present : List Nat) : Fresh present.length (initialVa
 starts with the keys in `present`, whose leaves are the first
 `present.length` coordinates of `tape`; the rest of the tape is the call's
 coins, two per access. -/
-def observedLeaves (present : List Nat) (steps : List LeafStep) (tape : List Nat) : List Nat :=
+def observedLeaves (present : List σ) (steps : List (LeafStep σ)) (tape : List Nat) : List Nat :=
   (runLeaves (readVars tape (initialVars present)) steps (tape.drop present.length)).1
 
 /-- The leaves of the keys present after the call, listed over `slots`. -/
-def finalLeaves (present slots : List Nat) (steps : List LeafStep) (tape : List Nat) :
+def finalLeaves (present slots : List σ) (steps : List (LeafStep σ)) (tape : List Nat) :
     List Nat :=
   slots.filterMap (runLeaves (readVars tape (initialVars present)) steps
     (tape.drop present.length)).2
 
-theorem observedLeaves_eq_readAt (present : List Nat) (steps : List LeafStep) (tape : List Nat) :
+theorem observedLeaves_eq_readAt (present : List σ) (steps : List (LeafStep σ)) (tape : List Nat) :
     observedLeaves present steps tape =
       readAt (runVars present.length (initialVars present) steps).1 tape := by
   simp [observedLeaves, runLeaves_readVars, readAt]
@@ -385,7 +397,7 @@ theorem observedLeaves_eq_readAt (present : List Nat) (steps : List LeafStep) (t
 the `2n` coins of its `n` accesses), every schedule of `n` leaves appears
 `L ^ (p + n)` times, for every sequence of `n` accesses (hits, misses,
 inserts, deletes, masked writes, on any keys). -/
-theorem observedLeaves_uniform (L : Nat) (present : List Nat) (steps : List LeafStep) :
+theorem observedLeaves_uniform (L : Nat) (present : List σ) (steps : List (LeafStep σ)) :
     ((coinTapes L (present.length + 2 * steps.length)).map
         (observedLeaves present steps)).Perm
       ((coinTapes L steps.length).flatMap fun v =>
@@ -406,7 +418,8 @@ theorem observedLeaves_uniform (L : Nat) (present : List Nat) (steps : List Leaf
       present.length + steps.length := by omega
   rwa [hExp] at this
 
-theorem nodup_filterMap_of_injOn {l : List Nat} {f : Nat → Option Nat} (h : l.Nodup)
+omit [DecidableEq σ] in
+theorem nodup_filterMap_of_injOn {l : List σ} {f : σ → Option Nat} (h : l.Nodup)
     (hInj : ∀ s s' v, f s = some v → f s' = some v → s = s') : (l.filterMap f).Nodup := by
   induction l with
   | nil => simp
@@ -428,8 +441,8 @@ schedule followed by those leaves is uniform over tapes of their combined
 length. So the leaves the next call starts from are uniform and independent of
 everything this call showed the host, which is the premise of
 `observedLeaves_uniform` for the next call. -/
-theorem observedLeaves_finalLeaves_uniform (L : Nat) (present : List Nat) {slots : List Nat}
-    (hSlots : slots.Nodup) (steps : List LeafStep) :
+theorem observedLeaves_finalLeaves_uniform (L : Nat) (present : List σ) {slots : List σ}
+    (hSlots : slots.Nodup) (steps : List (LeafStep σ)) :
     let finals := slots.filterMap (runVars present.length (initialVars present) steps).2
     ((coinTapes L (present.length + 2 * steps.length)).map
         fun tape => observedLeaves present steps tape ++ finalLeaves present slots steps tape).Perm
@@ -467,9 +480,12 @@ theorem observedLeaves_finalLeaves_uniform (L : Nat) (present : List Nat) {slots
   have := map_readAt_coinTapes_perm (L := L) hAll hAllBound
   rwa [List.length_append, hLen] at this
 
+
+/-! ## The runtime follows the model -/
+
 /-- The access a validated runtime transition makes, by what it does to the
 key's leaf. -/
-def LeafStep.ofTransition (transition : RuntimePathOramTransitionCertificate) : LeafStep :=
+def LeafStep.ofTransition (transition : RuntimePathOramTransitionCertificate) : LeafStep Nat :=
   match transition.kind, transition.slotIndex with
   | .readHit, some slot => .remap slot
   | .writeUpdate, some slot => .remap slot
@@ -655,7 +671,7 @@ uniform, the leaf schedule the host sees is distributed as the canonical
 leaf-value distribution of `n` steps on that map, each schedule weighted
 `L ^ (p + n)`. No seed is enumerated; the access pattern does not enter. -/
 theorem observedLeaves_canonical (object : String) (bucketCount : Nat) (present : List Nat)
-    (steps : List LeafStep) :
+    (steps : List (LeafStep Nat)) :
     ((CoinTape.coinTapes (pathOramLeafChoiceCount bucketCount)
           (present.length + 2 * steps.length)).map (observedLeaves present steps)).Perm
       ((pathOramLeafValueDistributionOfScaffold
@@ -663,6 +679,239 @@ theorem observedLeaves_canonical (object : String) (bucketCount : Nat) (present 
         List.replicate (pathOramLeafChoiceCount bucketCount ^ (present.length + steps.length)) v) := by
   rw [samples_leafValueDistribution_replicate]
   exact observedLeaves_uniform _ present steps
+
+
+/-! ## Several maps -/
+
+
+/-- An access to one of several maps: the map, and what it does on that map's
+slots. -/
+abbrev MapAccess := Nat × LeafStep Nat
+
+def liftStep (map : Nat) : LeafStep Nat → LeafStep (Nat × Nat)
+  | .remap s => .remap (map, s)
+  | .miss => .miss
+  | .insert s => .insert (map, s)
+  | .delete s => .delete (map, s)
+
+def liftSteps (accesses : List MapAccess) : List (LeafStep (Nat × Nat)) :=
+  accesses.map fun access => liftStep access.1 access.2
+
+/-- Coin bounds for a call on several maps: the leaves of the keys present
+before the call, each below its map's leaf count, then two coins per access
+below the accessed map's leaf count. -/
+def coinBounds (leafCount : Nat → Nat) (accesses : List MapAccess) : List Nat :=
+  accesses.flatMap fun access => [leafCount access.1, leafCount access.1]
+
+def multiBounds (leafCount : Nat → Nat) (present : List (Nat × Nat))
+    (accesses : List MapAccess) : List Nat :=
+  present.map (fun key => leafCount key.1) ++ coinBounds leafCount accesses
+
+theorem length_coinBounds (leafCount : Nat → Nat) (accesses : List MapAccess) :
+    (coinBounds leafCount accesses).length = 2 * accesses.length := by
+  induction accesses with
+  | nil => rfl
+  | cons a as ih => simp [coinBounds] at ih ⊢; omega
+
+/-- Every key's coordinate has its map's leaf count as bound. -/
+def BoundsOk (bounds : List Nat) (leafCount : Nat → Nat) (vars : Nat × Nat → Option Nat) : Prop :=
+  ∀ map slot v, vars (map, slot) = some v → bounds.getD v 0 = leafCount map
+
+theorem getD_append_right {l r : List Nat} {i : Nat} (h : l.length ≤ i) :
+    (l ++ r).getD i 0 = r.getD (i - l.length) 0 := by
+  simp [List.getD_eq_getElem?_getD, List.getElem?_append_right h]
+
+theorem getD_append_left {l r : List Nat} {i : Nat} (h : i < l.length) :
+    (l ++ r).getD i 0 = l.getD i 0 := by
+  simp [List.getD_eq_getElem?_getD, List.getElem?_append_left h]
+
+/-- The observed coordinate of each access has the accessed map's leaf count
+as bound, so the schedule's bounds are the maps' leaf counts in access
+order. -/
+theorem readAt_runVars_bounds (leafCount : Nat → Nat) (pre : List Nat)
+    (vars : Nat × Nat → Option Nat) (accesses : List MapAccess)
+    (hOk : BoundsOk (pre ++ coinBounds leafCount accesses) leafCount vars)
+    (hBelow : ∀ key v, vars key = some v → v < pre.length) :
+    readAt (runVars pre.length vars (liftSteps accesses)).1 (pre ++ coinBounds leafCount accesses) =
+      accesses.map fun access => leafCount access.1 := by
+  induction accesses generalizing pre vars with
+  | nil => rfl
+  | cons access accesses ih =>
+      obtain ⟨map, step⟩ := access
+      have hSplit : pre ++ coinBounds leafCount ((map, step) :: accesses) =
+          (pre ++ [leafCount map, leafCount map]) ++ coinBounds leafCount accesses := by
+        simp [coinBounds]
+      have hLen : (pre ++ [leafCount map, leafCount map]).length = pre.length + 2 := by simp
+      have hCoin0 : (pre ++ coinBounds leafCount ((map, step) :: accesses)).getD pre.length 0 =
+          leafCount map := by
+        rw [getD_append_right (Nat.le_refl _)]; simp [coinBounds]
+      have hCoin1 : (pre ++ coinBounds leafCount ((map, step) :: accesses)).getD (pre.length + 1) 0 =
+          leafCount map := by
+        rw [getD_append_right (by omega)]; simp [coinBounds]
+      -- the state after this access keeps the bounds invariant
+      have hStep : ∀ (st : LeafStep (Nat × Nat)), st = liftStep map step →
+          let r := stepVars pre.length vars st
+          (pre ++ coinBounds leafCount ((map, step) :: accesses)).getD r.1 0 = leafCount map ∧
+            BoundsOk ((pre ++ [leafCount map, leafCount map]) ++ coinBounds leafCount accesses)
+              leafCount r.2 ∧
+            ∀ key v, r.2 key = some v → v < pre.length + 2 := by
+        intro st hst
+        rw [← hSplit]
+        cases step with
+        | miss =>
+            subst hst
+            refine ⟨hCoin0, hOk, fun key v h => by have := hBelow key v h; omega⟩
+        | insert s =>
+            subst hst
+            refine ⟨hCoin0, ?_, ?_⟩
+            · intro m s' v h
+              simp only [stepVars, liftStep, setAt] at h
+              split at h
+              · rename_i hk; cases h; cases hk; exact hCoin1
+              · exact hOk m s' v h
+            · intro key v h
+              simp only [stepVars, liftStep, setAt] at h
+              split at h
+              · cases h; omega
+              · have := hBelow key v h; omega
+        | remap s =>
+            subst hst
+            cases hv : vars (map, s) with
+            | none =>
+                simp only [stepVars, liftStep, hv]
+                exact ⟨hCoin0, hOk, fun key v h => by have := hBelow key v h; omega⟩
+            | some v0 =>
+                simp only [stepVars, liftStep, hv]
+                refine ⟨hOk map s v0 hv, ?_, ?_⟩
+                · intro m s' v h
+                  simp only [setAt] at h
+                  split at h
+                  · rename_i hk; cases h; cases hk; exact hCoin1
+                  · exact hOk m s' v h
+                · intro key v h
+                  simp only [setAt] at h
+                  split at h
+                  · cases h; omega
+                  · have := hBelow key v h; omega
+        | delete s =>
+            subst hst
+            cases hv : vars (map, s) with
+            | none =>
+                simp only [stepVars, liftStep, hv]
+                exact ⟨hCoin0, hOk, fun key v h => by have := hBelow key v h; omega⟩
+            | some v0 =>
+                simp only [stepVars, liftStep, hv]
+                refine ⟨hOk map s v0 hv, ?_, ?_⟩
+                · intro m s' v h
+                  simp only [setAt] at h
+                  split at h
+                  · cases h
+                  · exact hOk m s' v h
+                · intro key v h
+                  simp only [setAt] at h
+                  split at h
+                  · cases h
+                  · have := hBelow key v h; omega
+      obtain ⟨hObs, hOk', hBelow'⟩ := hStep (liftStep map step) rfl
+      have hRest := ih (pre ++ [leafCount map, leafCount map]) (stepVars pre.length vars (liftStep map step)).2
+        hOk' (by rw [hLen]; exact hBelow')
+      rw [hLen] at hRest
+      simp only [liftSteps, List.map_cons, runVars] at hRest ⊢
+      simp only [readAt, List.map_cons] at hRest ⊢
+      rw [hSplit] at hObs ⊢
+      rw [hObs]
+      simp only [List.cons.injEq, true_and]
+      exact hRest
+
+theorem length_liftSteps (accesses : List MapAccess) :
+    (liftSteps accesses).length = accesses.length := by
+  simp [liftSteps]
+
+theorem length_multiBounds (leafCount : Nat → Nat) (present : List (Nat × Nat))
+    (accesses : List MapAccess) :
+    (multiBounds leafCount present accesses).length = present.length + 2 * accesses.length := by
+  simp [multiBounds, length_coinBounds]
+
+/-- **Several maps in one call.** For any accesses to any number of maps, in
+any interleaving, and any keys `present` before the call (as `(map, slot)`),
+if those keys' leaves and the call's coins are independent and uniform, each
+below its map's leaf count, then the schedule is uniform over the accessed
+maps' leaf counts in access order: every schedule appears equally often. -/
+theorem multiObservedLeaves_uniform (leafCount : Nat → Nat) (present : List (Nat × Nat))
+    (accesses : List MapAccess) :
+    ∃ K, ((boundedTapes (multiBounds leafCount present accesses)).map
+        (observedLeaves present (liftSteps accesses))).Perm
+      ((boundedTapes (accesses.map fun access => leafCount access.1)).flatMap fun v =>
+        List.replicate K v) := by
+  obtain ⟨hNodup, hBound, -, -, -, -⟩ := runVars_spec (fresh_initialVars present) (liftSteps accesses)
+  have hBound' : ∀ p ∈ (runVars present.length (initialVars present) (liftSteps accesses)).1,
+      p < (multiBounds leafCount present accesses).length := by
+    intro p hp
+    rw [length_multiBounds, ← length_liftSteps]
+    exact hBound p hp
+  obtain ⟨rest, hPerm⟩ := map_readAt_boundedTapes_perm (bounds := multiBounds leafCount present accesses)
+    hNodup hBound'
+  refine ⟨(boundedTapes (readAt rest (multiBounds leafCount present accesses))).length, ?_⟩
+  have hMap : (boundedTapes (multiBounds leafCount present accesses)).map
+      (observedLeaves present (liftSteps accesses)) =
+      (boundedTapes (multiBounds leafCount present accesses)).map
+        (readAt (runVars present.length (initialVars present) (liftSteps accesses)).1) := by
+    apply List.map_congr_left
+    intro tape _
+    exact observedLeaves_eq_readAt present (liftSteps accesses) tape
+  rw [hMap]
+  have hPre : (present.map fun key => leafCount key.1).length = present.length := by simp
+  have hReadBounds :
+      readAt (runVars present.length (initialVars present) (liftSteps accesses)).1
+          (multiBounds leafCount present accesses) =
+        accesses.map fun access => leafCount access.1 := by
+    have := readAt_runVars_bounds leafCount (present.map fun key => leafCount key.1)
+      (initialVars present) accesses ?_ ?_
+    · rw [hPre] at this
+      exact this
+    · intro map slot v h
+      obtain ⟨hv, hpv⟩ := initialVars_eq_some h
+      rw [getD_append_left (by simpa using hv), getD_of_lt (by simpa using hv)]
+      simp only [List.getElem_map, hpv]
+    · intro key v h
+      rw [hPre]
+      exact (fresh_initialVars present).1 key v h
+  rw [hReadBounds] at hPerm
+  exact hPerm
+
+
+
+/-- The canonical leaf-value distribution of any scaffold is uniform over
+independent leaves, each below its step's leaf count. -/
+theorem samples_leafValueDistribution (scaffold : PathOramLeafScheduleScaffold) :
+    (pathOramLeafValueDistributionOfScaffold scaffold).samples =
+      boundedTapes (scaffold.map fun step => pathOramLeafChoiceCount step.2) := by
+  induction scaffold with
+  | nil => rfl
+  | cons step scaffold ih =>
+      obtain ⟨object, bucketCount⟩ := step
+      simp only [pathOramLeafValueDistributionOfScaffold, FiniteDistribution.samples_productWith,
+        pathOramUniformLeafValueDistribution, FiniteDistribution.samples_chooseNat, ih,
+        concat_map_eq_flatMap, List.map_cons, boundedTapes]
+
+/-- **Enumeration-free Path ORAM schedule theorem, several maps.** A call
+whose accesses touch maps `0, 1, …` (map `i` named `name i` with
+`bucketCount i` buckets), in any interleaving and with any keys present
+before the call: if the keys' leaves and the call's coins are independent and
+uniform, the schedule is distributed as the canonical leaf-value distribution
+of the call's scaffold, every schedule equally often. -/
+theorem multiObservedLeaves_canonical (name : Nat → String) (bucketCount : Nat → Nat)
+    (present : List (Nat × Nat)) (accesses : List MapAccess) :
+    ∃ K, ((boundedTapes (multiBounds (fun map => pathOramLeafChoiceCount (bucketCount map))
+          present accesses)).map (observedLeaves present (liftSteps accesses))).Perm
+      ((pathOramLeafValueDistributionOfScaffold
+          (accesses.map fun access => (name access.1, bucketCount access.1))).samples.flatMap
+        fun v => List.replicate K v) := by
+  obtain ⟨K, hK⟩ := multiObservedLeaves_uniform
+    (fun map => pathOramLeafChoiceCount (bucketCount map)) present accesses
+  refine ⟨K, ?_⟩
+  rw [samples_leafValueDistribution, List.map_map]
+  exact hK
 
 
 end PathOramFreshLeaves

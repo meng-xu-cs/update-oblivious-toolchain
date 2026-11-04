@@ -53,12 +53,16 @@ The Lean development states more than it currently proves for Path ORAM:
   call, so the statement covers keys written by earlier calls. Every
   transition the Lean replay accepts is a step of this model
   (`replay_runLeaves`), on either scheme, since both share one data path. The
-  theorem covers one map; the paper-main theorems do not use it yet.
+  model is generic in the slot type, so it also covers a call on several maps
+  in any interleaving, each map's leaves and coins below its own leaf count:
+  the schedule is distributed as the canonical leaf-value distribution of the
+  call's scaffold (`multiObservedLeaves_canonical`). The paper-main theorems
+  do not use it yet.
 
 Open work: restate the bundle over admitted configurations and derive it from
-`PathOramFreshLeaves`, which needs the product over several maps (they
-interleave by the public schedule, each with its own coins); and replace the
-flat position map by a recursive one.
+`PathOramFreshLeaves`; extend `replay_runLeaves`, which takes one map's
+transitions, to replays that interleave several maps; and replace the flat
+position map by a recursive one.
 
 ## Current Route
 
