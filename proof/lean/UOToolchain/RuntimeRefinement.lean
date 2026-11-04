@@ -353,13 +353,16 @@ def runtimePathOramApplyTransition?
               none
         | _, _, _ => none
     | .writeNoop =>
+        -- A no-op on a present key remaps it, as a read hit does.
         match transition.slotIndex, transition.priorLeaf, transition.nextLeaf with
         | none, none, none => some state
         | some slotIndex, some priorLeaf, some nextLeaf =>
             if leaf.leaf = priorLeaf &&
-                nextLeaf = priorLeaf &&
+                nextLeaf < object.pathOramLeafChoiceCount &&
                 runtimePathOramGetLeafAt? leaves slotIndex = some (some priorLeaf) then
-              some state
+              do
+                let updated ← runtimePathOramSetLeafAt? leaves slotIndex (some nextLeaf)
+                runtimePathOramStateUpdate? state leaf.objectId updated
             else
               none
         | _, _, _ => none
@@ -446,9 +449,10 @@ def runtimePathOramFreshCoinScaffoldOfStep
         | some _ => some [scaffoldStep]
         | none => none
     | .writeNoop =>
-        match transition.slotIndex with
-        | some _ => some []
-        | none => some [scaffoldStep]
+        match transition.slotIndex, transition.nextLeaf with
+        | some _, some _ => some [scaffoldStep]
+        | some _, none => none
+        | none, _ => some [scaffoldStep]
     | .writeInsert =>
         match transition.nextLeaf with
         | some _ => some [scaffoldStep, scaffoldStep]
@@ -475,9 +479,10 @@ def runtimePathOramFreshCoinValuesOfStep
         | some nextLeaf => some [nextLeaf]
         | none => none
     | .writeNoop =>
-        match transition.slotIndex with
-        | some _ => some []
-        | none => some [leaf.leaf]
+        match transition.slotIndex, transition.nextLeaf with
+        | some _, some nextLeaf => some [nextLeaf]
+        | some _, none => none
+        | none, _ => some [leaf.leaf]
     | .writeInsert =>
         match transition.nextLeaf with
         | some nextLeaf => some [leaf.leaf, nextLeaf]
@@ -562,7 +567,11 @@ def runtimePathOramApplyTransitionShapeWithCoins?
         match transition.slotIndex with
         | some slotIndex =>
             match runtimePathOramGetLeafAt? leaves slotIndex with
-            | some (some priorLeaf) => some (mkLeaf priorLeaf, state, coins)
+            | some (some priorLeaf) => do
+                let (nextLeaf, coins) ← runtimePathOramTakeFreshCoin? leafCount coins
+                let updated ← runtimePathOramSetLeafAt? leaves slotIndex (some nextLeaf)
+                let nextState ← runtimePathOramStateUpdate? state transition.objectId updated
+                some (mkLeaf priorLeaf, nextState, coins)
             | _ => none
         | none => do
             let (accessLeaf, coins) ← runtimePathOramTakeFreshCoin? leafCount coins
@@ -955,31 +964,55 @@ theorem runtimePathOramApplyTransitionShapeWithCoins_of_explicit
                       · have hFalse : False := by
                             simp [hObj, hId, hName, hBucket, hState, hEq] at hExplicit
                         exact False.elim hFalse
-                    have hNextEq : nextLeaf = priorLeaf := by
-                      by_cases hEq : nextLeaf = priorLeaf
-                      · exact hEq
-                      · have hFalse : False := by
-                            simp [hObj, hId, hName, hBucket, hState, hLeafEq, hEq] at hExplicit
+                    have hNextLt : nextLeaf < object.pathOramLeafChoiceCount := by
+                      by_cases hLt : nextLeaf < object.pathOramLeafChoiceCount
+                      · exact hLt
+                      · have hNotLt : ¬ nextLeaf < object.pathOramLeafChoiceCount :=
+                          hLt
+                        have hFalse : False := by
+                          simp
+                            [ hObj, hScheme, hId, hName, hBucket, hObjName, hObjBucket
+                            , hState, hLeafEq, hNotLt
+                            ] at hExplicit
                         exact False.elim hFalse
                     have hGetEq :
                         runtimePathOramGetLeafAt? leaves slotIndex = some (some priorLeaf) := by
                       by_cases hEq : runtimePathOramGetLeafAt? leaves slotIndex = some (some priorLeaf)
                       · exact hEq
                       · have hFalse : False := by
-                            simp [hObj, hId, hName, hBucket, hState, hLeafEq, hNextEq, hEq] at hExplicit
+                            simp [hObj, hId, hName, hBucket, hState, hLeafEq, hEq] at hExplicit
                         exact False.elim hFalse
-                    simp
-                      [hObj, hId, hName, hBucket, hState, hLeafEq, hNextEq, hGetEq] at hExplicit
-                    rcases hExplicit with ⟨_, hStateEq⟩
-                    cases hStateEq
-                    subst transitionObjectId
-                    subst transitionObjectName
-                    subst transitionBucketCount
-                    subst leafValue
-                    subst nextLeaf
-                    refine ⟨[], ?_, ?_⟩
-                    · simp
-                    · simp [hObj, hScheme, hObjName, hObjBucket, hState, hGetEq]
+                    cases hSet : runtimePathOramSetLeafAt? leaves slotIndex (some nextLeaf) with
+                    | none =>
+                        simp
+                          [ hObj, hId, hName, hBucket, hState, hLeafEq
+                          , hGetEq, hSet
+                          ] at hExplicit
+                    | some updated =>
+                        cases hUpdate : runtimePathOramStateUpdate? state leafObjectId updated with
+                        | none =>
+                            simp
+                              [ hObj, hId, hName, hBucket, hState, hLeafEq
+                              , hGetEq, hSet, hUpdate
+                              ] at hExplicit
+                        | some updatedState =>
+                            simp
+                              [ hObj, hId, hName, hBucket, hState, hLeafEq
+                              , hGetEq, hSet, hUpdate
+                              ] at hExplicit
+                            rcases hExplicit with ⟨_, _, hNextStateEq⟩
+                            cases hNextStateEq
+                            subst transitionObjectId
+                            subst transitionObjectName
+                            subst transitionBucketCount
+                            subst leafValue
+                            refine ⟨[nextLeaf], ?_, ?_⟩
+                            · simp
+                            · simp
+                                [ hObj, hScheme, hObjName, hObjBucket, hState
+                                , hGetEq, hSet, hUpdate
+                                , runtimePathOramTakeFreshCoin?, hNextLt
+                                ]
           case mk.mk.writeInsert.some.none.some =>
             rename_i slotIndex nextLeaf
             cases hObj : runtimeOramObjectById? oramObjects leafObjectId with

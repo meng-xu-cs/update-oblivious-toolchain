@@ -853,6 +853,106 @@ bounds:
     }
 
     #[test]
+    fn path_oram_masked_noop_write_remaps_the_key() {
+        // `if (doIt) records[key] = value;` with doIt false leaves the value
+        // unchanged but must still remap the key; otherwise the next access to
+        // it reads the same path and the host learns doIt.
+        let source = write_temp(
+            "cond-map",
+            r#"
+            contract CondMap {
+                mapping(bytes32 => uint256) private records;
+
+                function put(bytes32 key, uint256 value) public {
+                    records[key] = value;
+                }
+
+                function maybePut(bytes32 key, uint256 value, bool doIt) public {
+                    if (doIt) {
+                        records[key] = value;
+                    }
+                }
+
+                function read(bytes32 key) public returns (uint256) {
+                    return records[key];
+                }
+            }
+            "#,
+        );
+        let metadata = r#"
+contract: CondMap
+entrypoints:
+  put(bytes32,uint256):
+    secret_args: [key, value]
+    confidential: true
+    returns: forbidden
+    status: declassified
+    declassifies: [success]
+  maybePut(bytes32,uint256,bool):
+    secret_args: [key, value, doIt]
+    confidential: true
+    returns: forbidden
+    status: declassified
+    declassifies: [success]
+  read(bytes32):
+    secret_args: [key]
+    confidential: true
+    returns: declassified
+    status: public
+    declassifies: [return]
+state:
+  records:
+    kind: map
+    key: bytes32
+    value: uint256
+    capacity: 16
+    backend: oram
+    oram_scheme: path_oram_local_posmap_v1
+    confidential: true
+bounds:
+  loops: {}
+"#;
+        let artifact = compile_bench(source.to_str().unwrap(), metadata, ProgramMode::Uo);
+        let mut instance = ContractInstance::deploy_with_seed(artifact, 5).unwrap();
+        let key = Value::Bytes32([3u8; 32]);
+        instance
+            .call("put(bytes32,uint256)", vec![key.clone(), Value::uint(5)])
+            .unwrap();
+        let noop = instance
+            .call(
+                "maybePut(bytes32,uint256,bool)",
+                vec![key.clone(), Value::uint(7), Value::Bool(false)],
+            )
+            .unwrap();
+        let witness = noop.trace.runtime_refinement_witness().unwrap();
+        let transition = &witness.oram_leaf_state_transitions()[0];
+        assert_eq!(
+            transition.kind,
+            uo_core::RuntimePathOramTransitionKind::WriteNoop
+        );
+        assert!(transition.slot_index.present && transition.prior_leaf.present);
+        assert!(transition.next_leaf.present);
+        assert_eq!(transition.fresh_leaf, transition.next_leaf.value);
+        let after = &witness.oram_position_map_after()[0].leaves[transition.slot_index.value];
+        assert!(after.present);
+        assert_eq!(after.value, transition.next_leaf.value);
+        // With this deploy seed the fresh leaf differs from the prior one, so
+        // the next access to the key reads a different path.
+        assert_ne!(transition.next_leaf.value, transition.prior_leaf.value);
+        let read = instance.call("read(bytes32)", vec![key]).unwrap();
+        assert_eq!(read.return_value, Some(Value::uint(5)));
+        let path_buckets = |trace: &uo_core::ExecutionTrace| {
+            trace
+                .physical_reads
+                .iter()
+                .filter(|event| event.location.contains("bucket"))
+                .map(|event| event.location.clone())
+                .collect::<Vec<_>>()
+        };
+        assert_ne!(path_buckets(&noop.trace), path_buckets(&read.trace));
+    }
+
+    #[test]
     fn private_posmap_path_oram_supports_multi_access_entrypoints() {
         // SingleAccessMap with its map on the scalable private-position-map
         // scheme at capacity 256, above the local scheme's cap of 128.

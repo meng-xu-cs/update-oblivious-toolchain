@@ -26,7 +26,10 @@ The Lean development states more than it currently proves for Path ORAM:
   map per call, but it is not yet covered by a theorem. The runtime has no
   recursive position map; both schemes share one data path, a flat position
   map in encrypted metadata pages that every access scans in full, so an
-  access to a capacity-256 map reads 64 metadata pages and 9 buckets. The Lean
+  access to a capacity-256 map reads 64 metadata pages and 9 buckets. Every
+  access remaps the key it touches to a fresh leaf, including a masked write
+  that leaves the key unchanged (a write under a false predicate), so the next
+  access to the key reads an independent path. The Lean
   runtime-witness checkers accept the private scheme's events, but the
   per-configuration paper-main boundary is stated for the local scheme only.
 

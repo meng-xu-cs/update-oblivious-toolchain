@@ -6022,8 +6022,9 @@ fn runtime_path_oram_fresh_coin_scaffold_of_step(
             }
         }
         RuntimePathOramTransitionKind::WriteNoop => {
-            if transition.slot_index.is_some() {
-                Some(Box::default())
+            // A no-op on a present key remaps it, as a read hit does.
+            if transition.slot_index.is_some() && transition.next_leaf.is_none() {
+                None
             } else {
                 Some(Box::from([scaffold_step]))
             }
@@ -6066,10 +6067,12 @@ fn runtime_path_oram_fresh_coin_values_of_step(
             }
         }
         RuntimePathOramTransitionKind::WriteNoop => {
-            if transition.slot_index.is_some() {
-                Some(Box::default())
-            } else {
+            if transition.slot_index.is_none() {
                 Some(Box::from([leaf.leaf]))
+            } else if transition.next_leaf.is_some() {
+                Some(Box::from([transition.next_leaf.value]))
+            } else {
+                None
             }
         }
         RuntimePathOramTransitionKind::WriteInsert => {
@@ -6360,14 +6363,17 @@ fn validate_path_oram_leaf_state(
                         }
                     }
                     (true, true, true) => {
+                        // A no-op on a present key remaps it, as a read hit does.
+                        let slot_index = transition.slot_index.value;
                         let prior_leaf = transition.prior_leaf.value;
                         let next_leaf = transition.next_leaf.value;
-                        if step.leaf != prior_leaf
-                            || next_leaf != prior_leaf
-                            || transition.fresh_leaf != prior_leaf
-                        {
+                        if step.leaf != prior_leaf || next_leaf != transition.fresh_leaf {
                             return Err(RefinementWitnessError::OramLeafStateMismatch);
                         }
+                        let slot = state
+                            .get_mut(slot_index)
+                            .ok_or(RefinementWitnessError::OramLeafStateMismatch)?;
+                        *slot = RuntimeMaskedUsizeOptionWitness::some(next_leaf);
                     }
                     _ => return Err(RefinementWitnessError::OramLeafStateMismatch),
                 }
@@ -10846,7 +10852,10 @@ mod tests {
     }
 
     #[test]
-    fn extract_runtime_path_oram_fresh_coins_skips_write_noop_slot_reuse() {
+    fn extract_runtime_path_oram_fresh_coins_remaps_write_noop_slot() {
+        // A masked write that leaves a present key unchanged reads the key's
+        // path at its prior leaf and remaps it to a fresh one, as a read hit
+        // does, so the next access to the key reads an independent path.
         let leaf = RuntimeOramLeafWitness {
             object_id: 7,
             object_name: "records".into(),
@@ -10861,12 +10870,18 @@ mod tests {
             fresh_leaf: 11,
             slot_index: RuntimeMaskedUsizeOptionWitness::some(0),
             prior_leaf: RuntimeMaskedUsizeOptionWitness::some(2),
-            next_leaf: RuntimeMaskedUsizeOptionWitness::some(2),
+            next_leaf: RuntimeMaskedUsizeOptionWitness::some(11),
         };
         let scaffold = runtime_path_oram_fresh_coin_scaffold_of_step(&leaf, &transition).unwrap();
         let values = runtime_path_oram_fresh_coin_values_of_step(&leaf, &transition).unwrap();
-        assert!(scaffold.is_empty());
-        assert!(values.is_empty());
+        assert_eq!(scaffold.len(), 1);
+        assert_eq!(values, Box::from([11]));
+
+        let retained = RuntimePathOramTransitionWitness {
+            next_leaf: RuntimeMaskedUsizeOptionWitness::none(),
+            ..transition
+        };
+        assert!(runtime_path_oram_fresh_coin_values_of_step(&leaf, &retained).is_none());
     }
 
     #[test]

@@ -25007,6 +25007,8 @@ fn path_oram_fresh_coin_plan_for_runtime_tape(
             }
             RuntimePathOramTransitionKind::WriteNoop => {
                 if transition.slot_index.is_none() {
+                    // A miss reads a fresh random path; the next-leaf coin is
+                    // drawn but unused.
                     push_semantic_fresh_coin(
                         scenario,
                         &scaffold,
@@ -25015,15 +25017,25 @@ fn path_oram_fresh_coin_plan_for_runtime_tape(
                         &expected,
                         &mut coins_by_object,
                     )?;
-                } else if transition.prior_leaf.is_none() {
+                    push_dummy_write_coin(&expected, &mut coins_by_object);
+                } else if transition.prior_leaf.is_none() || transition.next_leaf.is_none() {
                     bail!(
-                        "write-noop slot transition without prior leaf for {}",
+                        "write-noop slot transition without prior or next leaf for {}",
                         scenario
                     );
                 } else {
+                    // A hit reads the prior leaf's path and remaps the key to
+                    // the next-leaf coin, as a read hit does.
                     push_dummy_write_coin(&expected, &mut coins_by_object);
+                    push_semantic_fresh_coin(
+                        scenario,
+                        &scaffold,
+                        values,
+                        &mut cursor,
+                        &expected,
+                        &mut coins_by_object,
+                    )?;
                 }
-                push_dummy_write_coin(&expected, &mut coins_by_object);
             }
             RuntimePathOramTransitionKind::WriteInsert => {
                 push_semantic_fresh_coin(
@@ -28788,7 +28800,9 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
 	        && generated_oram_codecs_source.contains("pub(super) fn apply_path_put_update(")
 	        && generated_oram_codecs_source.contains(") -> Result<bool> {")
 	        && generated_oram_codecs_source
-	            .contains("let update_failed = ((update_existing | delete_existing) & !matched_slot)")
+	            .contains(
+	                "let update_failed = ((update_existing | delete_existing | keep_existing) & !matched_slot)",
+	            )
 	        && generated_oram_codecs_source.contains("| (insert_new & !inserted_slot)")
 	        && generated_oram_codecs_source
 	            .contains("| (insert_new & (insert_slot_index >= entries.len()));")

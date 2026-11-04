@@ -1,6 +1,6 @@
 {
   "accepted": true,
-  "artifact_json_bytes": 1287794,
+  "artifact_json_bytes": 1292460,
   "checker": "proof/lean/.lake/build/bin/checkProofGradeRuntimeSharedConfidentialKernelBoundary",
   "handwritten_runtime_public_only_theorem_checked": true,
   "lean_checker_input": "source-backed runtime shared confidential-kernel boundary",
@@ -19,7 +19,7 @@
     "generated_confidential_kernel": 25055,
     "generated_kernel_machine": 5241,
     "generated_object_helpers": 26762,
-    "generated_oram_codecs": 108685,
+    "generated_oram_codecs": 108665,
     "generated_store_codec": 1683,
     "generated_store_helpers": 11516,
     "generated_store_surface": 6914,
@@ -32,7 +32,7 @@
     "store_codec": 5892,
     "store_lib": 154,
     "store_store": 2898,
-    "trace": 413759,
+    "trace": 414735,
     "trusted_kernel": 4548,
     "types": 29154
   },
