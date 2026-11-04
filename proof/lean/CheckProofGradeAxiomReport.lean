@@ -168,4 +168,12 @@ info: 'UOToolchain.PathOramFreshLeaves.multiObservedLeaves_canonical' depends on
 #guard_msgs in
 #print axioms UOToolchain.PathOramFreshLeaves.multiObservedLeaves_canonical
 
+/--
+info: 'UOToolchain.PathOramFreshLeaves.replay_runLeaves_interleaved' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+-/
+#guard_msgs in
+#print axioms UOToolchain.PathOramFreshLeaves.replay_runLeaves_interleaved
+
 def main : IO UInt32 := pure 0

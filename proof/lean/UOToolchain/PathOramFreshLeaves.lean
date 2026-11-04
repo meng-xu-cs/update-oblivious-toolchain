@@ -914,6 +914,178 @@ theorem multiObservedLeaves_canonical (name : Nat → String) (bucketCount : Nat
   exact hK
 
 
+/-! ## The runtime follows the model on several maps -/
+
+theorem stateLookup?_of_stateUpdate?_ne {state state' : RuntimePathOramPositionMapState}
+    {objectId other : Nat} {leaves : List (Option Nat)}
+    (h : runtimePathOramStateUpdate? state objectId leaves = some state') (hne : other ≠ objectId) :
+    runtimePathOramStateLookup? state' other = runtimePathOramStateLookup? state other := by
+  induction state generalizing state' with
+  | nil => simp [runtimePathOramStateUpdate?] at h
+  | cons entry entries ih =>
+      obtain ⟨entryId, entryLeaves⟩ := entry
+      simp only [runtimePathOramStateUpdate?] at h
+      split at h
+      · rename_i hId
+        simp only [Option.some.injEq] at h
+        subst h
+        subst hId
+        simp [runtimePathOramStateLookup?, Ne.symm hne]
+      · cases hTail : runtimePathOramStateUpdate? entries objectId leaves with
+        | none => simp [hTail] at h
+        | some tail =>
+            simp only [hTail, Option.bind_eq_bind, Option.bind_some, Option.some.injEq] at h
+            subst h
+            have := ih hTail
+            by_cases hId' : entryId = other
+            · simp [runtimePathOramStateLookup?, hId']
+            · simp only [runtimePathOramStateLookup?, List.find?_cons, hId', decide_false] at this ⊢
+              exact this
+
+/-- A transition the replay accepts changes only its own map's entry, and
+that entry exists. -/
+theorem applyTransition?_frame {state state' : RuntimePathOramPositionMapState}
+    {objects : List RuntimeOramObjectCertificate} {leaf : RuntimeOramLeafCertificate}
+    {transition : RuntimePathOramTransitionCertificate}
+    (h : runtimePathOramApplyTransition? state objects leaf transition = some state') :
+    (∃ leaves, runtimePathOramStateLookup? state leaf.objectId = some leaves) ∧
+      ∀ other, other ≠ leaf.objectId →
+        runtimePathOramStateLookup? state' other = runtimePathOramStateLookup? state other := by
+  obtain ⟨objectId, objectName, bucketCount, kind, slotIndex, priorLeaf, nextLeaf⟩ := transition
+  simp only [runtimePathOramApplyTransition?, Option.bind_eq_bind] at h
+  cases hObj : runtimeOramObjectById? objects leaf.objectId with
+  | none => simp [hObj] at h
+  | some object =>
+      simp only [hObj, Option.bind_some] at h
+      split at h
+      · cases h
+      cases hLookup : runtimePathOramStateLookup? state leaf.objectId with
+      | none => simp [hLookup] at h
+      | some leaves =>
+          refine ⟨⟨leaves, rfl⟩, ?_⟩
+          intro other hne
+          simp only [hLookup, Option.bind_some] at h
+          cases kind <;> rcases slotIndex with _ | slot <;> rcases priorLeaf with _ | prior <;>
+            rcases nextLeaf with _ | next <;> simp only at h
+          all_goals
+            first
+            | (simp at h; done)
+            | (simp at h; subst h; rfl)
+            | (split at h
+               · obtain ⟨updated, _, hUpd⟩ := Option.bind_eq_some_iff.mp h
+                 exact stateLookup?_of_stateUpdate?_ne hUpd hne
+               · cases h)
+
+/-- The replay state as one partial map from `(map, slot)` to leaves. -/
+def stateLeafMap (state : RuntimePathOramPositionMapState) : Nat × Nat → Option Nat :=
+  fun key =>
+    match runtimePathOramStateLookup? state key.1 with
+    | some leaves => leafMapOf leaves key.2
+    | none => none
+
+theorem stepLeaves_liftStep (missCoin nextCoin : Nat) (combined : Nat × Nat → Option Nat)
+    (map : Nat) (step : LeafStep Nat) :
+    stepLeaves missCoin nextCoin combined (liftStep map step) =
+      ((stepLeaves missCoin nextCoin (fun slot => combined (map, slot)) step).1,
+        fun key => if key.1 = map then
+          (stepLeaves missCoin nextCoin (fun slot => combined (map, slot)) step).2 key.2
+        else combined key) := by
+  have hFrame : combined = fun key => if key.1 = map then combined (map, key.2) else combined key := by
+    funext key
+    obtain ⟨m, s⟩ := key
+    by_cases hm : m = map
+    · subst hm; simp
+    · simp [hm]
+  cases step with
+  | miss =>
+      simp only [liftStep, stepLeaves]
+      exact Prod.ext rfl hFrame
+  | insert s =>
+      simp only [liftStep, stepLeaves]
+      refine Prod.ext rfl ?_
+      funext key
+      obtain ⟨m, s'⟩ := key
+      by_cases hm : m = map
+      · subst hm; by_cases hs : s' = s <;> simp [setAt, hs]
+      · simp [setAt, hm]
+  | remap s =>
+      cases hv : combined (map, s) with
+      | none =>
+          simp only [liftStep, stepLeaves, hv]
+          exact Prod.ext rfl hFrame
+      | some v =>
+          simp only [liftStep, stepLeaves, hv]
+          refine Prod.ext rfl ?_
+          funext key
+          obtain ⟨m, s'⟩ := key
+          by_cases hm : m = map
+          · subst hm; by_cases hs : s' = s <;> simp [setAt, hs]
+          · simp [setAt, hm]
+  | delete s =>
+      cases hv : combined (map, s) with
+      | none =>
+          simp only [liftStep, stepLeaves, hv]
+          exact Prod.ext rfl hFrame
+      | some v =>
+          simp only [liftStep, stepLeaves, hv]
+          refine Prod.ext rfl ?_
+          funext key
+          obtain ⟨m, s'⟩ := key
+          by_cases hm : m = map
+          · subst hm; by_cases hs : s' = s <;> simp [setAt, hs]
+          · simp [setAt, hm]
+
+/-- The accesses of a run of runtime transitions, on `(map, slot)` keys. -/
+def transitionAccesses :
+    List RuntimeOramLeafCertificate → List RuntimePathOramTransitionCertificate → List MapAccess
+  | leaf :: leafs, transition :: transitions =>
+      (leaf.objectId, LeafStep.ofTransition transition) :: transitionAccesses leafs transitions
+  | _, _ => []
+
+/-- **The runtime follows the model on several maps.** A replay the Lean
+checker accepts, interleaving any maps, is a run of the leaf model on
+`(map, slot)` keys with the recorded coins. -/
+theorem replay_runLeaves_interleaved {state final : RuntimePathOramPositionMapState}
+    {objects : List RuntimeOramObjectCertificate} {leafs : List RuntimeOramLeafCertificate}
+    {transitions : List RuntimePathOramTransitionCertificate}
+    (h : replayRuntimePathOramTransitionsAux state objects leafs transitions = some final) :
+    runLeaves (stateLeafMap state) (liftSteps (transitionAccesses leafs transitions))
+        (recordedCoins leafs transitions) =
+      (leafs.map (·.leaf), stateLeafMap final) := by
+  induction leafs generalizing state transitions with
+  | nil =>
+      cases transitions with
+      | nil =>
+          simp only [replayRuntimePathOramTransitionsAux, Option.some.injEq] at h
+          subst h
+          rfl
+      | cons transition transitions => simp [replayRuntimePathOramTransitionsAux] at h
+  | cons leaf leafs ih =>
+      cases transitions with
+      | nil => simp [replayRuntimePathOramTransitionsAux] at h
+      | cons transition transitions =>
+          simp only [replayRuntimePathOramTransitionsAux, Option.bind_eq_bind] at h
+          obtain ⟨next, hApply, hRest⟩ := Option.bind_eq_some_iff.mp h
+          obtain ⟨⟨leaves, hLookup⟩, hFrame⟩ := applyTransition?_frame hApply
+          obtain ⟨leaves', hLookup', hStep⟩ := applyTransition?_stepLeaves hApply hLookup
+          have hRun := ih hRest
+          have hSlots : (fun slot => stateLeafMap state (leaf.objectId, slot)) = leafMapOf leaves := by
+            funext slot
+            simp [stateLeafMap, hLookup]
+          have hNext : stateLeafMap next = fun key =>
+              if key.1 = leaf.objectId then leafMapOf leaves' key.2 else stateLeafMap state key := by
+            funext key
+            obtain ⟨m, s⟩ := key
+            by_cases hm : m = leaf.objectId
+            · subst hm; simp [stateLeafMap, hLookup']
+            · simp only [stateLeafMap, hm, if_false, hFrame m hm]
+          simp only [transitionAccesses, liftSteps, List.map_cons, runLeaves, recordedCoins,
+            List.getD_cons_zero, List.getD_cons_succ, List.drop_succ_cons, List.drop_zero]
+          rw [stepLeaves_liftStep, hSlots, hStep]
+          rw [← hNext]
+          simp only [liftSteps] at hRun
+          rw [hRun]
+
 end PathOramFreshLeaves
 
 end UOToolchain

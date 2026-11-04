@@ -52,7 +52,9 @@ The Lean development states more than it currently proves for Path ORAM:
   (`observedLeaves_finalLeaves_uniform`), which is the premise for the next
   call, so the statement covers keys written by earlier calls. Every
   transition the Lean replay accepts is a step of this model
-  (`replay_runLeaves`), on either scheme, since both share one data path. The
+  (`replay_runLeaves` for one map, `replay_runLeaves_interleaved` for a
+  replay that interleaves several), on either scheme, since both share one
+  data path. The
   model is generic in the slot type, so it also covers a call on several maps
   in any interleaving, each map's leaves and coins below its own leaf count:
   the schedule is distributed as the canonical leaf-value distribution of the
@@ -60,9 +62,7 @@ The Lean development states more than it currently proves for Path ORAM:
   do not use it yet.
 
 Open work: restate the bundle over admitted configurations and derive it from
-`PathOramFreshLeaves`; extend `replay_runLeaves`, which takes one map's
-transitions, to replays that interleave several maps; and replace the flat
-position map by a recursive one.
+`PathOramFreshLeaves`; and replace the flat position map by a recursive one.
 
 ## Current Route
 
