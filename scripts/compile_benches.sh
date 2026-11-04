@@ -25,4 +25,5 @@ compile benches/raw/ConfidentialMixer.sol benches/raw/ConfidentialMixer.fullscan
 compile benches/raw/ConfidentialMixer.sol benches/raw/ConfidentialMixer.oram.yaml uo benches/uo/ConfidentialMixer.oram.json
 compile benches/raw/ERC20Lite.sol benches/raw/ERC20Lite.uo.yaml uo benches/uo/ERC20Lite.fullscan.json
 compile benches/raw/ERC20Lite.sol benches/raw/ERC20Lite.oram.yaml uo benches/uo/ERC20Lite.oram.json
+compile benches/raw/ERC20Lite.sol benches/raw/ERC20Lite.private-posmap.yaml uo benches/uo/ERC20Lite.private-posmap.json
 compile benches/raw/RegistryCRUD.sol benches/raw/RegistryCRUD.uo.yaml uo benches/uo/RegistryCRUD.uo.json

@@ -2,9 +2,9 @@
   "checker": "proof/lean/.lake/build/bin/checkProofGradeTranslationArtifacts",
   "kernel_admission_all_admitted": true,
   "kernel_admission_checker": "proof/lean/.lake/build/bin/checkKernelAdmission",
-  "kernel_admission_entrypoint_count": 33,
+  "kernel_admission_entrypoint_count": 39,
   "kernel_admission_exact_route_count": 24,
-  "kernel_admission_path_oram_route_count": 9,
+  "kernel_admission_path_oram_route_count": 15,
   "legacy_axiom_definition_checks": [
     {
       "expected_files": [
@@ -691,6 +691,8 @@
       "fullscan64_kernel_admission": null,
       "oram_artifact": null,
       "oram_kernel_admission": null,
+      "private_posmap_artifact": null,
+      "private_posmap_kernel_admission": null,
       "raw_artifact": {
         "accepted": false,
         "artifact_json_bytes": 4734,
@@ -931,6 +933,8 @@
           }
         ]
       },
+      "private_posmap_artifact": null,
+      "private_posmap_kernel_admission": null,
       "raw_artifact": {
         "accepted": false,
         "artifact_json_bytes": 6530,
@@ -1056,6 +1060,117 @@
         "state_object_count": 2
       },
       "oram_kernel_admission": {
+        "all_admitted": true,
+        "contract": "ERC20Lite",
+        "entrypoint_count": 6,
+        "entrypoints": [
+          {
+            "admitted": true,
+            "entrypoint": "allowanceOf(address,address)",
+            "flow_return": "secret",
+            "flow_status": "public",
+            "policy_agrees_with_flow": true,
+            "program_matches_function": true,
+            "return_policy": "declassified",
+            "returns_only_last": true,
+            "secret_args_match_manifest": true,
+            "status_policy": "public",
+            "trace_route": "path_oram",
+            "well_typed": true,
+            "writes_only_confidential": true
+          },
+          {
+            "admitted": true,
+            "entrypoint": "approve(address,address,uint256)",
+            "flow_return": "public",
+            "flow_status": "secret",
+            "policy_agrees_with_flow": true,
+            "program_matches_function": true,
+            "return_policy": "forbidden",
+            "returns_only_last": true,
+            "secret_args_match_manifest": true,
+            "status_policy": "declassified",
+            "trace_route": "path_oram",
+            "well_typed": true,
+            "writes_only_confidential": true
+          },
+          {
+            "admitted": true,
+            "entrypoint": "balanceOf(address)",
+            "flow_return": "secret",
+            "flow_status": "public",
+            "policy_agrees_with_flow": true,
+            "program_matches_function": true,
+            "return_policy": "declassified",
+            "returns_only_last": true,
+            "secret_args_match_manifest": true,
+            "status_policy": "public",
+            "trace_route": "path_oram",
+            "well_typed": true,
+            "writes_only_confidential": true
+          },
+          {
+            "admitted": true,
+            "entrypoint": "mint(address,uint256)",
+            "flow_return": "public",
+            "flow_status": "secret",
+            "policy_agrees_with_flow": true,
+            "program_matches_function": true,
+            "return_policy": "forbidden",
+            "returns_only_last": true,
+            "secret_args_match_manifest": true,
+            "status_policy": "declassified",
+            "trace_route": "path_oram",
+            "well_typed": true,
+            "writes_only_confidential": true
+          },
+          {
+            "admitted": true,
+            "entrypoint": "transfer(address,address,uint256)",
+            "flow_return": "public",
+            "flow_status": "secret",
+            "policy_agrees_with_flow": true,
+            "program_matches_function": true,
+            "return_policy": "declassified",
+            "returns_only_last": true,
+            "secret_args_match_manifest": true,
+            "status_policy": "declassified",
+            "trace_route": "path_oram",
+            "well_typed": true,
+            "writes_only_confidential": true
+          },
+          {
+            "admitted": true,
+            "entrypoint": "transferFrom(address,address,address,uint256)",
+            "flow_return": "public",
+            "flow_status": "secret",
+            "policy_agrees_with_flow": true,
+            "program_matches_function": true,
+            "return_policy": "declassified",
+            "returns_only_last": true,
+            "secret_args_match_manifest": true,
+            "status_policy": "declassified",
+            "trace_route": "path_oram",
+            "well_typed": true,
+            "writes_only_confidential": true
+          }
+        ]
+      },
+      "private_posmap_artifact": {
+        "accepted": true,
+        "artifact_json_bytes": 30562,
+        "contract": "ERC20Lite",
+        "function_count": 6,
+        "lean_stderr": "",
+        "lean_stdout": "validated proof-grade translation artifacts for ERC20Lite",
+        "manifest_entrypoint_count": 6,
+        "manifest_object_count": 2,
+        "metadata_contract": "ERC20Lite",
+        "mode": "uo",
+        "source_artifact_json_bytes": 30562,
+        "state_object_count": 2
+      },
+      "private_posmap_kernel_admission": {
         "all_admitted": true,
         "contract": "ERC20Lite",
         "entrypoint_count": 6,
@@ -1294,6 +1409,8 @@
       "fullscan64_kernel_admission": null,
       "oram_artifact": null,
       "oram_kernel_admission": null,
+      "private_posmap_artifact": null,
+      "private_posmap_kernel_admission": null,
       "raw_artifact": {
         "accepted": false,
         "artifact_json_bytes": 4034,
@@ -1391,6 +1508,8 @@
       "fullscan64_kernel_admission": null,
       "oram_artifact": null,
       "oram_kernel_admission": null,
+      "private_posmap_artifact": null,
+      "private_posmap_kernel_admission": null,
       "raw_artifact": {
         "accepted": false,
         "artifact_json_bytes": 5475,

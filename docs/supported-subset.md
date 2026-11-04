@@ -93,14 +93,12 @@ Sidecar metadata requirements:
 - confidential entrypoints must declare `secret_args`
 - `oram_scheme` must be set explicitly when a proof-grade ORAM path is
   intended; `path_oram_local_posmap_v1` remains capped at capacity `128`.
-  Larger maps compile against `path_oram_private_posmap_v1`, but that route
-  is not executable today: the runtime rejects every call on such a map (see
-  [`path-oram.md`](./path-oram.md)). Multi-access entrypoints (the same
-  map touched more than once per call) are supported only by the bounded
-  `path_oram_local_posmap_v1` route (capacity `128`); `path_oram_private_posmap_v1`
-  admits only one logical access per map per entrypoint, and a multi-access
-  private-posmap entrypoint is rejected at compile time with a diagnostic
-  naming the limitation
+  Larger maps use `path_oram_private_posmap_v1`, which executes but is not yet
+  covered by a theorem (see [`path-oram.md`](./path-oram.md)). Both Path ORAM
+  schemes admit multi-access entrypoints (the same map touched more than once
+  per call); the surrogate scheme is single-access, and a multi-access
+  surrogate entrypoint is rejected at compile time with a diagnostic naming
+  the limitation
 - gas is not declared in the sidecar: a `public_gas_budget` entry is rejected.
   The compiler derives each entrypoint's public gas into the emitted manifest,
   and the recorded `public_gas_budget` and the runtime `gas_used` are a MODELED

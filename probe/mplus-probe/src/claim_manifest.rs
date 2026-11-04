@@ -130,7 +130,7 @@ const CLAIM_ENTRIES: &[ClaimEntry] = &[
     ClaimEntry {
         id: "computational-uo-path-oram-private",
         category: "claim",
-        text: "The scalable private-position-map Path ORAM route path_oram_private_posmap_v1 compiles single-access entrypoints but is not executable (the runtime refinement witness rejects the scheme), and its Lean theorems take the empty seeded proof bundle.",
+        text: "The scalable private-position-map Path ORAM route path_oram_private_posmap_v1 executes, including several accesses to one map per call, but is not yet covered by a theorem: its Lean theorems take the empty seeded proof bundle.",
         status: STATUS_EXPERIMENTAL,
         doc_anchor: "path_oram_private_posmap_v1",
         source_files: &["crates/uo-core/src/trace.rs"],

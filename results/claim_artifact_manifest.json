@@ -922,7 +922,7 @@
         "crates/uo-core/src/trace.rs"
       ],
       "status": "experimental",
-      "text": "The scalable private-position-map Path ORAM route path_oram_private_posmap_v1 compiles single-access entrypoints but is not executable (the runtime refinement witness rejects the scheme), and its Lean theorems take the empty seeded proof bundle.",
+      "text": "The scalable private-position-map Path ORAM route path_oram_private_posmap_v1 executes, including several accesses to one map per call, but is not yet covered by a theorem: its Lean theorems take the empty seeded proof bundle.",
       "validation_command": "cargo run -q -p mplus-probe -- --only claim-consistency --out-dir results"
     },
     {

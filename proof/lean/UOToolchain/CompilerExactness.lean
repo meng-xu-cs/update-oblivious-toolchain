@@ -89,7 +89,7 @@ inductive ExpectedOramObjectWitnessAlignment :
   | nil : ExpectedOramObjectWitnessAlignment [] []
   | cons {entry expectedTail object objectTail} :
       WellFormedOramObject object →
-      ((1 < entry.snd) → WellFormedPathOramObject object) →
+      ((1 < entry.snd) → WellFormedAnyPathOramObject object) →
       ExpectedOramObjectWitnessAlignment expectedTail objectTail →
       ExpectedOramObjectWitnessAlignment (entry :: expectedTail) (object :: objectTail)
 
@@ -128,7 +128,7 @@ theorem ImportedProofRelevantManifestObjectView.exists_oramObjectManifest_of_val
   ∃ object,
     manifestObject.toOramObjectManifest? stateObject = some object ∧
     WellFormedOramObject object ∧
-    ((1 < accesses) → WellFormedPathOramObject object) := by
+    ((1 < accesses) → WellFormedAnyPathOramObject object) := by
   cases hOram : manifestObject.oram with
   | none =>
       simp [validateImportedOramShape, hOram] at hShape
@@ -216,6 +216,8 @@ theorem ImportedProofRelevantManifestObjectView.exists_oramObjectManifest_of_val
             , hMany
             , translationSurrogateOramScheme
             , translationPathOramScheme
+            , translationPathOramPrivatePosmapScheme
+            , translationIsPathOramScheme
             ] at hImpossible
         refine
           ⟨{ objectId := stateObject.id
@@ -357,7 +359,7 @@ theorem ImportedProofRelevantManifestObjectView.exists_oramObjectManifest_of_val
             exact hWellFormedPath
           ·
             intro _hMany
-            exact hWellFormedPath
+            exact Or.inl hWellFormedPath
         · by_cases hPrivateScheme : oram.scheme = translationPathOramPrivatePosmapScheme
           · have hBlocksPerBucket : oram.blocks_per_bucket = 5 := by
               by_cases hEq : oram.blocks_per_bucket = 5
@@ -456,12 +458,6 @@ theorem ImportedProofRelevantManifestObjectView.exists_oramObjectManifest_of_val
                   And.intro hRecursionDepth <|
                   And.intro hMetadataPagesPerAccess <|
                   And.intro hBucketsPerAccess hAccessesPerCall
-            have hNotManyAccesses : ¬ 1 < accesses := by
-              intro hMany
-              have hImpossible := hShape
-              simp [validateImportedOramShape, hOram, hPrivateScheme, hMany,
-                translationSurrogateOramScheme, translationPathOramScheme,
-                translationPathOramPrivatePosmapScheme] at hImpossible
             refine
               ⟨{ objectId := stateObject.id
                , objectName := stateObject.name
@@ -485,8 +481,8 @@ theorem ImportedProofRelevantManifestObjectView.exists_oramObjectManifest_of_val
               right
               exact hWellFormedPrivate
             ·
-              intro hMany
-              exact False.elim (hNotManyAccesses hMany)
+              intro _hMany
+              exact Or.inr hWellFormedPrivate
           · simp [validateImportedOramShape, hOram, hNotSurrogate,
               translationSurrogateOramScheme, translationPathOramScheme,
               translationPathOramPrivatePosmapScheme, translationIsPathOramScheme] at hShape
@@ -603,7 +599,7 @@ theorem ImportedProofRelevantContractView.exists_buildExpectedOramObjectWitnesse
           manifestObjectById? view.manifest.objects objectId = some manifestObject ∧
           manifestObject.toOramObjectManifest? stateObject = some object ∧
           WellFormedOramObject object ∧
-          ((1 < accesses) → WellFormedPathOramObject object)) :
+          ((1 < accesses) → WellFormedAnyPathOramObject object)) :
   ∃ objects,
     view.buildExpectedOramObjectWitnesses expected = .ok objects ∧
     ExpectedOramObjectWitnessAlignment expected objects := by
@@ -630,7 +626,7 @@ theorem ImportedProofRelevantContractView.exists_buildExpectedOramObjectWitnesse
               manifestObjectById? view.manifest.objects objectId = some manifestObject ∧
               manifestObject.toOramObjectManifest? stateObject = some object ∧
               WellFormedOramObject object ∧
-              ((1 < accesses) → WellFormedPathOramObject object) := by
+              ((1 < accesses) → WellFormedAnyPathOramObject object) := by
         intro objectId accesses hMem
         exact
           hWitness
@@ -794,7 +790,7 @@ theorem proofGradeExpectedOramObjectWitnessExistsOfLookup
         manifestObjectById? bundle.source_view.manifest.objects objectId = some manifestObject ∧
         manifestObject.toOramObjectManifest? stateObject = some object ∧
         WellFormedOramObject object ∧
-        ((1 < accesses) → WellFormedPathOramObject object) := by
+        ((1 < accesses) → WellFormedAnyPathOramObject object) := by
   rcases
       bundle.source_view.manifest_oram_accesses_exact_of_lookup
         (bundle.source_view_structural_valid hValid)
@@ -878,7 +874,7 @@ theorem proofGradeExpectedPathOramObjectWitnessExistsOfLookup
         stateObjectById? bundle.source_view.state objectId = some stateObject ∧
         manifestObjectById? bundle.source_view.manifest.objects objectId = some manifestObject ∧
         manifestObject.toOramObjectManifest? stateObject = some object ∧
-        WellFormedPathOramObject object := by
+        WellFormedAnyPathOramObject object := by
   intro objectId accesses hMemExpected hMany
   rcases
       proofGradeExpectedOramObjectWitnessExistsOfLookup
@@ -911,7 +907,7 @@ theorem proofGradeExpectedOramObjectWitnessesAlignedOfLookup
           manifestObjectById? bundle.source_view.manifest.objects objectId = some manifestObject ∧
           manifestObject.toOramObjectManifest? stateObject = some object ∧
           WellFormedOramObject object ∧
-          ((1 < accesses) → WellFormedPathOramObject object) := by
+          ((1 < accesses) → WellFormedAnyPathOramObject object) := by
     intro objectId accesses hMemExpected
     exact
       proofGradeExpectedOramObjectWitnessExistsOfLookup
@@ -1492,7 +1488,7 @@ structure ProofGradeCompilerFacts
             manifestObjectById? bundle.source_view.manifest.objects objectId = some manifestObject ∧
             manifestObject.toOramObjectManifest? stateObject = some object ∧
             WellFormedOramObject object ∧
-            ((1 < accesses) → WellFormedPathOramObject object)
+            ((1 < accesses) → WellFormedAnyPathOramObject object)
   expectedPathOramObjectWitnessExists :
     ∀ {fn : ImportedProofRelevantFunctionView}
       {entry : ImportedProofRelevantEntrypointView},
@@ -1508,7 +1504,7 @@ structure ProofGradeCompilerFacts
             stateObjectById? bundle.source_view.state objectId = some stateObject ∧
             manifestObjectById? bundle.source_view.manifest.objects objectId = some manifestObject ∧
             manifestObject.toOramObjectManifest? stateObject = some object ∧
-            WellFormedPathOramObject object
+            WellFormedAnyPathOramObject object
   expectedOramObjectWitnessesAligned :
     ∀ {fn : ImportedProofRelevantFunctionView}
       {entry : ImportedProofRelevantEntrypointView},

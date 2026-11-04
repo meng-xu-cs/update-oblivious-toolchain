@@ -25,6 +25,19 @@
       "outcome_model_matches": null,
       "physical_read_equal": true,
       "physical_trace_equal": true
+    },
+    {
+      "benchmark": "ERC20Lite",
+      "comparison_class": "computational_oram",
+      "equality_is_obligation": false,
+      "exact_encoding_matches": null,
+      "logical_access_equal": false,
+      "logical_write_equal": true,
+      "mode": "oram_private_posmap",
+      "opcode_equal": true,
+      "outcome_model_matches": null,
+      "physical_read_equal": false,
+      "physical_trace_equal": false
     }
   ],
   "exact_uo": [

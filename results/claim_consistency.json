@@ -43,28 +43,28 @@
       "ok": true
     },
     {
-      "detail": "README.md states that path_oram_private_posmap_v1 is not executable",
-      "name": "README.md:states-private-scheme-not-executable",
+      "detail": "README.md states that path_oram_private_posmap_v1 is not yet covered by a theorem",
+      "name": "README.md:states-private-scheme-unproved",
       "ok": true
     },
     {
-      "detail": "docs/claim-boundary.md states that path_oram_private_posmap_v1 is not executable",
-      "name": "docs/claim-boundary.md:states-private-scheme-not-executable",
+      "detail": "docs/claim-boundary.md states that path_oram_private_posmap_v1 is not yet covered by a theorem",
+      "name": "docs/claim-boundary.md:states-private-scheme-unproved",
       "ok": true
     },
     {
-      "detail": "docs/supported-subset.md states that path_oram_private_posmap_v1 is not executable",
-      "name": "docs/supported-subset.md:states-private-scheme-not-executable",
+      "detail": "docs/supported-subset.md states that path_oram_private_posmap_v1 is not yet covered by a theorem",
+      "name": "docs/supported-subset.md:states-private-scheme-unproved",
       "ok": true
     },
     {
-      "detail": "docs/path-oram.md states that path_oram_private_posmap_v1 is not executable",
-      "name": "docs/path-oram.md:states-private-scheme-not-executable",
+      "detail": "docs/path-oram.md states that path_oram_private_posmap_v1 is not yet covered by a theorem",
+      "name": "docs/path-oram.md:states-private-scheme-unproved",
       "ok": true
     },
     {
-      "detail": "README names path_oram_local_posmap_v1 as the executable computational-UO route",
-      "name": "README.md:names-executable-local-route",
+      "detail": "README names path_oram_local_posmap_v1 as the computational-UO route with a Lean instance",
+      "name": "README.md:names-local-route-with-lean-instance",
       "ok": true
     },
     {

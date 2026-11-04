@@ -98,6 +98,7 @@ def RuntimeOramObjectCertificate.metadataEventKind?
   match object.scheme with
   | "surrogate_public_schedule_v1" => some "uooram_meta_scan"
   | "path_oram_local_posmap_v1" => some "uooram_metadata_load"
+  | "path_oram_private_posmap_v1" => some "uooram_metadata_load"
   | _ => none
 
 def RuntimeOramObjectCertificate.bucketEventKind?
@@ -105,11 +106,12 @@ def RuntimeOramObjectCertificate.bucketEventKind?
   match object.scheme with
   | "surrogate_public_schedule_v1" => some "uooram_bucket_scan"
   | "path_oram_local_posmap_v1" => some "uooram_path_read"
+  | "path_oram_private_posmap_v1" => some "uooram_path_read"
   | _ => none
 
 def RuntimeOramObjectCertificate.isPathOram
   (object : RuntimeOramObjectCertificate) : Bool :=
-  object.scheme = pathOramScheme
+  isPathOramScheme object.scheme
 
 def RuntimeOramLeafCertificate.toPathOramLeafScheduleStep
   (leaf : RuntimeOramLeafCertificate) : PathOramLeafScheduleStep :=
@@ -226,7 +228,7 @@ theorem runtimeOramObject_isPathOram_of_matchPublicConfig
       _hMetadata, _hBuckets, _hAccesses⟩
   have hObjectScheme : object.scheme = pathOramScheme := by
     simpa [RuntimeOramObjectCertificate.toOramObjectManifest] using hScheme
-  simp [RuntimeOramObjectCertificate.isPathOram, hObjectScheme]
+  simp [RuntimeOramObjectCertificate.isPathOram, isPathOramScheme, hObjectScheme]
 
 theorem runtimeOramObjectByName?_isPathOram_of_matchPublicConfig
   {oramObjects : List RuntimeOramObjectCertificate}
@@ -320,7 +322,7 @@ def runtimePathOramApplyTransition?
   (transition : RuntimePathOramTransitionCertificate) :
   Option RuntimePathOramPositionMapState := do
   let object ← runtimeOramObjectById? oramObjects leaf.objectId
-  if object.scheme != pathOramScheme ||
+  if !isPathOramScheme object.scheme ||
       transition.objectId != leaf.objectId ||
       transition.objectName != leaf.objectName ||
       transition.bucketCount != leaf.bucketCount ||
@@ -528,7 +530,7 @@ def runtimePathOramApplyTransitionShapeWithCoins?
   (coins : List Nat) :
   Option (RuntimeOramLeafCertificate × RuntimePathOramPositionMapState × List Nat) := do
   let object ← runtimeOramObjectById? oramObjects transition.objectId
-  if object.scheme != pathOramScheme ||
+  if !isPathOramScheme object.scheme ||
       object.objectName != transition.objectName ||
       object.bucketCount != transition.bucketCount then
     none
@@ -665,8 +667,8 @@ theorem runtimePathOramApplyTransitionShapeWithCoins_of_explicit
             | none =>
                 simp [hObj] at hExplicit
             | some object =>
-                have hScheme : object.scheme = pathOramScheme := by
-                  by_cases hEq : object.scheme = pathOramScheme
+                have hScheme : isPathOramScheme object.scheme = true := by
+                  by_cases hEq : isPathOramScheme object.scheme = true
                   · exact hEq
                   · have hFalse : False := by
                         simp [hObj, hEq] at hExplicit
@@ -733,8 +735,8 @@ theorem runtimePathOramApplyTransitionShapeWithCoins_of_explicit
             | none =>
                 simp [hObj] at hExplicit
             | some object =>
-                have hScheme : object.scheme = pathOramScheme := by
-                  by_cases hEq : object.scheme = pathOramScheme
+                have hScheme : isPathOramScheme object.scheme = true := by
+                  by_cases hEq : isPathOramScheme object.scheme = true
                   · exact hEq
                   · have hFalse : False := by
                         simp [hObj, hEq] at hExplicit
@@ -841,8 +843,8 @@ theorem runtimePathOramApplyTransitionShapeWithCoins_of_explicit
             | none =>
                 simp [hObj] at hExplicit
             | some object =>
-                have hScheme : object.scheme = pathOramScheme := by
-                  by_cases hEq : object.scheme = pathOramScheme
+                have hScheme : isPathOramScheme object.scheme = true := by
+                  by_cases hEq : isPathOramScheme object.scheme = true
                   · exact hEq
                   · have hFalse : False := by
                         simp [hObj, hEq] at hExplicit
@@ -899,8 +901,8 @@ theorem runtimePathOramApplyTransitionShapeWithCoins_of_explicit
             | none =>
                 simp [hObj] at hExplicit
             | some object =>
-                have hScheme : object.scheme = pathOramScheme := by
-                  by_cases hEq : object.scheme = pathOramScheme
+                have hScheme : isPathOramScheme object.scheme = true := by
+                  by_cases hEq : isPathOramScheme object.scheme = true
                   · exact hEq
                   · have hFalse : False := by
                         simp [hObj, hEq] at hExplicit
@@ -984,8 +986,8 @@ theorem runtimePathOramApplyTransitionShapeWithCoins_of_explicit
             | none =>
                 simp [hObj] at hExplicit
             | some object =>
-                have hScheme : object.scheme = pathOramScheme := by
-                  by_cases hEq : object.scheme = pathOramScheme
+                have hScheme : isPathOramScheme object.scheme = true := by
+                  by_cases hEq : isPathOramScheme object.scheme = true
                   · exact hEq
                   · have hFalse : False := by
                         simp [hObj, hEq] at hExplicit
@@ -1073,8 +1075,8 @@ theorem runtimePathOramApplyTransitionShapeWithCoins_of_explicit
             | none =>
                 simp [hObj] at hExplicit
             | some object =>
-                have hScheme : object.scheme = pathOramScheme := by
-                  by_cases hEq : object.scheme = pathOramScheme
+                have hScheme : isPathOramScheme object.scheme = true := by
+                  by_cases hEq : isPathOramScheme object.scheme = true
                   · exact hEq
                   · have hFalse : False := by
                         simp [hObj, hEq] at hExplicit
@@ -1169,8 +1171,8 @@ theorem runtimePathOramApplyTransitionShapeWithCoins_of_explicit
             | none =>
                 simp [hObj] at hExplicit
             | some object =>
-                have hScheme : object.scheme = pathOramScheme := by
-                  by_cases hEq : object.scheme = pathOramScheme
+                have hScheme : isPathOramScheme object.scheme = true := by
+                  by_cases hEq : isPathOramScheme object.scheme = true
                   · exact hEq
                   · have hFalse : False := by
                         simp [hObj, hEq] at hExplicit

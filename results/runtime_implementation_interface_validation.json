@@ -1,6 +1,6 @@
 {
   "accepted": true,
-  "artifact_json_bytes": 1285501,
+  "artifact_json_bytes": 1287765,
   "checker": "proof/lean/.lake/build/bin/checkProofGradeRuntimeImplementationInterface",
   "deeper_semantics_of_rust_refinement_required": true,
   "evidence_classification": "source-frozen/static-drift checked",
@@ -35,7 +35,7 @@
     "objects": 90720,
     "oram": 55848,
     "precompiles": 240,
-    "runtime_evm_lib": 66791,
+    "runtime_evm_lib": 68845,
     "runtime_module": 2948,
     "shell": 20977,
     "state": 35250,
@@ -43,7 +43,7 @@
     "store_lib": 154,
     "store_store": 2898,
     "theorem": 6238,
-    "trace": 413621,
+    "trace": 413759,
     "trusted_kernel": 4548,
     "types": 29154
   },

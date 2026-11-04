@@ -209,7 +209,7 @@ theorem proofGrade_source_expected_oram_object_witness_exists_of_lookup
         manifestObjectById? bundle.source_view.manifest.objects objectId = some manifestObject ∧
         manifestObject.toOramObjectManifest? stateObject = some object ∧
         WellFormedOramObject object ∧
-        ((1 < accesses) → WellFormedPathOramObject object) := by
+        ((1 < accesses) → WellFormedAnyPathOramObject object) := by
   exact
     proofGradeExpectedOramObjectWitnessExistsOfLookup bundle hValid hMem hLookup
 
@@ -244,7 +244,7 @@ theorem proofGrade_source_expected_path_oram_object_witness_exists_of_lookup
         stateObjectById? bundle.source_view.state objectId = some stateObject ∧
         manifestObjectById? bundle.source_view.manifest.objects objectId = some manifestObject ∧
         manifestObject.toOramObjectManifest? stateObject = some object ∧
-        WellFormedPathOramObject object := by
+        WellFormedAnyPathOramObject object := by
   exact
     proofGradeExpectedPathOramObjectWitnessExistsOfLookup bundle hValid hMem hLookup
 

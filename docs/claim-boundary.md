@@ -167,10 +167,10 @@ field bindings required by `DeploymentCallAccepted`.
   access). Multi-access local entrypoints are validated through compact
   theorem inputs that check a representative witness and derive no theorem,
   and a call that aborts on the local route is rejected by the runtime.
-  `path_oram_private_posmap_v1` compiles single-access entrypoints but is not
-  executable: the runtime refinement witness rejects the scheme, so every call
-  fails, and its Lean route inherits the vacuous bundle. See
-  [`path-oram.md`](./path-oram.md).
+  `path_oram_private_posmap_v1` executes, with several accesses to one map
+  per call (the capacity-256 `balances` map of the private ERC20Lite
+  benchmark), but it is not yet covered by a theorem: its Lean route inherits
+  the vacuous bundle. See [`path-oram.md`](./path-oram.md).
 - Legacy/surrogate ORAM paths remain available for benchmarking and historical
   comparison, not for the strengthened proof-grade claim.
 - Executable insecure raw baselines (the `insecure-eval-raw` evaluation feature,

@@ -1,9 +1,9 @@
 {
   "accepted": true,
   "class_counts": {
-    "advisory_nonclaim": 567,
+    "advisory_nonclaim": 574,
     "deprecated_report": 0,
-    "expected_computational_difference": 98,
+    "expected_computational_difference": 101,
     "expected_negative": 998,
     "required_failure": 0,
     "unclassified": 0
@@ -1841,6 +1841,7 @@
         "cases.4.ct_gas_only.rejected",
         "cases.4.full_scan.rejected",
         "cases.4.oram.rejected",
+        "cases.4.oram_private_posmap.rejected",
         "cases.4.raw.executable",
         "cases.4.raw_insecure_eval.rejected",
         "cases.4.variants.0.executable",
@@ -1848,6 +1849,7 @@
         "cases.4.variants.2.rejected",
         "cases.4.variants.3.rejected",
         "cases.4.variants.4.rejected",
+        "cases.4.variants.5.rejected",
         "cases.5.ct_gas_only.rejected",
         "cases.5.full_scan.rejected",
         "cases.5.raw.executable",
@@ -1881,13 +1883,14 @@
         "matrix.22.rejected",
         "matrix.23.rejected",
         "matrix.24.rejected",
-        "matrix.25.executable",
-        "matrix.26.rejected",
+        "matrix.25.rejected",
+        "matrix.26.executable",
         "matrix.27.rejected",
-        "matrix.28.rejected"
+        "matrix.28.rejected",
+        "matrix.29.rejected"
       ],
       "class_counts": {
-        "advisory_nonclaim": 89,
+        "advisory_nonclaim": 92,
         "deprecated_report": 0,
         "expected_computational_difference": 1,
         "expected_negative": 0,
@@ -1898,8 +1901,8 @@
       "expected_false_paths": [
         "cases.4.oram_improves_physical_writes"
       ],
-      "false_count": 90,
-      "false_paths": 90,
+      "false_count": 93,
+      "false_paths": 93,
       "mode": "evaluation",
       "report": "overheads",
       "required": false,
@@ -2117,10 +2120,12 @@
         "runtime_overheads.cases.3.variants.3.rejected",
         "runtime_overheads.cases.4.full_scan.rejected",
         "runtime_overheads.cases.4.oram.rejected",
+        "runtime_overheads.cases.4.oram_private_posmap.rejected",
         "runtime_overheads.cases.4.raw.executable",
         "runtime_overheads.cases.4.variants.0.executable",
         "runtime_overheads.cases.4.variants.1.rejected",
         "runtime_overheads.cases.4.variants.2.rejected",
+        "runtime_overheads.cases.4.variants.3.rejected",
         "runtime_overheads.cases.5.full_scan.rejected",
         "runtime_overheads.cases.5.raw.executable",
         "runtime_overheads.cases.5.variants.0.executable",
@@ -2140,11 +2145,12 @@
         "runtime_overheads.matrix.12.executable",
         "runtime_overheads.matrix.13.rejected",
         "runtime_overheads.matrix.14.rejected",
-        "runtime_overheads.matrix.15.executable",
-        "runtime_overheads.matrix.16.rejected"
+        "runtime_overheads.matrix.15.rejected",
+        "runtime_overheads.matrix.16.executable",
+        "runtime_overheads.matrix.17.rejected"
       ],
       "class_counts": {
-        "advisory_nonclaim": 88,
+        "advisory_nonclaim": 91,
         "deprecated_report": 0,
         "expected_computational_difference": 1,
         "expected_negative": 0,
@@ -2155,8 +2161,8 @@
       "expected_false_paths": [
         "runtime_overheads.cases.4.oram_improves_physical_writes"
       ],
-      "false_count": 89,
-      "false_paths": 89,
+      "false_count": 92,
+      "false_paths": 92,
       "mode": "advisory",
       "report": "reviewer_summary",
       "required": false,
@@ -3442,21 +3448,26 @@
       "advisory_false_paths": [
         "computational_uo.0.equality_is_obligation",
         "computational_uo.1.equality_is_obligation",
+        "computational_uo.2.equality_is_obligation",
         "positive_control.raw.executable",
         "positive_control.same_same.executable"
       ],
       "class_counts": {
-        "advisory_nonclaim": 4,
+        "advisory_nonclaim": 5,
         "deprecated_report": 0,
-        "expected_computational_difference": 0,
+        "expected_computational_difference": 3,
         "expected_negative": 0,
         "required_failure": 0,
         "unclassified": 0
       },
       "declared_accepted": null,
-      "expected_false_paths": [],
-      "false_count": 4,
-      "false_paths": 4,
+      "expected_false_paths": [
+        "computational_uo.2.logical_access_equal",
+        "computational_uo.2.physical_read_equal",
+        "computational_uo.2.physical_trace_equal"
+      ],
+      "false_count": 8,
+      "false_paths": 8,
       "mode": "evaluation",
       "report": "trace_equivalence",
       "required": false,

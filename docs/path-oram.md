@@ -22,16 +22,18 @@ The Lean development states more than it currently proves for Path ORAM:
   witness and derive no theorem.
 - A call that aborts on the local route is rejected by the runtime
   (`rejected_by_proof_grade_route` in `results/abort_rollback.json`).
-- `path_oram_private_posmap_v1` compiles single-access entrypoints but is not
-  executable: the runtime refinement witness rejects the scheme, so every call
-  on such a map fails. The runtime has no recursive position map; both schemes
-  share one data path, a flat position map in encrypted metadata pages that
-  every access scans in full.
+- `path_oram_private_posmap_v1` executes, including several accesses to one
+  map per call, but it is not yet covered by a theorem. The runtime has no
+  recursive position map; both schemes share one data path, a flat position
+  map in encrypted metadata pages that every access scans in full, so an
+  access to a capacity-256 map reads 64 metadata pages and 9 buckets. The Lean
+  runtime-witness checkers accept the private scheme's events, but the
+  per-configuration paper-main boundary is stated for the local scheme only.
 
 Open work: restate the bundle over admitted configurations; prove without seed
 enumeration that fresh coins give independent uniform leaves for several
-accesses, including keys written by earlier calls; make the private route
-executable; and support aborts on the ORAM route.
+accesses, including keys written by earlier calls; support aborts on the ORAM
+route; and replace the flat position map by a recursive one.
 
 ## Current Route
 
@@ -85,22 +87,21 @@ and storage-projection facts.
 The legacy local-position-map route is intentionally capped at capacity `128`
 (`PATH_ORAM_LOCAL_POSMAP_MAX_CAPACITY` in Rust and
 `translationPathOramLocalPosmapMaxCapacity` in the Lean imported-shape
-checker). Larger maps compile against `path_oram_private_posmap_v1`, which is
-not executable today (see Current Status). Its compact symbolic certificate
+checker). Larger maps use `path_oram_private_posmap_v1`, which executes but is
+not yet covered by a theorem (see Current Status). Its compact symbolic certificate
 (`ScalablePathOramCertificate`) records six shape numbers instead of
 enumerating large seed/family spaces, and `ScalablePathOramCertificate.Subenumerative`
 bounds its size and validation steps below the represented capacity. The
 private-scheme theorems do not use the certificate, and the Rust
 `ScalablePathOramEvidence` mirror is exercised only by unit tests.
 
-The private-position-map route admits only one logical access per map per
-entrypoint. Multi-access composition for it — fresh coins, recursive
-position-map traces, and stash bounds across several accesses — is not yet
-proved, so `supports_multi_access_per_entrypoint()` is true only for the
-bounded `path_oram_local_posmap_v1` route (capacity `128`). A multi-access
-`path_oram_private_posmap_v1` entrypoint is rejected at compile time with a
-diagnostic that names the limitation and points to the local-posmap route for
-multi-access maps.
+Both Path ORAM schemes admit several logical accesses to one map per
+entrypoint (`supports_multi_access_per_entrypoint()`): every access draws fresh
+leaves and rewrites its path and the metadata pages, and the per-entrypoint
+resource bounds scale with the access count. The surrogate scheme is
+single-access, and a multi-access surrogate entrypoint is rejected at compile
+time. No theorem yet covers multi-access calls on either scheme (see Current
+Status).
 
 ## Assumption Provenance
 

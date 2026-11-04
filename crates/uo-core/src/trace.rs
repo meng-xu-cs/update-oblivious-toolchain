@@ -6,7 +6,8 @@ use crate::confidential_kernel::{
 use crate::fixed_buffer;
 use crate::ir::StateObject;
 use crate::manifest::{
-    EntrypointManifest, RuntimeKernelStepManifest, PATH_ORAM_SCHEME, SURROGATE_ORAM_SCHEME,
+    is_path_oram_scheme, EntrypointManifest, RuntimeKernelStepManifest,
+    PATH_ORAM_PRIVATE_POSMAP_SCHEME, PATH_ORAM_SCHEME, SURROGATE_ORAM_SCHEME,
 };
 use crate::metadata::{DeclassificationKind, ReturnPolicy, StatusPolicy};
 use crate::types::{FixedBoxBuilder, Value};
@@ -5442,7 +5443,7 @@ impl RuntimeOramObjectWitness {
     fn metadata_event_kind(&self) -> Result<&'static str, RefinementWitnessError> {
         match self.scheme.as_str() {
             SURROGATE_ORAM_SCHEME => Ok("uooram_meta_scan"),
-            PATH_ORAM_SCHEME => Ok("uooram_metadata_load"),
+            PATH_ORAM_SCHEME | PATH_ORAM_PRIVATE_POSMAP_SCHEME => Ok("uooram_metadata_load"),
             other => Err(RefinementWitnessError::UnsupportedOramScheme {
                 scheme: other.into(),
             }),
@@ -5452,7 +5453,7 @@ impl RuntimeOramObjectWitness {
     fn bucket_event_kind(&self) -> Result<&'static str, RefinementWitnessError> {
         match self.scheme.as_str() {
             SURROGATE_ORAM_SCHEME => Ok("uooram_bucket_scan"),
-            PATH_ORAM_SCHEME => Ok("uooram_path_read"),
+            PATH_ORAM_SCHEME | PATH_ORAM_PRIVATE_POSMAP_SCHEME => Ok("uooram_path_read"),
             other => Err(RefinementWitnessError::UnsupportedOramScheme {
                 scheme: other.into(),
             }),
@@ -5924,7 +5925,7 @@ fn reconstruct_path_oram_leaf_scaffold_from_logical_trace(
             object.buckets_per_access,
             "bucket:",
         )?;
-        if object.scheme == PATH_ORAM_SCHEME {
+        if is_path_oram_scheme(&object.scheme) {
             scaffold.push((
                 object.object_id,
                 object.object_name.clone(),
@@ -5942,7 +5943,7 @@ fn runtime_path_oram_bucket_trace(
 ) -> Result<RuntimePathOramBucketTrace, RefinementWitnessError> {
     let path_objects = oram_objects
         .iter()
-        .filter(|object| object.scheme == PATH_ORAM_SCHEME)
+        .filter(|object| is_path_oram_scheme(&object.scheme))
         .map(|object| object.object_name.as_str())
         .collect::<std::collections::BTreeSet<_>>();
     let read_buckets = physical_reads
@@ -6199,7 +6200,7 @@ fn validate_path_oram_leaf_schedule(
     for ((object_id, object_name, bucket_count), step) in scaffold.iter().zip(leaf_schedule.iter())
     {
         let object = runtime_oram_object_by_id(oram_objects, step.object_id)?;
-        if object.scheme != PATH_ORAM_SCHEME
+        if !is_path_oram_scheme(&object.scheme)
             || step.object_id != *object_id
             || step.object_name != *object_name
             || step.bucket_count != *bucket_count
@@ -6240,7 +6241,7 @@ fn runtime_path_oram_state_by_object(
     let mut by_object = BTreeMap::new();
     for object in oram_objects
         .iter()
-        .filter(|object| object.scheme == PATH_ORAM_SCHEME)
+        .filter(|object| is_path_oram_scheme(&object.scheme))
     {
         let state = states
             .iter()
@@ -6284,7 +6285,7 @@ fn validate_path_oram_leaf_state(
     let expected_after = runtime_path_oram_state_by_object(after, oram_objects)?;
     for (step, transition) in leaf_schedule.iter().zip(transitions.iter()) {
         let object = runtime_oram_object_by_id(oram_objects, step.object_id)?;
-        if object.scheme != PATH_ORAM_SCHEME
+        if !is_path_oram_scheme(&object.scheme)
             || transition.object_id != step.object_id
             || transition.object_name != step.object_name
             || transition.bucket_count != step.bucket_count

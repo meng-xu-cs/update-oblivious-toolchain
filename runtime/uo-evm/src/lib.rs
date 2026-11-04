@@ -853,6 +853,57 @@ bounds:
     }
 
     #[test]
+    fn private_posmap_path_oram_supports_multi_access_entrypoints() {
+        // SingleAccessMap with its map on the scalable private-position-map
+        // scheme at capacity 256, above the local scheme's cap of 128.
+        let metadata = include_str!(bench_raw!("SingleAccessMap.pathoram.yaml"))
+            .replace("capacity: 16", "capacity: 256")
+            .replace("path_oram_local_posmap_v1", "path_oram_private_posmap_v1");
+        let artifact = compile_bench(
+            bench_raw!("SingleAccessMap.sol"),
+            &metadata,
+            ProgramMode::Uo,
+        );
+        let mut first = ContractInstance::deploy(artifact.clone()).unwrap();
+        let first_trace = first
+            .call(
+                "add(bytes32,uint256)",
+                vec![Value::Bytes32([1u8; 32]), Value::uint(7)],
+            )
+            .unwrap();
+        let mut second = ContractInstance::deploy(artifact).unwrap();
+        let second_trace = second
+            .call(
+                "add(bytes32,uint256)",
+                vec![Value::Bytes32([9u8; 32]), Value::uint(7)],
+            )
+            .unwrap();
+        first_trace.trace.runtime_refinement_witness().unwrap();
+
+        assert_eq!(
+            first_trace.trace.theorem_trace,
+            second_trace.trace.theorem_trace
+        );
+        assert_eq!(first_trace.trace.theorem_trace.boundary_schedule.len(), 6);
+        // Each access reads the counter, all 64 metadata pages (32 position-map
+        // and 32 stash pages), and the 9 buckets of one path.
+        assert_eq!(first_trace.trace.physical_reads.len(), 2 * (1 + 64 + 9));
+        assert_eq!(
+            first_trace
+                .trace
+                .logical_accesses
+                .iter()
+                .filter(|event| event.kind == "uooram_counter")
+                .count(),
+            2
+        );
+        let read_back = first
+            .call("read(bytes32)", vec![Value::Bytes32([1u8; 32])])
+            .unwrap();
+        assert_eq!(read_back.return_value, Some(Value::uint(7)));
+    }
+
+    #[test]
     fn execution_trace_exports_refinement_witness() {
         let artifact = compile_bench(
             bench_raw!("SingleAccessMap.sol"),

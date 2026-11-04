@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use uo_core::ir::{
     BackendKind, CompiledFunction, ContainerKind, Expr, ProgramMode, StateObject, Statement,
 };
-use uo_core::manifest::{EntrypointManifest, PATH_ORAM_SCHEME};
+use uo_core::manifest::{is_path_oram_scheme, EntrypointManifest};
 use uo_core::{
     lower_confidential_kernel_statements, CompiledArtifact, ContractMetadata, DeclassificationKind,
     OramManifest, ProofRelevantTranslationBundle, ReturnPolicy, StateObjectManifest, StatusPolicy,
@@ -992,7 +992,7 @@ fn expected_commit_ops(
                     if object.backend == BackendKind::Oram =>
                 {
                     let per_access = OramManifest::for_object(object)?.total_commit_ops();
-                    if object.oram_scheme == PATH_ORAM_SCHEME {
+                    if is_path_oram_scheme(&object.oram_scheme) {
                         per_access * oram_accesses.get(&object_id).copied().unwrap_or(0)
                     } else {
                         per_access
@@ -1811,17 +1811,13 @@ bounds:
             .map(|entry| entry.unwrap().path())
             .filter(|path| {
                 let name = path.file_name().unwrap().to_str().unwrap();
-                // Raw-mode sidecars are checked by the raw tests; the private
-                // position-map sidecar is rejected at compile time (it makes
-                // several accesses to one map on a single-access scheme).
-                name.ends_with(".yaml")
-                    && !name.ends_with(".raw.yaml")
-                    && !name.ends_with(".private-posmap.yaml")
+                // Raw-mode sidecars are checked by the raw tests.
+                name.ends_with(".yaml") && !name.ends_with(".raw.yaml")
             })
             .collect::<Vec<_>>();
         sidecars.sort();
         assert!(
-            sidecars.len() >= 11,
+            sidecars.len() >= 12,
             "found only {} UO sidecars",
             sidecars.len()
         );

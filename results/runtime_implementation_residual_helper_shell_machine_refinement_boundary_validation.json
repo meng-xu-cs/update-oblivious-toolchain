@@ -15,7 +15,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1288053,
+      "boundary_json_bytes": 1290317,
       "confidential_slot_program": {
         "entrypoint_id": "classify(uint256)",
         "expected_runtime_step_count": 4,
@@ -49,7 +49,7 @@
         "objects": 90720,
         "oram": 55848,
         "precompiles": 240,
-        "runtime_evm_lib": 66791,
+        "runtime_evm_lib": 68845,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -57,7 +57,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413621,
+        "trace": 413759,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -261,7 +261,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1288053,
+      "boundary_json_bytes": 1290317,
       "confidential_slot_program": {
         "entrypoint_id": "classify(uint256)",
         "expected_runtime_step_count": 4,
@@ -295,7 +295,7 @@
         "objects": 90720,
         "oram": 55848,
         "precompiles": 240,
-        "runtime_evm_lib": 66791,
+        "runtime_evm_lib": 68845,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -303,7 +303,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413621,
+        "trace": 413759,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -507,7 +507,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1291985,
+      "boundary_json_bytes": 1294249,
       "confidential_slot_program": {
         "entrypoint_id": "auth(bytes32)",
         "expected_runtime_step_count": 8,
@@ -541,7 +541,7 @@
         "objects": 90720,
         "oram": 55848,
         "precompiles": 240,
-        "runtime_evm_lib": 66791,
+        "runtime_evm_lib": 68845,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -549,7 +549,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413621,
+        "trace": 413759,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -956,7 +956,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1291985,
+      "boundary_json_bytes": 1294249,
       "confidential_slot_program": {
         "entrypoint_id": "auth(bytes32)",
         "expected_runtime_step_count": 8,
@@ -990,7 +990,7 @@
         "objects": 90720,
         "oram": 55848,
         "precompiles": 240,
-        "runtime_evm_lib": 66791,
+        "runtime_evm_lib": 68845,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -998,7 +998,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413621,
+        "trace": 413759,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -1405,7 +1405,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1289909,
+      "boundary_json_bytes": 1292173,
       "confidential_slot_program": {
         "entrypoint_id": "upsert(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -1439,7 +1439,7 @@
         "objects": 90720,
         "oram": 55848,
         "precompiles": 240,
-        "runtime_evm_lib": 66791,
+        "runtime_evm_lib": 68845,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -1447,7 +1447,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413621,
+        "trace": 413759,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -1813,7 +1813,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1289909,
+      "boundary_json_bytes": 1292173,
       "confidential_slot_program": {
         "entrypoint_id": "upsert(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -1847,7 +1847,7 @@
         "objects": 90720,
         "oram": 55848,
         "precompiles": 240,
-        "runtime_evm_lib": 66791,
+        "runtime_evm_lib": 68845,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -1855,7 +1855,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413621,
+        "trace": 413759,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -2221,7 +2221,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1291501,
+      "boundary_json_bytes": 1293765,
       "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
@@ -2255,7 +2255,7 @@
         "objects": 90720,
         "oram": 55848,
         "precompiles": 240,
-        "runtime_evm_lib": 66791,
+        "runtime_evm_lib": 68845,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -2263,7 +2263,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413621,
+        "trace": 413759,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -2713,7 +2713,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1291501,
+      "boundary_json_bytes": 1293765,
       "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
@@ -2747,7 +2747,7 @@
         "objects": 90720,
         "oram": 55848,
         "precompiles": 240,
-        "runtime_evm_lib": 66791,
+        "runtime_evm_lib": 68845,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -2755,7 +2755,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413621,
+        "trace": 413759,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -3205,7 +3205,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1292805,
+      "boundary_json_bytes": 1295069,
       "confidential_slot_program": {
         "entrypoint_id": "approve(address,address,uint256)",
         "expected_runtime_step_count": 4,
@@ -3239,7 +3239,7 @@
         "objects": 90720,
         "oram": 55848,
         "precompiles": 240,
-        "runtime_evm_lib": 66791,
+        "runtime_evm_lib": 68845,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -3247,7 +3247,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413621,
+        "trace": 413759,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -3843,7 +3843,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1292805,
+      "boundary_json_bytes": 1295069,
       "confidential_slot_program": {
         "entrypoint_id": "approve(address,address,uint256)",
         "expected_runtime_step_count": 4,
@@ -3877,7 +3877,7 @@
         "objects": 90720,
         "oram": 55848,
         "precompiles": 240,
-        "runtime_evm_lib": 66791,
+        "runtime_evm_lib": 68845,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -3885,7 +3885,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413621,
+        "trace": 413759,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -4481,7 +4481,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "boundary_json_bytes": 1295026,
+      "boundary_json_bytes": 1297290,
       "confidential_slot_program": {
         "entrypoint_id": "put(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -4515,7 +4515,7 @@
         "objects": 90720,
         "oram": 55848,
         "precompiles": 240,
-        "runtime_evm_lib": 66791,
+        "runtime_evm_lib": 68845,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -4523,7 +4523,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413621,
+        "trace": 413759,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -5309,7 +5309,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "boundary_json_bytes": 1295026,
+      "boundary_json_bytes": 1297290,
       "confidential_slot_program": {
         "entrypoint_id": "put(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -5343,7 +5343,7 @@
         "objects": 90720,
         "oram": 55848,
         "precompiles": 240,
-        "runtime_evm_lib": 66791,
+        "runtime_evm_lib": 68845,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -5351,7 +5351,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413621,
+        "trace": 413759,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -6137,7 +6137,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 1297725,
+      "boundary_json_bytes": 1299989,
       "confidential_slot_program": {
         "entrypoint_id": "add(bytes32,uint256)",
         "expected_runtime_step_count": 5,
@@ -6171,7 +6171,7 @@
         "objects": 90720,
         "oram": 55848,
         "precompiles": 240,
-        "runtime_evm_lib": 66791,
+        "runtime_evm_lib": 68845,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -6179,7 +6179,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413621,
+        "trace": 413759,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -7168,7 +7168,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 1297725,
+      "boundary_json_bytes": 1299989,
       "confidential_slot_program": {
         "entrypoint_id": "add(bytes32,uint256)",
         "expected_runtime_step_count": 5,
@@ -7202,7 +7202,7 @@
         "objects": 90720,
         "oram": 55848,
         "precompiles": 240,
-        "runtime_evm_lib": 66791,
+        "runtime_evm_lib": 68845,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -7210,7 +7210,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413621,
+        "trace": 413759,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -8199,7 +8199,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 1319253,
+      "boundary_json_bytes": 1321517,
       "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
@@ -8233,7 +8233,7 @@
         "objects": 90720,
         "oram": 55848,
         "precompiles": 240,
-        "runtime_evm_lib": 66791,
+        "runtime_evm_lib": 68845,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -8241,7 +8241,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413621,
+        "trace": 413759,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -10971,7 +10971,7 @@
     {
       "accepted": true,
       "boundary_events": 14,
-      "boundary_json_bytes": 1386463,
+      "boundary_json_bytes": 1388727,
       "confidential_slot_program": {
         "entrypoint_id": "transferFrom(address,address,address,uint256)",
         "expected_runtime_step_count": 9,
@@ -11005,7 +11005,7 @@
         "objects": 90720,
         "oram": 55848,
         "precompiles": 240,
-        "runtime_evm_lib": 66791,
+        "runtime_evm_lib": 68845,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -11013,7 +11013,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6238,
-        "trace": 413621,
+        "trace": 413759,
         "trusted_kernel": 4548,
         "types": 29154
       },

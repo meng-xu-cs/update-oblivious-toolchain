@@ -2,10 +2,10 @@
 //!
 //! The Path ORAM claim language must agree across README, the topic docs, the
 //! Lean proof-grade root, and the Rust admission surface. Today
-//! `path_oram_private_posmap_v1` compiles but is not executable (the runtime
-//! refinement witness rejects the scheme) and its Lean theorems take an empty
+//! `path_oram_private_posmap_v1` executes but its Lean theorems take an empty
 //! proof bundle, so no doc may present it as theorem-facing or proof-grade,
-//! and every doc that mentions it must say that it is not executable.
+//! and every doc that mentions it must say that it is not yet covered by a
+//! theorem.
 //!
 //! This probe fails closed: any disagreement drives `accepted: false`.
 
@@ -50,7 +50,7 @@ fn check(name: &str, ok: bool, detail: impl Into<String>) -> Check {
 }
 
 /// A line that presents the private-posmap scheme as theorem-facing or
-/// proof-grade. While the scheme is not executable, any such line overclaims;
+/// proof-grade. While no theorem covers the scheme, any such line overclaims;
 /// a line that negates the status ("not theorem-facing") is a status note.
 fn promotes_private_scheme(doc: &str) -> Option<String> {
     for line in doc.lines() {
@@ -110,25 +110,26 @@ pub fn run_claim_consistency_report() -> Result<JsonValue> {
         }
     }
 
-    // Every doc must state that the private-posmap scheme is not executable
+    // Every doc must state that no theorem covers the private-posmap scheme yet
     // (compared with whitespace collapsed, so line wrapping does not matter).
     for (name, body) in &docs {
         let collapsed = body.split_whitespace().collect::<Vec<_>>().join(" ");
         checks.push(check(
-            &format!("{name}:states-private-scheme-not-executable"),
-            collapsed.contains("not executable"),
-            format!("{name} states that {PRIVATE_SCHEME} is not executable"),
+            &format!("{name}:states-private-scheme-unproved"),
+            collapsed.contains("not yet covered by a theorem"),
+            format!("{name} states that {PRIVATE_SCHEME} is not yet covered by a theorem"),
         ));
     }
 
-    // The README must name the local-posmap scheme as the executable route.
-    let readme = &docs[0].1;
+    // The README must name the local-posmap scheme as the route with a Lean
+    // instance.
+    let readme = docs[0].1.split_whitespace().collect::<Vec<_>>().join(" ");
     checks.push(check(
-        "README.md:names-executable-local-route",
+        "README.md:names-local-route-with-lean-instance",
         readme.contains(&format!(
-            "executable computational-UO route is `{LOCAL_SCHEME}`"
+            "computational-UO route with a Lean instance is `{LOCAL_SCHEME}`"
         )),
-        format!("README names {LOCAL_SCHEME} as the executable computational-UO route"),
+        format!("README names {LOCAL_SCHEME} as the computational-UO route with a Lean instance"),
     ));
 
     // The Lean proof-grade root must import the private-posmap modules.
@@ -184,7 +185,7 @@ mod tests {
     fn private_scheme_promotion_is_detected() {
         let doc = format!("The {PRIVATE_SCHEME} route is theorem-facing for scalable maps.");
         assert!(promotes_private_scheme(&doc).is_some());
-        let note = format!("The {PRIVATE_SCHEME} route is not executable and not theorem-facing.");
+        let note = format!("The {PRIVATE_SCHEME} route executes but is not theorem-facing yet.");
         assert!(promotes_private_scheme(&note).is_none());
     }
 

@@ -310,13 +310,12 @@ impl OramManifest {
     }
 
     /// Whether the scheme admits more than one logical access to the same map
-    /// within a single entrypoint. Only the bounded local-position-map route
-    /// (`path_oram_local_posmap_v1`, capacity <= 128) supports multi-access;
-    /// the scalable private-position-map route is single-access per map per
-    /// entrypoint, because multi-access composition (fresh coins, recursive
-    /// position-map traces, stash bounds) is not yet proved for it.
+    /// within a single entrypoint. Both Path ORAM schemes do: every access
+    /// draws fresh leaves and rewrites its path and the metadata pages, and
+    /// the per-entrypoint resource bounds scale with the access count. The
+    /// surrogate scheme is single-access.
     pub fn supports_multi_access_per_entrypoint(&self) -> bool {
-        self.scheme == PATH_ORAM_SCHEME
+        is_path_oram_scheme(&self.scheme)
     }
 
     pub fn validate_theorem_shape_for_object(&self, object: &StateObject) -> Result<()> {
@@ -449,13 +448,13 @@ pub fn validate_oram_access_shape(
             })?;
         if *accesses > 1 && !manifest.supports_multi_access_per_entrypoint() {
             bail!(
-                "entrypoint {} performs {} ORAM accesses to {} but scheme {} supports only one logical access per map per entrypoint; multi-access maps must use {} with capacity <= {}",
+                "entrypoint {} performs {} ORAM accesses to {} but scheme {} supports only one logical access per map per entrypoint; multi-access maps must use a Path ORAM scheme ({} or {})",
                 signature,
                 accesses,
                 object.name,
                 manifest.scheme,
                 PATH_ORAM_SCHEME,
-                PATH_ORAM_LOCAL_POSMAP_MAX_CAPACITY
+                PATH_ORAM_PRIVATE_POSMAP_SCHEME
             );
         }
     }
@@ -488,6 +487,7 @@ mod tests {
     use super::{
         validate_oram_access_shape, EntrypointManifest, OramManifest, RuntimeKernelStepManifest,
         RuntimeManifest, StateObjectManifest, PATH_ORAM_PRIVATE_POSMAP_SCHEME, PATH_ORAM_SCHEME,
+        SURROGATE_ORAM_SCHEME,
     };
     use crate::confidential_kernel::ConfidentialKernelSlotProgram;
     use crate::ir::{BackendKind, ContainerKind, StateObject};
@@ -556,9 +556,25 @@ mod tests {
     }
 
     #[test]
-    fn private_posmap_rejects_multi_access_with_documented_diagnostic() {
-        // path_oram_private_posmap_v1 is single-access per map per entrypoint.
+    fn private_posmap_admits_multi_access_per_entrypoint() {
+        // ERC20Lite.transfer reads and writes two balances: four accesses.
         let object = private_posmap_object(256);
+        let mut accesses = BTreeMap::new();
+        accesses.insert(7u32, 4usize);
+        validate_oram_access_shape(
+            "transfer(address,address,uint256)",
+            &accesses,
+            std::slice::from_ref(&object),
+        )
+        .expect("private-posmap multi-access is supported");
+    }
+
+    #[test]
+    fn surrogate_rejects_multi_access_with_documented_diagnostic() {
+        let object = StateObject {
+            oram_scheme: SURROGATE_ORAM_SCHEME.into(),
+            ..private_posmap_object(16)
+        };
         let mut accesses = BTreeMap::new();
         accesses.insert(7u32, 2usize);
         let err = validate_oram_access_shape(
@@ -566,18 +582,14 @@ mod tests {
             &accesses,
             std::slice::from_ref(&object),
         )
-        .expect_err("private-posmap multi-access must be rejected");
+        .expect_err("surrogate multi-access must be rejected");
         let msg = err.to_string();
         assert!(
             msg.contains("only one logical access per map per entrypoint"),
             "unexpected diagnostic: {msg}"
         );
         assert!(
-            msg.contains("path_oram_local_posmap_v1"),
-            "unexpected diagnostic: {msg}"
-        );
-        assert!(
-            msg.contains("capacity <= 128"),
+            msg.contains("path_oram_private_posmap_v1"),
             "unexpected diagnostic: {msg}"
         );
     }

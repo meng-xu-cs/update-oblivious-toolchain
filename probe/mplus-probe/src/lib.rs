@@ -64,6 +64,9 @@ struct BenchArtifacts {
     uo: CompiledArtifact,
     oram: Option<CompiledArtifact>,
     fullscan64: Option<CompiledArtifact>,
+    /// The benchmark with its multi-access map on the scalable
+    /// `path_oram_private_posmap_v1` route, above the local scheme's cap.
+    private_posmap: Option<CompiledArtifact>,
 }
 
 #[derive(Clone)]
@@ -3693,6 +3696,7 @@ fn compile_suite() -> Result<BTreeMap<&'static str, BenchArtifacts>> {
             )?,
             oram: None,
             fullscan64: None,
+            private_posmap: None,
         },
     );
     suite.insert(
@@ -3710,6 +3714,7 @@ fn compile_suite() -> Result<BTreeMap<&'static str, BenchArtifacts>> {
             )?,
             oram: None,
             fullscan64: None,
+            private_posmap: None,
         },
     );
     suite.insert(
@@ -3735,6 +3740,7 @@ fn compile_suite() -> Result<BTreeMap<&'static str, BenchArtifacts>> {
                 "benches/raw/ConfidentialMixer.fullscan64.yaml",
                 ProgramMode::Uo,
             )?),
+            private_posmap: None,
         },
     );
     suite.insert(
@@ -3756,6 +3762,11 @@ fn compile_suite() -> Result<BTreeMap<&'static str, BenchArtifacts>> {
                 ProgramMode::Uo,
             )?),
             fullscan64: None,
+            private_posmap: Some(compile_artifact(
+                "benches/raw/ERC20Lite.sol",
+                "benches/raw/ERC20Lite.private-posmap.yaml",
+                ProgramMode::Uo,
+            )?),
         },
     );
     suite.insert(
@@ -3773,6 +3784,7 @@ fn compile_suite() -> Result<BTreeMap<&'static str, BenchArtifacts>> {
             )?,
             oram: None,
             fullscan64: None,
+            private_posmap: None,
         },
     );
     Ok(suite)
@@ -4174,9 +4186,21 @@ fn run_static_checks(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<J
                 )
             })
             .transpose()?;
+        let private_posmap_kernel_admission = artifacts
+            .private_posmap
+            .as_ref()
+            .map(|artifact| {
+                check_kernel_admission(
+                    &format!("{name}-private-posmap-admission"),
+                    artifact,
+                    &admission_checker,
+                )
+            })
+            .transpose()?;
         for report in std::iter::once(&uo_kernel_admission)
             .chain(oram_kernel_admission.as_ref())
             .chain(fullscan64_kernel_admission.as_ref())
+            .chain(private_posmap_kernel_admission.as_ref())
         {
             tally_kernel_admission(report, &mut admission_counts);
         }
@@ -4195,6 +4219,11 @@ fn run_static_checks(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<J
         let fullscan64_metadata = workspace_path(&fullscan64_meta)
             .exists()
             .then(|| load_metadata(&fullscan64_meta))
+            .transpose()?;
+        let private_posmap_meta = format!("benches/raw/{name}.private-posmap.yaml");
+        let private_posmap_metadata = workspace_path(&private_posmap_meta)
+            .exists()
+            .then(|| load_metadata(&private_posmap_meta))
             .transpose()?;
         reports.push(json!({
             "benchmark": name,
@@ -4242,9 +4271,24 @@ fn run_static_checks(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<J
                     )
                 })
                 .transpose()?,
+            "private_posmap_artifact": artifacts
+                .private_posmap
+                .as_ref()
+                .filter(|_| private_posmap_metadata.is_some())
+                .map(|artifact| {
+                    validate_translation_artifacts_against_source(
+                        &format!("{name}-private-posmap-artifact"),
+                        source_path.to_str().unwrap(),
+                        &private_posmap_meta,
+                        artifact,
+                        &checker,
+                    )
+                })
+                .transpose()?,
             "uo_kernel_admission": uo_kernel_admission,
             "oram_kernel_admission": oram_kernel_admission,
             "fullscan64_kernel_admission": fullscan64_kernel_admission,
+            "private_posmap_kernel_admission": private_posmap_kernel_admission,
         }));
     }
     let admission_count = |key: &str| admission_counts.get(key).copied().unwrap_or(0usize);
@@ -47769,6 +47813,13 @@ fn run_trace_equivalence(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Resu
             .ok_or_else(|| anyhow!("missing erc20 oram"))?,
     )
     .context("trace_equivalence/ERC20Lite/oram")?;
+    let erc20_private_posmap = run_erc20_transfer_experiment(
+        suite["ERC20Lite"]
+            .private_posmap
+            .as_ref()
+            .ok_or_else(|| anyhow!("missing erc20 private posmap"))?,
+    )
+    .context("trace_equivalence/ERC20Lite/oram_private_posmap")?;
     let registry_uo = run_registry_key_experiment(&suite["RegistryCRUD"].uo)
         .context("trace_equivalence/RegistryCRUD/uo")?;
     Ok(json!({
@@ -47787,6 +47838,7 @@ fn run_trace_equivalence(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Resu
         "computational_uo": [
             trace_summary("ConfidentialMixer", "oram", &mixer_oram),
             trace_summary("ERC20Lite", "oram", &erc20_oram),
+            trace_summary("ERC20Lite", "oram_private_posmap", &erc20_private_posmap),
         ],
     }))
 }
@@ -50858,45 +50910,7 @@ fn run_overheads(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<JsonV
         "cost_formula_exact": cost_formula_exact,
         "cases": cases,
         "matrix": matrix,
-        "rejected_oram_cases": collect_rejected_oram_cases(),
     }))
-}
-
-/// Explicit data for ORAM configurations rejected by the access-shape policy,
-/// so overheads records rejected cases rather than omitting them. The scalable
-/// `path_oram_private_posmap_v1` route admits only one logical access per map
-/// per entrypoint, and ERC20Lite touches the balances map several times.
-fn collect_rejected_oram_cases() -> Vec<JsonValue> {
-    let scenario = "ERC20Lite/private_posmap_multi_access";
-    let source = workspace_path("benches/raw/ERC20Lite.sol");
-    match load_metadata("benches/raw/ERC20Lite.private-posmap.yaml") {
-        Ok(metadata) => {
-            let result = uo_solc::compile(source.to_str().unwrap(), &metadata, ProgramMode::Uo);
-            vec![match result {
-                Ok(_) => json!({
-                    "scenario": scenario,
-                    "scheme": "path_oram_private_posmap_v1",
-                    "map": "balances",
-                    "capacity": 256,
-                    "rejected": false,
-                    "reason": "unexpectedly compiled; private-posmap multi-access must be rejected",
-                }),
-                Err(err) => json!({
-                    "scenario": scenario,
-                    "scheme": "path_oram_private_posmap_v1",
-                    "map": "balances",
-                    "capacity": 256,
-                    "rejected": true,
-                    "reason": err.to_string(),
-                }),
-            }]
-        }
-        Err(err) => vec![json!({
-            "scenario": scenario,
-            "rejected": true,
-            "reason": format!("metadata load failed: {err}"),
-        })],
-    }
 }
 
 fn append_overhead_workload(
@@ -50939,6 +50953,14 @@ fn append_overhead_workload(
         .map(|artifact| {
             run_scenario(artifact, setup, target, getters)
                 .with_context(|| format!("{benchmark}/oram"))
+        })
+        .transpose()?;
+    let private_posmap = artifacts
+        .private_posmap
+        .as_ref()
+        .map(|artifact| {
+            run_scenario(artifact, setup, target, getters)
+                .with_context(|| format!("{benchmark}/oram_private_posmap"))
         })
         .transpose()?;
 
@@ -51050,6 +51072,29 @@ fn append_overhead_workload(
             oram_artifact,
             target.entrypoint,
             &oram_label,
+        ));
+    }
+
+    if let Some(private_posmap) = private_posmap {
+        let private_artifact = artifacts.private_posmap.as_ref().unwrap();
+        let private_row = overhead_matrix_row(
+            benchmark,
+            "oram_private_posmap",
+            private_artifact,
+            target.entrypoint,
+            &private_posmap,
+        )?;
+        case["oram_private_posmap"] = scenario_overhead(&private_posmap);
+        case["variants"]
+            .as_array_mut()
+            .expect("variants is an array")
+            .push(private_row.clone());
+        matrix.push(private_row);
+        cost_formula.push(scenario_cost_formula(
+            &private_posmap,
+            private_artifact,
+            target.entrypoint,
+            "oram_private_posmap",
         ));
     }
 
@@ -51331,6 +51376,38 @@ fn run_erc20_allowance_value_experiment(artifact: &CompiledArtifact) -> Result<E
             vec![owner.clone(), spender.clone(), Value::uint(2)],
             vec![owner.clone(), spender.clone(), Value::uint(3)],
             vec![owner, spender, Value::uint(4)],
+        ],
+    )
+}
+
+/// Transfers between different accounts: four accesses to `balances` per call
+/// (read and write the sender, then the recipient), after setup mints that keep
+/// every transfer in balance.
+fn run_erc20_transfer_experiment(artifact: &CompiledArtifact) -> Result<ExperimentOutcome> {
+    run_binary_experiment(
+        artifact,
+        &[
+            CallSpec {
+                entrypoint: "mint(address,uint256)",
+                args: vec![addr(0x11), Value::uint(50)],
+            },
+            CallSpec {
+                entrypoint: "mint(address,uint256)",
+                args: vec![addr(0x31), Value::uint(50)],
+            },
+        ],
+        "transfer(address,address,uint256)",
+        vec![
+            vec![addr(0x11), addr(0x21), Value::uint(3)],
+            vec![addr(0x11), addr(0x22), Value::uint(4)],
+            vec![addr(0x11), addr(0x23), Value::uint(5)],
+            vec![addr(0x11), addr(0x24), Value::uint(6)],
+        ],
+        vec![
+            vec![addr(0x31), addr(0x41), Value::uint(3)],
+            vec![addr(0x31), addr(0x42), Value::uint(4)],
+            vec![addr(0x31), addr(0x43), Value::uint(5)],
+            vec![addr(0x31), addr(0x44), Value::uint(6)],
         ],
     )
 }
@@ -52173,7 +52250,7 @@ fn trace_summary(benchmark: &str, mode: &str, outcome: &ExperimentOutcome) -> Js
     // Exact backends (uo) owe exact physical-trace equality; the ORAM route is
     // related only computationally, so a physical-trace inequality there is an
     // expected computational difference, not a failed obligation.
-    let computational = mode == "oram";
+    let computational = mode.starts_with("oram");
     json!({
         "benchmark": benchmark,
         "mode": mode,
@@ -53515,6 +53592,7 @@ mod tests {
             .unwrap(),
             oram: None,
             fullscan64: None,
+            private_posmap: None,
         };
         let report = check_authscan_correctness(&artifacts).unwrap();
         assert_eq!(report["equivalent"].as_bool(), Some(true));

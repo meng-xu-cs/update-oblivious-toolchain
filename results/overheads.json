@@ -1022,6 +1022,15 @@
           "formula_exact": true,
           "gas_used": 7485,
           "manifest_public_gas_budget": 7485
+        },
+        {
+          "backend": "oram_private_posmap",
+          "cost_formula": "modeled_static_budget",
+          "cost_model": "uo-modeled-resource-cost-v1",
+          "entrypoint": "transferFrom(address,address,address,uint256)",
+          "formula_exact": true,
+          "gas_used": 13285,
+          "manifest_public_gas_budget": 13285
         }
       ],
       "ct_gas_only": {
@@ -1057,6 +1066,16 @@
       },
       "oram_improves_physical_writes": false,
       "oram_improves_physical_writes_baseline": "full_scan",
+      "oram_private_posmap": {
+        "bytes_read": 428640.0,
+        "bytes_written": 428640.0,
+        "executable": true,
+        "gas_used": 13285,
+        "physical_reads": 378,
+        "physical_writes": 378,
+        "rejected": false,
+        "trace_json_bytes": 1010963
+      },
       "raw": {
         "error": "raw confidential backends are rejected in proof-grade builds; this feature build emits the executable raw_insecure_eval control separately",
         "executable": false,
@@ -1268,6 +1287,63 @@
             }
           ],
           "trace_json_bytes": 499446
+        },
+        {
+          "artifact_json_bytes": 30562,
+          "backend": "oram_private_posmap",
+          "benchmark": "ERC20Lite/transferFrom",
+          "bytes_read": 428640.0,
+          "bytes_written": 428640.0,
+          "capacity": "128+256",
+          "entrypoint": "transferFrom(address,address,address,uint256)",
+          "entrypoint_resource_bounds": {
+            "max_commit_ops": 378,
+            "oram_bounds": [
+              {
+                "accesses": 4,
+                "buckets_per_access": 9,
+                "capacity": 256,
+                "commit_ops_for_entrypoint": 296,
+                "commit_ops_per_access": 74,
+                "metadata_pages": 64,
+                "metadata_pages_per_access": 65,
+                "scheme": "path_oram_private_posmap_v1"
+              },
+              {
+                "accesses": 2,
+                "buckets_per_access": 8,
+                "capacity": 128,
+                "commit_ops_for_entrypoint": 82,
+                "commit_ops_per_access": 41,
+                "metadata_pages": 32,
+                "metadata_pages_per_access": 33,
+                "scheme": "path_oram_local_posmap_v1"
+              }
+            ],
+            "signature": "transferFrom(address,address,address,uint256)"
+          },
+          "executable": true,
+          "gas_used": 13285,
+          "physical_reads": 378,
+          "physical_writes": 378,
+          "rejected": false,
+          "state_objects": [
+            {
+              "backend": "oram",
+              "capacity": 128,
+              "confidential": true,
+              "kind": "Map",
+              "name": "allowances"
+            },
+            {
+              "backend": "oram",
+              "capacity": 256,
+              "confidential": true,
+              "kind": "Map",
+              "name": "balances"
+            }
+          ],
+          "trace_json_bytes": 1010963
         }
       ]
     },
@@ -1446,7 +1522,7 @@
     "public_runtime_formula": "logical_reads*3 + logical_writes*5 + physical_writes*17"
   },
   "coverage": {
-    "matrix_row_count": 29,
+    "matrix_row_count": 30,
     "metrics": [
       "gas_used",
       "physical_reads",
@@ -2351,6 +2427,63 @@
       "trace_json_bytes": 499446
     },
     {
+      "artifact_json_bytes": 30562,
+      "backend": "oram_private_posmap",
+      "benchmark": "ERC20Lite/transferFrom",
+      "bytes_read": 428640.0,
+      "bytes_written": 428640.0,
+      "capacity": "128+256",
+      "entrypoint": "transferFrom(address,address,address,uint256)",
+      "entrypoint_resource_bounds": {
+        "max_commit_ops": 378,
+        "oram_bounds": [
+          {
+            "accesses": 4,
+            "buckets_per_access": 9,
+            "capacity": 256,
+            "commit_ops_for_entrypoint": 296,
+            "commit_ops_per_access": 74,
+            "metadata_pages": 64,
+            "metadata_pages_per_access": 65,
+            "scheme": "path_oram_private_posmap_v1"
+          },
+          {
+            "accesses": 2,
+            "buckets_per_access": 8,
+            "capacity": 128,
+            "commit_ops_for_entrypoint": 82,
+            "commit_ops_per_access": 41,
+            "metadata_pages": 32,
+            "metadata_pages_per_access": 33,
+            "scheme": "path_oram_local_posmap_v1"
+          }
+        ],
+        "signature": "transferFrom(address,address,address,uint256)"
+      },
+      "executable": true,
+      "gas_used": 13285,
+      "physical_reads": 378,
+      "physical_writes": 378,
+      "rejected": false,
+      "state_objects": [
+        {
+          "backend": "oram",
+          "capacity": 128,
+          "confidential": true,
+          "kind": "Map",
+          "name": "allowances"
+        },
+        {
+          "backend": "oram",
+          "capacity": 256,
+          "confidential": true,
+          "kind": "Map",
+          "name": "balances"
+        }
+      ],
+      "trace_json_bytes": 1010963
+    },
+    {
       "artifact_json_bytes": 5475,
       "backend": "raw",
       "benchmark": "RegistryCRUD/clearIfMatch",
@@ -2460,16 +2593,6 @@
         }
       ],
       "trace_json_bytes": 21554
-    }
-  ],
-  "rejected_oram_cases": [
-    {
-      "capacity": 256,
-      "map": "balances",
-      "reason": "entrypoint mint(address,uint256) performs 2 ORAM accesses to balances but scheme path_oram_private_posmap_v1 supports only one logical access per map per entrypoint; multi-access maps must use path_oram_local_posmap_v1 with capacity <= 128",
-      "rejected": true,
-      "scenario": "ERC20Lite/private_posmap_multi_access",
-      "scheme": "path_oram_private_posmap_v1"
     }
   ]
 }

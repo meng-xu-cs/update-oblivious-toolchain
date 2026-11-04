@@ -59,6 +59,10 @@ def oramBucketHeaderBytes : Nat := 24
 def surrogateOramScheme : String := "surrogate_public_schedule_v1"
 def pathOramScheme : String := "path_oram_local_posmap_v1"
 def privatePathOramScheme : String := "path_oram_private_posmap_v1"
+
+/-- The two Path ORAM schemes, which share one runtime data path. -/
+def isPathOramScheme (scheme : String) : Bool :=
+  scheme == pathOramScheme || scheme == privatePathOramScheme
 def surrogateOramBlocksPerBucket : Nat := 2
 def pathOramBlocksPerBucket : Nat := 5
 
@@ -159,6 +163,12 @@ def WellFormedOramObject (object : OramObjectManifest) : Prop :=
   WellFormedSurrogateOramObject object ∨
     WellFormedPathOramObject object ∨
     WellFormedPrivatePathOramObject object
+
+/-- A Path ORAM object of either scheme. The local and private position-map
+schemes share one runtime data path, so both admit several accesses per call;
+only the surrogate scheme is single-access. -/
+def WellFormedAnyPathOramObject (object : OramObjectManifest) : Prop :=
+  WellFormedPathOramObject object ∨ WellFormedPrivatePathOramObject object
 
 def totalPhysicalReadsPerAccess (object : OramObjectManifest) (accessCounter : Nat) : Nat :=
   1 + (accessSchedule object accessCounter).metadataPages.length +

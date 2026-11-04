@@ -1816,7 +1816,7 @@ def validateImportedOramShape
         manifestObject.kind == "map" &&
         manifestObject.backend == "oram" &&
         oram.scheme == stateObject.oram_scheme &&
-        (if accesses > 1 then oram.scheme == translationPathOramScheme else true) &&
+        (if accesses > 1 then translationIsPathOramScheme oram.scheme else true) &&
         (if oram.scheme == translationSurrogateOramScheme then
           oram.blocks_per_bucket == 2 &&
             oram.bucket_size ==

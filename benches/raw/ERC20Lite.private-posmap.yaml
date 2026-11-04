@@ -1,10 +1,8 @@
 contract: ERC20Lite
-# Evaluation-only metadata that intentionally puts the multi-access balances map
-# on the scalable private-position-map route above the local cap. Because
-# path_oram_private_posmap_v1 admits only one logical access per map per
-# entrypoint and transfer/transferFrom touch balances several times, this is
-# rejected at compile time. The probe records the rejection as explicit data in
-# results/overheads.json (see run_overheads).
+# Puts the multi-access balances map on the scalable private-position-map route
+# above the local scheme's cap (capacity 256); allowances stay on the local
+# route. transfer and transferFrom make four accesses to balances per call. The
+# probe runs it as the oram_private_posmap variant of ERC20Lite.
 entrypoints:
   mint(address,uint256):
     confidential: true
