@@ -32,9 +32,12 @@ a public chain" as its main execution model.
 - Exact-UO is claimed for exact backends on the repository's instrumented
   abstract/runtime model: `UOCell`, `UOArray`, and full-scan `UOMap`.
 - The computational-UO route with a Lean instance is `path_oram_local_posmap_v1`,
-  the bounded local-position-map route (capped at capacity `128`). Its Lean
-  paper-main boundary is derived only for a concrete single-access instance;
-  the general Path ORAM theorems are vacuous today. The scalable
+  the bounded local-position-map route (capped at capacity `128`). Its
+  paper-main theorem holds over admitted configurations given bundle evidence
+  (`PathOramAdmitted`), whose leaf obligation follows from the leaf model
+  without seed enumeration. The bundle is derived for a concrete
+  single-access instance; multi-access entrypoints are validated through
+  compact theorem inputs. The scalable
   `path_oram_private_posmap_v1` route is in the `UOToolchain.ProofGradeRoot`
   import closure (`PathOramPrivatePosmapV1`, `ScalablePathOramEvidence`) and
   executes, but it is not yet covered by a theorem. See

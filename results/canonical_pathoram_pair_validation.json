@@ -28,7 +28,7 @@
       "normalized_micro_trace_equal": true,
       "paper_instantiation_proof_grade_accepted": true,
       "paper_instantiation_status": "validated",
-      "paper_instantiation_stdout": "validated proof-grade concrete local paper-main instantiation for put(bytes32,uint256)",
+      "paper_instantiation_stdout": "validated proof-grade concrete local paper-main instantiation for put(bytes32,uint256)\nderived the Path ORAM bundle over admitted configurations for put(bytes32,uint256): two admitted sides, one public projection",
       "proof_grade_accepted": true,
       "public_outcome_equal": true,
       "rhs_seed_count": 256,

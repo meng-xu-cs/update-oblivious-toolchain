@@ -156,23 +156,29 @@ field bindings required by `DeploymentCallAccepted`.
   discharges the paper-main theorem's storage-trace premise. That the runtime
   store emits exactly this encoding is checked against runtime traces
   (`exact_encoding_matches` in `results/trace_equivalence.json`), not proved.
-- Computational UO on Path ORAM is not yet a general theorem. The general
-  Path ORAM theorems for both schemes take a `SeededRuntimePathOramProofBundle`,
-  whose `cfgWellFormed` field quantifies over every `OramConfig`; no such
-  bundle exists (`seededRuntimePathOramProofBundle_empty` in
-  `UOToolchain/RuntimeCoins.lean`), so those theorems hold vacuously. The
-  non-vacuous result is the per-configuration paper-main pair boundary for
-  `path_oram_local_posmap_v1`, which `checkCanonicalPathOramPaperInstantiation`
-  derives for one concrete pair of `SingleAccessMap.put` runs (one ORAM
-  access). Multi-access local entrypoints are validated through compact
-  theorem inputs that check a representative witness and derive no theorem.
-  Calls that abort run on both schemes: map writes reach the ORAM at commit,
-  masked off on abort, so an aborted call makes the same accesses as a
-  committed one. `UOToolchain/PathOramFreshLeaves.lean` proves without seed
-  enumeration that a call's leaf schedule, on one map or several, is uniform
-  for any accesses and any keys present before the call, given uniform coins
-  and leaves, and that the leaves left behind stay uniform and independent of
-  it; the paper-main theorems do not use it yet.
+- Computational UO on `path_oram_local_posmap_v1` is a theorem over admitted
+  configurations, given bundle evidence for them
+  (`UOToolchain/PathOramAdmitted.lean`): every pair of admitted
+  configurations with the same public projection satisfies the local Path
+  ORAM theorem, the SGX execution theorem and the paper-main theorem modulo
+  releases. The bundle exists: a runtime pair slice is one, admitting the
+  pair's two sides, and `checkCanonicalPathOramPaperInstantiation` derives it
+  for one concrete pair of `SingleAccessMap.put` runs (one ORAM access). The
+  bundle's leaf obligation follows from `UOToolchain/PathOramFreshLeaves.lean`
+  without seed enumeration, for a runtime family that runs every coin tape of
+  a call: that file proves that a call's leaf schedule, on one map or
+  several, is uniform for any accesses and any keys present before the call,
+  given uniform coins and leaves, and that the leaves left behind stay
+  uniform and independent of it. The probe does not build such families from
+  runtime runs yet, so multi-access local entrypoints are still validated
+  through compact theorem inputs that check a representative witness and
+  derive no theorem. The older theorems that take a
+  `SeededRuntimePathOramProofBundle`, whose `cfgWellFormed` field quantifies
+  over every `OramConfig`, hold vacuously
+  (`seededRuntimePathOramProofBundle_empty` in
+  `UOToolchain/RuntimeCoins.lean`). Calls that abort run on both schemes: map
+  writes reach the ORAM at commit, masked off on abort, so an aborted call
+  makes the same accesses as a committed one.
   `path_oram_private_posmap_v1` executes, with several accesses to one map
   per call (the capacity-256 `balances` map of the private ERC20Lite
   benchmark), but it is not yet covered by a theorem: its Lean route inherits

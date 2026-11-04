@@ -1,4 +1,5 @@
 import UOToolchain.ProofGrade
+import UOToolchain.PathOramAdmitted
 
 open UOToolchain
 
@@ -156,8 +157,35 @@ def main (args : List String) : IO UInt32 := do
                 hValid
                 hLhsCoverage
                 hRhsCoverage
+            -- The same pair is a bundle over its two sides, which agree on the
+            -- public projection and differ in their secret inputs, and the
+            -- general theorem over admitted configurations relates them.
+            have _ :
+                (certificate.toConcretePairSlice modelTags hValid hLhsCoverage hRhsCoverage).Admitted
+                    (certificate.toConcretePairSlice modelTags hValid hLhsCoverage hRhsCoverage).lhsCfg ∧
+                  (certificate.toConcretePairSlice modelTags hValid hLhsCoverage hRhsCoverage).Admitted
+                    (certificate.toConcretePairSlice modelTags hValid hLhsCoverage hRhsCoverage).rhsCfg ∧
+                  sameOramPublicProjection
+                    (certificate.toConcretePairSlice modelTags hValid hLhsCoverage hRhsCoverage).lhsCfg
+                    (certificate.toConcretePairSlice modelTags hValid hLhsCoverage hRhsCoverage).rhsCfg ∧
+                  (certificate.toConcretePairSlice modelTags hValid hLhsCoverage hRhsCoverage).lhsCfg ≠
+                    (certificate.toConcretePairSlice modelTags hValid hLhsCoverage hRhsCoverage).rhsCfg :=
+              (certificate.toConcretePairSlice
+                modelTags
+                hValid
+                hLhsCoverage
+                hRhsCoverage).toPaperMainBundleOn_admits_distinct_pair
+            have _ :=
+              (certificate.toConcretePairSlice
+                modelTags
+                hValid
+                hLhsCoverage
+                hRhsCoverage).sgxViewRelation_sides
+                checkerAssumptions
             IO.println
               s!"validated proof-grade concrete local paper-main instantiation for {certificate.runtimePublicOutcome.entrypointId}"
+            IO.println
+              s!"derived the Path ORAM bundle over admitted configurations for {certificate.runtimePublicOutcome.entrypointId}: two admitted sides, one public projection"
             pure 0
           else
             IO.eprintln "rhs canonical family does not cover the hidden leaf-value seed space"

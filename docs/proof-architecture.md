@@ -163,8 +163,9 @@ The proof development is organized around these layers:
 - ORAM theorem route: `OramGame`, `StandardOramReduction`,
   `PathOramSecurity`, `PathOramLocalPosmapV1`,
   `ScalablePathOramEvidence`, `PathOramJACMTheorem`,
-  `PaperPathOramTheoremRoute`, and `CoinTapes` with `PathOramFreshLeaves`,
-  the enumeration-free leaf-schedule theorem for one map or several (see
+  `PaperPathOramTheoremRoute`, `CoinTapes` with `PathOramFreshLeaves`, the
+  enumeration-free leaf-schedule theorem for one map or several, and
+  `PathOramAdmitted`, the route over admitted configurations (see
   [`path-oram.md`](./path-oram.md#current-status)).
 - SGX/TEE observer: `SgxBoundary`, `SgxRelation`, `SgxController`,
   `SgxControllerTrace`, `SgxMicroModel`, `SgxObserverFreeze`,
@@ -176,7 +177,9 @@ The proof development is organized around these layers:
   routes; the release semantics is documented in
   [`claim-boundary.md`](./claim-boundary.md#declared-releases). The Path ORAM
   versions take a seeded proof bundle that cannot exist, so they hold
-  vacuously; see [`path-oram.md`](./path-oram.md#current-status).
+  vacuously; `PathOramAdmitted` restates the local-scheme version over admitted
+  configurations, where the bundle exists; see
+  [`path-oram.md`](./path-oram.md#current-status).
 
 The default `UOToolchain` umbrella imports `UOToolchain.ProofGradeRoot`.
 Legacy axiom-backed demonstrations are isolated behind `UOToolchain.LegacyRoot`

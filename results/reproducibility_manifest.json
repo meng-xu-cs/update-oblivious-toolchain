@@ -44,18 +44,18 @@
     },
     {
       "path": "canonical_pathoram_pair_validation.json",
-      "bytes": 6598,
-      "sha256": "2e5dfdcd6e65c0a181d0e0c57f1c28ed5931804c6a4aa98cf5ee878ae8378da5"
+      "bytes": 6725,
+      "sha256": "f7acde1331de9026e2fb9a7e28616ebcf0d7b3f0a18c12315be41e0482582b4f"
     },
     {
       "path": "capacity_sweep.json",
-      "bytes": 27484,
-      "sha256": "c082b551a0709050e3ad34def5ca446fd553bb0cc0120c0c2a17dd028529a17a"
+      "bytes": 27478,
+      "sha256": "3db86ded645429fcebbbe7e1fd05f61488734a5fc6fb207f9b242afe39bb4361"
     },
     {
       "path": "claim_artifact_manifest.json",
-      "bytes": 57561,
-      "sha256": "961e1d820e225fb10e169729cc4d4c855adbc432a8adcdd522c7a240bf5a09a2"
+      "bytes": 58361,
+      "sha256": "00a51bd70d8db471a8f2cfe4b5456fbe0d3e649d109fd867e7feace95f9b81ef"
     },
     {
       "path": "claim_consistency.json",
@@ -64,13 +64,13 @@
     },
     {
       "path": "claim_status.json",
-      "bytes": 47113,
-      "sha256": "3e8fc2204c3c0cba375d7267ce7044a9c0801686a2e9fce12458249503bbb3fb"
+      "bytes": 47798,
+      "sha256": "e4fbfc521afdebfa3a8fd2378eb7f0b4822390bd34e733d91b424f4da01f4414"
     },
     {
       "path": "claim_status.md",
-      "bytes": 6857,
-      "sha256": "6a41f30d2833f8d96adde5d0411d304cea7c34323fed3a5566710e34748c12e9"
+      "bytes": 7008,
+      "sha256": "9e39422f5c4eb04d0e6970591c44950abda6f64bcd4eb61f746146531d4f1791"
     },
     {
       "path": "confidential_core_kernel_finish_slot_validation.json",
@@ -279,13 +279,13 @@
     },
     {
       "path": "reviewer_summary.json",
-      "bytes": 116302,
-      "sha256": "a4740e0bf461d25f34afe32f4a84993b7806f4f98facfdc8137c49d57e46a250"
+      "bytes": 116420,
+      "sha256": "0e8e6e91377e341e8771c764244519c49b000022b0e9ec56df11257827fdeef9"
     },
     {
       "path": "reviewer_summary.md",
-      "bytes": 28777,
-      "sha256": "818a42a57199d4ac12596870409405ff299a255cc59d4fdbb5859d4e129d9bed"
+      "bytes": 28778,
+      "sha256": "1fda580289352fee8b871034a8b3a3b4dba72d153118c9e28e902fb972efcc3b"
     },
     {
       "path": "runtime_boundary_validation.json",

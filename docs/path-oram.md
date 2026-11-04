@@ -7,19 +7,33 @@ paper claim.
 
 The Lean development states more than it currently proves for Path ORAM:
 
-- The general theorems for both schemes take a
+- The general theorems for both schemes that take a
   `SeededRuntimePathOramProofBundle`, or a `SeededRuntimePaperMainBundle`,
-  which extends it. Its `cfgWellFormed` field requires every `OramConfig` to
-  hold only local-scheme objects, and `OramConfig` constrains nothing, so no
-  bundle exists (`seededRuntimePathOramProofBundle_empty` and
-  `seededRuntimePaperMainBundle_empty` in `UOToolchain/RuntimeCoins.lean`) and
-  these theorems hold vacuously.
-- The non-vacuous result is the per-configuration paper-main pair boundary
-  for `path_oram_local_posmap_v1` (`ConcreteRuntimePathOramPaperPairBoundary`),
-  which `checkCanonicalPathOramPaperInstantiation` derives for one concrete pair
-  of `SingleAccessMap.put` runs (one ORAM access). Multi-access entrypoints are
-  validated through compact theorem inputs, which check a representative
-  witness and derive no theorem.
+  which extends it, hold vacuously. The bundle's `cfgWellFormed` field
+  requires every `OramConfig` to hold only local-scheme objects, and
+  `OramConfig` constrains nothing, so no bundle exists
+  (`seededRuntimePathOramProofBundle_empty` and
+  `seededRuntimePaperMainBundle_empty` in `UOToolchain/RuntimeCoins.lean`).
+- `UOToolchain/PathOramAdmitted.lean` states the local-scheme route over the
+  configurations an admission predicate selects.
+  `SeededRuntimePathOramProofBundleOn` and `SeededRuntimePaperMainBundleOn`
+  guard every field by admission. They give the local theorem for every pair
+  of admitted configurations with the same public projection
+  (`ComputationalUOWithOn`), the SGX execution theorem over those pairs, and
+  the paper-main theorem modulo releases
+  (`paperMain_pathOramLocalPosmapV1_noninterference_moduloReleases_on`). With
+  every configuration admitted, `ComputationalUOWithOn` is
+  `ComputationalUOWith`.
+- This bundle exists. A runtime pair slice is a bundle that admits the pair's
+  two sides (`ConcreteRuntimePathOramPairSlice.toPaperMainBundleOn`), which
+  agree on the public projection and differ in their secret inputs
+  (`toPaperMainBundleOn_admits_distinct_pair`). For example, the pair of
+  `SingleAccessMap.put` runs that `checkCanonicalPathOramPaperInstantiation`
+  accepts gives a bundle, and the checker derives the general SGX execution
+  theorem at the pair's two sides (`sgxViewRelation_sides`), which relates
+  the left and right runtime families. That pair makes one ORAM access.
+  Multi-access entrypoints are validated through compact theorem inputs,
+  which check a representative witness and derive no theorem.
 - Every call that touches a Path ORAM map first reads the whole map: the
   runtime opens the map's counter, every metadata page, and every bucket and
   rebuilds the map's contents inside the enclave
@@ -73,13 +87,30 @@ The Lean development states more than it currently proves for Path ORAM:
   model is generic in the slot type, so it also covers a call on several maps
   in any interleaving, each map's leaves and coins below its own leaf count:
   the schedule is distributed as the canonical leaf-value distribution of the
-  call's scaffold (`multiObservedLeaves_canonical`). The paper-main theorems
-  do not use it yet.
+  call's scaffold (`multiObservedLeaves_canonical`).
+- The bundle's leaf obligation follows from this model, without seed
+  enumeration. A `TapeRuntimePathOramWitnessFamily` has a run of the call for
+  every tape (the leaves of the keys present before the call, then two coins
+  per access), and each run's leaf values are those the model reads from its
+  tape. Over its tapes, the runs' leaf values are the canonical distribution,
+  each schedule equally often (`leafValues_perm_canonical`). One tape per
+  canonical schedule gives a seeded family that realizes the canonical seed
+  space (`toSeeded_realizesCanonicalLeafValueSeedSpace`), which is the
+  bundle's `canonicalSeedSpace` field. So `TapePathOramPaperMainEvidenceOn`,
+  which asks only for facts that hold on every tape (the public view,
+  location, shape, outcome and boundary schedule), builds the bundle
+  (`toBundle`) and gives the paper-main theorem for every admitted pair. The
+  probe does not build tape families yet: for the one-access pair it
+  materializes the call's fresh coins and checks hidden-leaf coverage by
+  enumeration.
 
-Open work: restate the bundle over admitted configurations and derive it from
-`PathOramFreshLeaves`; read only the accessed paths at call time instead of the
-whole map, which needs an oblivious key-to-slot index and values served from
-the path and stash; and then replace the flat position map by a recursive one.
+Open work: build tape families from runtime runs, so that multi-access
+entrypoints get the theorem instead of compact theorem inputs (each run's
+certificate records the coins it used, and the replay checks it against the
+leaf model); extend the admitted route to `path_oram_private_posmap_v1`; read
+only the accessed paths at call time instead of the whole map, which needs an
+oblivious key-to-slot index and values served from the path and stash; and
+then replace the flat position map by a recursive one.
 
 ## Current Route
 
@@ -159,8 +190,9 @@ Status).
 
 Fresh leaf remapping is checked by the canonical fresh-coin runtime-family
 interface and hidden-leaf coverage checkers, which today cover the
-single-access `SingleAccessMap.put` instance only. It is not part of the
-explicit backend-assumption bundle.
+single-access `SingleAccessMap.put` instance only, and follows for any call
+from the leaf model on tape families (`TapeRuntimePathOramWitnessFamily`). It
+is not part of the explicit backend-assumption bundle.
 
 ## Sources
 

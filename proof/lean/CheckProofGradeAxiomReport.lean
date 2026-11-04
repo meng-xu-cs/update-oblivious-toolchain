@@ -176,4 +176,68 @@ info: 'UOToolchain.PathOramFreshLeaves.replay_runLeaves_interleaved' depends on 
 #guard_msgs in
 #print axioms UOToolchain.PathOramFreshLeaves.replay_runLeaves_interleaved
 
+/--
+info: 'UOToolchain.SeededRuntimePathOramProofBundleOn.computationalUOWithOn' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+-/
+#guard_msgs in
+#print axioms UOToolchain.SeededRuntimePathOramProofBundleOn.computationalUOWithOn
+
+/--
+info: 'UOToolchain.paperMain_pathOramLocalPosmapV1_noninterference_moduloReleases_on' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+-/
+#guard_msgs in
+#print axioms UOToolchain.paperMain_pathOramLocalPosmapV1_noninterference_moduloReleases_on
+
+/--
+info: 'UOToolchain.SeededRuntimePaperMainBundleOn.paperMain_noninterference_moduloReleases' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+-/
+#guard_msgs in
+#print axioms UOToolchain.SeededRuntimePaperMainBundleOn.paperMain_noninterference_moduloReleases
+
+/--
+info: 'UOToolchain.ConcreteRuntimePathOramPairSlice.toPaperMainBundleOn_admits_distinct_pair' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+-/
+#guard_msgs in
+#print axioms UOToolchain.ConcreteRuntimePathOramPairSlice.toPaperMainBundleOn_admits_distinct_pair
+
+/--
+info: 'UOToolchain.ConcreteRuntimePathOramPairSlice.sgxViewRelation_sides' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+-/
+#guard_msgs in
+#print axioms UOToolchain.ConcreteRuntimePathOramPairSlice.sgxViewRelation_sides
+
+/--
+info: 'UOToolchain.TapeRuntimePathOramWitnessFamily.leafValues_perm_canonical' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+-/
+#guard_msgs in
+#print axioms UOToolchain.TapeRuntimePathOramWitnessFamily.leafValues_perm_canonical
+
+/--
+info: 'UOToolchain.TapeRuntimePathOramWitnessFamily.toSeeded_realizesCanonicalLeafValueSeedSpace' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+-/
+#guard_msgs in
+#print axioms UOToolchain.TapeRuntimePathOramWitnessFamily.toSeeded_realizesCanonicalLeafValueSeedSpace
+
+/--
+info: 'UOToolchain.TapePathOramPaperMainEvidenceOn.paperMain_noninterference_moduloReleases' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+-/
+#guard_msgs in
+#print axioms UOToolchain.TapePathOramPaperMainEvidenceOn.paperMain_noninterference_moduloReleases
+
 def main : IO UInt32 := pure 0

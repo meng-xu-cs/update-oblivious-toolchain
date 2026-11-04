@@ -527,6 +527,16 @@
       "ok": true
     },
     {
+      "detail": "artifact proof/lean/UOToolchain/PathOramFreshLeaves.lean referenced by computational-uo-path-oram-local exists",
+      "name": "file-exists:computational-uo-path-oram-local:proof/lean/UOToolchain/PathOramFreshLeaves.lean",
+      "ok": true
+    },
+    {
+      "detail": "artifact proof/lean/UOToolchain/PathOramAdmitted.lean referenced by computational-uo-path-oram-local exists",
+      "name": "file-exists:computational-uo-path-oram-local:proof/lean/UOToolchain/PathOramAdmitted.lean",
+      "ok": true
+    },
+    {
       "detail": "artifact runtime/uo-evm/src/controller.rs referenced by computational-uo-path-oram-local exists",
       "name": "file-exists:computational-uo-path-oram-local:runtime/uo-evm/src/controller.rs",
       "ok": true
@@ -892,7 +902,9 @@
       "lean_modules": [
         "proof/lean/UOToolchain/PathOramLocalPosmapV1.lean",
         "proof/lean/UOToolchain/RuntimePaperInstantiation.lean",
-        "proof/lean/UOToolchain/RuntimeCoins.lean"
+        "proof/lean/UOToolchain/RuntimeCoins.lean",
+        "proof/lean/UOToolchain/PathOramFreshLeaves.lean",
+        "proof/lean/UOToolchain/PathOramAdmitted.lean"
       ],
       "runtime_compiler_files": [
         "runtime/uo-evm/src/controller.rs"
@@ -901,7 +913,7 @@
         "crates/uo-core/src/trace.rs"
       ],
       "status": "generated-and-checked",
-      "text": "The bounded local-position-map Path ORAM route path_oram_local_posmap_v1 (capacity 128) executes; its Lean paper-main pair boundary is derived for a concrete single-access instance (SingleAccessMap.put), while the general bundle-based Path ORAM theorems are vacuous.",
+      "text": "The bounded local-position-map Path ORAM route path_oram_local_posmap_v1 (capacity 128) executes; its Lean paper-main theorem holds over admitted configurations given bundle evidence, whose leaf obligation follows from the leaf model without seed enumeration, and the bundle is derived for a concrete single-access instance (SingleAccessMap.put); multi-access entrypoints are validated through compact theorem inputs.",
       "validation_command": "cargo run -q -p mplus-probe -- --only claim-consistency --out-dir results"
     },
     {

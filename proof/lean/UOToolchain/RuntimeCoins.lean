@@ -503,9 +503,9 @@ def foreignSchemeOramConfig : OramConfig :=
 `cfgWellFormed` field requires every `OramConfig` to hold only local-scheme
 objects, and `foreignSchemeOramConfig` does not, so every theorem that takes a
 bundle (or a `SeededRuntimePaperMainBundle`, which extends it) holds vacuously.
-The non-vacuous Path ORAM route is the per-configuration
-`ConcreteRuntimePathOramConfigSlice`. Restating the bundle over admitted
-configurations is open work (`docs/path-oram.md`). -/
+The bundle over admitted configurations, `SeededRuntimePathOramProofBundleOn`
+in `UOToolchain/PathOramAdmitted.lean`, exists: a runtime pair slice
+(`ConcreteRuntimePathOramConfigSlice` on each side) is one. -/
 theorem seededRuntimePathOramProofBundle_empty {modelTags : SGXModelTags}
     (bundle : SeededRuntimePathOramProofBundle modelTags) : False := by
   have hScheme :=
