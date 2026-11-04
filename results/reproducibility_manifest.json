@@ -19,8 +19,8 @@
     },
     {
       "path": "acceptance.json",
-      "bytes": 152724,
-      "sha256": "bbb65e07b51012cc9332ac575db69d7d7a02ebb05b28fbfdeccfb4eb09fc8373"
+      "bytes": 151914,
+      "sha256": "628e06da5738ff346e3fd504e0a0df480df19a11ed6f3b92211834ac29503245"
     },
     {
       "path": "admission_matrix.json",
@@ -39,8 +39,8 @@
     },
     {
       "path": "bridge_validation.json",
-      "bytes": 25684260,
-      "sha256": "55f7b2b2cfbcb5d4ffcd5bd7972b8d1b6afc898d5803ee2dc9ffdd305a23baf4"
+      "bytes": 25695080,
+      "sha256": "7e7fc8fee230141ab155f7665aac39064472d6a4f3cda6aa1efc4851965b07f7"
     },
     {
       "path": "canonical_pathoram_pair_validation.json",
@@ -49,8 +49,8 @@
     },
     {
       "path": "capacity_sweep.json",
-      "bytes": 27490,
-      "sha256": "23f9bb6cb92243479ca61a660d0314169666bd62b104a4c188a821769efb7529"
+      "bytes": 27482,
+      "sha256": "43f6265a4fed14d932db8bef1379d69066897e70e7111fc03d9015ef324cb39c"
     },
     {
       "path": "claim_artifact_manifest.json",
@@ -255,7 +255,7 @@
     {
       "path": "overheads.json",
       "bytes": 72284,
-      "sha256": "e97cff73273dd54a026bd47d886c88bf3b232780c626f75f7d70dca04827b1ae"
+      "sha256": "ab8e200465dc70805f57b8cbcc464e18894ab5f0f2e0927db724c1182495bc05"
     },
     {
       "path": "paper_main_family_boundary_validation.json",
@@ -279,13 +279,13 @@
     },
     {
       "path": "reviewer_summary.json",
-      "bytes": 109643,
-      "sha256": "693682b0d82e182a767eea5289c2f4c388c373e041f710e6f4860f98353cfa12"
+      "bytes": 109640,
+      "sha256": "b93cbd0405d2c69269142f45bf8b3d2630e418eacd52915d6eaeb4e48feafaf6"
     },
     {
       "path": "reviewer_summary.md",
-      "bytes": 28571,
-      "sha256": "557a0f795060dea805f7c802b3e7b242ce31606041abf75652c1a9251054f77a"
+      "bytes": 28568,
+      "sha256": "f4c4c6f18435ebf79df0ebc625af184db5681d6d7d2bb2bd318cc03957efb735"
     },
     {
       "path": "runtime_boundary_validation.json",
@@ -414,13 +414,13 @@
     },
     {
       "path": "static_checks.json",
-      "bytes": 52478,
-      "sha256": "d0baa15b5390746dc737098427987361f5178a7f223118092e9adffd8eecce7b"
+      "bytes": 60024,
+      "sha256": "0dfa79ef1dc1202686adf2635a40c61a2ca9c49afd33072a34adee7ee15a0410"
     },
     {
       "path": "tamper_validation.json",
-      "bytes": 680146,
-      "sha256": "13b0ec47d151fa1b984df555c6499380fbddc0680882dc73dfc21fc2888bd24e"
+      "bytes": 683420,
+      "sha256": "d05536e1660829366858dc21cf58ba1125b967d4b69f2ed4ec5d3e0aab37334f"
     },
     {
       "path": "targeted-tamper/tamper_validation.json",

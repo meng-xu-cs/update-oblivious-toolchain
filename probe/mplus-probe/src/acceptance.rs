@@ -195,13 +195,16 @@ fn classify(report: &str, path: &[String], parent: Option<&JsonValue>) -> &'stat
             if in_tamper {
                 return CLASS_EXPECTED_NEGATIVE;
             }
-            // Standalone translation-checker row over a bare CompiledArtifact:
-            // the artifact JSON is not self-certifying (it lacks the certificate
-            // / raw_metadata), so the standalone proof-grade checker is expected
-            // to reject it. The proof-grade acceptance is carried by the full
-            // translation bundle, not the bare artifact.
+            // Translation-checker row: the probe compiles each benchmark with its
+            // raw sidecar bytes, so the artifact is self-certifying and a UO
+            // artifact the proof-grade checker rejects is a real failure.
+            // Raw-mode artifacts target raw confidential backends, which
+            // proof-grade translation rejects by design.
             if parent.get("lean_stderr").is_some() && parent.get("mode").is_some() {
-                return CLASS_EXPECTED_NEGATIVE;
+                if parent.get("mode").and_then(JsonValue::as_str) == Some("raw") {
+                    return CLASS_EXPECTED_NEGATIVE;
+                }
+                return CLASS_REQUIRED_FAILURE;
             }
             let mode_raw = parent.get("mode").and_then(JsonValue::as_str) == Some("raw");
             let kind_raw = parent
@@ -498,6 +501,29 @@ mod tests {
         assert_eq!(report["accepted"], json!(false));
         assert_eq!(report["required_failures"].as_array().unwrap().len(), 1);
         assert!(run_acceptance_check_fail_closed(dir.to_str().unwrap()).is_err());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn rejected_uo_translation_row_is_required_failure() {
+        let dir = temp_results_dir("translation");
+        write(
+            &dir,
+            "static_checks.json",
+            json!({
+                "reports": [{
+                    // Raw-mode artifacts target raw confidential backends, which
+                    // proof-grade translation rejects by design.
+                    "raw_artifact": {"mode": "raw", "lean_stderr": "rejected", "accepted": false},
+                    // A self-certifying UO artifact the checker rejects is real.
+                    "uo_artifact": {"mode": "uo", "lean_stderr": "rejected", "accepted": false}
+                }]
+            }),
+        );
+        let report = run_acceptance_check_report(dir.to_str().unwrap()).unwrap();
+        assert_eq!(report["accepted"], json!(false));
+        assert_eq!(report["required_failures"].as_array().unwrap().len(), 1);
+        assert_eq!(report["class_counts"]["expected_negative"], json!(1));
         let _ = fs::remove_dir_all(&dir);
     }
 

@@ -693,16 +693,16 @@
       "oram_kernel_admission": null,
       "raw_artifact": {
         "accepted": false,
-        "artifact_json_bytes": 4543,
+        "artifact_json_bytes": 4734,
         "contract": "AuthScan",
         "function_count": 3,
-        "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: UOToolchain.ImportedAdmittedPackageIdentity.raw_metadata_sha256: String expected",
+        "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: imported proof-grade translation artifacts do not satisfy Lean validity checks: source_view: confidential state objects use raw backends: confidential state object TOKENS uses raw backend, confidential state object lastAuth uses raw backend; metadata policy checks failed for: auth(bytes32): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[TOKENS]), readLast(): metadata policy failed (secret policy=true, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[lastAuth]); artifact_view: confidential state objects use raw backends: confidential state object TOKENS uses raw backend, confidential state object lastAuth uses raw backend; metadata policy checks failed for: auth(bytes32): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[TOKENS]), readLast(): metadata policy failed (secret policy=true, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[lastAuth])",
         "lean_stdout": "",
         "manifest_entrypoint_count": 3,
         "manifest_object_count": 2,
         "metadata_contract": "AuthScan",
         "mode": "raw",
-        "source_artifact_json_bytes": 4543,
+        "source_artifact_json_bytes": 4734,
         "state_object_count": 2
       },
       "source_raw": [
@@ -716,17 +716,17 @@
         "diagnostics: none"
       ],
       "uo_artifact": {
-        "accepted": false,
-        "artifact_json_bytes": 13454,
+        "accepted": true,
+        "artifact_json_bytes": 13645,
         "contract": "AuthScan",
         "function_count": 3,
-        "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: UOToolchain.ImportedAdmittedPackageIdentity.raw_metadata_sha256: String expected",
-        "lean_stdout": "",
+        "lean_stderr": "",
+        "lean_stdout": "validated proof-grade translation artifacts for AuthScan",
         "manifest_entrypoint_count": 3,
         "manifest_object_count": 2,
         "metadata_contract": "AuthScan",
         "mode": "uo",
-        "source_artifact_json_bytes": 13454,
+        "source_artifact_json_bytes": 13645,
         "state_object_count": 2
       },
       "uo_kernel_admission": {
@@ -770,17 +770,17 @@
     {
       "benchmark": "ConfidentialMixer",
       "fullscan64_artifact": {
-        "accepted": false,
-        "artifact_json_bytes": 16080,
+        "accepted": true,
+        "artifact_json_bytes": 16271,
         "contract": "ConfidentialMixer",
         "function_count": 4,
-        "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: UOToolchain.ImportedAdmittedPackageIdentity.raw_metadata_sha256: String expected",
-        "lean_stdout": "",
+        "lean_stderr": "",
+        "lean_stdout": "validated proof-grade translation artifacts for ConfidentialMixer",
         "manifest_entrypoint_count": 4,
         "manifest_object_count": 2,
         "metadata_contract": "ConfidentialMixer",
         "mode": "uo",
-        "source_artifact_json_bytes": 16080,
+        "source_artifact_json_bytes": 16271,
         "state_object_count": 2
       },
       "fullscan64_kernel_admission": {
@@ -851,17 +851,17 @@
         ]
       },
       "oram_artifact": {
-        "accepted": false,
-        "artifact_json_bytes": 16341,
+        "accepted": true,
+        "artifact_json_bytes": 16532,
         "contract": "ConfidentialMixer",
         "function_count": 4,
-        "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: UOToolchain.ImportedAdmittedPackageIdentity.raw_metadata_sha256: String expected",
-        "lean_stdout": "",
+        "lean_stderr": "",
+        "lean_stdout": "validated proof-grade translation artifacts for ConfidentialMixer",
         "manifest_entrypoint_count": 4,
         "manifest_object_count": 2,
         "metadata_contract": "ConfidentialMixer",
         "mode": "uo",
-        "source_artifact_json_bytes": 16341,
+        "source_artifact_json_bytes": 16532,
         "state_object_count": 2
       },
       "oram_kernel_admission": {
@@ -933,16 +933,16 @@
       },
       "raw_artifact": {
         "accepted": false,
-        "artifact_json_bytes": 6339,
+        "artifact_json_bytes": 6530,
         "contract": "ConfidentialMixer",
         "function_count": 4,
-        "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: UOToolchain.ImportedAdmittedPackageIdentity.raw_metadata_sha256: String expected",
+        "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: imported proof-grade translation artifacts do not satisfy Lean validity checks: source_view: confidential state objects use raw backends: confidential state object balances uses raw backend, confidential state object total uses raw backend; metadata policy checks failed for: deposit(bytes32,uint256): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[total,balances]), withdraw(bytes32,uint256): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[total,balances]), balanceOf(bytes32): metadata policy failed (secret policy=true, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[balances]), totalValue(): metadata policy failed (secret policy=true, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[total]); artifact_view: confidential state objects use raw backends: confidential state object balances uses raw backend, confidential state object total uses raw backend; metadata policy checks failed for: deposit(bytes32,uint256): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[total,balances]), withdraw(bytes32,uint256): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[total,balances]), balanceOf(bytes32): metadata policy failed (secret policy=true, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[balances]), totalValue(): metadata policy failed (secret policy=true, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[total])",
         "lean_stdout": "",
         "manifest_entrypoint_count": 4,
         "manifest_object_count": 2,
         "metadata_contract": "ConfidentialMixer",
         "mode": "raw",
-        "source_artifact_json_bytes": 6339,
+        "source_artifact_json_bytes": 6530,
         "state_object_count": 2
       },
       "source_raw": [
@@ -956,17 +956,17 @@
         "diagnostics: none"
       ],
       "uo_artifact": {
-        "accepted": false,
-        "artifact_json_bytes": 16075,
+        "accepted": true,
+        "artifact_json_bytes": 16266,
         "contract": "ConfidentialMixer",
         "function_count": 4,
-        "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: UOToolchain.ImportedAdmittedPackageIdentity.raw_metadata_sha256: String expected",
-        "lean_stdout": "",
+        "lean_stderr": "",
+        "lean_stdout": "validated proof-grade translation artifacts for ConfidentialMixer",
         "manifest_entrypoint_count": 4,
         "manifest_object_count": 2,
         "metadata_contract": "ConfidentialMixer",
         "mode": "uo",
-        "source_artifact_json_bytes": 16075,
+        "source_artifact_json_bytes": 16266,
         "state_object_count": 2
       },
       "uo_kernel_admission": {
@@ -1042,17 +1042,17 @@
       "fullscan64_artifact": null,
       "fullscan64_kernel_admission": null,
       "oram_artifact": {
-        "accepted": false,
-        "artifact_json_bytes": 30360,
+        "accepted": true,
+        "artifact_json_bytes": 30551,
         "contract": "ERC20Lite",
         "function_count": 6,
-        "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: UOToolchain.ImportedAdmittedPackageIdentity.raw_metadata_sha256: String expected",
-        "lean_stdout": "",
+        "lean_stderr": "",
+        "lean_stdout": "validated proof-grade translation artifacts for ERC20Lite",
         "manifest_entrypoint_count": 6,
         "manifest_object_count": 2,
         "metadata_contract": "ERC20Lite",
         "mode": "uo",
-        "source_artifact_json_bytes": 30360,
+        "source_artifact_json_bytes": 30551,
         "state_object_count": 2
       },
       "oram_kernel_admission": {
@@ -1154,16 +1154,16 @@
       },
       "raw_artifact": {
         "accepted": false,
-        "artifact_json_bytes": 10358,
+        "artifact_json_bytes": 10549,
         "contract": "ERC20Lite",
         "function_count": 6,
-        "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: UOToolchain.ImportedAdmittedPackageIdentity.raw_metadata_sha256: String expected",
+        "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: imported proof-grade translation artifacts do not satisfy Lean validity checks: source_view: confidential state objects use raw backends: confidential state object allowances uses raw backend, confidential state object balances uses raw backend; metadata policy checks failed for: mint(address,uint256): metadata policy failed (secret policy=true, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[balances]), approve(address,address,uint256): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=true, confidential_reads=[]), transfer(address,address,uint256): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[balances]), transferFrom(address,address,address,uint256): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[balances,allowances]), balanceOf(address): metadata policy failed (secret policy=true, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[balances]), allowanceOf(address,address): metadata policy failed (secret policy=true, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[allowances]); artifact_view: confidential state objects use raw backends: confidential state object allowances uses raw backend, confidential state object balances uses raw backend; metadata policy checks failed for: mint(address,uint256): metadata policy failed (secret policy=true, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[balances]), approve(address,address,uint256): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=true, confidential_reads=[]), transfer(address,address,uint256): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[balances]), transferFrom(address,address,address,uint256): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[balances,allowances]), balanceOf(address): metadata policy failed (secret policy=true, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[balances]), allowanceOf(address,address): metadata policy failed (secret policy=true, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[allowances])",
         "lean_stdout": "",
         "manifest_entrypoint_count": 6,
         "manifest_object_count": 2,
         "metadata_contract": "ERC20Lite",
         "mode": "raw",
-        "source_artifact_json_bytes": 10358,
+        "source_artifact_json_bytes": 10549,
         "state_object_count": 2
       },
       "source_raw": [
@@ -1177,17 +1177,17 @@
         "diagnostics: none"
       ],
       "uo_artifact": {
-        "accepted": false,
-        "artifact_json_bytes": 29823,
+        "accepted": true,
+        "artifact_json_bytes": 30014,
         "contract": "ERC20Lite",
         "function_count": 6,
-        "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: UOToolchain.ImportedAdmittedPackageIdentity.raw_metadata_sha256: String expected",
-        "lean_stdout": "",
+        "lean_stderr": "",
+        "lean_stdout": "validated proof-grade translation artifacts for ERC20Lite",
         "manifest_entrypoint_count": 6,
         "manifest_object_count": 2,
         "metadata_contract": "ERC20Lite",
         "mode": "uo",
-        "source_artifact_json_bytes": 29823,
+        "source_artifact_json_bytes": 30014,
         "state_object_count": 2
       },
       "uo_kernel_admission": {
@@ -1296,16 +1296,16 @@
       "oram_kernel_admission": null,
       "raw_artifact": {
         "accepted": false,
-        "artifact_json_bytes": 3843,
+        "artifact_json_bytes": 4034,
         "contract": "FixedSlotClassifier",
         "function_count": 3,
-        "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: UOToolchain.ImportedAdmittedPackageIdentity.raw_metadata_sha256: String expected",
+        "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: imported proof-grade translation artifacts do not satisfy Lean validity checks: source_view: confidential state objects use raw backends: confidential state object last uses raw backend; metadata policy checks failed for: classify(uint256): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=true, confidential_reads=[]), sameSame(uint256): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=true, confidential_reads=[]), peek(): metadata policy failed (secret policy=true, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[last]); artifact_view: confidential state objects use raw backends: confidential state object last uses raw backend; metadata policy checks failed for: classify(uint256): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=true, confidential_reads=[]), sameSame(uint256): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=true, confidential_reads=[]), peek(): metadata policy failed (secret policy=true, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[last])",
         "lean_stdout": "",
         "manifest_entrypoint_count": 3,
         "manifest_object_count": 1,
         "metadata_contract": "FixedSlotClassifier",
         "mode": "raw",
-        "source_artifact_json_bytes": 3843,
+        "source_artifact_json_bytes": 4034,
         "state_object_count": 1
       },
       "source_raw": [
@@ -1319,17 +1319,17 @@
         "diagnostics: none"
       ],
       "uo_artifact": {
-        "accepted": false,
-        "artifact_json_bytes": 8730,
+        "accepted": true,
+        "artifact_json_bytes": 8921,
         "contract": "FixedSlotClassifier",
         "function_count": 3,
-        "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: UOToolchain.ImportedAdmittedPackageIdentity.raw_metadata_sha256: String expected",
-        "lean_stdout": "",
+        "lean_stderr": "",
+        "lean_stdout": "validated proof-grade translation artifacts for FixedSlotClassifier",
         "manifest_entrypoint_count": 3,
         "manifest_object_count": 1,
         "metadata_contract": "FixedSlotClassifier",
         "mode": "uo",
-        "source_artifact_json_bytes": 8730,
+        "source_artifact_json_bytes": 8921,
         "state_object_count": 1
       },
       "uo_kernel_admission": {
@@ -1393,16 +1393,16 @@
       "oram_kernel_admission": null,
       "raw_artifact": {
         "accepted": false,
-        "artifact_json_bytes": 5284,
+        "artifact_json_bytes": 5475,
         "contract": "RegistryCRUD",
         "function_count": 4,
-        "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: UOToolchain.ImportedAdmittedPackageIdentity.raw_metadata_sha256: String expected",
+        "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: imported proof-grade translation artifacts do not satisfy Lean validity checks: source_view: confidential state objects use raw backends: confidential state object records uses raw backend; metadata policy checks failed for: upsert(bytes32,uint256): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=true, confidential_reads=[]), clear(bytes32): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=true, confidential_reads=[]), clearIfMatch(bytes32,uint256): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[records]), read(bytes32): metadata policy failed (secret policy=true, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[records]); artifact_view: confidential state objects use raw backends: confidential state object records uses raw backend; metadata policy checks failed for: upsert(bytes32,uint256): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=true, confidential_reads=[]), clear(bytes32): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=true, confidential_reads=[]), clearIfMatch(bytes32,uint256): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[records]), read(bytes32): metadata policy failed (secret policy=true, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[records])",
         "lean_stdout": "",
         "manifest_entrypoint_count": 4,
         "manifest_object_count": 1,
         "metadata_contract": "RegistryCRUD",
         "mode": "raw",
-        "source_artifact_json_bytes": 5284,
+        "source_artifact_json_bytes": 5475,
         "state_object_count": 1
       },
       "source_raw": [
@@ -1416,17 +1416,17 @@
         "diagnostics: none"
       ],
       "uo_artifact": {
-        "accepted": false,
-        "artifact_json_bytes": 13531,
+        "accepted": true,
+        "artifact_json_bytes": 13722,
         "contract": "RegistryCRUD",
         "function_count": 4,
-        "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: UOToolchain.ImportedAdmittedPackageIdentity.raw_metadata_sha256: String expected",
-        "lean_stdout": "",
+        "lean_stderr": "",
+        "lean_stdout": "validated proof-grade translation artifacts for RegistryCRUD",
         "manifest_entrypoint_count": 4,
         "manifest_object_count": 1,
         "metadata_contract": "RegistryCRUD",
         "mode": "uo",
-        "source_artifact_json_bytes": 13531,
+        "source_artifact_json_bytes": 13722,
         "state_object_count": 1
       },
       "uo_kernel_admission": {

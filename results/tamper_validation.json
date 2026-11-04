@@ -75,7 +75,7 @@
   "scenarios": [
     {
       "accepted": false,
-      "artifact_json_bytes": 11491,
+      "artifact_json_bytes": 11682,
       "artifact_kind": "proofgrade_translation_artifacts",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -88,17 +88,17 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 11235,
+      "artifact_json_bytes": 11426,
       "artifact_kind": "proofgrade_translation_artifacts",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
-      "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: UOToolchain.ImportedAdmittedPackageIdentity.raw_metadata_sha256: String expected",
+      "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: imported proof-grade translation artifacts do not satisfy Lean validity checks: source_view: confidential kernel schedules target raw, non-confidential, or unknown state objects: put(bytes32,uint256): kernel step MapPut@1 targets raw backend object records, clear(bytes32): kernel step MapPut@1 targets raw backend object records, add(bytes32,uint256): kernel step MapGet@1 targets raw backend object records, add(bytes32,uint256): kernel step MapPut@1 targets raw backend object records, read(bytes32): kernel step MapGet@1 targets raw backend object records; manifest ORAM accesses do not match recomputed body accesses for: put(bytes32,uint256): expected ORAM accesses , manifest has 1:1, clear(bytes32): expected ORAM accesses , manifest has 1:1, add(bytes32,uint256): expected ORAM accesses , manifest has 1:2, read(bytes32): expected ORAM accesses , manifest has 1:1; manifest max_commit_ops do not match recomputed body accesses for: put(bytes32,uint256): expected max_commit_ops=16, manifest has 10, clear(bytes32): expected max_commit_ops=16, manifest has 10, add(bytes32,uint256): expected max_commit_ops=16, manifest has 20, read(bytes32): expected max_commit_ops=16, manifest has 10; metadata policy checks failed for: put(bytes32,uint256): metadata policy failed (secret policy=true, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[]), clear(bytes32): metadata policy failed (secret policy=true, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[]), add(bytes32,uint256): metadata policy failed (secret policy=true, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[]); artifact_view: confidential kernel schedules target raw, non-confidential, or unknown state objects: put(bytes32,uint256): kernel step MapPut@1 targets raw backend object records, clear(bytes32): kernel step MapPut@1 targets raw backend object records, add(bytes32,uint256): kernel step MapGet@1 targets raw backend object records, add(bytes32,uint256): kernel step MapPut@1 targets raw backend object records, read(bytes32): kernel step MapGet@1 targets raw backend object records; manifest ORAM accesses do not match recomputed body accesses for: put(bytes32,uint256): expected ORAM accesses , manifest has 1:1, clear(bytes32): expected ORAM accesses , manifest has 1:1, add(bytes32,uint256): expected ORAM accesses , manifest has 1:2, read(bytes32): expected ORAM accesses , manifest has 1:1; manifest max_commit_ops do not match recomputed body accesses for: put(bytes32,uint256): expected max_commit_ops=16, manifest has 10, clear(bytes32): expected max_commit_ops=16, manifest has 10, add(bytes32,uint256): expected max_commit_ops=16, manifest has 20, read(bytes32): expected max_commit_ops=16, manifest has 10; metadata policy checks failed for: put(bytes32,uint256): metadata policy failed (secret policy=true, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[]), clear(bytes32): metadata policy failed (secret policy=true, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[]), add(bytes32,uint256): metadata policy failed (secret policy=true, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[])",
       "lean_stdout": "",
       "mutation": "make the confidential kernel step target a public raw backend in both source and artifact projections",
       "object_id": 1,
       "rejected": true,
       "scenario": "translation/confidential_raw_kernel_target",
-      "source_artifact_json_bytes": 11235
+      "source_artifact_json_bytes": 11426
     },
     {
       "accepted": false,
@@ -5724,7 +5724,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 16069,
+      "artifact_json_bytes": 16260,
       "artifact_kind": "uo_compiled_artifact",
       "benchmark": "ConfidentialMixer/uo",
       "entrypoint": "withdraw(bytes32,uint256)",
@@ -5736,7 +5736,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 16069,
+      "artifact_json_bytes": 16260,
       "artifact_kind": "uo_compiled_artifact",
       "benchmark": "ConfidentialMixer/uo",
       "entrypoint": "withdraw(bytes32,uint256)",
@@ -5748,7 +5748,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 16076,
+      "artifact_json_bytes": 16267,
       "artifact_kind": "uo_compiled_artifact",
       "benchmark": "ConfidentialMixer/uo",
       "entrypoint": "withdraw(bytes32,uint256)",

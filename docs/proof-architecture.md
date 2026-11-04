@@ -22,7 +22,13 @@ The direct checker `checkProofGradeTranslationArtifacts` is an executable proof
 witness for concrete source/artifact pairs. It is not the trust root: compiler
 correctness is represented by Lean theorems over the admitted post-resolution
 DSL, while parser/preprocessing remains the explicit front-end trust
-surface.
+surface. The static checks run it on every benchmark artifact, compiled with
+its raw sidecar bytes as the `uo-solc` CLI does, and the acceptance gate fails
+if it rejects a UO artifact (`uo_artifact`, `oram_artifact`, ... in
+`static_checks.json`); raw-mode artifacts are rejected by design. The `uo-check`
+test `artifact_checker_accepts_every_uo_benchmark` applies the Rust artifact
+checker to every UO benchmark sidecar, so a policy rule the compiler enforces
+but a checker does not mirror fails the build.
 
 The Sol, IR, and kernel evaluators share one abort rule
 (`EvalStatus.continuesBody`). Confidential entrypoints run their whole

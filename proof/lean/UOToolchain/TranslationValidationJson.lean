@@ -1559,10 +1559,18 @@ private partial def collectPolicySensitivityStatement
         state objectId
         (controlSensitive || keySensitive || valueSensitive || predicateSensitive)
         {}
+    -- A bounded map aborts a write of a new key when it is full, and whether a
+    -- key is new depends on the map's confidential contents, so a write to a
+    -- confidential map makes the status secret-dependent (the compiler's rule).
+    let confidentialMap :=
+      match stateObjectById? state objectId with
+      | some object => object.confidential
+      | none => false
     pure (tainted,
-      sensitivity.merge
+      (sensitivity.merge
         (confidentialReadSensitivity
-          (mergeStringSets (mergeStringSets keyReads valueReads) predicateReads)))
+          (mergeStringSets (mergeStringSets keyReads valueReads) predicateReads))).merge
+        { statusSensitive := confidentialMap })
   else if let some inner := taggedPayload? json "Return" then
     let value? ← lookupOptionalFieldJson inner "value"
     let returnSensitive ←

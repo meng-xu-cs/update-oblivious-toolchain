@@ -3836,11 +3836,20 @@ fn artifact_variants<'a>(
     variants
 }
 
+/// Compile a benchmark the way the `uo-solc` CLI does: the artifact records the
+/// sidecar's raw bytes in its admitted-package identity, so it is
+/// self-certifying for the proof-grade translation checker.
 fn compile_artifact(source: &str, metadata: &str, mode: ProgramMode) -> Result<CompiledArtifact> {
     let metadata_path = workspace_path(metadata);
     let source_path = workspace_path(source);
-    let metadata: ContractMetadata = serde_yaml::from_slice(&fs::read(&metadata_path)?)?;
-    uo_solc::compile(source_path.to_str().unwrap(), &metadata, mode)
+    let raw_metadata = fs::read(&metadata_path)?;
+    let metadata: ContractMetadata = serde_yaml::from_slice(&raw_metadata)?;
+    uo_solc::compile_with_metadata_bytes(
+        source_path.to_str().unwrap(),
+        &metadata,
+        &raw_metadata,
+        mode,
+    )
 }
 
 fn compile_artifact_from_metadata(
@@ -4194,26 +4203,26 @@ fn run_static_checks(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<J
             "raw_artifact": validate_translation_artifacts_against_source(
                 &format!("{name}-raw-artifact"),
                 source_path.to_str().unwrap(),
-                &raw_metadata,
+                &raw_meta,
                 &artifacts.raw,
                 &checker,
             )?,
             "uo_artifact": validate_translation_artifacts_against_source(
                 &format!("{name}-uo-artifact"),
                 source_path.to_str().unwrap(),
-                &uo_metadata,
+                &uo_meta,
                 &artifacts.uo,
                 &checker,
             )?,
             "oram_artifact": artifacts
                 .oram
                 .as_ref()
-                .zip(oram_metadata.as_ref())
-                .map(|(artifact, metadata)| {
+                .filter(|_| oram_metadata.is_some())
+                .map(|artifact| {
                     validate_translation_artifacts_against_source(
                         &format!("{name}-oram-artifact"),
                         source_path.to_str().unwrap(),
-                        metadata,
+                        &oram_meta,
                         artifact,
                         &checker,
                     )
@@ -4222,12 +4231,12 @@ fn run_static_checks(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<J
             "fullscan64_artifact": artifacts
                 .fullscan64
                 .as_ref()
-                .zip(fullscan64_metadata.as_ref())
-                .map(|(artifact, metadata)| {
+                .filter(|_| fullscan64_metadata.is_some())
+                .map(|artifact| {
                     validate_translation_artifacts_against_source(
                         &format!("{name}-fullscan64-artifact"),
                         source_path.to_str().unwrap(),
-                        metadata,
+                        &fullscan64_meta,
                         artifact,
                         &checker,
                     )
@@ -4318,11 +4327,19 @@ fn tally_kernel_admission(report: &JsonValue, counts: &mut BTreeMap<String, usiz
 fn validate_translation_artifacts_against_source(
     case_name: &str,
     source_path: &str,
-    metadata: &ContractMetadata,
+    metadata_path: &str,
     artifact: &CompiledArtifact,
     checker: &Path,
 ) -> Result<JsonValue> {
-    let expected = uo_solc::compile(source_path, metadata, artifact.contract.mode.clone())?;
+    let raw_metadata = fs::read(workspace_path(metadata_path))?;
+    let metadata: ContractMetadata = serde_yaml::from_slice(&raw_metadata)?;
+    let metadata = &metadata;
+    let expected = uo_solc::compile_with_metadata_bytes(
+        source_path,
+        metadata,
+        &raw_metadata,
+        artifact.contract.mode.clone(),
+    )?;
     let source_artifact_case_name = format!("{case_name}-source-artifact");
     let artifact_case_name = format!("{case_name}-artifact");
     let (source_artifact_path, source_artifact_json_bytes) =

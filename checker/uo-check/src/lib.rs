@@ -681,6 +681,16 @@ fn collect_artifact_policy_sensitivity(
                 value,
                 predicate,
             } => {
+                // A bounded map aborts a write of a new key when it is full, and
+                // whether a key is new depends on the map's confidential
+                // contents, so any write to a confidential map makes the status
+                // secret-dependent (the compiler's rule, mirrored here).
+                if state
+                    .iter()
+                    .any(|object| object.id == *object_id && object.confidential)
+                {
+                    sensitivity.status_sensitive = true;
+                }
                 record_artifact_sensitive_public_write(
                     *object_id,
                     control_sensitive
@@ -1401,7 +1411,8 @@ fn forbid_raw_expr(expr: &Expr, signature: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::{
-        check_artifact, check_artifact_against_source, forbid_raw_expr,
+        check_artifact, check_artifact_against_source,
+        check_artifact_against_source_with_metadata_bytes, forbid_raw_expr,
         translation_validation_bundle_against_source_with_metadata_bytes,
     };
     use std::fs;
@@ -1786,5 +1797,54 @@ bounds:
         let artifact =
             uo_solc::compile(source.to_str().unwrap(), &metadata, ProgramMode::Raw).unwrap();
         check_artifact(&artifact).unwrap();
+    }
+
+    /// Every UO benchmark sidecar compiles to an artifact that the checker
+    /// accepts against its source. This catches a policy rule the compiler
+    /// enforces but the checker does not mirror, such as the success status of
+    /// a confidential map write.
+    #[test]
+    fn artifact_checker_accepts_every_uo_benchmark() {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let mut sidecars = fs::read_dir(root.join("benches/raw"))
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .filter(|path| {
+                let name = path.file_name().unwrap().to_str().unwrap();
+                // Raw-mode sidecars are checked by the raw tests; the private
+                // position-map sidecar is rejected at compile time (it makes
+                // several accesses to one map on a single-access scheme).
+                name.ends_with(".yaml")
+                    && !name.ends_with(".raw.yaml")
+                    && !name.ends_with(".private-posmap.yaml")
+            })
+            .collect::<Vec<_>>();
+        sidecars.sort();
+        assert!(
+            sidecars.len() >= 11,
+            "found only {} UO sidecars",
+            sidecars.len()
+        );
+        for path in sidecars {
+            let name = path.file_name().unwrap().to_str().unwrap().to_owned();
+            let contract = name.split('.').next().unwrap();
+            let source = root.join(format!("benches/raw/{contract}.sol"));
+            let raw_metadata = fs::read(&path).unwrap();
+            let metadata: ContractMetadata = serde_yaml::from_slice(&raw_metadata).unwrap();
+            let artifact = uo_solc::compile_with_metadata_bytes(
+                source.to_str().unwrap(),
+                &metadata,
+                &raw_metadata,
+                ProgramMode::Uo,
+            )
+            .unwrap_or_else(|err| panic!("{name} does not compile: {err:#}"));
+            check_artifact_against_source_with_metadata_bytes(
+                source.to_str().unwrap(),
+                &metadata,
+                &raw_metadata,
+                &artifact,
+            )
+            .unwrap_or_else(|err| panic!("{name} fails the artifact checker: {err:#}"));
+        }
     }
 }
