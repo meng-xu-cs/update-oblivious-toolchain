@@ -25,7 +25,9 @@ View_SGX(c₁) ∖ rel = View_SGX(c₂) ∖ rel
 
 exactly for the exact backends, and with the storage component related by the
 Path ORAM storage relation on the proof-grade Path ORAM routes. The released
-values themselves may differ between the two executions.
+values themselves may differ between the two executions. On the Path ORAM
+routes the Lean development currently proves much less than this statement;
+see Backend Scope.
 
 The compiler-side trust story starts at the post-resolution Sol AST / UO IR
 consumed by Lean. The active source theorem is for `uo-solidity-like-dsl-v1`,
@@ -154,9 +156,21 @@ field bindings required by `DeploymentCallAccepted`.
   discharges the paper-main theorem's storage-trace premise. That the runtime
   store emits exactly this encoding is checked against runtime traces
   (`exact_encoding_matches` in `results/trace_equivalence.json`), not proved.
-- The theorem-facing computational-UO path is only
-  `path_oram_local_posmap_v1` for the bounded local-position-map route and
-  `path_oram_private_posmap_v1` for scalable private position metadata.
+- Computational UO on Path ORAM is not yet a general theorem. The general
+  Path ORAM theorems for both schemes take a `SeededRuntimePathOramProofBundle`,
+  whose `cfgWellFormed` field quantifies over every `OramConfig`; no such
+  bundle exists (`seededRuntimePathOramProofBundle_empty` in
+  `UOToolchain/RuntimeCoins.lean`), so those theorems hold vacuously. The
+  non-vacuous result is the per-configuration paper-main pair boundary for
+  `path_oram_local_posmap_v1`, which `checkCanonicalPathOramPaperInstantiation`
+  derives for one concrete pair of `SingleAccessMap.put` runs (one ORAM
+  access). Multi-access local entrypoints are validated through compact
+  theorem inputs that check a representative witness and derive no theorem,
+  and a call that aborts on the local route is rejected by the runtime.
+  `path_oram_private_posmap_v1` compiles single-access entrypoints but is not
+  executable: the runtime refinement witness rejects the scheme, so every call
+  fails, and its Lean route inherits the vacuous bundle. See
+  [`path-oram.md`](./path-oram.md).
 - Legacy/surrogate ORAM paths remain available for benchmarking and historical
   comparison, not for the strengthened proof-grade claim.
 - Executable insecure raw baselines (the `insecure-eval-raw` evaluation feature,
@@ -192,7 +206,8 @@ The components are interpreted as follows:
   gas; there is no EVM gas schedule or bytecode backend).
 - `boundary_schedule` is the exact enclave boundary sequence.
 - `storage_trace` is exact for exact backends and related through the
-  proof-grade Path ORAM route.
+  proof-grade Path ORAM route (currently a concrete single-access instance;
+  see Backend Scope).
 - `micro_trace` is SGX-specific and is normalized/simulated from
   `L_sgx_micro`; the theorem does not claim raw page-id or full micro-event
   equality.

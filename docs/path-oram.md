@@ -3,6 +3,36 @@
 This document owns the Path ORAM theorem/provenance story for the current
 paper claim.
 
+## Current Status
+
+The Lean development states more than it currently proves for Path ORAM:
+
+- The general theorems for both schemes take a
+  `SeededRuntimePathOramProofBundle`, or a `SeededRuntimePaperMainBundle`,
+  which extends it. Its `cfgWellFormed` field requires every `OramConfig` to
+  hold only local-scheme objects, and `OramConfig` constrains nothing, so no
+  bundle exists (`seededRuntimePathOramProofBundle_empty` and
+  `seededRuntimePaperMainBundle_empty` in `UOToolchain/RuntimeCoins.lean`) and
+  these theorems hold vacuously.
+- The non-vacuous result is the per-configuration paper-main pair boundary
+  for `path_oram_local_posmap_v1` (`ConcreteRuntimePathOramPaperPairBoundary`),
+  which `checkCanonicalPathOramPaperInstantiation` derives for one concrete pair
+  of `SingleAccessMap.put` runs (one ORAM access). Multi-access entrypoints are
+  validated through compact theorem inputs, which check a representative
+  witness and derive no theorem.
+- A call that aborts on the local route is rejected by the runtime
+  (`rejected_by_proof_grade_route` in `results/abort_rollback.json`).
+- `path_oram_private_posmap_v1` compiles single-access entrypoints but is not
+  executable: the runtime refinement witness rejects the scheme, so every call
+  on such a map fails. The runtime has no recursive position map; both schemes
+  share one data path, a flat position map in encrypted metadata pages that
+  every access scans in full.
+
+Open work: restate the bundle over admitted configurations; prove without seed
+enumeration that fresh coins give independent uniform leaves for several
+accesses, including keys written by earlier calls; make the private route
+executable; and support aborts on the ORAM route.
+
 ## Current Route
 
 The paper route uses the JACM Path ORAM theorem as the cited theorem source at
@@ -55,13 +85,13 @@ and storage-projection facts.
 The legacy local-position-map route is intentionally capped at capacity `128`
 (`PATH_ORAM_LOCAL_POSMAP_MAX_CAPACITY` in Rust and
 `translationPathOramLocalPosmapMaxCapacity` in the Lean imported-shape
-checker). Larger maps use `path_oram_private_posmap_v1`, which keeps the
-position metadata on the private theorem-facing route and carries compact
-symbolic evidence rather than enumerating large seed/family spaces. The Rust
-`ScalablePathOramEvidence` check and Lean
-`ScalablePathOramCertificate.Subenumerative` theorem pin the certificate size
-and validation-step bound below the represented capacity for representative
-large maps.
+checker). Larger maps compile against `path_oram_private_posmap_v1`, which is
+not executable today (see Current Status). Its compact symbolic certificate
+(`ScalablePathOramCertificate`) records six shape numbers instead of
+enumerating large seed/family spaces, and `ScalablePathOramCertificate.Subenumerative`
+bounds its size and validation steps below the represented capacity. The
+private-scheme theorems do not use the certificate, and the Rust
+`ScalablePathOramEvidence` mirror is exercised only by unit tests.
 
 The private-position-map route admits only one logical access per map per
 entrypoint. Multi-access composition for it — fresh coins, recursive
@@ -80,9 +110,10 @@ multi-access maps.
 | `bucketEncryptionINDCPA` | concrete sealed bucket/path records implemented with `ChaCha20Poly1305` and paired with RFC 8439 plus AEAD composition analysis |
 | `metadataEncryptionINDCPA` | same sealed-record crypto route for encrypted position-map metadata pages |
 
-Fresh leaf remapping is discharged by the canonical fresh-coin runtime-family
-interface and hidden-leaf coverage checkers. It is not part of the explicit
-backend-assumption bundle.
+Fresh leaf remapping is checked by the canonical fresh-coin runtime-family
+interface and hidden-leaf coverage checkers, which today cover the
+single-access `SingleAccessMap.put` instance only. It is not part of the
+explicit backend-assumption bundle.
 
 ## Sources
 

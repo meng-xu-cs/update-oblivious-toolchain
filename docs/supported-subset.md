@@ -92,9 +92,10 @@ Sidecar metadata requirements:
 - map and array capacities must be positive
 - confidential entrypoints must declare `secret_args`
 - `oram_scheme` must be set explicitly when a proof-grade ORAM path is
-  intended; `path_oram_local_posmap_v1` remains capped at capacity `128`,
-  while larger theorem-facing maps use `path_oram_private_posmap_v1` with
-  compact symbolic position-map evidence. Multi-access entrypoints (the same
+  intended; `path_oram_local_posmap_v1` remains capped at capacity `128`.
+  Larger maps compile against `path_oram_private_posmap_v1`, but that route
+  is not executable today: the runtime rejects every call on such a map (see
+  [`path-oram.md`](./path-oram.md)). Multi-access entrypoints (the same
   map touched more than once per call) are supported only by the bounded
   `path_oram_local_posmap_v1` route (capacity `128`); `path_oram_private_posmap_v1`
   admits only one logical access per map per entrypoint, and a multi-access

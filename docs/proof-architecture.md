@@ -166,7 +166,9 @@ The proof development is organized around these layers:
   the accepted-package capstones modulo the declared releases
   (`View_SGX ∖ rel`) for the exact backend and both proof-grade Path ORAM
   routes; the release semantics is documented in
-  [`claim-boundary.md`](./claim-boundary.md#declared-releases).
+  [`claim-boundary.md`](./claim-boundary.md#declared-releases). The Path ORAM
+  versions take a seeded proof bundle that cannot exist, so they hold
+  vacuously; see [`path-oram.md`](./path-oram.md#current-status).
 
 The default `UOToolchain` umbrella imports `UOToolchain.ProofGradeRoot`.
 Legacy axiom-backed demonstrations are isolated behind `UOToolchain.LegacyRoot`

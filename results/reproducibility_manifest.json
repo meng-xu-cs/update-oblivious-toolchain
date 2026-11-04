@@ -49,28 +49,28 @@
     },
     {
       "path": "capacity_sweep.json",
-      "bytes": 27464,
-      "sha256": "cd2a52ecb8ea0f1979321dafc5f96e2bf653ae698eae128af89e1c9cd4e72320"
+      "bytes": 27490,
+      "sha256": "23f9bb6cb92243479ca61a660d0314169666bd62b104a4c188a821769efb7529"
     },
     {
       "path": "claim_artifact_manifest.json",
-      "bytes": 56412,
-      "sha256": "ad670bc448607d3558ee4dbe6af5d162835667a58d620ecd45cc6dcc10c73140"
+      "bytes": 57580,
+      "sha256": "9ab78c53dcd56b17388ca5590ff4c52089d71123ade3c140398ad154367fc675"
     },
     {
       "path": "claim_consistency.json",
-      "bytes": 2443,
-      "sha256": "29f4dcd5348177735c2f820df7b62298880398dbed75464d28eb25309dc629a8"
+      "bytes": 3341,
+      "sha256": "394cf58a747b01760ea46304409e1cc3625bbdbff9fb328b0f3fcc95321181c6"
     },
     {
       "path": "claim_status.json",
-      "bytes": 46133,
-      "sha256": "17cbe98cbd04255246a13b76ffe1b5294361a812f38e50fdc79577cdb8f07301"
+      "bytes": 47132,
+      "sha256": "ebc57d3a90bd95dd306f9dc441648cfededbc3d16f9b7d105d5723024b94d0c4"
     },
     {
       "path": "claim_status.md",
-      "bytes": 6686,
-      "sha256": "a30544ac132080d905a14fcd7141e94349bfd80b30e6edc64bb8c96f83920f83"
+      "bytes": 6876,
+      "sha256": "ebd1102dd10704ac32d231274118cdf66fdd820fb9f0c1c1874596c546f5768f"
     },
     {
       "path": "confidential_core_kernel_finish_slot_validation.json",
@@ -279,13 +279,13 @@
     },
     {
       "path": "reviewer_summary.json",
-      "bytes": 109639,
-      "sha256": "6c6ca3b5064ccd98686680e0017a9295715b722355a3cd13ee19116245c64f82"
+      "bytes": 109643,
+      "sha256": "693682b0d82e182a767eea5289c2f4c388c373e041f710e6f4860f98353cfa12"
     },
     {
       "path": "reviewer_summary.md",
-      "bytes": 28567,
-      "sha256": "a32af141758a7fad04a3570d85bad456b48a4c8f0161c1ef1b504c75c385bbb9"
+      "bytes": 28571,
+      "sha256": "557a0f795060dea805f7c802b3e7b242ce31606041abf75652c1a9251054f77a"
     },
     {
       "path": "runtime_boundary_validation.json",

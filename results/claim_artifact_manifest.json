@@ -37,7 +37,7 @@
       "ok": true
     },
     {
-      "detail": "computational-uo-path-oram-local declares an allowed status (Lean-proved)",
+      "detail": "computational-uo-path-oram-local declares an allowed status (generated-and-checked)",
       "name": "status-allowed:computational-uo-path-oram-local",
       "ok": true
     },
@@ -47,7 +47,7 @@
       "ok": true
     },
     {
-      "detail": "computational-uo-path-oram-private declares an allowed status (Lean-proved)",
+      "detail": "computational-uo-path-oram-private declares an allowed status (experimental)",
       "name": "status-allowed:computational-uo-path-oram-private",
       "ok": true
     },
@@ -517,6 +517,16 @@
       "ok": true
     },
     {
+      "detail": "artifact proof/lean/UOToolchain/RuntimePaperInstantiation.lean referenced by computational-uo-path-oram-local exists",
+      "name": "file-exists:computational-uo-path-oram-local:proof/lean/UOToolchain/RuntimePaperInstantiation.lean",
+      "ok": true
+    },
+    {
+      "detail": "artifact proof/lean/UOToolchain/RuntimeCoins.lean referenced by computational-uo-path-oram-local exists",
+      "name": "file-exists:computational-uo-path-oram-local:proof/lean/UOToolchain/RuntimeCoins.lean",
+      "ok": true
+    },
+    {
       "detail": "artifact runtime/uo-evm/src/controller.rs referenced by computational-uo-path-oram-local exists",
       "name": "file-exists:computational-uo-path-oram-local:runtime/uo-evm/src/controller.rs",
       "ok": true
@@ -529,6 +539,11 @@
     {
       "detail": "artifact proof/lean/UOToolchain/PathOramPrivatePosmapV1.lean referenced by computational-uo-path-oram-private exists",
       "name": "file-exists:computational-uo-path-oram-private:proof/lean/UOToolchain/PathOramPrivatePosmapV1.lean",
+      "ok": true
+    },
+    {
+      "detail": "artifact proof/lean/UOToolchain/RuntimeCoins.lean referenced by computational-uo-path-oram-private exists",
+      "name": "file-exists:computational-uo-path-oram-private:proof/lean/UOToolchain/RuntimeCoins.lean",
       "ok": true
     },
     {
@@ -875,7 +890,9 @@
       "doc_anchor": "path_oram_local_posmap_v1",
       "id": "computational-uo-path-oram-local",
       "lean_modules": [
-        "proof/lean/UOToolchain/PathOramLocalPosmapV1.lean"
+        "proof/lean/UOToolchain/PathOramLocalPosmapV1.lean",
+        "proof/lean/UOToolchain/RuntimePaperInstantiation.lean",
+        "proof/lean/UOToolchain/RuntimeCoins.lean"
       ],
       "runtime_compiler_files": [
         "runtime/uo-evm/src/controller.rs"
@@ -883,8 +900,8 @@
       "source_files": [
         "crates/uo-core/src/trace.rs"
       ],
-      "status": "Lean-proved",
-      "text": "The bounded local-position-map Path ORAM route path_oram_local_posmap_v1 (capacity 128) is a theorem-facing computational-UO path in the proof-grade import closure.",
+      "status": "generated-and-checked",
+      "text": "The bounded local-position-map Path ORAM route path_oram_local_posmap_v1 (capacity 128) executes; its Lean paper-main pair boundary is derived for a concrete single-access instance (SingleAccessMap.put), while the general bundle-based Path ORAM theorems are vacuous.",
       "validation_command": "cargo run -q -p mplus-probe -- --only claim-consistency --out-dir results"
     },
     {
@@ -895,7 +912,8 @@
       "doc_anchor": "path_oram_private_posmap_v1",
       "id": "computational-uo-path-oram-private",
       "lean_modules": [
-        "proof/lean/UOToolchain/PathOramPrivatePosmapV1.lean"
+        "proof/lean/UOToolchain/PathOramPrivatePosmapV1.lean",
+        "proof/lean/UOToolchain/RuntimeCoins.lean"
       ],
       "runtime_compiler_files": [
         "runtime/uo-evm/src/controller.rs"
@@ -903,8 +921,8 @@
       "source_files": [
         "crates/uo-core/src/trace.rs"
       ],
-      "status": "Lean-proved",
-      "text": "The scalable private-position-map Path ORAM route path_oram_private_posmap_v1 is a theorem-facing computational-UO path carrying compact symbolic position-map evidence.",
+      "status": "experimental",
+      "text": "The scalable private-position-map Path ORAM route path_oram_private_posmap_v1 compiles single-access entrypoints but is not executable (the runtime refinement witness rejects the scheme), and its Lean theorems take the empty seeded proof bundle.",
       "validation_command": "cargo run -q -p mplus-probe -- --only claim-consistency --out-dir results"
     },
     {

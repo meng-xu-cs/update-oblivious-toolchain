@@ -23,8 +23,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2061,
-      "p50_latency": 1635280,
-      "p95_latency": 1739699,
+      "p50_latency": 2276486,
+      "p95_latency": 3812630,
       "physical_reads": 1,
       "physical_writes": 1,
       "proof_object_bytes": 72,
@@ -32,7 +32,7 @@
       "stash_bound": 0,
       "status": "ok",
       "trace_json_bytes": 9546,
-      "validation_time_ms": 2
+      "validation_time_ms": 3
     },
     {
       "artifact_json_bytes": 11222,
@@ -43,8 +43,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2061,
-      "p50_latency": 1526228,
-      "p95_latency": 1627505,
+      "p50_latency": 2386895,
+      "p95_latency": 4851029,
       "physical_reads": 1,
       "physical_writes": 1,
       "proof_object_bytes": 65,
@@ -52,7 +52,7 @@
       "stash_bound": 0,
       "status": "ok",
       "trace_json_bytes": 9546,
-      "validation_time_ms": 2
+      "validation_time_ms": 3
     },
     {
       "artifact_json_bytes": 11222,
@@ -63,8 +63,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2054,
-      "p50_latency": 1495439,
-      "p95_latency": 1530866,
+      "p50_latency": 2178482,
+      "p95_latency": 2824165,
       "physical_reads": 1,
       "physical_writes": 1,
       "proof_object_bytes": 65,
@@ -72,7 +72,7 @@
       "stash_bound": 0,
       "status": "ok",
       "trace_json_bytes": 9353,
-      "validation_time_ms": 2
+      "validation_time_ms": 3
     },
     {
       "artifact_json_bytes": 11484,
@@ -83,8 +83,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2177,
-      "p50_latency": 7433838,
-      "p95_latency": 8136894,
+      "p50_latency": 10883868,
+      "p95_latency": 11779158,
       "physical_reads": 5,
       "physical_writes": 5,
       "proof_object_bytes": 264,
@@ -103,8 +103,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2177,
-      "p50_latency": 7695673,
-      "p95_latency": 9345236,
+      "p50_latency": 10462208,
+      "p95_latency": 12683059,
       "physical_reads": 5,
       "physical_writes": 5,
       "proof_object_bytes": 257,
@@ -123,8 +123,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2170,
-      "p50_latency": 7287980,
-      "p95_latency": 7778650,
+      "p50_latency": 11805707,
+      "p95_latency": 12804686,
       "physical_reads": 5,
       "physical_writes": 5,
       "proof_object_bytes": 257,
@@ -143,8 +143,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2090,
-      "p50_latency": 1857827,
-      "p95_latency": 2046478,
+      "p50_latency": 2343246,
+      "p95_latency": 4357901,
       "physical_reads": 2,
       "physical_writes": 2,
       "proof_object_bytes": 72,
@@ -152,7 +152,7 @@
       "stash_bound": 0,
       "status": "ok",
       "trace_json_bytes": 10790,
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
       "artifact_json_bytes": 11222,
@@ -163,8 +163,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2090,
-      "p50_latency": 1824456,
-      "p95_latency": 2154423,
+      "p50_latency": 3530788,
+      "p95_latency": 5518114,
       "physical_reads": 2,
       "physical_writes": 2,
       "proof_object_bytes": 65,
@@ -172,7 +172,7 @@
       "stash_bound": 0,
       "status": "ok",
       "trace_json_bytes": 10790,
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
       "artifact_json_bytes": 11222,
@@ -183,8 +183,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2083,
-      "p50_latency": 1832184,
-      "p95_latency": 1866635,
+      "p50_latency": 3413301,
+      "p95_latency": 6183460,
       "physical_reads": 2,
       "physical_writes": 2,
       "proof_object_bytes": 65,
@@ -192,7 +192,7 @@
       "stash_bound": 0,
       "status": "ok",
       "trace_json_bytes": 10597,
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
       "artifact_json_bytes": 11484,
@@ -203,8 +203,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2177,
-      "p50_latency": 7665991,
-      "p95_latency": 8950512,
+      "p50_latency": 11072882,
+      "p95_latency": 14162536,
       "physical_reads": 5,
       "physical_writes": 5,
       "proof_object_bytes": 264,
@@ -212,7 +212,7 @@
       "stash_bound": 2,
       "status": "ok",
       "trace_json_bytes": 19794,
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
       "artifact_json_bytes": 11484,
@@ -223,8 +223,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2177,
-      "p50_latency": 7676808,
-      "p95_latency": 8435912,
+      "p50_latency": 9112265,
+      "p95_latency": 15516208,
       "physical_reads": 5,
       "physical_writes": 5,
       "proof_object_bytes": 257,
@@ -232,7 +232,7 @@
       "stash_bound": 2,
       "status": "ok",
       "trace_json_bytes": 19794,
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
       "artifact_json_bytes": 11484,
@@ -243,8 +243,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2170,
-      "p50_latency": 8064930,
-      "p95_latency": 8535827,
+      "p50_latency": 10855416,
+      "p95_latency": 12958252,
       "physical_reads": 5,
       "physical_writes": 5,
       "proof_object_bytes": 257,
@@ -252,7 +252,7 @@
       "stash_bound": 2,
       "status": "ok",
       "trace_json_bytes": 19591,
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
       "artifact_json_bytes": 11222,
@@ -263,8 +263,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2148,
-      "p50_latency": 2525190,
-      "p95_latency": 2593989,
+      "p50_latency": 2974949,
+      "p95_latency": 3601061,
       "physical_reads": 4,
       "physical_writes": 4,
       "proof_object_bytes": 72,
@@ -272,7 +272,7 @@
       "stash_bound": 0,
       "status": "ok",
       "trace_json_bytes": 13278,
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
       "artifact_json_bytes": 11222,
@@ -283,8 +283,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2148,
-      "p50_latency": 2313573,
-      "p95_latency": 2385359,
+      "p50_latency": 3294383,
+      "p95_latency": 5395415,
       "physical_reads": 4,
       "physical_writes": 4,
       "proof_object_bytes": 65,
@@ -292,7 +292,7 @@
       "stash_bound": 0,
       "status": "ok",
       "trace_json_bytes": 13278,
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
       "artifact_json_bytes": 11222,
@@ -303,8 +303,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2141,
-      "p50_latency": 2398171,
-      "p95_latency": 2677917,
+      "p50_latency": 2812526,
+      "p95_latency": 3947533,
       "physical_reads": 4,
       "physical_writes": 4,
       "proof_object_bytes": 65,
@@ -312,7 +312,7 @@
       "stash_bound": 0,
       "status": "ok",
       "trace_json_bytes": 13085,
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
       "artifact_json_bytes": 11484,
@@ -323,8 +323,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2206,
-      "p50_latency": 12221402,
-      "p95_latency": 12995046,
+      "p50_latency": 15656032,
+      "p95_latency": 23118613,
       "physical_reads": 6,
       "physical_writes": 6,
       "proof_object_bytes": 264,
@@ -343,8 +343,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2206,
-      "p50_latency": 11783554,
-      "p95_latency": 11928649,
+      "p50_latency": 14466589,
+      "p95_latency": 19381306,
       "physical_reads": 6,
       "physical_writes": 6,
       "proof_object_bytes": 257,
@@ -363,8 +363,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2199,
-      "p50_latency": 12194500,
-      "p95_latency": 14344461,
+      "p50_latency": 15573711,
+      "p95_latency": 24749530,
       "physical_reads": 6,
       "physical_writes": 6,
       "proof_object_bytes": 257,
@@ -383,8 +383,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2264,
-      "p50_latency": 3455326,
-      "p95_latency": 3831673,
+      "p50_latency": 5354336,
+      "p95_latency": 9475876,
       "physical_reads": 8,
       "physical_writes": 8,
       "proof_object_bytes": 72,
@@ -392,7 +392,7 @@
       "stash_bound": 0,
       "status": "ok",
       "trace_json_bytes": 18257,
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
       "artifact_json_bytes": 11222,
@@ -403,8 +403,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2264,
-      "p50_latency": 3470209,
-      "p95_latency": 3909713,
+      "p50_latency": 5967773,
+      "p95_latency": 6580735,
       "physical_reads": 8,
       "physical_writes": 8,
       "proof_object_bytes": 65,
@@ -412,7 +412,7 @@
       "stash_bound": 0,
       "status": "ok",
       "trace_json_bytes": 18257,
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
       "artifact_json_bytes": 11222,
@@ -423,8 +423,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2257,
-      "p50_latency": 3426624,
-      "p95_latency": 3769662,
+      "p50_latency": 4853917,
+      "p95_latency": 6763284,
       "physical_reads": 8,
       "physical_writes": 8,
       "proof_object_bytes": 65,
@@ -432,7 +432,7 @@
       "stash_bound": 0,
       "status": "ok",
       "trace_json_bytes": 18064,
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
       "artifact_json_bytes": 11485,
@@ -443,8 +443,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2235,
-      "p50_latency": 20429436,
-      "p95_latency": 24078100,
+      "p50_latency": 25837387,
+      "p95_latency": 32020573,
       "physical_reads": 7,
       "physical_writes": 7,
       "proof_object_bytes": 264,
@@ -452,7 +452,7 @@
       "stash_bound": 8,
       "status": "ok",
       "trace_json_bytes": 29305,
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
       "artifact_json_bytes": 11485,
@@ -463,8 +463,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2235,
-      "p50_latency": 19686554,
-      "p95_latency": 22379575,
+      "p50_latency": 27574168,
+      "p95_latency": 30734595,
       "physical_reads": 7,
       "physical_writes": 7,
       "proof_object_bytes": 257,
@@ -472,7 +472,7 @@
       "stash_bound": 8,
       "status": "ok",
       "trace_json_bytes": 29305,
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
       "artifact_json_bytes": 11485,
@@ -483,8 +483,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2228,
-      "p50_latency": 20330312,
-      "p95_latency": 22599007,
+      "p50_latency": 25594341,
+      "p95_latency": 46784345,
       "physical_reads": 7,
       "physical_writes": 7,
       "proof_object_bytes": 257,
@@ -492,7 +492,7 @@
       "stash_bound": 8,
       "status": "ok",
       "trace_json_bytes": 29102,
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
       "artifact_json_bytes": 11228,
@@ -503,8 +503,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2496,
-      "p50_latency": 5625940,
-      "p95_latency": 6513951,
+      "p50_latency": 8201713,
+      "p95_latency": 10065559,
       "physical_reads": 16,
       "physical_writes": 16,
       "proof_object_bytes": 73,
@@ -512,7 +512,7 @@
       "stash_bound": 0,
       "status": "ok",
       "trace_json_bytes": 28245,
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
       "artifact_json_bytes": 11228,
@@ -523,8 +523,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2496,
-      "p50_latency": 5575144,
-      "p95_latency": 5790437,
+      "p50_latency": 7372378,
+      "p95_latency": 8585914,
       "physical_reads": 16,
       "physical_writes": 16,
       "proof_object_bytes": 66,
@@ -532,7 +532,7 @@
       "stash_bound": 0,
       "status": "ok",
       "trace_json_bytes": 28245,
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
       "artifact_json_bytes": 11228,
@@ -543,8 +543,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2489,
-      "p50_latency": 5539443,
-      "p95_latency": 6032832,
+      "p50_latency": 7873944,
+      "p95_latency": 10401033,
       "physical_reads": 16,
       "physical_writes": 16,
       "proof_object_bytes": 66,
@@ -552,7 +552,7 @@
       "stash_bound": 0,
       "status": "ok",
       "trace_json_bytes": 28052,
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
       "artifact_json_bytes": 11491,
@@ -563,8 +563,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2322,
-      "p50_latency": 41747088,
-      "p95_latency": 44372371,
+      "p50_latency": 52877888,
+      "p95_latency": 56946555,
       "physical_reads": 10,
       "physical_writes": 10,
       "proof_object_bytes": 268,
@@ -572,7 +572,7 @@
       "stash_bound": 16,
       "status": "ok",
       "trace_json_bytes": 42493,
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
       "artifact_json_bytes": 11491,
@@ -583,8 +583,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2322,
-      "p50_latency": 41530939,
-      "p95_latency": 43881724,
+      "p50_latency": 50082101,
+      "p95_latency": 73305391,
       "physical_reads": 10,
       "physical_writes": 10,
       "proof_object_bytes": 261,
@@ -592,7 +592,7 @@
       "stash_bound": 16,
       "status": "ok",
       "trace_json_bytes": 42493,
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
       "artifact_json_bytes": 11491,
@@ -603,8 +603,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2315,
-      "p50_latency": 41472974,
-      "p95_latency": 43160081,
+      "p50_latency": 51323450,
+      "p95_latency": 55020380,
       "physical_reads": 10,
       "physical_writes": 10,
       "proof_object_bytes": 261,
@@ -612,7 +612,7 @@
       "stash_bound": 16,
       "status": "ok",
       "trace_json_bytes": 42290,
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
       "artifact_json_bytes": 11228,
@@ -623,8 +623,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2960,
-      "p50_latency": 9704483,
-      "p95_latency": 10993617,
+      "p50_latency": 14264285,
+      "p95_latency": 18289408,
       "physical_reads": 32,
       "physical_writes": 32,
       "proof_object_bytes": 73,
@@ -632,7 +632,7 @@
       "stash_bound": 0,
       "status": "ok",
       "trace_json_bytes": 48245,
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
       "artifact_json_bytes": 11228,
@@ -643,8 +643,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2960,
-      "p50_latency": 9719877,
-      "p95_latency": 10884340,
+      "p50_latency": 10804278,
+      "p95_latency": 12033037,
       "physical_reads": 32,
       "physical_writes": 32,
       "proof_object_bytes": 66,
@@ -652,7 +652,7 @@
       "stash_bound": 0,
       "status": "ok",
       "trace_json_bytes": 48245,
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
       "artifact_json_bytes": 11228,
@@ -663,8 +663,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2953,
-      "p50_latency": 9605046,
-      "p95_latency": 10028321,
+      "p50_latency": 14731201,
+      "p95_latency": 17966668,
       "physical_reads": 32,
       "physical_writes": 32,
       "proof_object_bytes": 66,
@@ -672,7 +672,7 @@
       "stash_bound": 0,
       "status": "ok",
       "trace_json_bytes": 48052,
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
       "artifact_json_bytes": 11491,
@@ -683,8 +683,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2467,
-      "p50_latency": 102907566,
-      "p95_latency": 105972230,
+      "p50_latency": 125378196,
+      "p95_latency": 211917582,
       "physical_reads": 15,
       "physical_writes": 15,
       "proof_object_bytes": 268,
@@ -692,7 +692,7 @@
       "stash_bound": 32,
       "status": "ok",
       "trace_json_bytes": 67405,
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
       "artifact_json_bytes": 11491,
@@ -703,8 +703,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2467,
-      "p50_latency": 104649931,
-      "p95_latency": 114504878,
+      "p50_latency": 128496022,
+      "p95_latency": 148804381,
       "physical_reads": 15,
       "physical_writes": 15,
       "proof_object_bytes": 261,
@@ -712,7 +712,7 @@
       "stash_bound": 32,
       "status": "ok",
       "trace_json_bytes": 67405,
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
       "artifact_json_bytes": 11491,
@@ -723,8 +723,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2460,
-      "p50_latency": 102798936,
-      "p95_latency": 110424877,
+      "p50_latency": 129058480,
+      "p95_latency": 183028372,
       "physical_reads": 15,
       "physical_writes": 15,
       "proof_object_bytes": 261,
@@ -732,7 +732,7 @@
       "stash_bound": 32,
       "status": "ok",
       "trace_json_bytes": 67202,
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
       "artifact_json_bytes": 11228,
@@ -743,8 +743,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 3888,
-      "p50_latency": 17897842,
-      "p95_latency": 20529376,
+      "p50_latency": 24950016,
+      "p95_latency": 28510992,
       "physical_reads": 64,
       "physical_writes": 64,
       "proof_object_bytes": 73,
@@ -752,7 +752,7 @@
       "stash_bound": 0,
       "status": "ok",
       "trace_json_bytes": 88248,
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
       "artifact_json_bytes": 11228,
@@ -763,8 +763,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 3888,
-      "p50_latency": 18229398,
-      "p95_latency": 19584380,
+      "p50_latency": 26907988,
+      "p95_latency": 32637998,
       "physical_reads": 64,
       "physical_writes": 64,
       "proof_object_bytes": 66,
@@ -772,7 +772,7 @@
       "stash_bound": 0,
       "status": "ok",
       "trace_json_bytes": 88248,
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
       "artifact_json_bytes": 11228,
@@ -783,8 +783,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 3881,
-      "p50_latency": 17670530,
-      "p95_latency": 20361130,
+      "p50_latency": 27224075,
+      "p95_latency": 35486317,
       "physical_reads": 64,
       "physical_writes": 64,
       "proof_object_bytes": 66,
@@ -792,7 +792,7 @@
       "stash_bound": 0,
       "status": "ok",
       "trace_json_bytes": 88055,
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
       "artifact_json_bytes": 11494,
@@ -803,8 +803,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2728,
-      "p50_latency": 295199233,
-      "p95_latency": 299783462,
+      "p50_latency": 377876053,
+      "p95_latency": 474392726,
       "physical_reads": 24,
       "physical_writes": 24,
       "proof_object_bytes": 270,
@@ -812,7 +812,7 @@
       "stash_bound": 64,
       "status": "ok",
       "trace_json_bytes": 115869,
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
       "artifact_json_bytes": 11494,
@@ -823,8 +823,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2728,
-      "p50_latency": 294238395,
-      "p95_latency": 297628791,
+      "p50_latency": 366128896,
+      "p95_latency": 397116202,
       "physical_reads": 24,
       "physical_writes": 24,
       "proof_object_bytes": 263,
@@ -832,7 +832,7 @@
       "stash_bound": 64,
       "status": "ok",
       "trace_json_bytes": 115869,
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
       "artifact_json_bytes": 11494,
@@ -843,8 +843,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 2721,
-      "p50_latency": 294112642,
-      "p95_latency": 308314941,
+      "p50_latency": 367838187,
+      "p95_latency": 381708161,
       "physical_reads": 24,
       "physical_writes": 24,
       "proof_object_bytes": 263,
@@ -852,7 +852,7 @@
       "stash_bound": 64,
       "status": "ok",
       "trace_json_bytes": 115672,
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
       "artifact_json_bytes": 11234,
@@ -863,8 +863,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 5744,
-      "p50_latency": 34279350,
-      "p95_latency": 38299190,
+      "p50_latency": 46089800,
+      "p95_latency": 52583661,
       "physical_reads": 128,
       "physical_writes": 128,
       "proof_object_bytes": 74,
@@ -872,7 +872,7 @@
       "stash_bound": 0,
       "status": "ok",
       "trace_json_bytes": 168416,
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
       "artifact_json_bytes": 11234,
@@ -883,8 +883,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 5744,
-      "p50_latency": 34747457,
-      "p95_latency": 38602165,
+      "p50_latency": 53226994,
+      "p95_latency": 76233479,
       "physical_reads": 128,
       "physical_writes": 128,
       "proof_object_bytes": 67,
@@ -892,7 +892,7 @@
       "stash_bound": 0,
       "status": "ok",
       "trace_json_bytes": 168416,
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
       "artifact_json_bytes": 11234,
@@ -903,8 +903,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 5737,
-      "p50_latency": 34734799,
-      "p95_latency": 36204145,
+      "p50_latency": 47287363,
+      "p95_latency": 72217793,
       "physical_reads": 128,
       "physical_writes": 128,
       "proof_object_bytes": 67,
@@ -912,7 +912,7 @@
       "stash_bound": 0,
       "status": "ok",
       "trace_json_bytes": 168223,
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
       "artifact_json_bytes": 11497,
@@ -923,8 +923,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 3221,
-      "p50_latency": 952452718,
-      "p95_latency": 967999868,
+      "p50_latency": 1177934219,
+      "p95_latency": 1241487064,
       "physical_reads": 41,
       "physical_writes": 41,
       "proof_object_bytes": 271,
@@ -943,8 +943,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 3221,
-      "p50_latency": 948930226,
-      "p95_latency": 996093679,
+      "p50_latency": 1143150389,
+      "p95_latency": 1280837960,
       "physical_reads": 41,
       "physical_writes": 41,
       "proof_object_bytes": 264,
@@ -963,8 +963,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 3214,
-      "p50_latency": 961402390,
-      "p95_latency": 984739172,
+      "p50_latency": 1179203079,
+      "p95_latency": 1248737475,
       "physical_reads": 41,
       "physical_writes": 41,
       "proof_object_bytes": 264,
@@ -983,8 +983,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 9456,
-      "p50_latency": 67455805,
-      "p95_latency": 68289508,
+      "p50_latency": 100206834,
+      "p95_latency": 112949070,
       "physical_reads": 256,
       "physical_writes": 256,
       "proof_object_bytes": 74,
@@ -992,7 +992,7 @@
       "stash_bound": 0,
       "status": "ok",
       "trace_json_bytes": 329184,
-      "validation_time_ms": 1
+      "validation_time_ms": 3
     },
     {
       "artifact_json_bytes": 11234,
@@ -1003,8 +1003,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 9456,
-      "p50_latency": 68195691,
-      "p95_latency": 70977863,
+      "p50_latency": 88915094,
+      "p95_latency": 104032379,
       "physical_reads": 256,
       "physical_writes": 256,
       "proof_object_bytes": 67,
@@ -1012,7 +1012,7 @@
       "stash_bound": 0,
       "status": "ok",
       "trace_json_bytes": 329184,
-      "validation_time_ms": 1
+      "validation_time_ms": 3
     },
     {
       "artifact_json_bytes": 11234,
@@ -1023,8 +1023,8 @@
       "completed_trials": 10,
       "error": null,
       "gas": 9449,
-      "p50_latency": 67039717,
-      "p95_latency": 68778670,
+      "p50_latency": 96121750,
+      "p95_latency": 132330020,
       "physical_reads": 256,
       "physical_writes": 256,
       "proof_object_bytes": 67,
@@ -1032,7 +1032,7 @@
       "stash_bound": 0,
       "status": "ok",
       "trace_json_bytes": 328991,
-      "validation_time_ms": 1
+      "validation_time_ms": 3
     },
     {
       "backend": "oram",
@@ -1041,7 +1041,7 @@
       "error": "path_oram_local_posmap_v1 supports capacities up to 128 in the current proof-grade route; use a recursive/private position map before admitting capacity 256",
       "read_fraction": 0.0,
       "status": "error",
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
       "backend": "oram",
@@ -1050,7 +1050,7 @@
       "error": "path_oram_local_posmap_v1 supports capacities up to 128 in the current proof-grade route; use a recursive/private position map before admitting capacity 256",
       "read_fraction": 0.5,
       "status": "error",
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     },
     {
       "backend": "oram",
@@ -1059,7 +1059,7 @@
       "error": "path_oram_local_posmap_v1 supports capacities up to 128 in the current proof-grade route; use a recursive/private position map before admitting capacity 256",
       "read_fraction": 1.0,
       "status": "error",
-      "validation_time_ms": 1
+      "validation_time_ms": 2
     }
   ],
   "trials": 10,

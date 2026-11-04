@@ -479,6 +479,39 @@ structure SeededRuntimePathOramProofBundle (modelTags : SGXModelTags) where
   canonicalSeedSpace :
     ∀ cfg, (family cfg).RealizesCanonicalLeafValueSeedSpace
 
+/-- A configuration whose ORAM witness lists one object outside the local Path
+ORAM scheme. `OramConfig` constrains nothing, so it is a configuration like any
+other. -/
+def foreignSchemeOramConfig : OramConfig :=
+  { pubData :=
+      { witness :=
+          { publicGasBudget := 0, secretArgs := [], oramAccesses := []
+            entrypointId := ""
+            oramObjects :=
+              [ { objectId := 0, objectName := "", capacity := 1
+                  scheme := privatePathOramScheme, blockSize := 0, bucketSize := 0
+                  bucketCount := 1, blocksPerBucket := pathOramBlocksPerBucket
+                  treeHeight := 0, stashBound := 1, recursionDepth := 1
+                  metadataPages := 0, metadataPagesPerAccess := 1, bucketsPerAccess := 1
+                  accessesPerCall := 1 } ] }
+        publicArgs := []
+        accessCounters := [] }
+    secretState := []
+    secretArgs := [] }
+
+/-- Known defect: no `SeededRuntimePathOramProofBundle` exists. Its
+`cfgWellFormed` field requires every `OramConfig` to hold only local-scheme
+objects, and `foreignSchemeOramConfig` does not, so every theorem that takes a
+bundle (or a `SeededRuntimePaperMainBundle`, which extends it) holds vacuously.
+The non-vacuous Path ORAM route is the per-configuration
+`ConcreteRuntimePathOramConfigSlice`. Restating the bundle over admitted
+configurations is open work (`docs/path-oram.md`). -/
+theorem seededRuntimePathOramProofBundle_empty {modelTags : SGXModelTags}
+    (bundle : SeededRuntimePathOramProofBundle modelTags) : False := by
+  have hScheme :=
+    (bundle.cfgWellFormed foreignSchemeOramConfig _ (List.mem_singleton_self _)).1
+  simp [privatePathOramScheme, pathOramScheme] at hScheme
+
 def SeededRuntimePathOramProofBundle.run
   {modelTags : SGXModelTags}
   (bundle : SeededRuntimePathOramProofBundle modelTags) : OramSemantics :=
@@ -770,5 +803,11 @@ theorem SeededRuntimePaperMainBundle.paperMainSgxExecution
   · exact bundle.toSeededRuntimePathOramProofBundle.computationalUOWith assumptions
   · exact bundle.publicOutcomeSafe
   · exact bundle.boundarySafe
+
+/-- No `SeededRuntimePaperMainBundle` exists either, since it extends
+`SeededRuntimePathOramProofBundle` (`seededRuntimePathOramProofBundle_empty`). -/
+theorem seededRuntimePaperMainBundle_empty {modelTags : SGXModelTags}
+    (bundle : SeededRuntimePaperMainBundle modelTags) : False :=
+  seededRuntimePathOramProofBundle_empty bundle.toSeededRuntimePathOramProofBundle
 
 end UOToolchain

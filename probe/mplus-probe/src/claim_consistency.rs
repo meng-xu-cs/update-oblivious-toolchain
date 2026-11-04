@@ -1,12 +1,11 @@
 //! Claim-consistency probe (Issue 04).
 //!
 //! The Path ORAM claim language must agree across README, the topic docs, the
-//! Lean proof-grade root, and the Rust admission surface. In particular,
-//! `path_oram_private_posmap_v1` is a theorem-facing scalable route (it is in
-//! the `UOToolchain.ProofGradeRoot` import closure and is admitted by
-//! proof-grade compilation), so no doc may describe it as experimental /
-//! evaluation-only / rejected, and the README may not narrow the computational
-//! route to the local-posmap scheme alone.
+//! Lean proof-grade root, and the Rust admission surface. Today
+//! `path_oram_private_posmap_v1` compiles but is not executable (the runtime
+//! refinement witness rejects the scheme) and its Lean theorems take an empty
+//! proof bundle, so no doc may present it as theorem-facing or proof-grade,
+//! and every doc that mentions it must say that it is not executable.
 //!
 //! This probe fails closed: any disagreement drives `accepted: false`.
 
@@ -50,28 +49,23 @@ fn check(name: &str, ok: bool, detail: impl Into<String>) -> Check {
     }
 }
 
-/// Phrases that would mark a scheme as *not* theorem-facing. If any doc applies
-/// one of these to the private-posmap scheme, the claim language disagrees with
-/// the proof-grade root.
-fn demotes_private_scheme(doc: &str) -> Option<String> {
+/// A line that presents the private-posmap scheme as theorem-facing or
+/// proof-grade. While the scheme is not executable, any such line overclaims;
+/// a line that negates the status ("not theorem-facing") is a status note.
+fn promotes_private_scheme(doc: &str) -> Option<String> {
     for line in doc.lines() {
         if !line.contains(PRIVATE_SCHEME) {
             continue;
         }
         let lowered = line.to_lowercase();
-        // Phrases that demote the *scheme* below theorem-facing. Deliberately
-        // narrow: a per-case limitation ("multi-access ... is rejected at
-        // compile time") is a documented scope bound, not a scheme demotion.
-        for marker in [
-            "experimental",
-            "evaluation-only",
-            "evaluation only",
-            "non-proof-grade",
-            "not theorem-facing",
-            "not proof-grade",
-        ] {
+        if lowered.contains("not ") {
+            continue;
+        }
+        for marker in ["theorem-facing", "proof-grade", "proved"] {
             if lowered.contains(marker) {
-                return Some(format!("line marks {PRIVATE_SCHEME} as `{marker}`: {line}"));
+                return Some(format!(
+                    "line presents {PRIVATE_SCHEME} as `{marker}`: {line}"
+                ));
             }
         }
     }
@@ -104,31 +98,37 @@ pub fn run_claim_consistency_report() -> Result<JsonValue> {
         ));
     }
 
-    // No doc may demote the private-posmap scheme below theorem-facing.
+    // No doc may present the private-posmap scheme as theorem-facing.
     for (name, body) in &docs {
-        match demotes_private_scheme(body) {
-            Some(detail) => checks.push(check(&format!("{name}:no-demotion"), false, detail)),
+        match promotes_private_scheme(body) {
+            Some(detail) => checks.push(check(&format!("{name}:no-promotion"), false, detail)),
             None => checks.push(check(
-                &format!("{name}:no-demotion"),
+                &format!("{name}:no-promotion"),
                 true,
-                format!("{name} does not demote {PRIVATE_SCHEME}"),
+                format!("{name} does not present {PRIVATE_SCHEME} as theorem-facing"),
             )),
         }
     }
 
-    // The README must not narrow the computational route to local-posmap alone.
+    // Every doc must state that the private-posmap scheme is not executable
+    // (compared with whitespace collapsed, so line wrapping does not matter).
+    for (name, body) in &docs {
+        let collapsed = body.split_whitespace().collect::<Vec<_>>().join(" ");
+        checks.push(check(
+            &format!("{name}:states-private-scheme-not-executable"),
+            collapsed.contains("not executable"),
+            format!("{name} states that {PRIVATE_SCHEME} is not executable"),
+        ));
+    }
+
+    // The README must name the local-posmap scheme as the executable route.
     let readme = &docs[0].1;
-    let readme_narrows = readme.contains(&format!("path is only\n  `{LOCAL_SCHEME}`"))
-        || readme.contains(&format!("computational-UO path is only `{LOCAL_SCHEME}`"))
-        || (readme.contains("computational-UO path is only") && !readme.contains(PRIVATE_SCHEME));
     checks.push(check(
-        "README.md:does-not-narrow-to-local-only",
-        !readme_narrows,
-        if readme_narrows {
-            "README narrows the computational-UO route to the local-posmap scheme alone"
-        } else {
-            "README presents both theorem-facing computational routes"
-        },
+        "README.md:names-executable-local-route",
+        readme.contains(&format!(
+            "executable computational-UO route is `{LOCAL_SCHEME}`"
+        )),
+        format!("README names {LOCAL_SCHEME} as the executable computational-UO route"),
     ));
 
     // The Lean proof-grade root must import the private-posmap modules.
@@ -181,20 +181,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn private_scheme_demotion_is_detected() {
-        let doc = format!("The {PRIVATE_SCHEME} route is experimental for now.");
-        assert!(demotes_private_scheme(&doc).is_some());
-        let ok = format!("The {PRIVATE_SCHEME} route is theorem-facing for scalable maps.");
-        assert!(demotes_private_scheme(&ok).is_none());
+    fn private_scheme_promotion_is_detected() {
+        let doc = format!("The {PRIVATE_SCHEME} route is theorem-facing for scalable maps.");
+        assert!(promotes_private_scheme(&doc).is_some());
+        let note = format!("The {PRIVATE_SCHEME} route is not executable and not theorem-facing.");
+        assert!(promotes_private_scheme(&note).is_none());
     }
 
     #[test]
-    fn per_case_rejection_is_not_a_scheme_demotion() {
-        // A documented scope limitation (multi-access rejected) must not be
-        // read as demoting the scheme below theorem-facing.
+    fn per_case_rejection_is_not_a_promotion() {
         let doc =
             format!("A multi-access {PRIVATE_SCHEME} entrypoint is rejected at compile time.");
-        assert!(demotes_private_scheme(&doc).is_none());
+        assert!(promotes_private_scheme(&doc).is_none());
     }
 
     #[test]

@@ -1,6 +1,6 @@
 {
   "accepted": true,
-  "check_count": 13,
+  "check_count": 17,
   "checks": [
     {
       "detail": "README.md references path_oram_private_posmap_v1",
@@ -23,28 +23,48 @@
       "ok": true
     },
     {
-      "detail": "README.md does not demote path_oram_private_posmap_v1",
-      "name": "README.md:no-demotion",
+      "detail": "README.md does not present path_oram_private_posmap_v1 as theorem-facing",
+      "name": "README.md:no-promotion",
       "ok": true
     },
     {
-      "detail": "docs/claim-boundary.md does not demote path_oram_private_posmap_v1",
-      "name": "docs/claim-boundary.md:no-demotion",
+      "detail": "docs/claim-boundary.md does not present path_oram_private_posmap_v1 as theorem-facing",
+      "name": "docs/claim-boundary.md:no-promotion",
       "ok": true
     },
     {
-      "detail": "docs/supported-subset.md does not demote path_oram_private_posmap_v1",
-      "name": "docs/supported-subset.md:no-demotion",
+      "detail": "docs/supported-subset.md does not present path_oram_private_posmap_v1 as theorem-facing",
+      "name": "docs/supported-subset.md:no-promotion",
       "ok": true
     },
     {
-      "detail": "docs/path-oram.md does not demote path_oram_private_posmap_v1",
-      "name": "docs/path-oram.md:no-demotion",
+      "detail": "docs/path-oram.md does not present path_oram_private_posmap_v1 as theorem-facing",
+      "name": "docs/path-oram.md:no-promotion",
       "ok": true
     },
     {
-      "detail": "README presents both theorem-facing computational routes",
-      "name": "README.md:does-not-narrow-to-local-only",
+      "detail": "README.md states that path_oram_private_posmap_v1 is not executable",
+      "name": "README.md:states-private-scheme-not-executable",
+      "ok": true
+    },
+    {
+      "detail": "docs/claim-boundary.md states that path_oram_private_posmap_v1 is not executable",
+      "name": "docs/claim-boundary.md:states-private-scheme-not-executable",
+      "ok": true
+    },
+    {
+      "detail": "docs/supported-subset.md states that path_oram_private_posmap_v1 is not executable",
+      "name": "docs/supported-subset.md:states-private-scheme-not-executable",
+      "ok": true
+    },
+    {
+      "detail": "docs/path-oram.md states that path_oram_private_posmap_v1 is not executable",
+      "name": "docs/path-oram.md:states-private-scheme-not-executable",
+      "ok": true
+    },
+    {
+      "detail": "README names path_oram_local_posmap_v1 as the executable computational-UO route",
+      "name": "README.md:names-executable-local-route",
       "ok": true
     },
     {
