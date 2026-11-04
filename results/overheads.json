@@ -418,20 +418,28 @@
       },
       "oram": {
         "bytes_read": 56644.0,
+        "bytes_read_with_call_start": 195002.0,
         "bytes_written": 56520.0,
+        "call_start_bytes": 138358.0,
+        "call_start_reads": 144,
         "executable": true,
         "gas_used": 3531,
         "physical_reads": 50,
+        "physical_reads_with_call_start": 194,
         "physical_writes": 49,
         "rejected": false,
         "trace_json_bytes": 156637
       },
       "oram_64": {
         "bytes_read": 56644.0,
+        "bytes_read_with_call_start": 195002.0,
         "bytes_written": 56520.0,
+        "call_start_bytes": 138358.0,
+        "call_start_reads": 144,
         "executable": true,
         "gas_used": 3531,
         "physical_reads": 50,
+        "physical_reads_with_call_start": 194,
         "physical_writes": 49,
         "rejected": false,
         "trace_json_bytes": 156637
@@ -634,7 +642,10 @@
           "backend": "full_scan+oram",
           "benchmark": "ConfidentialMixer/deposit",
           "bytes_read": 56644.0,
+          "bytes_read_with_call_start": 195002.0,
           "bytes_written": 56520.0,
+          "call_start_bytes": 138358.0,
+          "call_start_reads": 144,
           "capacity": "64",
           "entrypoint": "deposit(bytes32,uint256)",
           "entrypoint_resource_bounds": {
@@ -656,6 +667,7 @@
           "executable": true,
           "gas_used": 3531,
           "physical_reads": 50,
+          "physical_reads_with_call_start": 194,
           "physical_writes": 49,
           "rejected": false,
           "state_objects": [
@@ -742,20 +754,28 @@
       },
       "oram": {
         "bytes_read": 56644.0,
+        "bytes_read_with_call_start": 195002.0,
         "bytes_written": 56520.0,
+        "call_start_bytes": 138358.0,
+        "call_start_reads": 144,
         "executable": true,
         "gas_used": 3588,
         "physical_reads": 50,
+        "physical_reads_with_call_start": 194,
         "physical_writes": 49,
         "rejected": false,
         "trace_json_bytes": 156700
       },
       "oram_64": {
         "bytes_read": 56644.0,
+        "bytes_read_with_call_start": 195002.0,
         "bytes_written": 56520.0,
+        "call_start_bytes": 138358.0,
+        "call_start_reads": 144,
         "executable": true,
         "gas_used": 3588,
         "physical_reads": 50,
+        "physical_reads_with_call_start": 194,
         "physical_writes": 49,
         "rejected": false,
         "trace_json_bytes": 156700
@@ -958,7 +978,10 @@
           "backend": "full_scan+oram",
           "benchmark": "ConfidentialMixer/withdraw",
           "bytes_read": 56644.0,
+          "bytes_read_with_call_start": 195002.0,
           "bytes_written": 56520.0,
+          "call_start_bytes": 138358.0,
+          "call_start_reads": 144,
           "capacity": "64",
           "entrypoint": "withdraw(bytes32,uint256)",
           "entrypoint_resource_bounds": {
@@ -980,6 +1003,7 @@
           "executable": true,
           "gas_used": 3588,
           "physical_reads": 50,
+          "physical_reads_with_call_start": 194,
           "physical_writes": 49,
           "rejected": false,
           "state_objects": [
@@ -1056,10 +1080,14 @@
       },
       "oram": {
         "bytes_read": 198768.0,
+        "bytes_read_with_call_start": 596372.0,
         "bytes_written": 198768.0,
+        "call_start_bytes": 397604.0,
+        "call_start_reads": 432,
         "executable": true,
         "gas_used": 7485,
         "physical_reads": 178,
+        "physical_reads_with_call_start": 610,
         "physical_writes": 178,
         "rejected": false,
         "trace_json_bytes": 499440
@@ -1068,10 +1096,14 @@
       "oram_improves_physical_writes_baseline": "full_scan",
       "oram_private_posmap": {
         "bytes_read": 428640.0,
+        "bytes_read_with_call_start": 1188548.0,
         "bytes_written": 428640.0,
+        "call_start_bytes": 759908.0,
+        "call_start_reads": 864,
         "executable": true,
         "gas_used": 13285,
         "physical_reads": 378,
+        "physical_reads_with_call_start": 1242,
         "physical_writes": 378,
         "rejected": false,
         "trace_json_bytes": 1010963
@@ -1236,7 +1268,10 @@
           "backend": "oram",
           "benchmark": "ERC20Lite/transferFrom",
           "bytes_read": 198768.0,
+          "bytes_read_with_call_start": 596372.0,
           "bytes_written": 198768.0,
+          "call_start_bytes": 397604.0,
+          "call_start_reads": 432,
           "capacity": "64+128",
           "entrypoint": "transferFrom(address,address,address,uint256)",
           "entrypoint_resource_bounds": {
@@ -1268,6 +1303,7 @@
           "executable": true,
           "gas_used": 7485,
           "physical_reads": 178,
+          "physical_reads_with_call_start": 610,
           "physical_writes": 178,
           "rejected": false,
           "state_objects": [
@@ -1293,7 +1329,10 @@
           "backend": "oram_private_posmap",
           "benchmark": "ERC20Lite/transferFrom",
           "bytes_read": 428640.0,
+          "bytes_read_with_call_start": 1188548.0,
           "bytes_written": 428640.0,
+          "call_start_bytes": 759908.0,
+          "call_start_reads": 864,
           "capacity": "128+256",
           "entrypoint": "transferFrom(address,address,address,uint256)",
           "entrypoint_resource_bounds": {
@@ -1325,6 +1364,7 @@
           "executable": true,
           "gas_used": 13285,
           "physical_reads": 378,
+          "physical_reads_with_call_start": 1242,
           "physical_writes": 378,
           "rejected": false,
           "state_objects": [
@@ -1966,7 +2006,10 @@
       "backend": "full_scan+oram",
       "benchmark": "ConfidentialMixer/deposit",
       "bytes_read": 56644.0,
+      "bytes_read_with_call_start": 195002.0,
       "bytes_written": 56520.0,
+      "call_start_bytes": 138358.0,
+      "call_start_reads": 144,
       "capacity": "64",
       "entrypoint": "deposit(bytes32,uint256)",
       "entrypoint_resource_bounds": {
@@ -1988,6 +2031,7 @@
       "executable": true,
       "gas_used": 3531,
       "physical_reads": 50,
+      "physical_reads_with_call_start": 194,
       "physical_writes": 49,
       "rejected": false,
       "state_objects": [
@@ -2188,7 +2232,10 @@
       "backend": "full_scan+oram",
       "benchmark": "ConfidentialMixer/withdraw",
       "bytes_read": 56644.0,
+      "bytes_read_with_call_start": 195002.0,
       "bytes_written": 56520.0,
+      "call_start_bytes": 138358.0,
+      "call_start_reads": 144,
       "capacity": "64",
       "entrypoint": "withdraw(bytes32,uint256)",
       "entrypoint_resource_bounds": {
@@ -2210,6 +2257,7 @@
       "executable": true,
       "gas_used": 3588,
       "physical_reads": 50,
+      "physical_reads_with_call_start": 194,
       "physical_writes": 49,
       "rejected": false,
       "state_objects": [
@@ -2374,7 +2422,10 @@
       "backend": "oram",
       "benchmark": "ERC20Lite/transferFrom",
       "bytes_read": 198768.0,
+      "bytes_read_with_call_start": 596372.0,
       "bytes_written": 198768.0,
+      "call_start_bytes": 397604.0,
+      "call_start_reads": 432,
       "capacity": "64+128",
       "entrypoint": "transferFrom(address,address,address,uint256)",
       "entrypoint_resource_bounds": {
@@ -2406,6 +2457,7 @@
       "executable": true,
       "gas_used": 7485,
       "physical_reads": 178,
+      "physical_reads_with_call_start": 610,
       "physical_writes": 178,
       "rejected": false,
       "state_objects": [
@@ -2431,7 +2483,10 @@
       "backend": "oram_private_posmap",
       "benchmark": "ERC20Lite/transferFrom",
       "bytes_read": 428640.0,
+      "bytes_read_with_call_start": 1188548.0,
       "bytes_written": 428640.0,
+      "call_start_bytes": 759908.0,
+      "call_start_reads": 864,
       "capacity": "128+256",
       "entrypoint": "transferFrom(address,address,address,uint256)",
       "entrypoint_resource_bounds": {
@@ -2463,6 +2518,7 @@
       "executable": true,
       "gas_used": 13285,
       "physical_reads": 378,
+      "physical_reads_with_call_start": 1242,
       "physical_writes": 378,
       "rejected": false,
       "state_objects": [

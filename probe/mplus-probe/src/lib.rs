@@ -51073,6 +51073,7 @@ fn append_overhead_workload(
             &oram,
         )?;
         case["oram"] = scenario_overhead(&oram);
+        append_call_start_decode(&mut case["oram"], oram_artifact, target.entrypoint, &oram)?;
         case["variants"]
             .as_array_mut()
             .expect("variants is an array")
@@ -51080,6 +51081,12 @@ fn append_overhead_workload(
         matrix.push(oram_row.clone());
         if artifact_capacity_label(oram_artifact) == Some("64".to_string()) {
             case["oram_64"] = scenario_overhead(&oram);
+            append_call_start_decode(
+                &mut case["oram_64"],
+                oram_artifact,
+                target.entrypoint,
+                &oram,
+            )?;
         }
         case["oram_improves_physical_writes_baseline"] = json!(oram_write_comparison_baseline.0);
         case["oram_improves_physical_writes"] =
@@ -51102,6 +51109,12 @@ fn append_overhead_workload(
             &private_posmap,
         )?;
         case["oram_private_posmap"] = scenario_overhead(&private_posmap);
+        append_call_start_decode(
+            &mut case["oram_private_posmap"],
+            private_artifact,
+            target.entrypoint,
+            &private_posmap,
+        )?;
         case["variants"]
             .as_array_mut()
             .expect("variants is an array")
@@ -52631,6 +52644,7 @@ fn overhead_matrix_row(
 ) -> Result<JsonValue> {
     let mut row = scenario_overhead(result);
     append_artifact_overhead_metadata(&mut row, benchmark, backend_label, artifact, entrypoint)?;
+    append_call_start_decode(&mut row, artifact, entrypoint, result)?;
     Ok(row)
 }
 
@@ -52738,6 +52752,93 @@ fn artifact_capacity_label(artifact: &CompiledArtifact) -> Option<String> {
                 .join("+"),
         )
     }
+}
+
+/// What a call reads at its start, outside the trace: for each Path ORAM map
+/// the entrypoint touches, the runtime opens the counter, every metadata
+/// page, and every bucket, and rebuilds the map's contents in the enclave
+/// (`refresh_path_state_from_storage`); keys and values come from that copy.
+/// The pattern is fixed by the public parameters, so it reveals nothing, but
+/// it makes a call's cost linear in the map's capacity. Lengths are the
+/// stored ciphertext lengths the trace records for the same units.
+fn call_start_decode(
+    artifact: &CompiledArtifact,
+    entrypoint: &str,
+    result: &ScenarioResult,
+) -> Result<(usize, usize)> {
+    let manifest = &artifact.contract.manifest;
+    let entry = manifest
+        .entrypoints
+        .get(entrypoint)
+        .ok_or_else(|| anyhow!("manifest entry missing for {entrypoint}"))?;
+    let mut reads = 0usize;
+    let mut bytes = 0usize;
+    for object_id in entry.oram_accesses.keys() {
+        let object = manifest
+            .objects
+            .iter()
+            .find(|object| object.id == *object_id)
+            .ok_or_else(|| anyhow!("manifest object {object_id} missing for {entrypoint}"))?;
+        let Some(oram) = object.oram.as_ref() else {
+            continue;
+        };
+        if !uo_core::manifest::is_path_oram_scheme(&oram.scheme) {
+            continue;
+        }
+        let traced_len = |unit: &str| -> Result<usize> {
+            let prefix = format!("{}@{unit}", object.name);
+            result
+                .target
+                .trace
+                .physical_reads
+                .iter()
+                .find(|event| event.object == object.name && event.location.starts_with(&prefix))
+                .map(|event| event.len)
+                .ok_or_else(|| anyhow!("no traced {unit} read for {}", object.name))
+        };
+        let counter = traced_len("counter")?;
+        let page = traced_len("meta")?;
+        let bucket = traced_len("bucket")?;
+        reads += 1 + oram.metadata_pages + oram.bucket_count;
+        bytes += counter + oram.metadata_pages * page + oram.bucket_count * bucket;
+    }
+    Ok((reads, bytes))
+}
+
+/// Adds the call-start reads to an overhead row of an entrypoint that touches
+/// a Path ORAM map, next to the traced counts.
+fn append_call_start_decode(
+    row: &mut JsonValue,
+    artifact: &CompiledArtifact,
+    entrypoint: &str,
+    result: &ScenarioResult,
+) -> Result<()> {
+    let (reads, bytes) = call_start_decode(artifact, entrypoint, result)?;
+    if reads == 0 {
+        return Ok(());
+    }
+    let traced_reads = result.target.trace.physical_reads.len();
+    let traced_bytes = result
+        .target
+        .trace
+        .physical_reads
+        .iter()
+        .map(|event| event.len)
+        .sum::<usize>();
+    let object = row
+        .as_object_mut()
+        .ok_or_else(|| anyhow!("overhead row for {entrypoint} is not a JSON object"))?;
+    object.insert("call_start_reads".into(), json!(reads));
+    object.insert("call_start_bytes".into(), json!(bytes as f64));
+    object.insert(
+        "physical_reads_with_call_start".into(),
+        json!(traced_reads + reads),
+    );
+    object.insert(
+        "bytes_read_with_call_start".into(),
+        json!((traced_bytes + bytes) as f64),
+    );
+    Ok(())
 }
 
 fn format_value(value: Option<&Value>) -> JsonValue {

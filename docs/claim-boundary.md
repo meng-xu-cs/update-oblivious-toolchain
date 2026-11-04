@@ -177,6 +177,12 @@ field bindings required by `DeploymentCallAccepted`.
   per call (the capacity-256 `balances` map of the private ERC20Lite
   benchmark), but it is not yet covered by a theorem: its Lean route inherits
   the vacuous bundle. See [`path-oram.md`](./path-oram.md).
+- On both Path ORAM schemes, a call first reads and decrypts the whole map it
+  touches (counter, metadata pages, every bucket) to rebuild it in the
+  enclave; the trace records only the per-access paths. The call-start reads
+  follow a public pattern, so the leakage claim is unaffected, but the cost of
+  a call is linear in the map's capacity, and `results/overheads.json` lists
+  those reads beside the traced counts (`call_start_reads`).
 - Legacy/surrogate ORAM paths remain available for benchmarking and historical
   comparison, not for the strengthened proof-grade claim.
 - Executable insecure raw baselines (the `insecure-eval-raw` evaluation feature,

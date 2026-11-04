@@ -20,6 +20,21 @@ The Lean development states more than it currently proves for Path ORAM:
   of `SingleAccessMap.put` runs (one ORAM access). Multi-access entrypoints are
   validated through compact theorem inputs, which check a representative
   witness and derive no theorem.
+- Every call that touches a Path ORAM map first reads the whole map: the
+  runtime opens the map's counter, every metadata page, and every bucket and
+  rebuilds the map's contents inside the enclave
+  (`refresh_path_state_from_storage`), and keys and values come from that
+  copy. The per-access path reads and rewrites keep the stored tree in Path
+  ORAM form and are what the trace records; the call-start reads are not in
+  the trace. They follow a fixed pattern set by the public parameters, so
+  they reveal nothing, but a call's cost is linear in the map's capacity:
+  ERC20Lite `transferFrom` on the local route makes 178 traced reads and 432
+  call-start reads (a capacity-64 map: the counter, 16 pages, 127 buckets; a
+  capacity-128 map: the counter, 32 pages, 255 buckets). `results/overheads.json`
+  reports these next to the traced counts of every ORAM row
+  (`call_start_reads`, `call_start_bytes`, `physical_reads_with_call_start`,
+  `bytes_read_with_call_start`). A recursive position map would not change
+  this cost, so it waits on reading only the accessed paths.
 - Calls that abort run on both schemes (`results/abort_rollback.json`). A
   map write makes no ORAM access during the call: it updates an in-enclave
   pending view of the map, which later reads in the call return and which
@@ -62,7 +77,9 @@ The Lean development states more than it currently proves for Path ORAM:
   do not use it yet.
 
 Open work: restate the bundle over admitted configurations and derive it from
-`PathOramFreshLeaves`; and replace the flat position map by a recursive one.
+`PathOramFreshLeaves`; read only the accessed paths at call time instead of the
+whole map, which needs an oblivious key-to-slot index and values served from
+the path and stash; and then replace the flat position map by a recursive one.
 
 ## Current Route
 
