@@ -168,7 +168,11 @@ field bindings required by `DeploymentCallAccepted`.
   theorem inputs that check a representative witness and derive no theorem.
   Calls that abort run on both schemes: map writes reach the ORAM at commit,
   masked off on abort, so an aborted call makes the same accesses as a
-  committed one.
+  committed one. `UOToolchain/PathOramFreshLeaves.lean` proves without seed
+  enumeration that one map's leaf schedule is uniform for any accesses and
+  any keys present before the call, given uniform coins and leaves, and that
+  the leaves left behind stay uniform and independent of it; the paper-main
+  theorems do not use it yet.
   `path_oram_private_posmap_v1` executes, with several accesses to one map
   per call (the capacity-256 `balances` map of the private ERC20Lite
   benchmark), but it is not yet covered by a theorem: its Lean route inherits

@@ -163,7 +163,9 @@ The proof development is organized around these layers:
 - ORAM theorem route: `OramGame`, `StandardOramReduction`,
   `PathOramSecurity`, `PathOramLocalPosmapV1`,
   `ScalablePathOramEvidence`, `PathOramJACMTheorem`,
-  `PaperPathOramTheoremRoute`.
+  `PaperPathOramTheoremRoute`, and `CoinTapes` with `PathOramFreshLeaves`,
+  the enumeration-free leaf-schedule theorem for one map (see
+  [`path-oram.md`](./path-oram.md#current-status)).
 - SGX/TEE observer: `SgxBoundary`, `SgxRelation`, `SgxController`,
   `SgxControllerTrace`, `SgxMicroModel`, `SgxObserverFreeze`,
   `TeeDeployment`, `DeploymentAcceptance`.

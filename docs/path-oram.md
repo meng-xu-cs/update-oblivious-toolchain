@@ -39,11 +39,26 @@ The Lean development states more than it currently proves for Path ORAM:
   access to the key reads an independent path. The Lean
   runtime-witness checkers accept the private scheme's events, but the
   per-configuration paper-main boundary is stated for the local scheme only.
+- `UOToolchain/PathOramFreshLeaves.lean` proves, without enumerating seeds,
+  that one map's leaf schedule does not depend on the accesses. Take any `n`
+  accesses (hits, misses, inserts, updates, deletes, masked writes, on any
+  keys) and any `p` keys present before the call. If those keys' leaves and
+  the call's `2n` coins (two per access, as the runtime draws them) are
+  uniform, every schedule of `n` leaves is equally likely: the schedule is
+  distributed as the canonical leaf-value distribution of `n` steps, each
+  schedule `L ^ (p + n)` times among the `L ^ (p + 2n)` tapes
+  (`observedLeaves_canonical`). The leaves the keys hold after the call are
+  uniform and independent of the schedule
+  (`observedLeaves_finalLeaves_uniform`), which is the premise for the next
+  call, so the statement covers keys written by earlier calls. Every
+  transition the Lean replay accepts is a step of this model
+  (`replay_runLeaves`), on either scheme, since both share one data path. The
+  theorem covers one map; the paper-main theorems do not use it yet.
 
-Open work: restate the bundle over admitted configurations; prove without seed
-enumeration that fresh coins give independent uniform leaves for several
-accesses, including keys written by earlier calls; and replace the flat
-position map by a recursive one.
+Open work: restate the bundle over admitted configurations and derive it from
+`PathOramFreshLeaves`, which needs the product over several maps (they
+interleave by the public schedule, each with its own coins); and replace the
+flat position map by a recursive one.
 
 ## Current Route
 

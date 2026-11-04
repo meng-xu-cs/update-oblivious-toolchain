@@ -20,6 +20,8 @@ import UOToolchain.SgxControllerTrace
 import UOToolchain.SgxMicroModel
 import UOToolchain.SgxObserverFreeze
 import UOToolchain.RuntimeRefinement
+import UOToolchain.CoinTapes
+import UOToolchain.PathOramFreshLeaves
 import UOToolchain.RuntimeTrustedKernel
 import UOToolchain.RuntimeShellBoundary
 import UOToolchain.ConfidentialKernelDsl

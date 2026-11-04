@@ -140,4 +140,24 @@ info: 'UOToolchain.paperMain_checkedKernel_exact_noninterference_moduloReleases'
 #guard_msgs in
 #print axioms UOToolchain.paperMain_checkedKernel_exact_noninterference_moduloReleases
 
+/--
+info: 'UOToolchain.PathOramFreshLeaves.observedLeaves_canonical' depends on axioms: [propext, Classical.choice, Quot.sound]
+-/
+#guard_msgs in
+#print axioms UOToolchain.PathOramFreshLeaves.observedLeaves_canonical
+
+/--
+info: 'UOToolchain.PathOramFreshLeaves.observedLeaves_finalLeaves_uniform' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+-/
+#guard_msgs in
+#print axioms UOToolchain.PathOramFreshLeaves.observedLeaves_finalLeaves_uniform
+
+/--
+info: 'UOToolchain.PathOramFreshLeaves.replay_runLeaves' depends on axioms: [propext, Classical.choice, Quot.sound]
+-/
+#guard_msgs in
+#print axioms UOToolchain.PathOramFreshLeaves.replay_runLeaves
+
 def main : IO UInt32 := pure 0
