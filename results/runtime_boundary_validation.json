@@ -923,42 +923,32 @@
     },
     {
       "expected_files": [
+        "runtime/uo-evm/src/generated_oram_codecs.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/generated_oram_codecs.rs"
+      ],
+      "pattern": "pub(super) fn run_path_commit_put(",
+      "restricted": true
+    },
+    {
+      "expected_files": [
         "runtime/uo-evm/src/oram.rs"
       ],
       "files": [
         "runtime/uo-evm/src/oram.rs"
       ],
-      "pattern": "fn restore_from_old(",
+      "pattern": "pub(crate) fn commit_put(",
       "restricted": true
     },
     {
       "expected_files": [
-        "runtime/uo-evm/src/generated_oram_codecs.rs"
+        "runtime/uo-evm/src/objects.rs"
       ],
       "files": [
-        "runtime/uo-evm/src/generated_oram_codecs.rs"
+        "runtime/uo-evm/src/objects.rs"
       ],
-      "pattern": ".directory_pages\n        .clone_from(&old.storage.directory_pages);",
-      "restricted": true
-    },
-    {
-      "expected_files": [
-        "runtime/uo-evm/src/generated_oram_codecs.rs"
-      ],
-      "files": [
-        "runtime/uo-evm/src/generated_oram_codecs.rs"
-      ],
-      "pattern": "state.storage.buckets.clone_from(&old.storage.buckets);",
-      "restricted": true
-    },
-    {
-      "expected_files": [
-        "runtime/uo-evm/src/generated_oram_codecs.rs"
-      ],
-      "files": [
-        "runtime/uo-evm/src/generated_oram_codecs.rs"
-      ],
-      "pattern": ".access_counter_slot\n        .clone_from(&old.storage.access_counter_slot);",
+      "pattern": "let transcript = next.oram.commit_put(",
       "restricted": true
     },
     {
@@ -981,16 +971,6 @@
         "runtime/uo-evm/src/oram.rs"
       ],
       "pattern": "decode_surrogate_entries_from_storage_into(",
-      "restricted": true
-    },
-    {
-      "expected_files": [
-        "runtime/uo-evm/src/oram.rs"
-      ],
-      "files": [
-        "runtime/uo-evm/src/oram.rs"
-      ],
-      "pattern": "next.restore_from_old(spec, old, allocator)?;",
       "restricted": true
     },
     {

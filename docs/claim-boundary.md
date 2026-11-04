@@ -165,8 +165,10 @@ field bindings required by `DeploymentCallAccepted`.
   `path_oram_local_posmap_v1`, which `checkCanonicalPathOramPaperInstantiation`
   derives for one concrete pair of `SingleAccessMap.put` runs (one ORAM
   access). Multi-access local entrypoints are validated through compact
-  theorem inputs that check a representative witness and derive no theorem,
-  and a call that aborts on the local route is rejected by the runtime.
+  theorem inputs that check a representative witness and derive no theorem.
+  Calls that abort run on both schemes: map writes reach the ORAM at commit,
+  masked off on abort, so an aborted call makes the same accesses as a
+  committed one.
   `path_oram_private_posmap_v1` executes, with several accesses to one map
   per call (the capacity-256 `balances` map of the private ERC20Lite
   benchmark), but it is not yet covered by a theorem: its Lean route inherits

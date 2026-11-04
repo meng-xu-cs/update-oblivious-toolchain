@@ -61,8 +61,8 @@ def main (args : List String) : IO UInt32 := do
         (RuntimeImplementationInterface.checkRuntimeObjectBootstrapUsesSharedBoxedSealHelper iface)
       printCheck "checkRuntimeOramUsesLeanGeneratedBlockBucketCodecs"
         (RuntimeImplementationInterface.checkRuntimeOramUsesLeanGeneratedBlockBucketCodecs iface)
-      printCheck "checkRuntimeOramCommitKeepsRestoreAndExactWriteBatchSplit"
-        (RuntimeImplementationInterface.checkRuntimeOramCommitKeepsRestoreAndExactWriteBatchSplit iface)
+      printCheck "checkRuntimeOramCommitAppliesPendingWritesAndExactWriteBatchSplit"
+        (RuntimeImplementationInterface.checkRuntimeOramCommitAppliesPendingWritesAndExactWriteBatchSplit iface)
       printCheck "checkRuntimeOramOpenUsesSharedDecodeShell"
         (RuntimeImplementationInterface.checkRuntimeOramOpenUsesSharedDecodeShell iface)
       printCheck "checkRuntimeOramBootstrapUsesSharedBoxedSealHelper"

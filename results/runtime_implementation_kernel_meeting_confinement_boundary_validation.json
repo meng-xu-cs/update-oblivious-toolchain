@@ -15,7 +15,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1302388,
+      "boundary_json_bytes": 1309877,
       "entrypoint": "classify(uint256)",
       "gas_used": 2086,
       "handwritten_runtime_public_only_theorem_checked": true,
@@ -30,17 +30,17 @@
         "generated_confidential_kernel": 25055,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 26935,
-        "generated_oram_codecs": 108889,
+        "generated_oram_codecs": 110119,
         "generated_store_codec": 1683,
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
         "generated_value_ops": 20978,
         "kernel_runtime": 23384,
         "kernel_slot_support": 3263,
-        "objects": 90720,
-        "oram": 55848,
+        "objects": 92204,
+        "oram": 55276,
         "precompiles": 240,
-        "runtime_evm_lib": 77248,
+        "runtime_evm_lib": 82392,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -272,7 +272,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1302388,
+      "boundary_json_bytes": 1309877,
       "entrypoint": "classify(uint256)",
       "gas_used": 2086,
       "handwritten_runtime_public_only_theorem_checked": true,
@@ -287,17 +287,17 @@
         "generated_confidential_kernel": 25055,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 26935,
-        "generated_oram_codecs": 108889,
+        "generated_oram_codecs": 110119,
         "generated_store_codec": 1683,
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
         "generated_value_ops": 20978,
         "kernel_runtime": 23384,
         "kernel_slot_support": 3263,
-        "objects": 90720,
-        "oram": 55848,
+        "objects": 92204,
+        "oram": 55276,
         "precompiles": 240,
-        "runtime_evm_lib": 77248,
+        "runtime_evm_lib": 82392,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -529,7 +529,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1309017,
+      "boundary_json_bytes": 1316506,
       "entrypoint": "auth(bytes32)",
       "gas_used": 2446,
       "handwritten_runtime_public_only_theorem_checked": true,
@@ -544,17 +544,17 @@
         "generated_confidential_kernel": 25055,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 26935,
-        "generated_oram_codecs": 108889,
+        "generated_oram_codecs": 110119,
         "generated_store_codec": 1683,
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
         "generated_value_ops": 20978,
         "kernel_runtime": 23384,
         "kernel_slot_support": 3263,
-        "objects": 90720,
-        "oram": 55848,
+        "objects": 92204,
+        "oram": 55276,
         "precompiles": 240,
-        "runtime_evm_lib": 77248,
+        "runtime_evm_lib": 82392,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -994,7 +994,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1309017,
+      "boundary_json_bytes": 1316506,
       "entrypoint": "auth(bytes32)",
       "gas_used": 2446,
       "handwritten_runtime_public_only_theorem_checked": true,
@@ -1009,17 +1009,17 @@
         "generated_confidential_kernel": 25055,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 26935,
-        "generated_oram_codecs": 108889,
+        "generated_oram_codecs": 110119,
         "generated_store_codec": 1683,
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
         "generated_value_ops": 20978,
         "kernel_runtime": 23384,
         "kernel_slot_support": 3263,
-        "objects": 90720,
-        "oram": 55848,
+        "objects": 92204,
+        "oram": 55276,
         "precompiles": 240,
-        "runtime_evm_lib": 77248,
+        "runtime_evm_lib": 82392,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -1459,7 +1459,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1306218,
+      "boundary_json_bytes": 1313707,
       "entrypoint": "upsert(bytes32,uint256)",
       "gas_used": 2264,
       "handwritten_runtime_public_only_theorem_checked": true,
@@ -1474,17 +1474,17 @@
         "generated_confidential_kernel": 25055,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 26935,
-        "generated_oram_codecs": 108889,
+        "generated_oram_codecs": 110119,
         "generated_store_codec": 1683,
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
         "generated_value_ops": 20978,
         "kernel_runtime": 23384,
         "kernel_slot_support": 3263,
-        "objects": 90720,
-        "oram": 55848,
+        "objects": 92204,
+        "oram": 55276,
         "precompiles": 240,
-        "runtime_evm_lib": 77248,
+        "runtime_evm_lib": 82392,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -1878,7 +1878,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1306218,
+      "boundary_json_bytes": 1313707,
       "entrypoint": "upsert(bytes32,uint256)",
       "gas_used": 2264,
       "handwritten_runtime_public_only_theorem_checked": true,
@@ -1893,17 +1893,17 @@
         "generated_confidential_kernel": 25055,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 26935,
-        "generated_oram_codecs": 108889,
+        "generated_oram_codecs": 110119,
         "generated_store_codec": 1683,
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
         "generated_value_ops": 20978,
         "kernel_runtime": 23384,
         "kernel_slot_support": 3263,
-        "objects": 90720,
-        "oram": 55848,
+        "objects": 92204,
+        "oram": 55276,
         "precompiles": 240,
-        "runtime_evm_lib": 77248,
+        "runtime_evm_lib": 82392,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -2297,7 +2297,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1309018,
+      "boundary_json_bytes": 1316507,
       "entrypoint": "deposit(bytes32,uint256)",
       "gas_used": 2371,
       "handwritten_runtime_public_only_theorem_checked": true,
@@ -2312,17 +2312,17 @@
         "generated_confidential_kernel": 25055,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 26935,
-        "generated_oram_codecs": 108889,
+        "generated_oram_codecs": 110119,
         "generated_store_codec": 1683,
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
         "generated_value_ops": 20978,
         "kernel_runtime": 23384,
         "kernel_slot_support": 3263,
-        "objects": 90720,
-        "oram": 55848,
+        "objects": 92204,
+        "oram": 55276,
         "precompiles": 240,
-        "runtime_evm_lib": 77248,
+        "runtime_evm_lib": 82392,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -2804,7 +2804,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1309018,
+      "boundary_json_bytes": 1316507,
       "entrypoint": "deposit(bytes32,uint256)",
       "gas_used": 2371,
       "handwritten_runtime_public_only_theorem_checked": true,
@@ -2819,17 +2819,17 @@
         "generated_confidential_kernel": 25055,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 26935,
-        "generated_oram_codecs": 108889,
+        "generated_oram_codecs": 110119,
         "generated_store_codec": 1683,
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
         "generated_value_ops": 20978,
         "kernel_runtime": 23384,
         "kernel_slot_support": 3263,
-        "objects": 90720,
-        "oram": 55848,
+        "objects": 92204,
+        "oram": 55276,
         "precompiles": 240,
-        "runtime_evm_lib": 77248,
+        "runtime_evm_lib": 82392,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -3311,7 +3311,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1311871,
+      "boundary_json_bytes": 1319360,
       "entrypoint": "approve(address,address,uint256)",
       "gas_used": 2528,
       "handwritten_runtime_public_only_theorem_checked": true,
@@ -3326,17 +3326,17 @@
         "generated_confidential_kernel": 25055,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 26935,
-        "generated_oram_codecs": 108889,
+        "generated_oram_codecs": 110119,
         "generated_store_codec": 1683,
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
         "generated_value_ops": 20978,
         "kernel_runtime": 23384,
         "kernel_slot_support": 3263,
-        "objects": 90720,
-        "oram": 55848,
+        "objects": 92204,
+        "oram": 55276,
         "precompiles": 240,
-        "runtime_evm_lib": 77248,
+        "runtime_evm_lib": 82392,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -3961,7 +3961,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1311871,
+      "boundary_json_bytes": 1319360,
       "entrypoint": "approve(address,address,uint256)",
       "gas_used": 2528,
       "handwritten_runtime_public_only_theorem_checked": true,
@@ -3976,17 +3976,17 @@
         "generated_confidential_kernel": 25055,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 26935,
-        "generated_oram_codecs": 108889,
+        "generated_oram_codecs": 110119,
         "generated_store_codec": 1683,
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
         "generated_value_ops": 20978,
         "kernel_runtime": 23384,
         "kernel_slot_support": 3263,
-        "objects": 90720,
-        "oram": 55848,
+        "objects": 92204,
+        "oram": 55276,
         "precompiles": 240,
-        "runtime_evm_lib": 77248,
+        "runtime_evm_lib": 82392,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -4611,7 +4611,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "boundary_json_bytes": 1316455,
+      "boundary_json_bytes": 1323944,
       "entrypoint": "put(bytes32,uint256)",
       "gas_used": 2322,
       "handwritten_runtime_public_only_theorem_checked": true,
@@ -4626,17 +4626,17 @@
         "generated_confidential_kernel": 25055,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 26935,
-        "generated_oram_codecs": 108889,
+        "generated_oram_codecs": 110119,
         "generated_store_codec": 1683,
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
         "generated_value_ops": 20978,
         "kernel_runtime": 23384,
         "kernel_slot_support": 3263,
-        "objects": 90720,
-        "oram": 55848,
+        "objects": 92204,
+        "oram": 55276,
         "precompiles": 240,
-        "runtime_evm_lib": 77248,
+        "runtime_evm_lib": 82392,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -5450,7 +5450,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "boundary_json_bytes": 1316455,
+      "boundary_json_bytes": 1323944,
       "entrypoint": "put(bytes32,uint256)",
       "gas_used": 2322,
       "handwritten_runtime_public_only_theorem_checked": true,
@@ -5465,17 +5465,17 @@
         "generated_confidential_kernel": 25055,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 26935,
-        "generated_oram_codecs": 108889,
+        "generated_oram_codecs": 110119,
         "generated_store_codec": 1683,
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
         "generated_value_ops": 20978,
         "kernel_runtime": 23384,
         "kernel_slot_support": 3263,
-        "objects": 90720,
-        "oram": 55848,
+        "objects": 92204,
+        "oram": 55276,
         "precompiles": 240,
-        "runtime_evm_lib": 77248,
+        "runtime_evm_lib": 82392,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -6289,7 +6289,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 1321676,
+      "boundary_json_bytes": 1329165,
       "entrypoint": "add(bytes32,uint256)",
       "gas_used": 2651,
       "handwritten_runtime_public_only_theorem_checked": true,
@@ -6304,17 +6304,17 @@
         "generated_confidential_kernel": 25055,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 26935,
-        "generated_oram_codecs": 108889,
+        "generated_oram_codecs": 110119,
         "generated_store_codec": 1683,
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
         "generated_value_ops": 20978,
         "kernel_runtime": 23384,
         "kernel_slot_support": 3263,
-        "objects": 90720,
-        "oram": 55848,
+        "objects": 92204,
+        "oram": 55276,
         "precompiles": 240,
-        "runtime_evm_lib": 77248,
+        "runtime_evm_lib": 82392,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -7332,7 +7332,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 1321676,
+      "boundary_json_bytes": 1329165,
       "entrypoint": "add(bytes32,uint256)",
       "gas_used": 2651,
       "handwritten_runtime_public_only_theorem_checked": true,
@@ -7347,17 +7347,17 @@
         "generated_confidential_kernel": 25055,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 26935,
-        "generated_oram_codecs": 108889,
+        "generated_oram_codecs": 110119,
         "generated_store_codec": 1683,
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
         "generated_value_ops": 20978,
         "kernel_runtime": 23384,
         "kernel_slot_support": 3263,
-        "objects": 90720,
-        "oram": 55848,
+        "objects": 92204,
+        "oram": 55276,
         "precompiles": 240,
-        "runtime_evm_lib": 77248,
+        "runtime_evm_lib": 82392,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -8375,7 +8375,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 1364522,
+      "boundary_json_bytes": 1372011,
       "entrypoint": "deposit(bytes32,uint256)",
       "gas_used": 3531,
       "handwritten_runtime_public_only_theorem_checked": true,
@@ -8390,17 +8390,17 @@
         "generated_confidential_kernel": 25055,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 26935,
-        "generated_oram_codecs": 108889,
+        "generated_oram_codecs": 110119,
         "generated_store_codec": 1683,
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
         "generated_value_ops": 20978,
         "kernel_runtime": 23384,
         "kernel_slot_support": 3263,
-        "objects": 90720,
-        "oram": 55848,
+        "objects": 92204,
+        "oram": 55276,
         "precompiles": 240,
-        "runtime_evm_lib": 77248,
+        "runtime_evm_lib": 82392,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -10634,6 +10634,18 @@
             "words": null
           },
           {
+            "bytes": 32,
+            "kind": "reserve_scratch",
+            "region": "value_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "value_scratch",
+            "words": null
+          },
+          {
             "bytes": 429,
             "kind": "reserve_scratch",
             "region": "io_scratch",
@@ -11008,18 +11020,6 @@
           {
             "bytes": 32,
             "kind": "reserve_scratch",
-            "region": "value_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "value_scratch",
-            "words": null
-          },
-          {
-            "bytes": 32,
-            "kind": "reserve_scratch",
             "region": "io_scratch",
             "words": null
           },
@@ -11162,7 +11162,7 @@
     {
       "accepted": true,
       "boundary_events": 14,
-      "boundary_json_bytes": 1497973,
+      "boundary_json_bytes": 1505462,
       "entrypoint": "transferFrom(address,address,address,uint256)",
       "gas_used": 7485,
       "handwritten_runtime_public_only_theorem_checked": true,
@@ -11177,17 +11177,17 @@
         "generated_confidential_kernel": 25055,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 26935,
-        "generated_oram_codecs": 108889,
+        "generated_oram_codecs": 110119,
         "generated_store_codec": 1683,
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
         "generated_value_ops": 20978,
         "kernel_runtime": 23384,
         "kernel_slot_support": 3263,
-        "objects": 90720,
-        "oram": 55848,
+        "objects": 92204,
+        "oram": 55276,
         "precompiles": 240,
-        "runtime_evm_lib": 77248,
+        "runtime_evm_lib": 82392,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -17507,594 +17507,6 @@
             "words": null
           },
           {
-            "bytes": 429,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 429,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 429,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 429,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 429,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 429,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 429,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 429,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 429,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 429,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 429,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 429,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 429,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 429,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 429,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 429,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 648,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 648,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 648,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 648,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 648,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 648,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 648,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 648,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 648,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 648,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 648,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 648,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 648,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 648,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 648,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 648,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 648,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 648,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 648,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 648,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 648,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 648,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 648,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 648,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 648,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 648,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 648,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 648,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 648,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 648,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 648,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 648,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 8,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
             "bytes": 32,
             "kind": "reserve_scratch",
             "region": "value_scratch",
@@ -18104,378 +17516,6 @@
             "bytes": null,
             "kind": "wipe_scratch",
             "region": "value_scratch",
-            "words": null
-          },
-          {
-            "bytes": 369,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 369,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 369,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 369,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 369,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 369,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 369,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 369,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 369,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 369,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 369,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 369,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 369,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 369,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 552,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 552,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 552,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 552,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 552,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 552,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 552,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 552,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 552,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 552,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 552,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 552,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 552,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 552,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 552,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 552,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 8,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
             "words": null
           },
           {
@@ -19224,6 +18264,966 @@
           },
           {
             "bytes": 552,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 8,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 369,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 369,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 369,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 369,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 369,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 369,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 369,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 369,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 369,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 369,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 369,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 369,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 369,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 369,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 552,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 552,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 552,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 552,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 552,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 552,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 552,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 552,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 552,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 552,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 552,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 552,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 552,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 552,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 552,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 552,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 8,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 429,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 429,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 429,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 429,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 429,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 429,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 429,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 429,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 429,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 429,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 429,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 429,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 429,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 429,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 429,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 429,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 648,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 648,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 648,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 648,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 648,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 648,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 648,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 648,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 648,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 648,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 648,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 648,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 648,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 648,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 648,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 648,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 648,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 648,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 648,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 648,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 648,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 648,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 648,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 648,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 648,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 648,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 648,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 648,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 648,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 648,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 648,
+            "kind": "reserve_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": null,
+            "kind": "wipe_scratch",
+            "region": "io_scratch",
+            "words": null
+          },
+          {
+            "bytes": 648,
             "kind": "reserve_scratch",
             "region": "io_scratch",
             "words": null

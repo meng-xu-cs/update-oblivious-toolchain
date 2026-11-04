@@ -1024,9 +1024,8 @@ bounds:
     #[test]
     fn path_oram_write_of_a_new_key_to_a_full_map_is_not_dropped() {
         // Capacity 2 holds k1 and k2, so writing k3 must abort, as on the
-        // full-scan route; the Path ORAM put used to drop the write and commit
-        // the call. The runtime does not yet run aborted calls on this route
-        // and rejects the call instead, leaving the committed state unchanged.
+        // full-scan route, and leave the map unchanged; the Path ORAM put used
+        // to drop the write and commit the call.
         let metadata = include_str!(bench_raw!("SingleAccessMap.pathoram.yaml"))
             .replace("capacity: 16", "capacity: 2");
         let artifact = compile_bench(
@@ -1042,17 +1041,163 @@ bounds:
                 .unwrap();
             assert!(!put.aborted);
         }
-        let overflow = instance.call("put(bytes32,uint256)", vec![key(3), Value::uint(7)]);
-        if let Ok(result) = overflow {
-            assert!(
-                result.aborted,
-                "a write of a new key to a full map committed"
-            );
-        }
+        let overflow = instance
+            .call("put(bytes32,uint256)", vec![key(3), Value::uint(7)])
+            .unwrap();
+        assert!(
+            overflow.aborted,
+            "a write of a new key to a full map committed"
+        );
+        overflow.trace.runtime_refinement_witness().unwrap();
         for (byte, value) in [(1u8, 5u64), (2, 6), (3, 0)] {
             let read = instance.call("read(bytes32)", vec![key(byte)]).unwrap();
             assert_eq!(read.return_value, Some(Value::uint(value)));
         }
+    }
+
+    const ORAM_VAULT_SOURCE: &str = r#"
+            contract Vault {
+                mapping(bytes32 => uint256) private balances;
+
+                function deposit(bytes32 who, uint256 amount) public {
+                    balances[who] = balances[who] + amount;
+                }
+
+                function withdraw(bytes32 who, uint256 amount) public {
+                    uint256 balance = balances[who];
+                    require(balance >= amount);
+                    balances[who] = balance - amount;
+                }
+
+                function setAndRead(bytes32 who, uint256 amount) public returns (uint256) {
+                    balances[who] = amount;
+                    return balances[who];
+                }
+
+                function read(bytes32 who) public returns (uint256) {
+                    return balances[who];
+                }
+            }
+            "#;
+
+    const ORAM_VAULT_METADATA: &str = r#"
+contract: Vault
+entrypoints:
+  deposit(bytes32,uint256):
+    secret_args: [who, amount]
+    confidential: true
+    returns: forbidden
+    status: declassified
+    declassifies: [success]
+  withdraw(bytes32,uint256):
+    secret_args: [who, amount]
+    confidential: true
+    returns: forbidden
+    status: declassified
+    declassifies: [success]
+  setAndRead(bytes32,uint256):
+    secret_args: [who, amount]
+    confidential: true
+    returns: declassified
+    status: declassified
+    declassifies: [return, success]
+  read(bytes32):
+    secret_args: [who]
+    confidential: true
+    returns: declassified
+    status: public
+    declassifies: [return]
+state:
+  balances:
+    kind: map
+    key: bytes32
+    value: uint256
+    capacity: 16
+    backend: oram
+    oram_scheme: path_oram_local_posmap_v1
+    confidential: true
+bounds:
+  loops: {}
+"#;
+
+    #[test]
+    fn path_oram_aborted_call_runs_and_matches_a_committed_one() {
+        // A Path ORAM write reaches the ORAM at commit, masked off when the
+        // call aborts, so an aborted withdrawal runs, keeps the balance, and
+        // makes the same storage accesses as a committed one.
+        let source = write_temp("oram-vault", ORAM_VAULT_SOURCE);
+        let artifact = compile_bench(
+            source.to_str().unwrap(),
+            ORAM_VAULT_METADATA,
+            ProgramMode::Uo,
+        );
+        let mut instance = ContractInstance::deploy_with_seed(artifact, 5).unwrap();
+        let alice = Value::Bytes32([1u8; 32]);
+        let deposit = instance
+            .call(
+                "deposit(bytes32,uint256)",
+                vec![alice.clone(), Value::uint(10)],
+            )
+            .unwrap();
+        assert!(!deposit.aborted);
+        let refused = instance
+            .call(
+                "withdraw(bytes32,uint256)",
+                vec![alice.clone(), Value::uint(30)],
+            )
+            .unwrap();
+        assert!(refused.aborted);
+        refused.trace.runtime_refinement_witness().unwrap();
+        let paid = instance
+            .call(
+                "withdraw(bytes32,uint256)",
+                vec![alice.clone(), Value::uint(3)],
+            )
+            .unwrap();
+        assert!(!paid.aborted);
+        let shape = |trace: &uo_core::ExecutionTrace| {
+            (
+                trace
+                    .physical_reads
+                    .iter()
+                    .map(|event| (event.object.clone(), event.len))
+                    .collect::<Vec<_>>(),
+                trace
+                    .physical_writes
+                    .iter()
+                    .map(|event| (event.object.clone(), event.len, event.class))
+                    .collect::<Vec<_>>(),
+                trace.theorem_trace.boundary_schedule.clone(),
+            )
+        };
+        assert_eq!(shape(&refused.trace), shape(&paid.trace));
+        let balance = instance.call("read(bytes32)", vec![alice.clone()]).unwrap();
+        assert_eq!(balance.return_value, Some(Value::uint(7)));
+    }
+
+    #[test]
+    fn path_oram_read_after_write_in_one_call_sees_the_write() {
+        // The write is still pending when the read runs; the read takes its
+        // value from the pending view.
+        let source = write_temp("oram-vault", ORAM_VAULT_SOURCE);
+        let artifact = compile_bench(
+            source.to_str().unwrap(),
+            ORAM_VAULT_METADATA,
+            ProgramMode::Uo,
+        );
+        let mut instance = ContractInstance::deploy_with_seed(artifact, 5).unwrap();
+        let bob = Value::Bytes32([2u8; 32]);
+        let set = instance
+            .call(
+                "setAndRead(bytes32,uint256)",
+                vec![bob.clone(), Value::uint(42)],
+            )
+            .unwrap();
+        assert!(!set.aborted);
+        assert_eq!(set.return_value, Some(Value::uint(42)));
+        set.trace.runtime_refinement_witness().unwrap();
+        let read = instance.call("read(bytes32)", vec![bob]).unwrap();
+        assert_eq!(read.return_value, Some(Value::uint(42)));
     }
 
     #[test]
@@ -1983,17 +2128,16 @@ bounds:
             .iter()
             .map(|access| access.object_id)
             .collect::<Vec<_>>();
-        assert_eq!(
-            observed_ids,
-            vec![
-                allowances_id,
-                balances_id,
-                allowances_id,
-                balances_id,
-                balances_id,
-                balances_id,
-            ]
-        );
+        // The reads access the ORAM in program order: the allowance, the
+        // owner's balance, the recipient's balance. The three writes reach the
+        // ORAM at commit, which visits the objects in id order.
+        let mut expected_ids = vec![allowances_id, balances_id, balances_id];
+        let mut writes = [(allowances_id, 1), (balances_id, 2)];
+        writes.sort();
+        for (object_id, count) in writes {
+            expected_ids.extend(std::iter::repeat_n(object_id, count));
+        }
+        assert_eq!(observed_ids, expected_ids);
         let phase_witness = witness
             .runtime_kernel_refinement_witness()
             .cloned()

@@ -1062,7 +1062,7 @@
         "physical_reads": 178,
         "physical_writes": 178,
         "rejected": false,
-        "trace_json_bytes": 499446
+        "trace_json_bytes": 499440
       },
       "oram_improves_physical_writes": false,
       "oram_improves_physical_writes_baseline": "full_scan",
@@ -1286,7 +1286,7 @@
               "name": "balances"
             }
           ],
-          "trace_json_bytes": 499446
+          "trace_json_bytes": 499440
         },
         {
           "artifact_json_bytes": 30562,
@@ -2424,7 +2424,7 @@
           "name": "balances"
         }
       ],
-      "trace_json_bytes": 499446
+      "trace_json_bytes": 499440
     },
     {
       "artifact_json_bytes": 30562,

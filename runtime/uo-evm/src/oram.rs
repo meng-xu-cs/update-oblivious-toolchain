@@ -24,15 +24,15 @@ use generated_object_helpers::{
 };
 use generated_oram_codecs::{
     bootstrap_empty_path_buckets, bootstrap_filler_buckets, bootstrap_oram_counter_slot,
-    bootstrap_surrogate_directory_pages, cold_clone_oram_state, cold_commit_oram_state,
-    decode_surrogate_entries_from_storage_into, empty_map_entry, empty_oram_write_batch,
-    encode_path_metadata_pages, finish_oram_write_log, oram_directory_page_count,
-    oram_write_log_capacity, oram_write_log_with_capacity, path_position_map_witness_leaves,
-    push_oram_write_update, read_oram_counter_from_storage, refresh_path_state_from_storage,
-    repeat_boxed_map_entries, repeat_boxed_masked_usize_options, restore_oram_storage_from_old,
+    bootstrap_surrogate_directory_pages, clone_boxed_map_entries, cold_clone_oram_state,
+    cold_commit_oram_state, decode_surrogate_entries_from_storage_into, empty_map_entry,
+    empty_oram_write_batch, encode_path_metadata_pages, finish_oram_write_log,
+    oram_directory_page_count, oram_write_log_capacity, oram_write_log_with_capacity,
+    path_position_map_witness_leaves, push_oram_write_update, read_oram_counter_from_storage,
+    refresh_path_state_from_storage, repeat_boxed_map_entries, repeat_boxed_masked_usize_options,
     rewrite_oram_counter_in_place, rewrite_surrogate_bucket_window_in_place,
-    rewrite_surrogate_directory_pages_in_place, run_path_get, run_path_put, run_surrogate_get,
-    run_surrogate_put, working_stash_capacity, FixedStash, MaskedUsizeOption,
+    rewrite_surrogate_directory_pages_in_place, run_path_commit_put, run_path_get, run_path_put,
+    run_surrogate_get, run_surrogate_put, working_stash_capacity, FixedStash, MaskedUsizeOption,
 };
 #[cfg(test)]
 use generated_oram_codecs::{
@@ -49,6 +49,15 @@ const ORAM_LEAF_LABEL_BYTES: usize = 8;
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct MapEntry {
     occupied: bool,
+    key: Value,
+    value: Value,
+}
+
+/// A write to a Path ORAM map held in the enclave until commit: its
+/// predicate, key, and value.
+#[derive(Debug)]
+pub(crate) struct PendingOramPut {
+    apply: bool,
     key: Value,
     value: Value,
 }
@@ -410,14 +419,8 @@ impl OramState {
         cold_clone_oram_state(spec, self)
     }
 
-    pub(crate) fn restore_from_old(
-        &mut self,
-        spec: &StateObject,
-        old: &Self,
-        allocator: &mut AllocatorSession,
-    ) -> Result<()> {
-        restore_oram_storage_from_old(self, spec, old)?;
-        self.refresh_from_storage(spec, allocator)
+    pub(crate) fn clone_logical_entries(&self) -> Result<Box<[MapEntry]>> {
+        clone_boxed_map_entries(&self.entries)
     }
 
     pub(crate) fn cold_commit(&mut self) {
@@ -546,43 +549,6 @@ impl OramState {
         Ok(())
     }
 
-    #[cfg(test)]
-    pub(crate) fn storage_snapshot_for_test(&self) -> (Vec<Vec<u8>>, Vec<Vec<u8>>, Vec<u8>) {
-        (
-            self.storage
-                .directory_pages
-                .iter()
-                .map(|page| page.to_vec())
-                .collect(),
-            self.storage
-                .buckets
-                .iter()
-                .map(|bucket| bucket.to_vec())
-                .collect(),
-            self.storage.access_counter_slot.to_vec(),
-        )
-    }
-
-    #[cfg(test)]
-    pub(crate) fn storage_ptrs_for_test(&self) -> (*const Box<[u8]>, *const Box<[u8]>, *const u8) {
-        (
-            self.storage.directory_pages.as_ptr(),
-            self.storage.buckets.as_ptr(),
-            self.storage.access_counter_slot.as_ptr(),
-        )
-    }
-
-    #[cfg(test)]
-    pub(crate) fn corrupt_storage_for_test(&mut self) {
-        if let Some(page) = self.storage.directory_pages.first_mut() {
-            page[0] ^= 0x01;
-        }
-        if let Some(bucket) = self.storage.buckets.first_mut() {
-            bucket[0] ^= 0x01;
-        }
-        self.storage.access_counter_slot[0] ^= 0x01;
-    }
-
     pub(crate) fn get(
         &mut self,
         spec: &StateObject,
@@ -685,16 +651,27 @@ impl OramState {
                 writes: writes.into_exact_batch()?,
             })
         } else {
-            let mut next = self;
-            if aborted {
-                next.restore_from_old(spec, old, allocator)?;
-            }
-            let _ = rng;
+            // A Path ORAM map's writes reach the ORAM through `commit_put`,
+            // one access each, and an aborted call masks them off rather than
+            // rolling back, so nothing is left to do here.
+            let _ = (spec, old, aborted, allocator, rng);
             Ok(OramCommit {
-                next,
+                next: self,
                 writes: OramWriteBatch::empty(),
             })
         }
+    }
+
+    pub(crate) fn commit_put(
+        &mut self,
+        spec: &StateObject,
+        put: &PendingOramPut,
+        aborted: bool,
+        allocator: &mut AllocatorSession,
+        leaf_coins: &mut PathOramLeafCoinSource,
+        rng: &mut ChaCha20Rng,
+    ) -> Result<OramTranscript> {
+        run_path_commit_put(self, spec, put, aborted, allocator, leaf_coins, rng)
     }
 
     fn path_get(

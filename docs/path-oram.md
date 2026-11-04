@@ -20,10 +20,15 @@ The Lean development states more than it currently proves for Path ORAM:
   of `SingleAccessMap.put` runs (one ORAM access). Multi-access entrypoints are
   validated through compact theorem inputs, which check a representative
   witness and derive no theorem.
-- A call that aborts on the local route is rejected by the runtime
-  (`rejected_by_proof_grade_route` in `results/abort_rollback.json`). This
-  includes a write of a new key to a full map, which aborts the call as on the
-  full-scan route; the runtime used to drop such a write and commit the call.
+- Calls that abort run on both schemes (`results/abort_rollback.json`). A
+  map write makes no ORAM access during the call: it updates an in-enclave
+  pending view of the map, which later reads in the call return and which
+  decides whether the write overflows the map (a write of a new key to a full
+  map aborts the call, as on the full-scan route). At commit each write makes
+  one ORAM access, with the write masked off if the call aborted, so an
+  aborted call makes the same accesses as a committed one and nothing is
+  rolled back; its reads only remapped keys. Restoring the pre-call storage
+  instead would leave the touched keys on the leaves the host just saw.
 - `path_oram_private_posmap_v1` executes, including several accesses to one
   map per call, but it is not yet covered by a theorem. The runtime has no
   recursive position map; both schemes share one data path, a flat position
@@ -37,8 +42,8 @@ The Lean development states more than it currently proves for Path ORAM:
 
 Open work: restate the bundle over admitted configurations; prove without seed
 enumeration that fresh coins give independent uniform leaves for several
-accesses, including keys written by earlier calls; support aborts on the ORAM
-route; and replace the flat position map by a recursive one.
+accesses, including keys written by earlier calls; and replace the flat
+position map by a recursive one.
 
 ## Current Route
 

@@ -4839,13 +4839,17 @@ def RuntimeImplementationInterface.checkRuntimeObjectBootstrapUsesSharedBoxedSea
     RuntimeImplementationInterface.runtimeObjectBootstrapUsesSharedBoxedSealHelper
   simp [and_assoc]
 
-def RuntimeImplementationInterface.runtimeOramCommitKeepsRestoreAndExactWriteBatchSplit
+def RuntimeImplementationInterface.runtimeOramCommitAppliesPendingWritesAndExactWriteBatchSplit
   (iface : RuntimeImplementationInterface) : Prop :=
   sourceContainsAll iface.objectsProductionSource
     [ "(Self::UoOramMap(new), Self::UoOramMap(old)) => {"
     , "if next.accessed {"
     , "if is_path_oram_scheme(&next.spec.oram_scheme) {"
-    , ".restore_from_old(&old.spec, &old.oram, allocator)?;"
+    , "let pending_puts = std::mem::take(&mut next.pending_puts);"
+    , "for put in pending_puts.iter() {"
+    , "trace.record_oram_access(next.spec.id, next.oram.parameters());"
+    , "let transcript = next.oram.commit_put("
+    , "next.leaf_coin_source.ensure_exhausted(&next.spec.name)?;"
     , "let shadow_oram ="
     , "std::mem::replace(&mut next.oram, OramState::placeholder());"
     , "let commit = shadow_oram.commit("
@@ -4867,8 +4871,10 @@ def RuntimeImplementationInterface.runtimeOramCommitKeepsRestoreAndExactWriteBat
     , "rewrite_surrogate_bucket_window_in_place("
     , "let next_counter = old.access_counter + 1;"
     , "writes: writes.into_exact_batch()?,"
-    , "next.restore_from_old(spec, old, allocator)?;"
+    , "let _ = (spec, old, aborted, allocator, rng);"
     , "writes: OramWriteBatch::empty(),"
+    , "pub(crate) fn commit_put("
+    , "run_path_commit_put(self, spec, put, aborted, allocator, leaf_coins, rng)"
     ] ∧
   sourceContainsAll iface.generatedObjectHelpersProductionSource
     [ "fn reseal_payload_and_record_write<F>("
@@ -4884,6 +4890,8 @@ def RuntimeImplementationInterface.runtimeOramCommitKeepsRestoreAndExactWriteBat
     , "record_oram_write("
     , "if !next.cipher.seal_and_wipe_into_slice("
     , "if !self.cipher.seal_and_wipe_into_slice("
+    , "fn restore_from_old("
+    , "restore_oram_storage_from_old"
     ]
 
 def RuntimeImplementationInterface.runtimeOramOpenUsesSharedDecodeShell
@@ -5049,20 +5057,35 @@ def RuntimeImplementationInterface.runtimeOramUsesLeanGeneratedBlockBucketCodecs
     , "pub(crate) use generated_oram_codecs::{OramBlock, OramBucket};"
     , "use generated_oram_codecs::{"
     , "bootstrap_empty_path_buckets, bootstrap_filler_buckets, bootstrap_oram_counter_slot,"
-    , "bootstrap_surrogate_directory_pages, cold_clone_oram_state, cold_commit_oram_state,"
-    , "decode_surrogate_entries_from_storage_into, empty_map_entry, empty_oram_write_batch,"
-    , "encode_path_metadata_pages, finish_oram_write_log, oram_directory_page_count,"
-    , "oram_write_log_capacity, oram_write_log_with_capacity, path_position_map_witness_leaves,"
-    , "push_oram_write_update, read_oram_counter_from_storage, refresh_path_state_from_storage,"
-    , "repeat_boxed_map_entries, repeat_boxed_masked_usize_options, restore_oram_storage_from_old,"
+    , "bootstrap_surrogate_directory_pages,"
+    , "clone_boxed_map_entries,"
+    , "cold_clone_oram_state,"
+    , "cold_commit_oram_state,"
+    , "decode_surrogate_entries_from_storage_into,"
+    , "empty_map_entry,"
+    , "empty_oram_write_batch,"
+    , "encode_path_metadata_pages,"
+    , "finish_oram_write_log,"
+    , "oram_directory_page_count,"
+    , "oram_write_log_capacity,"
+    , "oram_write_log_with_capacity,"
+    , "path_position_map_witness_leaves,"
+    , "push_oram_write_update,"
+    , "read_oram_counter_from_storage,"
+    , "refresh_path_state_from_storage,"
+    , "repeat_boxed_map_entries,"
+    , "repeat_boxed_masked_usize_options,"
     , "rewrite_oram_counter_in_place,"
     , "rewrite_surrogate_bucket_window_in_place,"
     , "rewrite_surrogate_directory_pages_in_place,"
-    , "run_path_get, run_path_put, run_surrogate_get,"
+    , "run_path_commit_put,"
+    , "run_path_get,"
+    , "run_path_put,"
+    , "run_surrogate_get,"
     , "run_surrogate_put, working_stash_capacity,"
     , "FixedStash,"
     , "refresh_path_state_from_storage("
-    , "restore_oram_storage_from_old(self, spec, old)?;"
+    , "clone_boxed_map_entries(&self.entries)"
     , "let directory_pages = encode_path_metadata_pages("
     , "run_surrogate_get(self, spec, key)"
     , "run_surrogate_put(self, spec, key, value, apply)"
@@ -5171,11 +5194,12 @@ def RuntimeImplementationInterface.runtimeOramUsesLeanGeneratedBlockBucketCodecs
     , "stash: FixedStash::with_capacity(spec, working_stash_capacity(&state.parameters)?)?,"
     , "storage: clone_oram_storage(&state.storage),"
     , "cipher: state.cipher.clone_for_runtime_state(),"
-    , "pub(super) fn restore_oram_storage_from_old("
-    , ".clone_from(&old.storage.directory_pages);"
-    , "state.storage.buckets.clone_from(&old.storage.buckets);"
-    , ".clone_from(&old.storage.access_counter_slot);"
-    , "state.access_counter = old.access_counter;"
+    , "pub(super) fn clone_boxed_map_entries(entries: &[MapEntry]) -> Result<Box<[MapEntry]>> {"
+    , "impl super::PendingOramPut {"
+    , "impl Drop for super::PendingOramPut {"
+    , "pub(crate) fn ensure_reserved_for_writes("
+    , "pub(super) fn run_path_commit_put("
+    , "let apply = put.apply & !aborted;"
     , "impl OramState {"
     , "pub(crate) fn placeholder() -> Self {"
     , "storage: super::OramStorage {"
@@ -5571,13 +5595,17 @@ def RuntimeImplementationInterface.runtimeOramUsesLeanGeneratedBlockBucketCodecs
     , "serialize_oram_block_into(block, spec, &mut out[cursor..end])?;"
     ]
 
-def RuntimeImplementationInterface.checkRuntimeOramCommitKeepsRestoreAndExactWriteBatchSplit
+def RuntimeImplementationInterface.checkRuntimeOramCommitAppliesPendingWritesAndExactWriteBatchSplit
   (iface : RuntimeImplementationInterface) : Bool :=
   checkSourceContainsAll iface.objectsProductionSource
     [ "(Self::UoOramMap(new), Self::UoOramMap(old)) => {"
     , "if next.accessed {"
     , "if is_path_oram_scheme(&next.spec.oram_scheme) {"
-    , ".restore_from_old(&old.spec, &old.oram, allocator)?;"
+    , "let pending_puts = std::mem::take(&mut next.pending_puts);"
+    , "for put in pending_puts.iter() {"
+    , "trace.record_oram_access(next.spec.id, next.oram.parameters());"
+    , "let transcript = next.oram.commit_put("
+    , "next.leaf_coin_source.ensure_exhausted(&next.spec.name)?;"
     , "let shadow_oram ="
     , "std::mem::replace(&mut next.oram, OramState::placeholder());"
     , "let commit = shadow_oram.commit("
@@ -5599,8 +5627,10 @@ def RuntimeImplementationInterface.checkRuntimeOramCommitKeepsRestoreAndExactWri
     , "rewrite_surrogate_bucket_window_in_place("
     , "let next_counter = old.access_counter + 1;"
     , "writes: writes.into_exact_batch()?,"
-    , "next.restore_from_old(spec, old, allocator)?;"
+    , "let _ = (spec, old, aborted, allocator, rng);"
     , "writes: OramWriteBatch::empty(),"
+    , "pub(crate) fn commit_put("
+    , "run_path_commit_put(self, spec, put, aborted, allocator, leaf_coins, rng)"
     ] &&
   checkSourceContainsAll iface.generatedObjectHelpersProductionSource
     [ "fn reseal_payload_and_record_write<F>("
@@ -5616,6 +5646,8 @@ def RuntimeImplementationInterface.checkRuntimeOramCommitKeepsRestoreAndExactWri
     , "record_oram_write("
     , "if !next.cipher.seal_and_wipe_into_slice("
     , "if !self.cipher.seal_and_wipe_into_slice("
+    , "fn restore_from_old("
+    , "restore_oram_storage_from_old"
     ]
 
 def RuntimeImplementationInterface.checkRuntimeOramOpenUsesSharedDecodeShell
@@ -5781,20 +5813,35 @@ def RuntimeImplementationInterface.checkRuntimeOramUsesLeanGeneratedBlockBucketC
     , "pub(crate) use generated_oram_codecs::{OramBlock, OramBucket};"
     , "use generated_oram_codecs::{"
     , "bootstrap_empty_path_buckets, bootstrap_filler_buckets, bootstrap_oram_counter_slot,"
-    , "bootstrap_surrogate_directory_pages, cold_clone_oram_state, cold_commit_oram_state,"
-    , "decode_surrogate_entries_from_storage_into, empty_map_entry, empty_oram_write_batch,"
-    , "encode_path_metadata_pages, finish_oram_write_log, oram_directory_page_count,"
-    , "oram_write_log_capacity, oram_write_log_with_capacity, path_position_map_witness_leaves,"
-    , "push_oram_write_update, read_oram_counter_from_storage, refresh_path_state_from_storage,"
-    , "repeat_boxed_map_entries, repeat_boxed_masked_usize_options, restore_oram_storage_from_old,"
+    , "bootstrap_surrogate_directory_pages,"
+    , "clone_boxed_map_entries,"
+    , "cold_clone_oram_state,"
+    , "cold_commit_oram_state,"
+    , "decode_surrogate_entries_from_storage_into,"
+    , "empty_map_entry,"
+    , "empty_oram_write_batch,"
+    , "encode_path_metadata_pages,"
+    , "finish_oram_write_log,"
+    , "oram_directory_page_count,"
+    , "oram_write_log_capacity,"
+    , "oram_write_log_with_capacity,"
+    , "path_position_map_witness_leaves,"
+    , "push_oram_write_update,"
+    , "read_oram_counter_from_storage,"
+    , "refresh_path_state_from_storage,"
+    , "repeat_boxed_map_entries,"
+    , "repeat_boxed_masked_usize_options,"
     , "rewrite_oram_counter_in_place,"
     , "rewrite_surrogate_bucket_window_in_place,"
     , "rewrite_surrogate_directory_pages_in_place,"
-    , "run_path_get, run_path_put, run_surrogate_get,"
+    , "run_path_commit_put,"
+    , "run_path_get,"
+    , "run_path_put,"
+    , "run_surrogate_get,"
     , "run_surrogate_put, working_stash_capacity,"
     , "FixedStash,"
     , "refresh_path_state_from_storage("
-    , "restore_oram_storage_from_old(self, spec, old)?;"
+    , "clone_boxed_map_entries(&self.entries)"
     , "let directory_pages = encode_path_metadata_pages("
     , "run_surrogate_get(self, spec, key)"
     , "run_surrogate_put(self, spec, key, value, apply)"
@@ -5903,11 +5950,12 @@ def RuntimeImplementationInterface.checkRuntimeOramUsesLeanGeneratedBlockBucketC
     , "stash: FixedStash::with_capacity(spec, working_stash_capacity(&state.parameters)?)?,"
     , "storage: clone_oram_storage(&state.storage),"
     , "cipher: state.cipher.clone_for_runtime_state(),"
-    , "pub(super) fn restore_oram_storage_from_old("
-    , ".clone_from(&old.storage.directory_pages);"
-    , "state.storage.buckets.clone_from(&old.storage.buckets);"
-    , ".clone_from(&old.storage.access_counter_slot);"
-    , "state.access_counter = old.access_counter;"
+    , "pub(super) fn clone_boxed_map_entries(entries: &[MapEntry]) -> Result<Box<[MapEntry]>> {"
+    , "impl super::PendingOramPut {"
+    , "impl Drop for super::PendingOramPut {"
+    , "pub(crate) fn ensure_reserved_for_writes("
+    , "pub(super) fn run_path_commit_put("
+    , "let apply = put.apply & !aborted;"
     , "impl OramState {"
     , "pub(crate) fn placeholder() -> Self {"
     , "storage: super::OramStorage {"
@@ -6312,12 +6360,12 @@ set_option maxRecDepth 10000 in
     RuntimeImplementationInterface.runtimeOramUsesLeanGeneratedBlockBucketCodecs
   simp [and_assoc]
 
-@[simp] theorem runtimeImplementationInterface_checkRuntimeOramCommitKeepsRestoreAndExactWriteBatchSplit_eq_true_iff
+@[simp] theorem runtimeImplementationInterface_checkRuntimeOramCommitAppliesPendingWritesAndExactWriteBatchSplit_eq_true_iff
   (iface : RuntimeImplementationInterface) :
-  iface.checkRuntimeOramCommitKeepsRestoreAndExactWriteBatchSplit = true ↔
-    iface.runtimeOramCommitKeepsRestoreAndExactWriteBatchSplit := by
-  unfold RuntimeImplementationInterface.checkRuntimeOramCommitKeepsRestoreAndExactWriteBatchSplit
-    RuntimeImplementationInterface.runtimeOramCommitKeepsRestoreAndExactWriteBatchSplit
+  iface.checkRuntimeOramCommitAppliesPendingWritesAndExactWriteBatchSplit = true ↔
+    iface.runtimeOramCommitAppliesPendingWritesAndExactWriteBatchSplit := by
+  unfold RuntimeImplementationInterface.checkRuntimeOramCommitAppliesPendingWritesAndExactWriteBatchSplit
+    RuntimeImplementationInterface.runtimeOramCommitAppliesPendingWritesAndExactWriteBatchSplit
   simp [and_assoc]
 
 @[simp] theorem runtimeImplementationInterface_checkRuntimeOramOpenUsesSharedDecodeShell_eq_true_iff
@@ -9310,7 +9358,7 @@ def RuntimeImplementationInterface.ResidualHelperShellBoundary
     iface.runtimeObjectOpenUsesSharedDecodeShell ∧
     iface.runtimeObjectBootstrapUsesSharedBoxedSealHelper ∧
     iface.runtimeOramUsesLeanGeneratedBlockBucketCodecs ∧
-    iface.runtimeOramCommitKeepsRestoreAndExactWriteBatchSplit ∧
+    iface.runtimeOramCommitAppliesPendingWritesAndExactWriteBatchSplit ∧
     iface.runtimeOramOpenUsesSharedDecodeShell ∧
     iface.runtimeOramBootstrapUsesSharedBoxedSealHelper ∧
     iface.runtimeOramBootstrapUsesSharedBoxedFillerHelper ∧
@@ -9341,7 +9389,7 @@ def RuntimeImplementationInterface.checkResidualHelperShellBoundary
     iface.checkRuntimeObjectOpenUsesSharedDecodeShell &&
     iface.checkRuntimeObjectBootstrapUsesSharedBoxedSealHelper &&
     iface.checkRuntimeOramUsesLeanGeneratedBlockBucketCodecs &&
-    iface.checkRuntimeOramCommitKeepsRestoreAndExactWriteBatchSplit &&
+    iface.checkRuntimeOramCommitAppliesPendingWritesAndExactWriteBatchSplit &&
     iface.checkRuntimeOramOpenUsesSharedDecodeShell &&
     iface.checkRuntimeOramBootstrapUsesSharedBoxedSealHelper &&
     iface.checkRuntimeOramBootstrapUsesSharedBoxedFillerHelper &&

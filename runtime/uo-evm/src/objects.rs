@@ -1,6 +1,6 @@
 use crate::controller::CallRecorder;
 use crate::freshness::derive_path_oram_leaf_seed;
-use crate::oram::{MapEntry, OramState, PathOramLeafCoinSource};
+use crate::oram::{MapEntry, OramState, OramTranscript, PathOramLeafCoinSource, PendingOramPut};
 use anyhow::{anyhow, bail, Result};
 use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
@@ -353,6 +353,11 @@ pub(crate) struct OramMapObject {
     leaf_coin_seed: u64,
     leaf_coin_source: PathOramLeafCoinSource,
     rng: ChaCha20Rng,
+    // Path ORAM schemes: the call's writes, which reach the ORAM at commit,
+    // and the map's contents with those writes applied, which later reads in
+    // the call return.
+    pending_view: Option<Box<[MapEntry]>>,
+    pending_puts: Vec<PendingOramPut>,
 }
 
 impl OramMapObject {
@@ -365,12 +370,20 @@ impl OramMapObject {
             leaf_coin_seed: self.leaf_coin_seed,
             leaf_coin_source: PathOramLeafCoinSource::from_domain_seed(self.leaf_coin_seed),
             rng: self.rng.clone(),
+            pending_view: None,
+            pending_puts: Vec::new(),
         })
+    }
+
+    fn clear_pending(&mut self) {
+        self.pending_view = None;
+        self.pending_puts.clear();
     }
 
     fn wipe_secrets(&mut self) {
         self.accessed = false;
         self.dirty = false;
+        self.clear_pending();
         self.rng = ChaCha20Rng::from_seed([0u8; 32]);
     }
 
@@ -378,6 +391,7 @@ impl OramMapObject {
         self.oram.cold_commit();
         self.accessed = false;
         self.dirty = false;
+        self.clear_pending();
         self.leaf_coin_source = PathOramLeafCoinSource::from_domain_seed(self.leaf_coin_seed);
         Ok(())
     }
@@ -553,6 +567,8 @@ impl RuntimeObject {
                     leaf_coin_seed,
                     leaf_coin_source: PathOramLeafCoinSource::from_domain_seed(leaf_coin_seed),
                     rng,
+                    pending_view: None,
+                    pending_puts: Vec::new(),
                 }))
             }
         }
@@ -582,6 +598,8 @@ impl RuntimeObject {
                 leaf_coin_seed: object.leaf_coin_seed,
                 leaf_coin_source: PathOramLeafCoinSource::from_domain_seed(object.leaf_coin_seed),
                 rng: object.rng.clone(),
+                pending_view: None,
+                pending_puts: Vec::with_capacity(object.oram.parameters().accesses_per_call),
             })),
         }
     }
@@ -961,36 +979,20 @@ impl RuntimeObject {
                     &mut object.leaf_coin_source,
                     &mut object.rng,
                 )?;
-                let (
-                    logical_accesses,
-                    physical_reads,
-                    physical_writes,
-                    zero_writes,
-                    path_leaf,
-                    path_transition,
-                ) = transcript.into_runtime_trace_parts();
-                if let Some(leaf) = path_leaf {
-                    trace.record_path_oram_leaf_access(
-                        object.spec.id,
-                        &object.spec.name,
-                        object.oram.path_bucket_count(),
-                        leaf,
-                    );
-                }
-                if let Some(transition) = path_transition {
-                    trace.record_path_oram_leaf_state_transition(transition);
-                }
-                for event in logical_accesses {
-                    trace.logical_read(&event.kind, &event.object, event.detail);
-                }
-                for event in physical_reads {
-                    trace.physical_read(&event.object, event.location, event.len);
-                }
-                physical_writes.for_each_write(|write| {
-                    trace.physical_write(write.with_object(&object.spec.name));
-                    Ok(())
-                })?;
-                trace.add_zero_writes(zero_writes);
+                record_oram_transcript(
+                    trace,
+                    &object.spec,
+                    object.oram.path_bucket_count(),
+                    transcript,
+                )?;
+                // Writes earlier in the call reach the ORAM at commit; until
+                // then a read takes its value from the pending view.
+                let value = match object.pending_view.as_deref() {
+                    Some(view) => {
+                        select_small_map_value_for_key(view, key, &object.spec.value_type)?
+                    }
+                    None => value,
+                };
                 Ok((value, update_failed))
             }
             _ => bail!("{} is not a map", self.name()),
@@ -1032,6 +1034,33 @@ impl RuntimeObject {
                 object.dirty = true;
                 Ok(capacity_overflowed)
             }
+            Self::UoOramMap(object) if is_path_oram_scheme(&object.spec.oram_scheme) => {
+                object.accessed = true;
+                // The write reaches the ORAM at commit, as one access that is
+                // masked off if the call aborts. Here it updates the pending
+                // view, which decides whether it overflows the map.
+                if object.pending_view.is_none() {
+                    object.pending_view = Some(object.oram.clone_logical_entries()?);
+                }
+                let view = object
+                    .pending_view
+                    .as_deref_mut()
+                    .ok_or_else(|| anyhow!("pending view missing for {}", object.spec.name))?;
+                let capacity_overflowed = update_small_map_entries_for_put(
+                    view,
+                    key.clone(),
+                    value.clone(),
+                    apply,
+                    &object.spec.value_type,
+                    &object.spec.name,
+                )?;
+                object
+                    .pending_puts
+                    .push(PendingOramPut::new(apply, key, value));
+                trace.logical_write("uooram_put", &object.spec.name, "oblivious");
+                object.dirty = true;
+                Ok(capacity_overflowed)
+            }
             Self::UoOramMap(object) => {
                 object.accessed = true;
                 trace.record_oram_access(object.spec.id, object.oram.parameters());
@@ -1044,36 +1073,12 @@ impl RuntimeObject {
                     &mut object.leaf_coin_source,
                     &mut object.rng,
                 )?;
-                let (
-                    logical_accesses,
-                    physical_reads,
-                    physical_writes,
-                    zero_writes,
-                    path_leaf,
-                    path_transition,
-                ) = transcript.into_runtime_trace_parts();
-                if let Some(leaf) = path_leaf {
-                    trace.record_path_oram_leaf_access(
-                        object.spec.id,
-                        &object.spec.name,
-                        object.oram.path_bucket_count(),
-                        leaf,
-                    );
-                }
-                if let Some(transition) = path_transition {
-                    trace.record_path_oram_leaf_state_transition(transition);
-                }
-                for event in logical_accesses {
-                    trace.logical_read(&event.kind, &event.object, event.detail);
-                }
-                for event in physical_reads {
-                    trace.physical_read(&event.object, event.location, event.len);
-                }
-                physical_writes.for_each_write(|write| {
-                    trace.physical_write(write.with_object(&object.spec.name));
-                    Ok(())
-                })?;
-                trace.add_zero_writes(zero_writes);
+                record_oram_transcript(
+                    trace,
+                    &object.spec,
+                    object.oram.path_bucket_count(),
+                    transcript,
+                )?;
                 trace.logical_write("uooram_put", &object.spec.name, "oblivious");
                 object.dirty = true;
                 Ok(update_failed)
@@ -1308,10 +1313,31 @@ impl RuntimeObject {
                 let mut next = new;
                 if next.accessed {
                     if is_path_oram_scheme(&next.spec.oram_scheme) {
-                        if aborted {
-                            next.oram
-                                .restore_from_old(&old.spec, &old.oram, allocator)?;
+                        // The call's writes reach the ORAM now, in order, one
+                        // access each. An aborted call's writes are masked off
+                        // but still make their accesses, so the call leaves the
+                        // trace of a committed one and nothing is rolled back:
+                        // its reads only remapped keys.
+                        next.pending_view = None;
+                        let pending_puts = std::mem::take(&mut next.pending_puts);
+                        for put in pending_puts.iter() {
+                            trace.record_oram_access(next.spec.id, next.oram.parameters());
+                            let transcript = next.oram.commit_put(
+                                &next.spec,
+                                put,
+                                aborted,
+                                allocator,
+                                &mut next.leaf_coin_source,
+                                &mut next.rng,
+                            )?;
+                            record_oram_transcript(
+                                trace,
+                                &next.spec,
+                                next.oram.path_bucket_count(),
+                                transcript,
+                            )?;
                         }
+                        next.leaf_coin_source.ensure_exhausted(&next.spec.name)?;
                     } else {
                         let shadow_oram =
                             std::mem::replace(&mut next.oram, OramState::placeholder());
@@ -1361,6 +1387,7 @@ impl RuntimeObject {
             Self::UoOramMap(object) => {
                 object.accessed = false;
                 object.dirty = false;
+                object.clear_pending();
                 object.leaf_coin_source =
                     PathOramLeafCoinSource::from_domain_seed(object.leaf_coin_seed);
             }
@@ -1391,12 +1418,48 @@ impl RuntimeObject {
 
     pub(in crate::runtime) fn ensure_path_oram_leaf_coins_consumed(&self) -> Result<()> {
         match self {
-            Self::UoOramMap(object) if is_path_oram_scheme(&object.spec.oram_scheme) => {
-                object.leaf_coin_source.ensure_exhausted(&object.spec.name)
-            }
+            Self::UoOramMap(object) if is_path_oram_scheme(&object.spec.oram_scheme) => object
+                .leaf_coin_source
+                .ensure_reserved_for_writes(&object.spec.name, object.pending_puts.len()),
             _ => Ok(()),
         }
     }
+}
+
+/// Record one ORAM access in the call trace: its logical and physical
+/// events and, on a Path ORAM map, its leaf and position-map transition.
+fn record_oram_transcript(
+    trace: &mut CallRecorder,
+    spec: &StateObject,
+    path_bucket_count: usize,
+    transcript: OramTranscript,
+) -> Result<()> {
+    let (
+        logical_accesses,
+        physical_reads,
+        physical_writes,
+        zero_writes,
+        path_leaf,
+        path_transition,
+    ) = transcript.into_runtime_trace_parts();
+    if let Some(leaf) = path_leaf {
+        trace.record_path_oram_leaf_access(spec.id, &spec.name, path_bucket_count, leaf);
+    }
+    if let Some(transition) = path_transition {
+        trace.record_path_oram_leaf_state_transition(transition);
+    }
+    for event in logical_accesses {
+        trace.logical_read(&event.kind, &event.object, event.detail);
+    }
+    for event in physical_reads {
+        trace.physical_read(&event.object, event.location, event.len);
+    }
+    physical_writes.for_each_write(|write| {
+        trace.physical_write(write.with_object(&spec.name));
+        Ok(())
+    })?;
+    trace.add_zero_writes(zero_writes);
+    Ok(())
 }
 
 fn boxed_false_flags(len: usize) -> Box<[bool]> {
@@ -2328,8 +2391,13 @@ mod tests {
     }
 
     #[test]
-    fn uo_path_oram_commit_restores_old_state_in_place_on_abort() {
+    fn uo_path_oram_commit_masks_pending_writes_on_abort() {
+        // A Path ORAM write reaches the ORAM only at commit. An aborted call
+        // masks it off there but still makes its access, so the contents stay
+        // as before the call while the path is rewritten as on a commit.
         let spec = path_oram_spec();
+        let key = Value::Address([0x77; 20]);
+        let written_entry = || MapEntry::new(true, Value::Address([0x77; 20]), Value::uint(23));
         let mut old = RuntimeObject::instantiate_with_seed(&spec, 0x0A13).unwrap();
         let mut old_allocator = tx_allocator();
         match &mut old {
@@ -2341,102 +2409,56 @@ mod tests {
             _ => unreachable!(),
         }
         old_allocator.finish().unwrap();
-        let (
-            expected_entries,
-            expected_position_map,
-            expected_stash,
-            expected_directory_pages,
-            expected_buckets,
-            expected_counter_slot,
-        ) = match &old {
-            RuntimeObject::UoOramMap(map) => {
-                let (entries, position_map, stash) = map.oram.logical_state_snapshot_for_test();
-                let (directory_pages, buckets, counter_slot) = map.oram.storage_snapshot_for_test();
-                (
-                    entries,
-                    position_map,
-                    stash,
-                    directory_pages,
-                    buckets,
-                    counter_slot,
-                )
-            }
+        let expected_entries = match &old {
+            RuntimeObject::UoOramMap(map) => map.oram.logical_state_snapshot_for_test().0,
             _ => unreachable!(),
         };
 
-        let mut shadow_allocator = tx_allocator();
-        let mut new = old.clone_for_tx(&mut shadow_allocator).unwrap();
-        shadow_allocator.finish().unwrap();
-        let (
-            entries_ptr,
-            position_map_ptr,
-            stash_ptr,
-            directory_pages_ptr,
-            buckets_ptr,
-            counter_ptr,
-        ) = match &new {
-            RuntimeObject::UoOramMap(map) => {
-                let (entries_ptr, position_map_ptr, stash_ptr) =
-                    map.oram.logical_state_ptrs_for_test();
-                let (directory_pages_ptr, buckets_ptr, counter_ptr) =
-                    map.oram.storage_ptrs_for_test();
-                (
-                    entries_ptr,
-                    position_map_ptr,
-                    stash_ptr,
-                    directory_pages_ptr,
-                    buckets_ptr,
-                    counter_ptr,
+        for aborted in [true, false] {
+            let mut shadow_allocator = tx_allocator();
+            let mut new = old.clone_for_tx(&mut shadow_allocator).unwrap();
+            shadow_allocator.finish().unwrap();
+            let mut recorder = crate::controller::CallRecorder::begin("commit_test", &[]);
+            let mut allocator = tx_allocator();
+            let overflowed = new
+                .put_map(
+                    key.clone(),
+                    Value::uint(23),
+                    Some(true),
+                    &mut recorder,
+                    &mut allocator,
                 )
-            }
-            _ => unreachable!(),
-        };
+                .unwrap();
+            assert!(!overflowed);
+            // The write is pending: it makes no access, and a read later in
+            // the call sees it through the pending view.
+            assert_eq!(recorder.physical_write_count(), 0);
+            let (read, _) = new.get_map(&key, &mut recorder, &mut allocator).unwrap();
+            assert_eq!(read, Value::uint(23));
+            allocator.finish().unwrap();
+            let writes_before_commit = recorder.physical_write_count();
 
-        match &mut new {
-            RuntimeObject::UoOramMap(map) => {
-                map.oram.install_slot_for_test(
-                    0,
-                    MapEntry::new(true, Value::Address([0x77; 20]), Value::uint(23)),
-                    Some(0),
-                );
-                map.oram.corrupt_storage_for_test();
-                map.accessed = true;
-                map.dirty = true;
+            let mut commit_allocator = tx_allocator();
+            let committed = new
+                .commit(&old, aborted, &mut recorder, &mut commit_allocator)
+                .unwrap();
+            commit_allocator.finish().unwrap();
+            assert!(recorder.physical_write_count() > writes_before_commit);
+            match committed {
+                RuntimeObject::UoOramMap(map) => {
+                    let entries = map.oram.logical_state_snapshot_for_test().0;
+                    let written = entries.iter().any(|entry| *entry == written_entry());
+                    assert_eq!(written, !aborted);
+                    if aborted {
+                        assert_eq!(entries, expected_entries);
+                    }
+                    assert!(map.pending_view.is_none());
+                    assert!(map.pending_puts.is_empty());
+                    assert!(!map.accessed);
+                    assert!(!map.dirty);
+                }
+                _ => unreachable!(),
             }
-            _ => unreachable!(),
-        }
-
-        let mut recorder = crate::controller::CallRecorder::begin("commit_test", &[]);
-        let mut commit_allocator = tx_allocator();
-        let committed = new
-            .commit(&old, true, &mut recorder, &mut commit_allocator)
-            .unwrap();
-        commit_allocator.finish().unwrap();
-
-        match committed {
-            RuntimeObject::UoOramMap(map) => {
-                let (entries, position_map, stash) = map.oram.logical_state_snapshot_for_test();
-                assert_eq!(entries, expected_entries);
-                assert_eq!(position_map, expected_position_map);
-                assert_eq!(stash, expected_stash);
-                let (directory_pages, buckets, counter_slot) = map.oram.storage_snapshot_for_test();
-                assert_eq!(directory_pages, expected_directory_pages);
-                assert_eq!(buckets, expected_buckets);
-                assert_eq!(counter_slot, expected_counter_slot);
-                let (current_entries_ptr, current_position_map_ptr, current_stash_ptr) =
-                    map.oram.logical_state_ptrs_for_test();
-                assert_eq!(current_entries_ptr, entries_ptr);
-                assert_eq!(current_position_map_ptr, position_map_ptr);
-                assert_eq!(current_stash_ptr, stash_ptr);
-                let (current_directory_pages_ptr, current_buckets_ptr, current_counter_ptr) =
-                    map.oram.storage_ptrs_for_test();
-                assert_eq!(current_directory_pages_ptr, directory_pages_ptr);
-                assert_eq!(current_buckets_ptr, buckets_ptr);
-                assert_eq!(current_counter_ptr, counter_ptr);
-                assert!(!map.accessed);
-                assert!(!map.dirty);
-            }
-            _ => unreachable!(),
         }
     }
 }

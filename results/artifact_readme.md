@@ -270,7 +270,8 @@ buffer, keep the public directory / bucket page surfaces in boxed fixed-shape
 arrays, and keep the ORAM counter slot in a boxed fixed-size ciphertext buffer
 rather than silently falling back to fresh zero-capacity vectors, and that
 touched Path-ORAM aborts
-restore old state in place through `OramState::restore_from_old(...)` so
+keep the in-place ORAM state, their writes masked off at commit through
+`OramState::commit_put(...)`, so
 neither untouched nor aborted `UoOramMap` commits replace the whole shadow
 ORAM object anymore, and that
 full-scan array and

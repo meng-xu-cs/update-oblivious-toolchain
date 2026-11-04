@@ -28410,7 +28410,10 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && oram_source.contains("mod generated_oram_codecs;")
         && oram_source.contains("pub(crate) use generated_oram_codecs::{OramBlock, OramBucket};")
         && oram_source.contains("use generated_oram_codecs::{")
-        && oram_source.contains("cold_clone_oram_state, cold_commit_oram_state,")
+        && oram_source.contains("cold_clone_oram_state,")
+        && oram_source.contains("cold_commit_oram_state,")
+        && oram_source.contains("clone_boxed_map_entries,")
+        && oram_source.contains("run_path_commit_put,")
         && oram_source
             .contains("bootstrap_empty_path_buckets, bootstrap_filler_buckets,")
         && oram_source.contains("bootstrap_oram_counter_slot,")
@@ -28420,19 +28423,22 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && oram_source.contains("path_position_map_witness_leaves,")
         && oram_source.contains("read_oram_counter_from_storage,")
         && oram_source.contains("refresh_path_state_from_storage,")
-        && oram_source.contains("restore_oram_storage_from_old,")
         && oram_source.contains("run_path_get,")
         && oram_source.contains("run_path_put,")
         && oram_source.contains("run_surrogate_get,")
         && oram_source.contains("run_surrogate_put,")
         && oram_source.contains("rewrite_surrogate_directory_pages_in_place,")
-        && oram_source.contains("finish_oram_write_log, oram_directory_page_count,")
+        && oram_source.contains("finish_oram_write_log,")
+        && oram_source.contains("oram_directory_page_count,")
         && oram_source.contains("repeat_boxed_map_entries,")
         && oram_source.contains("repeat_boxed_masked_usize_options,")
         && oram_source.contains("working_stash_capacity,")
         && oram_source.contains("#[derive(Debug, PartialEq, Eq)]\npub(crate) struct MapEntry {")
         && oram_source.contains("refresh_path_state_from_storage(")
-        && oram_source.contains("restore_oram_storage_from_old(self, spec, old)?;")
+        && oram_source.contains("clone_boxed_map_entries(&self.entries)")
+        && oram_source
+            .contains("run_path_commit_put(self, spec, put, aborted, allocator, leaf_coins, rng)")
+        && !oram_source.contains("restore_oram_storage_from_old")
         && oram_source.contains("let directory_pages = encode_path_metadata_pages(")
         && oram_source.contains("let entries = repeat_boxed_map_entries(parameters.capacity, &empty_entry)?;")
         && oram_source.contains("run_surrogate_get(self, spec, key)")
@@ -28668,11 +28674,9 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             .contains("stash: FixedStash::with_capacity(spec, working_stash_capacity(&state.parameters)?)?,")
         && generated_oram_codecs_source.contains("storage: clone_oram_storage(&state.storage),")
         && generated_oram_codecs_source.contains("cipher: state.cipher.clone_for_runtime_state(),")
-        && generated_oram_codecs_source.contains("pub(super) fn restore_oram_storage_from_old(")
-        && generated_oram_codecs_source.contains(".clone_from(&old.storage.directory_pages);")
-        && generated_oram_codecs_source.contains("state.storage.buckets.clone_from(&old.storage.buckets);")
-        && generated_oram_codecs_source.contains(".clone_from(&old.storage.access_counter_slot);")
-        && generated_oram_codecs_source.contains("state.access_counter = old.access_counter;")
+        && generated_oram_codecs_source.contains("pub(super) fn run_path_commit_put(")
+        && generated_oram_codecs_source.contains("let apply = put.apply & !aborted;")
+        && !generated_oram_codecs_source.contains("fn restore_oram_storage_from_old(")
         && !generated_oram_codecs_source.contains("impl Clone for OramState {")
         && !generated_oram_codecs_source.contains("entries: self.entries.clone(),")
         && !generated_oram_codecs_source.contains("position_map: self.position_map.clone(),")
@@ -40967,20 +40971,16 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             vec![String::from("runtime/uo-evm/src/generated_oram_codecs.rs")],
         ),
         (
-            "fn restore_from_old(",
+            "pub(super) fn run_path_commit_put(",
+            vec![String::from("runtime/uo-evm/src/generated_oram_codecs.rs")],
+        ),
+        (
+            "pub(crate) fn commit_put(",
             vec![String::from("runtime/uo-evm/src/oram.rs")],
         ),
         (
-            ".directory_pages\n        .clone_from(&old.storage.directory_pages);",
-            vec![String::from("runtime/uo-evm/src/generated_oram_codecs.rs")],
-        ),
-        (
-            "state.storage.buckets.clone_from(&old.storage.buckets);",
-            vec![String::from("runtime/uo-evm/src/generated_oram_codecs.rs")],
-        ),
-        (
-            ".access_counter_slot\n        .clone_from(&old.storage.access_counter_slot);",
-            vec![String::from("runtime/uo-evm/src/generated_oram_codecs.rs")],
+            "let transcript = next.oram.commit_put(",
+            vec![String::from("runtime/uo-evm/src/objects.rs")],
         ),
         (
             "pub(super) fn decode_surrogate_entries_from_storage_into(",
@@ -40992,10 +40992,6 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
                 String::from("runtime/uo-evm/src/generated_oram_codecs.rs"),
                 String::from("runtime/uo-evm/src/oram.rs"),
             ],
-        ),
-        (
-            "next.restore_from_old(spec, old, allocator)?;",
-            vec![String::from("runtime/uo-evm/src/oram.rs")],
         ),
         (
             "pub(super) fn rewrite_path_metadata_pages_in_place(",
@@ -41126,8 +41122,11 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         )
         && !production_source_slice(&generated_oram_codecs_source)
             .contains("state.position_map = working_position_map.into_boxed_slice();");
+    // An aborted Path ORAM call keeps its in-place ORAM state: its writes are
+    // masked off at commit, and nothing is restored or re-cloned from `old`.
     let path_oram_restore_reuses_in_place_buffers = objects_source
-        .contains(".restore_from_old(&old.spec, &old.oram, allocator)?;")
+        .contains("let transcript = next.oram.commit_put(")
+        && !objects_source.contains("restore_from_old(")
         && !objects_source.contains("next.oram = old.oram.clone_for_tx(&old.spec, allocator)?;");
     let state_owns_shadow_loading =
         state_source.contains("fn shadow_load(") && !kernel_source.contains("clone_for_tx(");
@@ -53034,7 +53033,8 @@ buffer, keep the public directory / bucket page surfaces in boxed fixed-shape
 arrays, and keep the ORAM counter slot in a boxed fixed-size ciphertext buffer
 rather than silently falling back to fresh zero-capacity vectors, and that
 touched Path-ORAM aborts
-restore old state in place through `OramState::restore_from_old(...)` so
+keep the in-place ORAM state, their writes masked off at commit through
+`OramState::commit_put(...)`, so
 neither untouched nor aborted `UoOramMap` commits replace the whole shadow
 ORAM object anymore, and that
 full-scan array and

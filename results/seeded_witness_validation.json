@@ -153,13 +153,13 @@
       "paper_main_family_accepted": true,
       "paper_main_family_boundary_accepted": true,
       "paper_main_family_boundary_lean_stdout": "validated proof-grade seeded runtime paper-main family boundary and confinement route for transferFrom(address,address,address,uint256) with 4 seeds",
-      "paper_main_family_bundle_json_bytes": 807084,
+      "paper_main_family_bundle_json_bytes": 807095,
       "paper_main_family_lean_stdout": "validated proof-grade seeded runtime paper-main family bundle for transferFrom(address,address,address,uint256) with 4 seeds",
       "paper_main_lean_checker_input": "paper-main family bundle",
       "paper_main_slot_boundary_accepted": true,
       "paper_main_slot_boundary_lean_stdout": "validated proof-grade seeded runtime paper-main slot boundary and confinement route for transferFrom(address,address,address,uint256) with 4 seeds",
       "paper_main_slot_family_accepted": true,
-      "paper_main_slot_family_bundle_json_bytes": 808764,
+      "paper_main_slot_family_bundle_json_bytes": 808775,
       "paper_main_slot_family_lean_stdout": "validated proof-grade seeded runtime paper-main slot family bundle for transferFrom(address,address,address,uint256) with 4 seeds",
       "paper_main_slot_lean_checker_input": "paper-main slot family bundle",
       "paper_main_slot_opcode_trace_len": 9,
@@ -175,7 +175,7 @@
       "scenario": "ERC20Lite/pathoram/transferFrom-seeded",
       "seed_count": 4,
       "setup_calls": 2,
-      "witness_family_json_bytes": 805585
+      "witness_family_json_bytes": 805596
     }
   ]
 }

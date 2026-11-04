@@ -99,8 +99,8 @@ def printFailureSummary (iface : ImportedRuntimeImplementationInterface) : IO Un
     rt.checkRuntimeObjectBootstrapUsesSharedBoxedSealHelper
   printCheck "checkRuntimeOramUsesLeanGeneratedBlockBucketCodecs"
     rt.checkRuntimeOramUsesLeanGeneratedBlockBucketCodecs
-  printCheck "checkRuntimeOramCommitKeepsRestoreAndExactWriteBatchSplit"
-    rt.checkRuntimeOramCommitKeepsRestoreAndExactWriteBatchSplit
+  printCheck "checkRuntimeOramCommitAppliesPendingWritesAndExactWriteBatchSplit"
+    rt.checkRuntimeOramCommitAppliesPendingWritesAndExactWriteBatchSplit
   printCheck "checkRuntimeOramOpenUsesSharedDecodeShell"
     rt.checkRuntimeOramOpenUsesSharedDecodeShell
   printCheck "checkRuntimeOramBootstrapUsesSharedBoxedSealHelper"
