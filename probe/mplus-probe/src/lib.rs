@@ -15676,6 +15676,85 @@ fn run_tamper_validation() -> Result<JsonValue> {
         }),
     )?);
 
+    // A tape-family sample with one bucket read moved to another bucket: the
+    // checker must reject it, since it is no longer the representative run with
+    // the sample's tape's leaves.
+    let tape_sample_tamper = "canonical_pathoram_pair_tape_samples/bucket_drift";
+    let tape_theorem_input = build_canonical_pathoram_pair_theorem_input(
+        "SingleAccessMap/pathoram/put-tape-sample-tamper",
+        &artifact,
+        &[],
+        &target,
+        &pair_target,
+    )?;
+    let lhs_tape_samples = collect_tape_family_samples(
+        "SingleAccessMap/pathoram/put-tape-sample-tamper",
+        &artifact,
+        &[],
+        &target,
+        tape_theorem_input.lhs_input.representative_witness(),
+    )?;
+    let rhs_tape_samples = collect_tape_family_samples(
+        "SingleAccessMap/pathoram/put-tape-sample-tamper",
+        &artifact,
+        &[],
+        &pair_target,
+        tape_theorem_input.rhs_input.representative_witness(),
+    )?;
+    let mut tampered_tape_samples = serde_json::to_value(TapeFamilySamples {
+        lhs_samples: &lhs_tape_samples,
+        rhs_samples: &rhs_tape_samples,
+    })?;
+    let bucket_read = tampered_tape_samples["lhs_samples"][0]["trace"]["physical_reads"]
+        .as_array_mut()
+        .and_then(|reads| {
+            reads.iter_mut().find(|read| {
+                read["location"]
+                    .as_str()
+                    .is_some_and(|location| location.contains("@bucket"))
+            })
+        })
+        .ok_or_else(|| anyhow!("{} found no bucket read to move", tape_sample_tamper))?;
+    let location = bucket_read["location"]
+        .as_str()
+        .unwrap_or_default()
+        .to_string();
+    let (object, index) = location.rsplit_once("@bucket").ok_or_else(|| {
+        anyhow!(
+            "{} found no bucket index in {}",
+            tape_sample_tamper,
+            location
+        )
+    })?;
+    let index: usize = index.parse()?;
+    bucket_read["location"] = json!(format!("{object}@bucket{}", index ^ 1));
+    let (tape_theorem_input_path, _) = write_temp_json(
+        "canonical_pathoram_pair_tape_samples-theorem-input",
+        &tape_theorem_input,
+    )?;
+    let tape_sample_case = validate_tampered_json_case(
+        tape_sample_tamper,
+        &tampered_tape_samples,
+        |samples_path| {
+            Ok(Command::new(&canonical_pathoram_pair_theorem_input_checker)
+                .arg(&tape_theorem_input_path)
+                .arg("page_v1")
+                .arg("exit_v1")
+                .arg("shared_v1")
+                .arg(samples_path)
+                .output()?)
+        },
+        json!({
+            "scenario": tape_sample_tamper,
+            "artifact_kind": "runtime_canonical_pathoram_pair_tape_samples",
+            "benchmark": "SingleAccessMap/pathoram/put-canonical-pair",
+            "entrypoint": target.entrypoint,
+            "mutation": "move one bucket read of an lhs runtime sample to the neighbouring bucket",
+        }),
+    );
+    let _ = fs::remove_file(&tape_theorem_input_path);
+    scenarios.push(tape_sample_case?);
+
     // Kernel admission: the checker must reject declared policies that disagree
     // with the information-flow analysis, and a write to a public object.
     let kernel_admission_checker = lean_kernel_admission_checker_path()?;
@@ -26032,6 +26111,60 @@ fn validate_canonical_pathoram_pair_case(
     }))
 }
 
+/// Runtime runs per side checked against the Lean tape families of a pair
+/// theorem input.
+const TAPE_FAMILY_SAMPLES_PER_SIDE: usize = 4;
+
+#[derive(Serialize)]
+struct TapeFamilySamples<'a> {
+    lhs_samples: &'a [RuntimeRefinementWitness],
+    rhs_samples: &'a [RuntimeRefinementWitness],
+}
+
+/// A fixed sequence of coin seeds, so the samples and the results are
+/// reproducible.
+fn tape_family_coin_seed(sample: u64) -> u64 {
+    let mut z = sample.wrapping_add(0x9E37_79B9_7F4A_7C15);
+    z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    z ^ (z >> 31)
+}
+
+/// Runs of a call on other tapes: each deploys with another seed, so the keys
+/// present before the call hold other leaves, and draws other coins.
+fn collect_tape_family_samples(
+    name: &'static str,
+    artifact: &CompiledArtifact,
+    setup: &[CallSpec],
+    target: &CallSpec,
+    representative: &RuntimeRefinementWitness,
+) -> Result<Vec<RuntimeRefinementWitness>> {
+    let scaffold = representative
+        .path_oram_fresh_coin_scaffold()
+        .ok_or_else(|| anyhow!("fresh-coin scaffold extraction failed for {}", name))?;
+    let seed_count = canonical_path_oram_leaf_seed_space_size(&scaffold)
+        .ok_or_else(|| anyhow!("fresh-coin seed space overflow for {}", name))?;
+    (1..=TAPE_FAMILY_SAMPLES_PER_SIDE)
+        .map(|sample| -> Result<RuntimeRefinementWitness> {
+            let coin_seed = (tape_family_coin_seed(sample as u64) % seed_count as u64) as usize;
+            let values =
+                canonical_path_oram_leaf_values_of_seed(&scaffold, coin_seed).ok_or_else(|| {
+                    anyhow!(
+                        "fresh-coin seed decode overflow for {} sample {}",
+                        name,
+                        sample
+                    )
+                })?;
+            let plan = path_oram_fresh_coin_plan_for_runtime_tape(name, representative, &values)?;
+            let mut instance = prepare_instance_with_seed(artifact, setup, sample as u64)?;
+            let trace = instance
+                .call_with_path_oram_fresh_coins(target.entrypoint, target.args.clone(), plan)?
+                .trace;
+            Ok(trace.runtime_refinement_witness()?)
+        })
+        .collect()
+}
+
 fn validate_canonical_pathoram_pair_theorem_input_case(
     name: &'static str,
     artifact: &CompiledArtifact,
@@ -26084,6 +26217,9 @@ fn validate_canonical_pathoram_pair_theorem_input_case(
     let normalized_micro_trace_equal =
         lhs_witness.normalized_micro_trace() == rhs_witness.normalized_micro_trace();
 
+    let lhs_samples = collect_tape_family_samples(name, artifact, setup, lhs, lhs_witness)?;
+    let rhs_samples = collect_tape_family_samples(name, artifact, setup, rhs, rhs_witness)?;
+
     let theorem_input = ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput {
         cfg,
         lhs_input: lhs_collected.input,
@@ -26098,13 +26234,22 @@ fn validate_canonical_pathoram_pair_theorem_input_case(
     };
 
     let (theorem_input_path, theorem_input_json_bytes) = write_temp_json(name, &theorem_input)?;
+    let (samples_path, _) = write_temp_json(
+        &format!("{name}-tape-samples"),
+        &TapeFamilySamples {
+            lhs_samples: &lhs_samples,
+            rhs_samples: &rhs_samples,
+        },
+    )?;
     let output = Command::new(checker)
         .arg(&theorem_input_path)
         .arg("page_v1")
         .arg("exit_v1")
         .arg("shared_v1")
+        .arg(&samples_path)
         .output()?;
     let _ = fs::remove_file(&theorem_input_path);
+    let _ = fs::remove_file(&samples_path);
     if !output.status.success() {
         return Err(anyhow!(
             "Lean proof-grade canonical path-ORAM pair theorem-input validation failed for {}: {}",
@@ -26135,7 +26280,10 @@ fn validate_canonical_pathoram_pair_theorem_input_case(
         "normalized_micro_trace_equal": normalized_micro_trace_equal,
         "theorem_input_json_bytes": theorem_input_json_bytes,
         "lean_stdout": String::from_utf8_lossy(&output.stdout).trim(),
-        "paper_instantiation_status": "not_materialized",
+        "paper_instantiation_status": "derived_from_tape_families",
+        "tape_family_theorem": "derived",
+        "tape_family_samples_per_side": TAPE_FAMILY_SAMPLES_PER_SIDE,
+        "tape_family_samples_checked": true,
         "proof_grade_accepted": true,
         "lean_validated": true,
         "accepted": true,

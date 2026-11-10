@@ -4,7 +4,7 @@
     "advisory_nonclaim": 574,
     "deprecated_report": 0,
     "expected_computational_difference": 101,
-    "expected_negative": 998,
+    "expected_negative": 1000,
     "required_failure": 0,
     "unclassified": 0
   },
@@ -261,7 +261,7 @@
         "advisory_nonclaim": 163,
         "deprecated_report": 0,
         "expected_computational_difference": 48,
-        "expected_negative": 499,
+        "expected_negative": 500,
         "required_failure": 0,
         "unclassified": 0
       },
@@ -813,10 +813,11 @@
         "tamper_validation.scenarios.386.accepted",
         "tamper_validation.scenarios.387.accepted",
         "tamper_validation.scenarios.388.accepted",
-        "tamper_validation.scenarios.389.accepted"
+        "tamper_validation.scenarios.389.accepted",
+        "tamper_validation.scenarios.390.accepted"
       ],
-      "false_count": 710,
-      "false_paths": 710,
+      "false_count": 711,
+      "false_paths": 711,
       "mode": "proof_grade",
       "report": "bridge_validation",
       "required": true,
@@ -2933,7 +2934,7 @@
         "advisory_nonclaim": 0,
         "deprecated_report": 0,
         "expected_computational_difference": 0,
-        "expected_negative": 494,
+        "expected_negative": 495,
         "required_failure": 0,
         "unclassified": 0
       },
@@ -3432,10 +3433,11 @@
         "scenarios.386.accepted",
         "scenarios.387.accepted",
         "scenarios.388.accepted",
-        "scenarios.389.accepted"
+        "scenarios.389.accepted",
+        "scenarios.390.accepted"
       ],
-      "false_count": 494,
-      "false_paths": 494,
+      "false_count": 495,
+      "false_paths": 495,
       "mode": "expected_negative",
       "report": "tamper_validation",
       "required": false,

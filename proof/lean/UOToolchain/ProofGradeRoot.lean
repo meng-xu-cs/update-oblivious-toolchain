@@ -76,6 +76,7 @@ import UOToolchain.PaperMainTheorem
 import UOToolchain.AcceptedPackageCapstone
 import UOToolchain.PaperMainReleases
 import UOToolchain.PathOramAdmitted
+import UOToolchain.PathOramTapeWitness
 import UOToolchain.KernelExactTrace
 import UOToolchain.KernelFlow
 import UOToolchain.KernelPaperMain

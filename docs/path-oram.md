@@ -31,9 +31,8 @@ The Lean development states more than it currently proves for Path ORAM:
   `SingleAccessMap.put` runs that `checkCanonicalPathOramPaperInstantiation`
   accepts gives a bundle, and the checker derives the general SGX execution
   theorem at the pair's two sides (`sgxViewRelation_sides`), which relates
-  the left and right runtime families. That pair makes one ORAM access.
-  Multi-access entrypoints are validated through compact theorem inputs,
-  which check a representative witness and derive no theorem.
+  the left and right runtime families. That pair makes one ORAM access; the
+  multi-access pairs get the theorem from tape families (below).
 - Every call that touches a Path ORAM map first reads the whole map: the
   runtime opens the map's counter, every metadata page, and every bucket and
   rebuilds the map's contents inside the enclave
@@ -72,7 +71,7 @@ The Lean development states more than it currently proves for Path ORAM:
   that one map's leaf schedule does not depend on the accesses. Take any `n`
   accesses (hits, misses, inserts, updates, deletes, masked writes, on any
   keys) and any `p` keys present before the call. If those keys' leaves and
-  the call's `2n` coins (two per access, as the runtime draws them) are
+  the call's `2n` coins (two per access: a random path and a next leaf) are
   uniform, every schedule of `n` leaves is equally likely: the schedule is
   distributed as the canonical leaf-value distribution of `n` steps, each
   schedule `L ^ (p + n)` times among the `L ^ (p + 2n)` tapes
@@ -87,7 +86,11 @@ The Lean development states more than it currently proves for Path ORAM:
   model is generic in the slot type, so it also covers a call on several maps
   in any interleaving, each map's leaves and coins below its own leaf count:
   the schedule is distributed as the canonical leaf-value distribution of the
-  call's scaffold (`multiObservedLeaves_canonical`).
+  call's scaffold (`multiObservedLeaves_canonical`). The runtime draws two
+  coins for a write and one for a read, which it uses as the path when the key
+  is absent and as the next leaf when it is present. A read uses one of its
+  two model coins either way, so every runtime tape stands for the same number
+  of model tapes, and uniform model tapes give uniform runtime coins.
 - The bundle's leaf obligation follows from this model, without seed
   enumeration. A `TapeRuntimePathOramWitnessFamily` has a run of the call for
   every tape (the leaves of the keys present before the call, then two coins
@@ -99,15 +102,41 @@ The Lean development states more than it currently proves for Path ORAM:
   bundle's `canonicalSeedSpace` field. So `TapePathOramPaperMainEvidenceOn`,
   which asks only for facts that hold on every tape (the public view,
   location, shape, outcome and boundary schedule), builds the bundle
-  (`toBundle`) and gives the paper-main theorem for every admitted pair. The
-  probe does not build tape families yet: for the one-access pair it
-  materializes the call's fresh coins and checks hidden-leaf coverage by
-  enumeration.
+  (`toBundle`) and gives the paper-main theorem for every admitted pair.
+- One runtime run gives the tape family, without seed enumeration
+  (`UOToolchain/PathOramTapeWitness.lean`). Which keys a call touches, and
+  whether each access hits, misses, inserts or deletes, depend on the program
+  and its data; the coins and the leaves of the keys present before the call
+  decide only where the accesses go. So the run on any other tape is the run
+  with that tape's leaves substituted: the leaves the model reads and draws on
+  the tape go into the leaf schedule, the transitions and the position maps
+  before and after, and the bucket locations of the trace move to the new
+  paths (`substituteWitness`). Every substituted run passes the Lean
+  runtime-witness checks (`substituteWitness_valid`): the replay accepts the
+  model's leaves through the run's transitions (`replay_substSteps`), and the
+  logical-trace checks read only that a path read's detail is a bucket. The
+  substitution keeps the public view, the public locations and the storage
+  shape, so a pair of valid runs with the same public values gives
+  `TapePathOramPaperMainEvidenceOn` over the pair's two sides
+  (`TapePair.toEvidence`) and the theorem between them
+  (`TapePair.sgxViewRelation_sides`).
+- The probe derives this for every multi-access pair from the compact
+  theorem input it already checks: SingleAccessMap `add` (4,096 coin seeds),
+  ConfidentialMixer `deposit` (262,144) and ERC20Lite `transferFrom`
+  (2^44). `checkCanonicalPathOramPairTheoremInput` also checks four more
+  runtime runs per side, deployed with other seeds and given other coins,
+  and finds each equal to its side's run with that run's own tape
+  substituted (`sampleCheck`). For `transferFrom` every such run has other
+  leaves for the two keys present before the call;
+  `results/canonical_pathoram_pair_validation.json` reports the counts. The
+  check compares whole witnesses, all but their seed tag, and the tamper
+  suite moves one bucket read
+  of a sample to see it rejected
+  (`canonical_pathoram_pair_tape_samples/bucket_drift`). That the runtime's
+  run on every tape is the substituted run is what these samples test; it is
+  not proved of the Rust runtime.
 
-Open work: build tape families from runtime runs, so that multi-access
-entrypoints get the theorem instead of compact theorem inputs (each run's
-certificate records the coins it used, and the replay checks it against the
-leaf model); extend the admitted route to `path_oram_private_posmap_v1`; read
+Open work: extend the admitted route to `path_oram_private_posmap_v1`; read
 only the accessed paths at call time instead of the whole map, which needs an
 oblivious key-to-slot index and values served from the path and stash; and
 then replace the flat position map by a recursive one.
@@ -177,8 +206,8 @@ entrypoint (`supports_multi_access_per_entrypoint()`): every access draws fresh
 leaves and rewrites its path and the metadata pages, and the per-entrypoint
 resource bounds scale with the access count. The surrogate scheme is
 single-access, and a multi-access surrogate entrypoint is rejected at compile
-time. No theorem yet covers multi-access calls on either scheme (see Current
-Status).
+time. Multi-access calls on the local scheme get the theorem from tape
+families; no theorem covers the private scheme yet (see Current Status).
 
 ## Assumption Provenance
 
@@ -189,10 +218,11 @@ Status).
 | `metadataEncryptionINDCPA` | same sealed-record crypto route for encrypted position-map metadata pages |
 
 Fresh leaf remapping is checked by the canonical fresh-coin runtime-family
-interface and hidden-leaf coverage checkers, which today cover the
-single-access `SingleAccessMap.put` instance only, and follows for any call
-from the leaf model on tape families (`TapeRuntimePathOramWitnessFamily`). It
-is not part of the explicit backend-assumption bundle.
+interface and hidden-leaf coverage checkers for the single-access
+`SingleAccessMap.put` instance, and follows for any call from the leaf model
+on tape families (`TapeRuntimePathOramWitnessFamily`), which the probe builds
+for the multi-access pairs. It is not part of the explicit backend-assumption
+bundle.
 
 ## Sources
 

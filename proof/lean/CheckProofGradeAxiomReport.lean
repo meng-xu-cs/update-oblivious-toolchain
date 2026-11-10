@@ -240,4 +240,30 @@ info: 'UOToolchain.TapePathOramPaperMainEvidenceOn.paperMain_noninterference_mod
 #guard_msgs in
 #print axioms UOToolchain.TapePathOramPaperMainEvidenceOn.paperMain_noninterference_moduloReleases
 
+/--
+info: 'UOToolchain.PathOramTapeWitness.replay_substSteps' depends on axioms: [propext, Classical.choice, Quot.sound]
+-/
+#guard_msgs in
+#print axioms UOToolchain.PathOramTapeWitness.replay_substSteps
+
+/--
+info: 'UOToolchain.PathOramTapeWitness.substituteWitness_valid' depends on axioms: [propext, Classical.choice, Quot.sound]
+-/
+#guard_msgs in
+#print axioms UOToolchain.PathOramTapeWitness.substituteWitness_valid
+
+/--
+info: 'UOToolchain.PathOramTapeWitness.TapePair.sgxViewRelation_sides' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+-/
+#guard_msgs in
+#print axioms UOToolchain.PathOramTapeWitness.TapePair.sgxViewRelation_sides
+
+/--
+info: 'UOToolchain.PathOramTapeWitness.sampleCheck_sound' depends on axioms: [propext, Classical.choice, Quot.sound]
+-/
+#guard_msgs in
+#print axioms UOToolchain.PathOramTapeWitness.sampleCheck_sound
+
 def main : IO UInt32 := pure 0

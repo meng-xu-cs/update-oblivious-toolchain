@@ -36,8 +36,10 @@ a public chain" as its main execution model.
   paper-main theorem holds over admitted configurations given bundle evidence
   (`PathOramAdmitted`), whose leaf obligation follows from the leaf model
   without seed enumeration. The bundle is derived for a concrete
-  single-access instance; multi-access entrypoints are validated through
-  compact theorem inputs. The scalable
+  single-access instance, and for the multi-access entrypoints from one
+  runtime run per side, whose leaves are substituted for every other tape
+  (`PathOramTapeWitness`; runtime runs on sampled tapes are checked against
+  it). The scalable
   `path_oram_private_posmap_v1` route is in the `UOToolchain.ProofGradeRoot`
   import closure (`PathOramPrivatePosmapV1`, `ScalablePathOramEvidence`) and
   executes, but it is not yet covered by a theorem. See

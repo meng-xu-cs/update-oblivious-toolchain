@@ -169,10 +169,16 @@ field bindings required by `DeploymentCallAccepted`.
   a call: that file proves that a call's leaf schedule, on one map or
   several, is uniform for any accesses and any keys present before the call,
   given uniform coins and leaves, and that the leaves left behind stay
-  uniform and independent of it. The probe does not build such families from
-  runtime runs yet, so multi-access local entrypoints are still validated
-  through compact theorem inputs that check a representative witness and
-  derive no theorem. The older theorems that take a
+  uniform and independent of it. One valid runtime run gives such a family:
+  the run on any other tape is the run with that tape's leaves substituted,
+  and every substituted run passes the Lean runtime-witness checks
+  (`UOToolchain/PathOramTapeWitness.lean`). So the multi-access local
+  entrypoints (SingleAccessMap `add`, ConfidentialMixer `deposit`, ERC20Lite
+  `transferFrom`) get the theorem between their pair's two sides from the
+  compact theorem inputs the probe checks. That the runtime's run on every
+  tape is the substituted run is tested, not proved: the checker compares
+  four more runtime runs per side, on other deployment seeds and coins, with
+  their substituted runs. The older theorems that take a
   `SeededRuntimePathOramProofBundle`, whose `cfgWellFormed` field quantifies
   over every `OramConfig`, hold vacuously
   (`seededRuntimePathOramProofBundle_empty` in

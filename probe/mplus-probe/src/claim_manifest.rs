@@ -114,7 +114,7 @@ const CLAIM_ENTRIES: &[ClaimEntry] = &[
     ClaimEntry {
         id: "computational-uo-path-oram-local",
         category: "claim",
-        text: "The bounded local-position-map Path ORAM route path_oram_local_posmap_v1 (capacity 128) executes; its Lean paper-main theorem holds over admitted configurations given bundle evidence, whose leaf obligation follows from the leaf model without seed enumeration, and the bundle is derived for a concrete single-access instance (SingleAccessMap.put); multi-access entrypoints are validated through compact theorem inputs.",
+        text: "The bounded local-position-map Path ORAM route path_oram_local_posmap_v1 (capacity 128) executes; its Lean paper-main theorem holds over admitted configurations given bundle evidence, whose leaf obligation follows from the leaf model without seed enumeration, and the bundle is derived for a concrete single-access instance (SingleAccessMap.put) and, for the multi-access entrypoints, from one runtime run per side whose leaves are substituted for every other tape, with runtime runs on sampled tapes checked against the substitution.",
         status: STATUS_GENERATED_CHECKED,
         doc_anchor: "path_oram_local_posmap_v1",
         source_files: &["crates/uo-core/src/trace.rs"],
@@ -124,6 +124,7 @@ const CLAIM_ENTRIES: &[ClaimEntry] = &[
             "proof/lean/UOToolchain/RuntimeCoins.lean",
             "proof/lean/UOToolchain/PathOramFreshLeaves.lean",
             "proof/lean/UOToolchain/PathOramAdmitted.lean",
+            "proof/lean/UOToolchain/PathOramTapeWitness.lean",
         ],
         runtime_compiler_files: &["runtime/uo-evm/src/controller.rs"],
         benchmark_result_files: &["results/bridge_validation.json", "results/capacity_sweep.json"],

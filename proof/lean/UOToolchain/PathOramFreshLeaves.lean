@@ -63,7 +63,8 @@ def stepLeaves (missCoin nextCoin : Nat) (leaves : σ → Option Nat) :
       | none => (missCoin, leaves)
 
 /-- Run accesses, drawing two coins per access (the random path, then the
-fresh leaf), as the runtime does. -/
+fresh leaf). The runtime draws both for a write and one for a read, which
+serves as whichever of the two the read uses. -/
 def runLeaves (leaves : σ → Option Nat) : List (LeafStep σ) → List Nat → List Nat × (σ → Option Nat)
   | [], _ => ([], leaves)
   | step :: steps, coins =>

@@ -537,6 +537,11 @@
       "ok": true
     },
     {
+      "detail": "artifact proof/lean/UOToolchain/PathOramTapeWitness.lean referenced by computational-uo-path-oram-local exists",
+      "name": "file-exists:computational-uo-path-oram-local:proof/lean/UOToolchain/PathOramTapeWitness.lean",
+      "ok": true
+    },
+    {
       "detail": "artifact runtime/uo-evm/src/controller.rs referenced by computational-uo-path-oram-local exists",
       "name": "file-exists:computational-uo-path-oram-local:runtime/uo-evm/src/controller.rs",
       "ok": true
@@ -904,7 +909,8 @@
         "proof/lean/UOToolchain/RuntimePaperInstantiation.lean",
         "proof/lean/UOToolchain/RuntimeCoins.lean",
         "proof/lean/UOToolchain/PathOramFreshLeaves.lean",
-        "proof/lean/UOToolchain/PathOramAdmitted.lean"
+        "proof/lean/UOToolchain/PathOramAdmitted.lean",
+        "proof/lean/UOToolchain/PathOramTapeWitness.lean"
       ],
       "runtime_compiler_files": [
         "runtime/uo-evm/src/controller.rs"
@@ -913,7 +919,7 @@
         "crates/uo-core/src/trace.rs"
       ],
       "status": "generated-and-checked",
-      "text": "The bounded local-position-map Path ORAM route path_oram_local_posmap_v1 (capacity 128) executes; its Lean paper-main theorem holds over admitted configurations given bundle evidence, whose leaf obligation follows from the leaf model without seed enumeration, and the bundle is derived for a concrete single-access instance (SingleAccessMap.put); multi-access entrypoints are validated through compact theorem inputs.",
+      "text": "The bounded local-position-map Path ORAM route path_oram_local_posmap_v1 (capacity 128) executes; its Lean paper-main theorem holds over admitted configurations given bundle evidence, whose leaf obligation follows from the leaf model without seed enumeration, and the bundle is derived for a concrete single-access instance (SingleAccessMap.put) and, for the multi-access entrypoints, from one runtime run per side whose leaves are substituted for every other tape, with runtime runs on sampled tapes checked against the substitution.",
       "validation_command": "cargo run -q -p mplus-probe -- --only claim-consistency --out-dir results"
     },
     {

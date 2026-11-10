@@ -71,7 +71,7 @@
     "page_model": "page_v1",
     "shared_resource_model": "shared_v1"
   },
-  "scenario_count": 390,
+  "scenario_count": 391,
   "scenarios": [
     {
       "accepted": false,
@@ -5721,6 +5721,18 @@
       "mutation": "set rhs representative_seed just outside the canonical seed space",
       "rejected": true,
       "scenario": "canonical_pathoram_pair_theorem_input/representative_seed_drift"
+    },
+    {
+      "accepted": false,
+      "artifact_json_bytes": 135235,
+      "artifact_kind": "runtime_canonical_pathoram_pair_tape_samples",
+      "benchmark": "SingleAccessMap/pathoram/put-canonical-pair",
+      "entrypoint": "put(bytes32,uint256)",
+      "lean_stderr": "an lhs runtime run is not the lhs run with its tape's leaves",
+      "lean_stdout": "validated proof-grade canonical fresh-coin path-ORAM pair theorem input for put(bytes32,uint256)\nderived the Path ORAM tape-family theorem for put(bytes32,uint256): each side's run on every tape is its representative run with the tape's leaves, and the two sides are related",
+      "mutation": "move one bucket read of an lhs runtime sample to the neighbouring bucket",
+      "rejected": true,
+      "scenario": "canonical_pathoram_pair_tape_samples/bucket_drift"
     },
     {
       "accepted": false,

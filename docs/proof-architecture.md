@@ -164,8 +164,9 @@ The proof development is organized around these layers:
   `PathOramSecurity`, `PathOramLocalPosmapV1`,
   `ScalablePathOramEvidence`, `PathOramJACMTheorem`,
   `PaperPathOramTheoremRoute`, `CoinTapes` with `PathOramFreshLeaves`, the
-  enumeration-free leaf-schedule theorem for one map or several, and
-  `PathOramAdmitted`, the route over admitted configurations (see
+  enumeration-free leaf-schedule theorem for one map or several,
+  `PathOramAdmitted`, the route over admitted configurations, and
+  `PathOramTapeWitness`, the tape family of one runtime run (see
   [`path-oram.md`](./path-oram.md#current-status)).
 - SGX/TEE observer: `SgxBoundary`, `SgxRelation`, `SgxController`,
   `SgxControllerTrace`, `SgxMicroModel`, `SgxObserverFreeze`,
