@@ -49,13 +49,13 @@
     },
     {
       "path": "capacity_sweep.json",
-      "bytes": 27436,
-      "sha256": "ff8539db6e3e5204e1db9d7041d4a0a819f909e281f58d7dbd3a5585a151ed60"
+      "bytes": 99270,
+      "sha256": "6f5747c01b48290b61d3360ee1a179d855a842d91fc9dae326b93991d0d8846b"
     },
     {
       "path": "claim_artifact_manifest.json",
-      "bytes": 63871,
-      "sha256": "e142e4825e5a995f81558ae41dbd2ace5f8883b946349846a10d0294baf347b3"
+      "bytes": 63910,
+      "sha256": "b9b9c828d9013d20dff4941bbdda6fe80674659b11cbf9d90dbbf65a82e9f228"
     },
     {
       "path": "claim_consistency.json",
@@ -285,12 +285,12 @@
     {
       "path": "reviewer_summary.json",
       "bytes": 126797,
-      "sha256": "5fd3f3a74a67b480aed5b6f4611ad5f92c6ba607fded763735d87cec531a1965"
+      "sha256": "7d5bcf5bcd49ecb79cd4d13bf10ae9f590fef7bfa6eed6034a640135711331fc"
     },
     {
       "path": "reviewer_summary.md",
       "bytes": 28799,
-      "sha256": "9bc77be3218e58888a8c4019c758362b2520eb30905287036ae62a02a033d5e7"
+      "sha256": "b723251bccb120d1d206a81c0bff717db2f8fcbe577972b11faf71f0c6894c8a"
     },
     {
       "path": "runtime_boundary_validation.json",

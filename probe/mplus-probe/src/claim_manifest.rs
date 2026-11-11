@@ -149,7 +149,7 @@ const CLAIM_ENTRIES: &[ClaimEntry] = &[
             "proof/lean/UOToolchain/PathOramTapeWitness.lean",
         ],
         runtime_compiler_files: &["runtime/uo-evm/src/controller.rs"],
-        benchmark_result_files: &["results/bridge_validation.json"],
+        benchmark_result_files: &["results/bridge_validation.json", "results/capacity_sweep.json"],
         validation_command: "cargo run -q -p mplus-probe -- --only claim-consistency --out-dir results",
     },
     ClaimEntry {

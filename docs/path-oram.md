@@ -236,6 +236,25 @@ node access's kind, every size and every tree with its stored heights; the
 replay also checks the pointer level the model leaves out, and the checker
 rejects a replay with one of those facts changed.
 
+The capacity sweep (`--only capacity-sweep`, `results/capacity_sweep.json`)
+measures SingleAccessMap's `read`, one map get, and `put`, one map write, on
+a map of 1 to 16,384 entries on the full scan and on both schemes (the local
+one up to its cap of 128, with its rejection at 256), each on one deployment
+over several keys, and checks that every operation costs the same in every
+trial. On the full scan and the local scheme a read costs what a write does;
+on the tree a write, a get and then a put of `3h + 1` node accesses, costs
+about four times a read: 260 against 980 physical operations at 256 entries,
+654 against 2,556 at 16,384. The full scan moves 380 bytes per entry per
+operation. The tree moves fewer bytes than the full scan from 2,048 entries
+for reads alone, 4,096 for an even mix and 8,192 for writes alone; it makes
+fewer physical operations from 128, 512 and 1,024 entries, and costs less
+modeled gas from 512, 2,048 and 4,096. The local scheme makes fewer
+operations and costs less gas than the full scan from 8 entries but moves
+more bytes at every capacity it admits, and up to its 128 entries it costs
+less than the tree on every metric. The sweep's latencies are wall-clock
+times of the instrumented debug-build runtime, in which the tree is slower
+than the full scan at every capacity measured.
+
 What remains open on the private scheme: the runtime's pointer-level
 implementation of the AVL map (node ids, leaves, the free list, the stash)
 is replayed against the model and run against a reference map in the

@@ -979,7 +979,8 @@
     },
     {
       "benchmark_result_files": [
-        "results/bridge_validation.json"
+        "results/bridge_validation.json",
+        "results/capacity_sweep.json"
       ],
       "category": "claim",
       "doc_anchor": "path_oram_private_posmap_v1",
