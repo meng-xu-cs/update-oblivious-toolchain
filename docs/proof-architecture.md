@@ -228,7 +228,9 @@ entry points are:
   against the Lean model by `checkPathOramAvlMapReplay`
 - `capacity_sweep.json`: a map read's and write's cost on the full scan and
   both Path ORAM schemes from 1 to 16,384 entries, their read/write mixes,
-  and the capacities from which each scheme is cheaper than the full scan
+  and the capacities from which each scheme is cheaper than the full scan;
+  its release-build latencies split into the time spent on exported proof
+  objects and the runtime's own work
 - `reviewer_summary.md`: generated reviewer-facing summary
 - `reproducibility_manifest.json`: output paths, sizes, toolchain pin, and
   SHA-256 digests

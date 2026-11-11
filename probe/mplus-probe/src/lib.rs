@@ -39779,7 +39779,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && core_trace_source.contains("pub fn into_execution_trace_inputs(")
         && state_source.contains("fn ensure_ready_for_call(&self, context: &str) -> Result<()>")
         && state_source.contains(
-            "fn witness_snapshot(&self) -> Result<CommittedRuntimeWitnessSnapshot> {\n        self.committed.witness_snapshot()\n    }",
+            "fn witness_snapshot(&self) -> Result<CommittedRuntimeWitnessSnapshot> {\n        crate::instrumentation::time_witness(|| self.committed.witness_snapshot())\n    }",
         )
         && state_source.contains("CommittedRuntimeWitnessSnapshotBuilder::new(")
         && state_source.contains("let path_oram_object_count = self")
@@ -49204,8 +49204,11 @@ fn run_capacity_sweep() -> Result<JsonValue> {
     // same for every key on every backend, so a mix of reads and writes costs
     // the mix of the two, and the break-even is where a Path ORAM scheme's
     // mixed cost falls to the full scan's. Latencies are wall-clock times of
-    // the instrumented debug-build runtime. Override UO_SWEEP_* for other
-    // grids.
+    // the instrumented runtime in the build that runs the probe (scripts run
+    // the sweep from a release build), split into the time it spends on the
+    // proof objects it exports (position-map witnesses, the execution trace's
+    // proof bundles) and the rest, its own work. Override UO_SWEEP_* for
+    // other grids.
     let capacities = env_usize_list(
         "UO_SWEEP_CAPACITIES",
         &[
@@ -49221,6 +49224,7 @@ fn run_capacity_sweep() -> Result<JsonValue> {
     let trials = env_usize("UO_SWEEP_TRIALS", 3).max(1);
     let mut rows = Vec::new();
     let mut costs: BTreeMap<(&'static str, usize), SweepCosts> = BTreeMap::new();
+    let mut latencies: BTreeMap<(&'static str, usize), SweepLatencies> = BTreeMap::new();
     for &capacity in &capacities {
         for (label, backend, scheme) in CAPACITY_SWEEP_BACKENDS {
             let past_local_limit = scheme == Some("path_oram_local_posmap_v1")
@@ -49243,6 +49247,7 @@ fn run_capacity_sweep() -> Result<JsonValue> {
             };
             let validation_time_ms = validation_started.elapsed().as_millis();
             let mut measured = [None, None];
+            let mut timed = [None, None];
             let measurements = match measure_sweep_operations(&artifact, capacity, warmups, trials)
             {
                 Ok(measurements) => measurements,
@@ -49284,6 +49289,13 @@ fn run_capacity_sweep() -> Result<JsonValue> {
                             "gas": cost.gas,
                             "p50_latency_ns": percentile_sorted(&measurement.latencies_ns, 0.50),
                             "p95_latency_ns": percentile_sorted(&measurement.latencies_ns, 0.95),
+                            "p50_witness_ns": percentile_sorted(&measurement.witness_ns, 0.50),
+                            "p50_proof_objects_ns": percentile_sorted(
+                                &measurement.proof_objects_ns,
+                                0.50
+                            ),
+                            "p50_runtime_ns": percentile_sorted(&measurement.runtime_ns, 0.50),
+                            "p95_runtime_ns": percentile_sorted(&measurement.runtime_ns, 0.95),
                             "trace_json_bytes": measurement.trace_json_bytes,
                             "artifact_json_bytes": serde_json::to_vec(&artifact)?.len(),
                             "proof_object_bytes": serde_json::to_vec(
@@ -49294,6 +49306,18 @@ fn run_capacity_sweep() -> Result<JsonValue> {
                             "validation_time_ms": validation_time_ms,
                         }));
                         measured[index] = Some(cost);
+                        timed[index] = Some(SweepLatency {
+                            call_ns: u64::try_from(percentile_sorted(
+                                &measurement.latencies_ns,
+                                0.50,
+                            ))
+                            .unwrap_or(u64::MAX),
+                            runtime_ns: u64::try_from(percentile_sorted(
+                                &measurement.runtime_ns,
+                                0.50,
+                            ))
+                            .unwrap_or(u64::MAX),
+                        });
                     }
                     Err(err) => rows.push(json!({
                         "backend": label,
@@ -49308,11 +49332,15 @@ fn run_capacity_sweep() -> Result<JsonValue> {
             if let [Some(read), Some(write)] = measured {
                 costs.insert((label, capacity), SweepCosts { read, write });
             }
+            if let [Some(read), Some(write)] = timed {
+                latencies.insert((label, capacity), SweepLatencies { read, write });
+            }
         }
     }
     Ok(json!({
-        "schema": "uo-capacity-sweep-v2",
+        "schema": "uo-capacity-sweep-v3",
         "contract": "SingleAccessMap",
+        "build_profile": if cfg!(debug_assertions) { "debug" } else { "release" },
         "operations": {
             "read": "read(bytes32): one map get",
             "write": "put(bytes32,uint256): one map write",
@@ -49327,6 +49355,13 @@ fn run_capacity_sweep() -> Result<JsonValue> {
         "rows": rows,
         "mix": capacity_sweep_mix(&costs, &read_percents),
         "break_even": capacity_sweep_break_even(&costs, &capacities, &read_percents),
+        "latency_break_even": break_even_over(
+            &latencies,
+            &capacities,
+            &read_percents,
+            &CAPACITY_SWEEP_LATENCY_METRICS,
+            |latencies: &SweepLatencies, metric, percent| latencies.mixed_times_100(metric, percent),
+        ),
     }))
 }
 
@@ -49362,6 +49397,22 @@ fn capacity_sweep_break_even(
     capacities: &[usize],
     read_percents: &[u64],
 ) -> JsonValue {
+    break_even_over(
+        costs,
+        capacities,
+        read_percents,
+        &CAPACITY_SWEEP_METRICS,
+        |costs: &SweepCosts, metric, percent| costs.mixed_times_100(metric, percent),
+    )
+}
+
+fn break_even_over<T>(
+    costs: &BTreeMap<(&'static str, usize), T>,
+    capacities: &[usize],
+    read_percents: &[u64],
+    metrics: &[&str],
+    mixed_times_100: impl Fn(&T, &str, u64) -> u64,
+) -> JsonValue {
     let pairs = [
         ("full_scan", "path_oram_local_posmap_v1"),
         ("full_scan", "path_oram_private_posmap_v1"),
@@ -49385,7 +49436,7 @@ fn capacity_sweep_break_even(
             row.insert("candidate".into(), json!(other));
             row.insert("read_fraction".into(), json!(percent as f64 / 100.0));
             row.insert("capacities_compared".into(), json!(compared));
-            for metric in CAPACITY_SWEEP_METRICS {
+            for &metric in metrics {
                 let mut from = None;
                 for &capacity in compared.iter().rev() {
                     let (Some(base_costs), Some(other_costs)) =
@@ -49393,8 +49444,8 @@ fn capacity_sweep_break_even(
                     else {
                         break;
                     };
-                    if other_costs.mixed_times_100(metric, percent)
-                        <= base_costs.mixed_times_100(metric, percent)
+                    if mixed_times_100(other_costs, metric, percent)
+                        <= mixed_times_100(base_costs, metric, percent)
                     {
                         from = Some(capacity);
                     } else {
@@ -51150,8 +51201,56 @@ fn sealed_encoded_len(payload_len: usize) -> usize {
 struct SweepMeasurement {
     cost: SweepCost,
     cost_same_for_every_trial: bool,
+    /// Each trial's wall-clock latency, sorted.
     latencies_ns: Vec<u128>,
+    /// Each trial's time decoding position-map witnesses, sorted.
+    witness_ns: Vec<u128>,
+    /// Each trial's time building and checking the execution trace's proof
+    /// objects, sorted.
+    proof_objects_ns: Vec<u128>,
+    /// Each trial's latency without the two, sorted: the runtime's own work.
+    runtime_ns: Vec<u128>,
     trace_json_bytes: usize,
+}
+
+/// One measured call.
+struct SweepSample {
+    cost: SweepCost,
+    latency_ns: u128,
+    timings: uo_evm::InstrumentationTimings,
+    trace_json_bytes: usize,
+}
+
+/// The p50 latencies of one operation, in nanoseconds: the whole call, and
+/// the call without the proof objects the instrumented runtime builds.
+#[derive(Clone, Copy, Debug, Default)]
+struct SweepLatency {
+    call_ns: u64,
+    runtime_ns: u64,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct SweepLatencies {
+    read: SweepLatency,
+    write: SweepLatency,
+}
+
+impl SweepLatencies {
+    fn mixed_times_100(&self, metric: &str, read_percent: u64) -> u64 {
+        let pick = |latency: &SweepLatency| match metric {
+            "call_latency_ns" => latency.call_ns,
+            "runtime_latency_ns" => latency.runtime_ns,
+            _ => 0,
+        };
+        read_percent * pick(&self.read) + (100 - read_percent) * pick(&self.write)
+    }
+}
+
+const CAPACITY_SWEEP_LATENCY_METRICS: [&str; 2] = ["call_latency_ns", "runtime_latency_ns"];
+
+fn sorted_u128(mut values: Vec<u128>) -> Vec<u128> {
+    values.sort_unstable();
+    values
 }
 
 fn single_access_map_artifact(
@@ -51205,17 +51304,42 @@ fn measure_sweep_operations(
                     .with_context(|| format!("trial {trial}"))?,
             );
         }
-        let (first, _, _) = samples
+        let first = samples
             .first()
-            .copied()
+            .map(|sample| sample.cost)
             .ok_or_else(|| anyhow!("capacity sweep produced no samples"))?;
-        let mut latencies_ns: Vec<u128> = samples.iter().map(|(_, latency, _)| *latency).collect();
-        latencies_ns.sort_unstable();
         Ok(SweepMeasurement {
             cost: first,
-            cost_same_for_every_trial: samples.iter().all(|(cost, _, _)| *cost == first),
-            latencies_ns,
-            trace_json_bytes: median_usize(samples.iter().map(|(_, _, bytes)| *bytes).collect()),
+            cost_same_for_every_trial: samples.iter().all(|sample| sample.cost == first),
+            latencies_ns: sorted_u128(samples.iter().map(|sample| sample.latency_ns).collect()),
+            witness_ns: sorted_u128(
+                samples
+                    .iter()
+                    .map(|sample| sample.timings.witness_ns)
+                    .collect(),
+            ),
+            proof_objects_ns: sorted_u128(
+                samples
+                    .iter()
+                    .map(|sample| sample.timings.proof_objects_ns)
+                    .collect(),
+            ),
+            runtime_ns: sorted_u128(
+                samples
+                    .iter()
+                    .map(|sample| {
+                        sample.latency_ns.saturating_sub(
+                            sample.timings.witness_ns + sample.timings.proof_objects_ns,
+                        )
+                    })
+                    .collect(),
+            ),
+            trace_json_bytes: median_usize(
+                samples
+                    .iter()
+                    .map(|sample| sample.trace_json_bytes)
+                    .collect(),
+            ),
         })
     };
     let read = measure(true);
@@ -51223,13 +51347,14 @@ fn measure_sweep_operations(
     Ok([read, write])
 }
 
-/// One measured call: a read of, or a write to, the trial's key.
+/// One measured call: a read of, or a write to, the trial's key, with the
+/// time the instrumented runtime spent on its proof objects.
 fn run_sweep_call(
     instance: &mut ContractInstance,
     read: bool,
     trial: usize,
     stored: usize,
-) -> Result<(SweepCost, u128, usize)> {
+) -> Result<SweepSample> {
     let (entrypoint, args) = if read {
         ("read(bytes32)", vec![b32((trial % (stored + 1)) as u8 + 1)])
     } else {
@@ -51241,12 +51366,14 @@ fn run_sweep_call(
             ],
         )
     };
+    uo_evm::take_instrumentation_timings();
     let started = Instant::now();
     let result = instance.call(entrypoint, args)?;
     let latency_ns = started.elapsed().as_nanos();
+    let timings = uo_evm::take_instrumentation_timings();
     let trace = result.trace;
-    Ok((
-        SweepCost {
+    Ok(SweepSample {
+        cost: SweepCost {
             physical_reads: trace.physical_reads.len(),
             physical_writes: trace.physical_writes.len(),
             bytes_read: trace.physical_reads.iter().map(|event| event.len).sum(),
@@ -51254,8 +51381,9 @@ fn run_sweep_call(
             gas: trace.gas_used,
         },
         latency_ns,
-        serde_json::to_vec(&trace)?.len(),
-    ))
+        timings,
+        trace_json_bytes: serde_json::to_vec(&trace)?.len(),
+    })
 }
 
 fn max_stash_bound(artifact: &CompiledArtifact) -> usize {

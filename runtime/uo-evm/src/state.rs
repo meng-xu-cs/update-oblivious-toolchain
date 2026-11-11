@@ -345,7 +345,7 @@ impl ContractRuntime {
     }
 
     fn witness_snapshot(&self) -> Result<CommittedRuntimeWitnessSnapshot> {
-        self.committed.witness_snapshot()
+        crate::instrumentation::time_witness(|| self.committed.witness_snapshot())
     }
 
     pub(in crate::runtime) fn prepare_public_shadow(

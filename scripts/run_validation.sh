@@ -62,8 +62,9 @@ UO_CORRECTNESS_TRIALS="${UO_CORRECTNESS_TRIALS:-4}" \
 # drives a bounded map past the proof-grade ORAM position-map bound (overflow
 # rows recorded explicitly); the abort/rollback study drives confidential calls
 # past a require(...) guard and checks public state rolls back on abort and
-# commits otherwise. Override UO_SWEEP_* for deeper capacity sweeps.
-cargo run -q -p mplus-probe -- --only capacity-sweep "${PROBE_ARGS[@]}"
+# commits otherwise. Override UO_SWEEP_* for deeper capacity sweeps. The sweep
+# reports wall-clock latencies, so it runs from a release build.
+cargo run -q --release -p mplus-probe -- --only capacity-sweep "${PROBE_ARGS[@]}"
 cargo run -q -p mplus-probe -- --only path-oram-avl-map-replay "${PROBE_ARGS[@]}"
 cargo run -q -p mplus-probe -- --only abort-rollback "${PROBE_ARGS[@]}"
 # Compiler admission matrix (Issue 20): compile-and-run every accepted DSL

@@ -270,9 +270,27 @@ fewer physical operations from 128, 512 and 1,024 entries, and costs less
 modeled gas from 512, 2,048 and 4,096. The local scheme makes fewer
 operations and costs less gas than the full scan from 8 entries but moves
 more bytes at every capacity it admits, and up to its 128 entries it costs
-less than the tree on every metric. The sweep's latencies are wall-clock
-times of the instrumented debug-build runtime, in which the tree is slower
-than the full scan at every capacity measured.
+less than the tree on every metric.
+
+The sweep runs from a release build and splits each call's wall-clock
+latency (the median of three trials) into the time the instrumented runtime
+spends on the proof objects it exports, the position-map witnesses and the
+execution trace's proof bundles, and the rest, its own work
+(`p50_witness_ns`, `p50_proof_objects_ns`, `p50_runtime_ns`;
+`latency_break_even` compares both). On its own work the tree is faster
+than the full scan for reads from 8,192 entries (27 ms against 36 at 8,192,
+52 against 84 at 16,384) and for an even mix from 16,384, while a write
+alone stays slower (96 ms against 87 at 16,384). Whole calls on the tree are
+slower at every capacity measured (564 ms against 405 for a read at 16,384):
+to export the position-map witnesses, the runtime decodes every bucket of the
+tree at the start and the end of each call, 467 ms of that read, where the
+full scan's time goes to the proof bundles of its 32,768-event trace (321
+ms). A node access evicts the stash bucket by bucket, placing a block in the
+bucket at a given depth exactly when its leaf and the read leaf agree above
+that depth (the leaf count is a power of two), and moves blocks with in-place
+masked selects; at 4,096 entries this takes 2.2 times fewer instructions per
+node access than walking each block's path and cloning its key and value,
+with every block placed where it was before.
 
 What remains open on the private scheme: the runtime's pointer-level
 implementation of the AVL map (node ids, leaves, the free list, the stash)
@@ -281,6 +299,9 @@ runtime's tests, not proved; and the stash bound for operations that hold
 their nodes until they end is assumed (`stashOverflowBounded`). A read
 followed by a write of the same key makes two gets where one would do, and
 the tree costs more than a flat position map below a few thousand entries.
+The instrumented runtime decodes every bucket of a tree twice per call to
+export the position-map witnesses its checks consume, so its calls take time
+linear in the capacity even where the ORAM's own work is logarithmic.
 
 ## Current Route
 

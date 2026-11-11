@@ -155,19 +155,21 @@ fn finalize_call_trace(
         aborted,
         confidential,
     )?;
-    let trace = ExecutionTrace::from_runtime_finalization_input(
-        artifact,
-        confidential,
-        trace_bundle.into_runtime_finalization_input(
-            opcode_trace,
-            gas_used,
-            Some(deploy_seed),
-            public_state_transition,
-            runtime_kernel_machine_finish_witness,
-            runtime_kernel_finish_bundle,
-            runtime_witness_state,
-        ),
-    )
+    let trace = crate::instrumentation::time_proof_objects(|| {
+        ExecutionTrace::from_runtime_finalization_input(
+            artifact,
+            confidential,
+            trace_bundle.into_runtime_finalization_input(
+                opcode_trace,
+                gas_used,
+                Some(deploy_seed),
+                public_state_transition,
+                runtime_kernel_machine_finish_witness,
+                runtime_kernel_finish_bundle,
+                runtime_witness_state,
+            ),
+        )
+    })
     .map_err(anyhow::Error::from)?;
     let host_return_value = if encrypted_return.is_some() {
         None

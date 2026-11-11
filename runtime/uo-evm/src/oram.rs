@@ -2008,9 +2008,10 @@ mod tests {
         //! bucket store: contents, tree shape, pointers, free list, stash
         //! bound, and the fixed number of path reads and writes.
         use super::super::generated_oram_codecs::{
-            bucket_on_leaf_path, clone_tree_node, tree_avl_height, tree_bootstrap_nodes, tree_get,
-            tree_get_accesses, tree_key_lt, tree_place_nodes, tree_put, tree_put_accesses,
-            TreeAccessRecord, TreeHeader, TreeLink, TreeNode, TreePathStore, TreeShape, TreeStash,
+            bucket_on_leaf_path, clone_tree_node, for_each_bucket_on_leaf_path_leaf_to_root,
+            tree_avl_height, tree_bootstrap_nodes, tree_get, tree_get_accesses, tree_key_lt,
+            tree_place_nodes, tree_put, tree_put_accesses, TreeAccessRecord, TreeHeader, TreeLink,
+            TreeNode, TreePathStore, TreeShape, TreeStash,
         };
         use anyhow::Result;
         use rand::{Rng, SeedableRng};
@@ -2450,6 +2451,81 @@ mod tests {
         fn tree_map_reports_a_stash_overflow() {
             // A stash of two blocks cannot take back the nodes a put reads.
             assert!(run_with(16, 3, 40, 2, true));
+        }
+
+        /// Evicting a path places exactly the blocks the path walk does, in
+        /// the same slots and stash order: a block fits the bucket at a depth
+        /// when its leaf and the read leaf agree above that depth.
+        #[test]
+        fn eviction_depth_test_places_blocks_as_the_path_walk() {
+            let empty = TreeNode::empty(&key_type(), &value_type());
+            let mut rng = ChaCha20Rng::seed_from_u64(0xe71c7);
+            for leaf_count in [2usize, 4, 8, 16, 64, 256] {
+                let levels = leaf_count.trailing_zeros() as usize + 1;
+                let shape = TreeShape {
+                    capacity: leaf_count,
+                    leaf_count,
+                    blocks_per_bucket: 4,
+                    avl_height: tree_avl_height(leaf_count),
+                    stash_bound: 0,
+                    key_type: key_type(),
+                    value_type: value_type(),
+                    key_width: 20,
+                    value_width: 32,
+                };
+                for _ in 0..20 {
+                    let read_leaf = rng.gen_range(0..leaf_count);
+                    let fill = 30;
+                    let mut stash = TreeStash::with_capacity(0, fill, &empty).unwrap();
+                    // (occupied, id, leaf) of each stash block, for the walk.
+                    let mut reference = Vec::new();
+                    for id in 0..fill {
+                        let mut node = clone_tree_node(&empty);
+                        node.occupied = rng.gen_bool(0.7);
+                        node.id = id;
+                        node.leaf = rng.gen_range(0..leaf_count);
+                        reference.push((node.occupied, node.id, node.leaf));
+                        stash.append(&node).unwrap();
+                    }
+                    let mut indices = Vec::new();
+                    for_each_bucket_on_leaf_path_leaf_to_root(leaf_count, read_leaf, |index| {
+                        indices.push(index)
+                    });
+                    assert_eq!(indices.len(), levels);
+                    for (offset, index) in indices.into_iter().enumerate() {
+                        let depth = levels - 1 - offset;
+                        let bucket = stash.evict_bucket(&shape, read_leaf, depth).unwrap();
+                        let mut expected = Vec::new();
+                        for block in reference.iter_mut() {
+                            if block.0
+                                && expected.len() < shape.blocks_per_bucket
+                                && bucket_on_leaf_path(leaf_count, index, block.2)
+                            {
+                                expected.push(block.1);
+                                block.0 = false;
+                            }
+                        }
+                        let placed: Vec<usize> = bucket
+                            .iter()
+                            .filter(|node| node.occupied)
+                            .map(|node| node.id)
+                            .collect();
+                        assert_eq!(placed, expected);
+                    }
+                    let left: Vec<usize> = stash
+                        .blocks
+                        .iter()
+                        .filter(|node| node.occupied)
+                        .map(|node| node.id)
+                        .collect();
+                    let expected_left: Vec<usize> = reference
+                        .iter()
+                        .filter(|block| block.0)
+                        .map(|block| block.1)
+                        .collect();
+                    assert_eq!(left, expected_left);
+                }
+            }
         }
     }
 }
