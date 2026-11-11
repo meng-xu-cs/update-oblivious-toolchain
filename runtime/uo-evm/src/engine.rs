@@ -250,6 +250,13 @@ impl ContractInstance {
         })
     }
 
+    /// The digest of the committed public state, as a call's public-state
+    /// transition record reports it.
+    #[cfg(feature = "diagnostics")]
+    pub fn public_state_digest(&self) -> Result<String> {
+        self.state.public_state_digest()
+    }
+
     fn call_impl(
         &mut self,
         entrypoint: &str,
@@ -414,8 +421,8 @@ mod tests {
     #[cfg(not(feature = "diagnostics"))]
     use uo_core::PublicEnvironment;
     use uo_core::{
-        canonical_runtime_public_object_ids, ContractMetadata, EncryptedReturnPayload, ProgramMode,
-        ReturnChannelPublicBinding, Value,
+        canonical_runtime_public_object_ids, public_delta_digest, ContractMetadata,
+        EncryptedReturnPayload, ProgramMode, ReturnChannelPublicBinding, Value,
     };
 
     fn compile_bench(source: &str, metadata: &str, mode: ProgramMode) -> uo_core::CompiledArtifact {
@@ -612,6 +619,191 @@ bounds:
         let read = instance.call("read()", vec![]).unwrap();
         assert!(!read.aborted);
         assert_eq!(read.return_value, Some(Value::uint(0)));
+    }
+
+    fn object_id(instance: &ContractInstance, name: &str) -> u32 {
+        instance
+            .artifact
+            .contract
+            .state
+            .iter()
+            .find(|object| object.name == name)
+            .unwrap()
+            .id
+    }
+
+    #[test]
+    fn public_state_transition_records_the_public_delta() {
+        let source = write_temp(
+            "public-state-delta",
+            r#"
+            contract C {
+                uint256 private x;
+                uint256 private y;
+                function setX(uint256 v) public {
+                    x = v;
+                }
+                function setThenFail(uint256 v) public {
+                    y = v;
+                    require(false);
+                }
+                function read() public returns (uint256) {
+                    return x;
+                }
+            }
+            "#,
+        );
+        let artifact = compile_bench(
+            source.to_str().unwrap(),
+            r#"
+contract: C
+entrypoints:
+  setX(uint256):
+    confidential: false
+    returns: forbidden
+    status: public
+  setThenFail(uint256):
+    confidential: false
+    returns: forbidden
+    status: public
+  read():
+    confidential: false
+    returns: public
+    status: public
+state:
+  x:
+    kind: cell
+    value: uint256
+    backend: raw
+    confidential: false
+  y:
+    kind: cell
+    value: uint256
+    backend: raw
+    confidential: false
+bounds:
+  loops: {}
+"#,
+            ProgramMode::Raw,
+        );
+        let mut instance = ContractInstance::deploy_with_seed(artifact, 19).unwrap();
+        let x = object_id(&instance, "x");
+
+        // A completed write commits its candidate state; the delta is the
+        // written object.
+        let before = instance.state.public_state_digest().unwrap();
+        let set = instance
+            .call("setX(uint256)", vec![Value::uint(7)])
+            .unwrap();
+        let after = instance.state.public_state_digest().unwrap();
+        let transition = set.trace.public_state_transition.as_ref().unwrap();
+        assert!(!transition.aborted);
+        assert_eq!(transition.initial_public_state_hash, before);
+        assert_eq!(transition.candidate_public_state_hash, after);
+        assert_eq!(transition.committed_public_state_hash, after);
+        assert_ne!(before, after);
+        assert_eq!(
+            transition.public_delta_hash,
+            public_delta_digest(&[x]).unwrap()
+        );
+
+        // An aborted write commits the initial state; its delta is empty.
+        let failed = instance
+            .call("setThenFail(uint256)", vec![Value::uint(9)])
+            .unwrap();
+        let transition = failed.trace.public_state_transition.as_ref().unwrap();
+        assert!(transition.aborted);
+        assert_eq!(transition.initial_public_state_hash, after);
+        assert_ne!(transition.candidate_public_state_hash, after);
+        assert_eq!(transition.committed_public_state_hash, after);
+        assert_eq!(
+            transition.public_delta_hash,
+            public_delta_digest(&[]).unwrap()
+        );
+
+        // A read changes nothing.
+        let read = instance.call("read()", vec![]).unwrap();
+        let transition = read.trace.public_state_transition.as_ref().unwrap();
+        assert_eq!(read.return_value, Some(Value::uint(7)));
+        assert_eq!(transition.initial_public_state_hash, after);
+        assert_eq!(transition.committed_public_state_hash, after);
+        assert_eq!(
+            transition.public_delta_hash,
+            public_delta_digest(&[]).unwrap()
+        );
+    }
+
+    #[test]
+    fn confidential_call_records_its_unchanged_public_state() {
+        let source = write_temp(
+            "confidential-public-state",
+            r#"
+            contract C {
+                uint256 private p;
+                uint256 private secret;
+                function setP(uint256 v) public {
+                    p = v;
+                }
+                function setSecret(uint256 amount) public {
+                    require(amount < 100);
+                    secret = amount;
+                }
+            }
+            "#,
+        );
+        let artifact = compile_bench(
+            source.to_str().unwrap(),
+            r#"
+contract: C
+entrypoints:
+  setP(uint256):
+    confidential: false
+    returns: forbidden
+    status: public
+  setSecret(uint256):
+    confidential: true
+    secret_args: [amount]
+    returns: forbidden
+    status: declassified
+    declassifies: [success]
+state:
+  p:
+    kind: cell
+    value: uint256
+    backend: raw
+    confidential: false
+  secret:
+    kind: cell
+    value: uint256
+    backend: full_scan
+    confidential: true
+bounds:
+  loops: {}
+"#,
+            ProgramMode::Uo,
+        );
+        let mut instance = ContractInstance::deploy_with_seed(artifact, 23).unwrap();
+        instance
+            .call("setP(uint256)", vec![Value::uint(5)])
+            .unwrap();
+        let public_state = instance.state.public_state_digest().unwrap();
+        let empty_delta = public_delta_digest(&[]).unwrap();
+
+        // Completed and aborted confidential calls both leave the public state
+        // as it was; only the abort flag differs.
+        for (amount, aborted) in [(7, false), (700, true)] {
+            let call = instance
+                .call("setSecret(uint256)", vec![Value::uint(amount)])
+                .unwrap();
+            assert_eq!(call.aborted, aborted);
+            let transition = call.trace.public_state_transition.as_ref().unwrap();
+            assert_eq!(transition.aborted, aborted);
+            assert_eq!(transition.initial_public_state_hash, public_state);
+            assert_eq!(transition.candidate_public_state_hash, public_state);
+            assert_eq!(transition.committed_public_state_hash, public_state);
+            assert_eq!(transition.public_delta_hash, empty_delta);
+            assert_eq!(instance.state.public_state_digest().unwrap(), public_state);
+        }
     }
 
     #[test]

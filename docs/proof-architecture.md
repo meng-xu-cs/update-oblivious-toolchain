@@ -108,9 +108,14 @@ paper-main theorem modulo releases with every premise discharged. The exit
 event's output length is the return length, so it reveals whether the call
 completed; the release erasure therefore clears it when the status is
 released (`boundaryWithoutStatusRelease`). Encrypted returns are outside the
-model. The probe checks the runtime's public outcomes and boundary schedules
-against these models on every exact-route experiment run, completed or aborted
-(`outcome_model_matches` in `trace_equivalence.json`).
+model. The probe checks the runtime's public outcomes, boundary schedules, and
+final public-state records against these models on every exact-route
+experiment run, completed or aborted (`outcome_model_matches` and
+`final_public_state_model_matches` in `trace_equivalence.json`). Confidential
+calls report the same record as public ones: the digests of the public state
+before the call, as the call left it, and as committed, the digest of the
+public delta (the ids of the public objects whose committed value changed), and
+the abort flag.
 
 `UOToolchain.KernelAdmission` makes the program-side premises checkable.
 `KernelProgram.admissionCheck` decides well-typedness, return placement,

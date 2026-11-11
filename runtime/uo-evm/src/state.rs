@@ -6,6 +6,7 @@ use anyhow::{anyhow, bail, Result};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::cmp::Ordering;
+use std::collections::{BTreeMap, BTreeSet};
 use uo_allocator::{AllocatorPlan, AllocatorSession};
 use uo_core::{
     ir::StateObject, manifest::EntrypointManifest, CommittedRuntimeWitnessSnapshot,
@@ -45,6 +46,41 @@ struct RuntimePublicObjectStateSnapshot {
     payload: serde_json::Value,
 }
 
+/// The public objects of a state, each with its snapshot payload, in object-id
+/// order, and their digest.
+pub(in crate::runtime) struct PublicStateSnapshot {
+    objects: Vec<RuntimePublicObjectStateSnapshot>,
+    digest: String,
+}
+
+impl PublicStateSnapshot {
+    fn from_objects(objects: Vec<RuntimePublicObjectStateSnapshot>) -> Result<Self> {
+        let digest = hash_json(&objects)?;
+        Ok(Self { objects, digest })
+    }
+
+    /// The ids of the public objects whose payload differs between this
+    /// snapshot and `committed`, ascending: a transition's public delta
+    /// (`publicStateDelta` in `UOToolchain/IRSemantics.lean`).
+    fn delta(&self, committed: &Self) -> Vec<u32> {
+        let initial: BTreeMap<u32, &serde_json::Value> = self
+            .objects
+            .iter()
+            .map(|object| (object.object_id, &object.payload))
+            .collect();
+        let committed: BTreeMap<u32, &serde_json::Value> = committed
+            .objects
+            .iter()
+            .map(|object| (object.object_id, &object.payload))
+            .collect();
+        let object_ids: BTreeSet<u32> = initial.keys().chain(committed.keys()).copied().collect();
+        object_ids
+            .into_iter()
+            .filter(|object_id| initial.get(object_id) != committed.get(object_id))
+            .collect()
+    }
+}
+
 #[derive(Debug, Default)]
 struct RuntimeObjectTable {
     entries: Box<[RuntimeObjectEntry]>,
@@ -53,6 +89,9 @@ struct RuntimeObjectTable {
 #[derive(Debug)]
 pub(in crate::runtime) struct ConfidentialRuntimeShadowState {
     shadow: RuntimeShadowState,
+    // The public-state digest of the call's candidate state, taken when the
+    // call commits.
+    candidate_public_state_hash: Option<String>,
 }
 
 #[derive(Debug)]
@@ -100,7 +139,7 @@ impl RuntimeObjectTable {
         object_ids.finish()
     }
 
-    fn public_state_digest(&self) -> Result<String> {
+    fn public_state_snapshot(&self) -> Result<PublicStateSnapshot> {
         let mut allocator = public_state_snapshot_allocator()?;
         let mut snapshots = Vec::new();
         for entry in &self.entries {
@@ -109,6 +148,24 @@ impl RuntimeObjectTable {
                     object_id: entry.object_id,
                     payload,
                 });
+            }
+        }
+        PublicStateSnapshot::from_objects(snapshots)
+    }
+
+    fn public_state_digest(&self) -> Result<String> {
+        Ok(self.public_state_snapshot()?.digest)
+    }
+
+    /// The public-state digest of this staged table over `committed`: each
+    /// object as staged here, or as committed when the call did not load it.
+    fn staged_public_state_digest(&self, committed: &Self) -> Result<String> {
+        let mut allocator = public_state_snapshot_allocator()?;
+        let mut snapshots = Vec::new();
+        for (object_id, committed_object) in committed.iter() {
+            let object = self.get(object_id).unwrap_or(committed_object);
+            if let Some(payload) = object.public_state_snapshot_value(&mut allocator)? {
+                snapshots.push(RuntimePublicObjectStateSnapshot { object_id, payload });
             }
         }
         hash_json(&snapshots)
@@ -238,8 +295,13 @@ impl ContractRuntime {
         self.committed.public_object_ids()
     }
 
-    pub(in crate::runtime) fn public_state_digest(&self) -> Result<String> {
-        self.committed.public_state_digest()
+    #[cfg(any(test, feature = "diagnostics"))]
+    pub(crate) fn public_state_digest(&self) -> Result<String> {
+        Ok(self.public_state_snapshot()?.digest)
+    }
+
+    pub(in crate::runtime) fn public_state_snapshot(&self) -> Result<PublicStateSnapshot> {
+        self.committed.objects.public_state_snapshot()
     }
 
     pub(in crate::runtime) fn begin_traced_call(
@@ -315,6 +377,7 @@ impl ContractRuntime {
         recorder: &mut CallRecorder,
     ) -> Result<RuntimeCallOutcome> {
         let public_object_ids = self.public_object_ids()?;
+        let initial_public_state = self.public_state_snapshot()?;
         let plan =
             manifest_entry.runtime_confidential_entrypoint_plan(entrypoint, public_object_ids)?;
         self.committed
@@ -329,6 +392,7 @@ impl ContractRuntime {
             runtime_kernel_finish_bundle,
             aborted,
             return_value,
+            candidate_public_state_hash,
         ) = self.committed.run_confidential_call(
             kernel,
             plan.confidential_slot_program(),
@@ -350,13 +414,20 @@ impl ContractRuntime {
             plan.public_object_ids(),
             "after completing the call and returning to committed storage",
         )?;
+        let public_state_transition = public_state_transition(
+            &initial_public_state,
+            candidate_public_state_hash,
+            &self.public_state_snapshot()?,
+            aborted,
+        )?;
         Ok(RuntimeCallOutcome::from_runtime_execution(
             runtime_kernel_machine_finish_witness,
             runtime_kernel_finish_bundle,
             aborted,
             return_value,
             opcode_trace.into_boxed_trace(),
-        ))
+        )
+        .with_public_state_transition(public_state_transition))
     }
 
     pub(in crate::runtime) fn replace_with_cold_public_shadow(
@@ -465,10 +536,6 @@ impl CommittedRuntimeState {
         self.objects.object_ids()
     }
 
-    fn public_state_digest(&self) -> Result<String> {
-        self.objects.public_state_digest()
-    }
-
     fn ensure_confidential_program_targets_uo_backends(
         &self,
         program: &ConfidentialKernelSlotProgram,
@@ -569,6 +636,7 @@ impl CommittedRuntimeState {
         RuntimeKernelFinishBundle,
         bool,
         Option<Value>,
+        String,
     )> {
         let (
             committed_shadow,
@@ -592,12 +660,14 @@ impl CommittedRuntimeState {
                     program.entrypoint_id
                 )
             })?;
+        let candidate_public_state_hash = committed_shadow.candidate_public_state_hash()?;
         self.objects = committed_shadow.into_cold_committed_state()?.objects;
         Ok((
             runtime_kernel_machine_finish_witness,
             runtime_kernel_finish_bundle,
             aborted,
             return_value,
+            candidate_public_state_hash,
         ))
     }
 
@@ -657,6 +727,10 @@ impl CommittedRuntimeState {
 impl RuntimeShadowState {
     fn public_state_digest(&self) -> Result<String> {
         self.objects.public_state_digest()
+    }
+
+    fn public_state_snapshot(&self) -> Result<PublicStateSnapshot> {
+        self.objects.public_state_snapshot()
     }
 
     pub(in crate::runtime) fn object_mut(&mut self, object_id: u32) -> Result<&mut RuntimeObject> {
@@ -760,7 +834,16 @@ impl RuntimeShadowState {
 
 impl ConfidentialRuntimeShadowState {
     pub(in crate::runtime) fn from_shadow(shadow: RuntimeShadowState) -> Self {
-        Self { shadow }
+        Self {
+            shadow,
+            candidate_public_state_hash: None,
+        }
+    }
+
+    fn candidate_public_state_hash(&self) -> Result<String> {
+        self.candidate_public_state_hash
+            .clone()
+            .ok_or_else(|| anyhow!("confidential call has no candidate public state"))
     }
 
     pub(in crate::runtime) fn object_mut(&mut self, object_id: u32) -> Result<&mut RuntimeObject> {
@@ -786,6 +869,13 @@ impl ConfidentialRuntimeShadowState {
         recorder: &mut CallRecorder,
         allocator: &mut AllocatorSession,
     ) -> Result<Box<[u32]>> {
+        // The candidate public state is the committed one with the call's
+        // staged objects in place, before the commit keeps or rolls them back.
+        self.candidate_public_state_hash = Some(
+            self.shadow
+                .objects
+                .staged_public_state_digest(&committed.objects)?,
+        );
         self.shadow
             .commit_against(committed, aborted, recorder, allocator)
     }
@@ -813,6 +903,10 @@ impl PublicRuntimeShadowState {
         self.shadow.public_state_digest()
     }
 
+    pub(in crate::runtime) fn public_state_snapshot(&self) -> Result<PublicStateSnapshot> {
+        self.shadow.public_state_snapshot()
+    }
+
     pub(in crate::runtime) fn commit_against(
         &mut self,
         committed: &CommittedRuntimeState,
@@ -829,16 +923,19 @@ impl PublicRuntimeShadowState {
     }
 }
 
-pub(in crate::runtime) fn public_state_transition_from_hashes(
-    initial_public_state_hash: String,
+/// A call's public-state transition record, from the public state before the
+/// call, the digest of its candidate state, and the committed public state.
+pub(in crate::runtime) fn public_state_transition(
+    initial: &PublicStateSnapshot,
     candidate_public_state_hash: String,
-    committed_public_state_hash: String,
+    committed: &PublicStateSnapshot,
     aborted: bool,
 ) -> Result<RuntimePublicStateTransition> {
-    RuntimePublicStateTransition::from_hashes(
-        initial_public_state_hash,
+    RuntimePublicStateTransition::from_digests(
+        initial.digest.as_str(),
         candidate_public_state_hash,
-        committed_public_state_hash,
+        committed.digest.as_str(),
+        &initial.delta(committed),
         aborted,
     )
     .map_err(anyhow::Error::from)

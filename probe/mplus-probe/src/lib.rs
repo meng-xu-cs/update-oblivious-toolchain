@@ -51634,6 +51634,9 @@ struct ExperimentOutcome {
     /// Whether every run's public outcome and enclave-boundary schedule are the
     /// ones the Lean models predict (`None` off the exact route).
     outcome_model_matches: Option<bool>,
+    /// Whether every run's final public-state record is the one the Lean model
+    /// predicts (`None` off the exact route).
+    final_public_state_model_matches: Option<bool>,
 }
 
 enum OptionalExperimentOutcome {
@@ -52105,6 +52108,64 @@ fn run_matches_outcome_model(
         && certificate.boundary_schedule() == schedule
 }
 
+/// Whether a run's final public-state record is the modeled one
+/// (`kernelFinalPublicState` in `UOToolchain/KernelPaperMain.lean`). An admitted
+/// program writes only confidential objects, so the model's initial, candidate,
+/// and committed states are all the public state before the call, and its
+/// public delta is empty; the abort flag is the negated termination status.
+/// The digests are the runtime's: `public_state_before` and
+/// `public_state_after` are the committed public state's digest just before
+/// and just after the call.
+fn run_matches_final_public_state_model(
+    trace: &uo_core::ExecutionTrace,
+    public_state_before: &str,
+    public_state_after: &str,
+) -> bool {
+    let Some(record) = trace.public_state_transition.as_ref() else {
+        return false;
+    };
+    let Ok(certificate) = trace.runtime_controller_observer_certificate() else {
+        return false;
+    };
+    let Ok(empty_delta) = uo_core::public_delta_digest(&[]) else {
+        return false;
+    };
+    record.initial_public_state_hash == public_state_before
+        && record.candidate_public_state_hash == public_state_before
+        && record.committed_public_state_hash == public_state_before
+        && public_state_after == public_state_before
+        && record.public_delta_hash == empty_delta
+        && record.aborted != certificate.public_outcome().termination_status
+}
+
+/// A target call's result, with the committed public state's digest just
+/// before and just after it.
+struct PublicStateBracketedCall {
+    result: DiagnosticCallResult,
+    public_state_before: String,
+    public_state_after: String,
+}
+
+fn run_target_call_with_public_state(
+    artifact: &CompiledArtifact,
+    setup: &[CallSpec],
+    entrypoint: &str,
+    args: Vec<Value>,
+) -> Result<PublicStateBracketedCall> {
+    let mut instance = ContractInstance::deploy_with_seed(artifact.clone(), PROBE_DEPLOY_SEED)?;
+    for call in setup {
+        instance.call(call.entrypoint, call.args.clone())?;
+    }
+    let public_state_before = instance.public_state_digest()?;
+    let result = instance.call_with_diagnostics(entrypoint, args)?;
+    let public_state_after = instance.public_state_digest()?;
+    Ok(PublicStateBracketedCall {
+        result,
+        public_state_before,
+        public_state_after,
+    })
+}
+
 fn run_binary_experiment(
     artifact: &CompiledArtifact,
     setup: &[CallSpec],
@@ -52122,8 +52183,10 @@ fn run_binary_experiment(
         .as_ref()
         .and_then(|_| kernel_outcome_model(artifact, entrypoint));
     let mut outcome_model_matches = prediction.as_ref().map(|_| outcome_model.is_some());
+    let mut final_public_state_model_matches = prediction.as_ref().map(|_| true);
     for args in class0 {
-        let result = run_target_call_with_diagnostics(artifact, setup, entrypoint, args)?;
+        let bracketed = run_target_call_with_public_state(artifact, setup, entrypoint, args)?;
+        let result = &bracketed.result;
         if let (Some(prediction), Some(matches)) =
             (prediction.as_ref(), exact_encoding_matches.as_mut())
         {
@@ -52133,12 +52196,20 @@ fn run_binary_experiment(
             (outcome_model.as_ref(), outcome_model_matches.as_mut())
         {
             *matches &= run_matches_outcome_model(&result.call.trace, entrypoint, model);
+        }
+        if let Some(matches) = final_public_state_model_matches.as_mut() {
+            *matches &= run_matches_final_public_state_model(
+                &result.call.trace,
+                &bracketed.public_state_before,
+                &bracketed.public_state_after,
+            );
         }
         class0_hashes.push(result.call.trace.hashes()?);
-        class0_metrics.push(extract_metrics(&result));
+        class0_metrics.push(extract_metrics(result));
     }
     for args in class1 {
-        let result = run_target_call_with_diagnostics(artifact, setup, entrypoint, args)?;
+        let bracketed = run_target_call_with_public_state(artifact, setup, entrypoint, args)?;
+        let result = &bracketed.result;
         if let (Some(prediction), Some(matches)) =
             (prediction.as_ref(), exact_encoding_matches.as_mut())
         {
@@ -52149,12 +52220,20 @@ fn run_binary_experiment(
         {
             *matches &= run_matches_outcome_model(&result.call.trace, entrypoint, model);
         }
+        if let Some(matches) = final_public_state_model_matches.as_mut() {
+            *matches &= run_matches_final_public_state_model(
+                &result.call.trace,
+                &bracketed.public_state_before,
+                &bracketed.public_state_after,
+            );
+        }
         class1_hashes.push(result.call.trace.hashes()?);
-        class1_metrics.push(extract_metrics(&result));
+        class1_metrics.push(extract_metrics(result));
     }
     Ok(ExperimentOutcome {
         exact_encoding_matches,
         outcome_model_matches,
+        final_public_state_model_matches,
         opcode_equal: hashes_equal(&class0_hashes, &class1_hashes, |hash| {
             &hash.opcode_trace_hash
         }),
@@ -52676,6 +52755,7 @@ fn trace_summary(benchmark: &str, mode: &str, outcome: &ExperimentOutcome) -> Js
         "physical_trace_equal": outcome.physical_equal,
         "exact_encoding_matches": outcome.exact_encoding_matches,
         "outcome_model_matches": outcome.outcome_model_matches,
+        "final_public_state_model_matches": outcome.final_public_state_model_matches,
     })
 }
 
@@ -53974,8 +54054,9 @@ mod tests {
     // Only used by the strict-default-build tests below, which the
     // insecure-eval-raw feature compiles out.
     use super::{
-        b32, exact_encoding_prediction, kernel_outcome_model, run_matches_outcome_model,
-        trace_matches_exact_encoding, KernelOutcomeModel, PROBE_DEPLOY_SEED,
+        b32, exact_encoding_prediction, kernel_outcome_model, run_matches_final_public_state_model,
+        run_matches_outcome_model, trace_matches_exact_encoding, KernelOutcomeModel,
+        PROBE_DEPLOY_SEED,
     };
     #[cfg(not(feature = "insecure-eval-raw"))]
     use super::{
@@ -54073,6 +54154,79 @@ mod tests {
             ..model
         };
         assert!(!run_matches_outcome_model(&completed, entrypoint, &drifted));
+    }
+
+    fn clone_trace(trace: &uo_core::ExecutionTrace) -> uo_core::ExecutionTrace {
+        serde_json::from_value(serde_json::to_value(trace).unwrap()).unwrap()
+    }
+
+    #[test]
+    fn final_public_state_model_matches_runtime_for_completed_and_aborted_calls() {
+        let artifact = compile_artifact(
+            "benches/raw/ConfidentialMixer.sol",
+            "benches/raw/ConfidentialMixer.uo.yaml",
+            ProgramMode::Uo,
+        )
+        .unwrap();
+        let entrypoint = "withdraw(bytes32,uint256)";
+        let mut instance =
+            ContractInstance::deploy_with_seed(artifact.clone(), PROBE_DEPLOY_SEED).unwrap();
+        instance
+            .call("deposit(bytes32,uint256)", vec![b32(7), Value::uint(5)])
+            .unwrap();
+        let mut call = |amount: u64| {
+            let before = instance.public_state_digest().unwrap();
+            let trace = instance
+                .call(entrypoint, vec![b32(7), Value::uint(amount)])
+                .unwrap()
+                .trace;
+            let after = instance.public_state_digest().unwrap();
+            (trace, before, after)
+        };
+        // A completed and an aborted withdrawal both leave the public state as
+        // it was, as the model predicts; their records differ in the abort flag
+        // only.
+        let (completed, before, after) = call(3);
+        assert!(run_matches_final_public_state_model(
+            &completed, &before, &after
+        ));
+        let (aborted, before, after) = call(9);
+        assert!(run_matches_final_public_state_model(
+            &aborted, &before, &after
+        ));
+        let completed_record = completed.public_state_transition.as_ref().unwrap();
+        let aborted_record = aborted.public_state_transition.as_ref().unwrap();
+        assert!(!completed_record.aborted);
+        assert!(aborted_record.aborted);
+        assert_eq!(
+            completed_record.committed_public_state_hash,
+            aborted_record.committed_public_state_hash
+        );
+
+        // A record with a flipped abort flag, a nonempty delta, a changed
+        // committed state, or no record at all does not match.
+        let tampered = |edit: &dyn Fn(&mut uo_core::RuntimePublicStateTransition)| {
+            let mut trace = clone_trace(&completed);
+            edit(trace.public_state_transition.as_mut().unwrap());
+            run_matches_final_public_state_model(&trace, &before, &after)
+        };
+        assert!(!tampered(&|record| record.aborted = true));
+        assert!(!tampered(&|record| {
+            record.public_delta_hash = uo_core::public_delta_digest(&[1]).unwrap()
+        }));
+        assert!(!tampered(&|record| {
+            record.committed_public_state_hash = "00".repeat(32)
+        }));
+        let mut missing = clone_trace(&completed);
+        missing.public_state_transition = None;
+        assert!(!run_matches_final_public_state_model(
+            &missing, &before, &after
+        ));
+        assert!(!run_matches_final_public_state_model(
+            &completed,
+            &before,
+            &"00".repeat(32)
+        ));
     }
 
     #[test]

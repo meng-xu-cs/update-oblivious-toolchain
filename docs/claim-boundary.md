@@ -100,11 +100,14 @@ entrypoint of the benchmark artifacts is admitted
 (`kernel_admission_*` in `results/static_checks.json`). Entrypoints that access
 an ORAM map are reported on the `path_oram` route, which this exact theorem does
 not cover. That the runtime emits the modeled observables is a refinement
-obligation, not proved. The probe checks the storage trace, public outcome, and
-boundary schedule of every exact-route experiment run against the models
-(`exact_encoding_matches` and `outcome_model_matches` in
-`results/trace_equivalence.json`); the final public-state record is not
-checked against the runtime.
+obligation, not proved. The probe checks all four against the models on every
+exact-route experiment run (`exact_encoding_matches`, `outcome_model_matches`,
+and `final_public_state_model_matches` in `results/trace_equivalence.json`).
+The record's digests are the runtime's own: its initial, candidate, and
+committed digests must each be the digest of the public state just before the
+call, which must also be the state just after it; its delta digest must be that
+of an empty public delta; and its abort flag must be the negated termination
+status.
 
 The theorems are `paperMain_exact_backend_noninterference_moduloReleases`,
 `paperMain_pathOramLocalPosmapV1_noninterference_moduloReleases`, and

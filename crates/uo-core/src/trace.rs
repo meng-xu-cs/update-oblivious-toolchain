@@ -6607,25 +6607,29 @@ pub struct RuntimePublicStateTransition {
     pub aborted: bool,
 }
 
+/// The digest of a call's public delta: the ids of the public objects whose
+/// committed value differs from their initial one, ascending
+/// (`publicStateDelta` in `UOToolchain/IRSemantics.lean`).
+pub fn public_delta_digest(public_delta: &[u32]) -> Result<String, serde_json::Error> {
+    hash_json(public_delta)
+}
+
 impl RuntimePublicStateTransition {
-    pub fn from_hashes(
+    /// The record of a call's public-state transition: the digests of the
+    /// public state before the call, as the call left it, and as committed,
+    /// the digest of the public delta, and whether the call aborted.
+    pub fn from_digests(
         initial_public_state_hash: impl Into<String>,
         candidate_public_state_hash: impl Into<String>,
         committed_public_state_hash: impl Into<String>,
+        public_delta: &[u32],
         aborted: bool,
     ) -> Result<Self, serde_json::Error> {
-        let initial_public_state_hash = initial_public_state_hash.into();
-        let candidate_public_state_hash = candidate_public_state_hash.into();
-        let committed_public_state_hash = committed_public_state_hash.into();
-        let public_delta_hash = hash_json(&(
-            initial_public_state_hash.as_str(),
-            committed_public_state_hash.as_str(),
-        ))?;
         Ok(Self {
-            initial_public_state_hash,
-            candidate_public_state_hash,
-            committed_public_state_hash,
-            public_delta_hash,
+            initial_public_state_hash: initial_public_state_hash.into(),
+            candidate_public_state_hash: candidate_public_state_hash.into(),
+            committed_public_state_hash: committed_public_state_hash.into(),
+            public_delta_hash: public_delta_digest(public_delta)?,
             aborted,
         })
     }

@@ -1,7 +1,5 @@
 use crate::controller::CallRecorder;
-use crate::runtime::state::{
-    public_state_transition_from_hashes, ContractRuntime, PublicRuntimeShadowState,
-};
+use crate::runtime::state::{public_state_transition, ContractRuntime, PublicRuntimeShadowState};
 use anyhow::{anyhow, bail, Result};
 use std::collections::BTreeMap;
 use tiny_keccak::{Hasher, Keccak};
@@ -41,7 +39,7 @@ pub(in crate::runtime) fn run_public_entrypoint(
         .ok_or_else(|| anyhow!("unknown public entrypoint: {entrypoint}"))?;
     let allocator = AllocatorPlan::from_manifest(manifest_entry);
     let public_object_ids = runtime.public_object_ids()?;
-    let initial_public_state_hash = runtime.public_state_digest()?;
+    let initial_public_state = runtime.public_state_snapshot()?;
     let mut kernel = PublicRuntimeKernel::begin(allocator, public_object_ids.as_ref())?;
     let mut shadow = runtime.prepare_public_shadow(&mut kernel, public_object_ids.as_ref())?;
     let execution = interpret_public_entrypoint(
@@ -54,11 +52,10 @@ pub(in crate::runtime) fn run_public_entrypoint(
     )?;
     let candidate_public_state_hash = shadow.public_state_digest()?;
     runtime.commit_public_shadow(&mut kernel, &mut shadow, execution.aborted, recorder)?;
-    let committed_public_state_hash = shadow.public_state_digest()?;
-    let public_state_transition = public_state_transition_from_hashes(
-        initial_public_state_hash,
+    let public_state_transition = public_state_transition(
+        &initial_public_state,
         candidate_public_state_hash,
-        committed_public_state_hash,
+        &shadow.public_state_snapshot()?,
         execution.aborted,
     )?;
     let (runtime_kernel_machine_finish_witness, runtime_kernel_finish_bundle) =

@@ -64,37 +64,37 @@
     ],
     "top_materialized_report_fields": [
       {
-        "bytes": 11724190,
+        "bytes": 11724610,
         "estimated": false,
         "metric": "overheads.cases[4].oram_private_posmap_16384.trace_json_bytes",
         "report": "overheads"
       },
       {
-        "bytes": 11724190,
+        "bytes": 11724610,
         "estimated": false,
         "metric": "overheads.cases[4].variants[5].trace_json_bytes",
         "report": "overheads"
       },
       {
-        "bytes": 11724190,
+        "bytes": 11724610,
         "estimated": false,
         "metric": "overheads.matrix[17].trace_json_bytes",
         "report": "overheads"
       },
       {
-        "bytes": 8068368,
+        "bytes": 8068788,
         "estimated": false,
         "metric": "overheads.cases[4].oram_private_posmap_4096.trace_json_bytes",
         "report": "overheads"
       },
       {
-        "bytes": 8068368,
+        "bytes": 8068788,
         "estimated": false,
         "metric": "overheads.cases[4].variants[4].trace_json_bytes",
         "report": "overheads"
       },
       {
-        "bytes": 8068368,
+        "bytes": 8068788,
         "estimated": false,
         "metric": "overheads.matrix[16].trace_json_bytes",
         "report": "overheads"
@@ -130,19 +130,19 @@
         "report": "tamper_validation"
       },
       {
-        "bytes": 4461440,
+        "bytes": 4461860,
         "estimated": false,
         "metric": "overheads.cases[4].oram_private_posmap.trace_json_bytes",
         "report": "overheads"
       },
       {
-        "bytes": 4461440,
+        "bytes": 4461860,
         "estimated": false,
         "metric": "overheads.cases[4].variants[3].trace_json_bytes",
         "report": "overheads"
       },
       {
-        "bytes": 4461440,
+        "bytes": 4461860,
         "estimated": false,
         "metric": "overheads.matrix[15].trace_json_bytes",
         "report": "overheads"
@@ -419,78 +419,78 @@
     "theorem_facing_large_artifacts_require_enumeration": false
   },
   "proof_checking_cost_ms": {
-    "canonical_pathoram_pair_validation": 337055,
-    "confidential_core_kernel_finish_slot_validation": 2208,
-    "confidential_core_kernel_interface_slot_finish_boundary_validation": 2388,
-    "confidential_core_kernel_interface_slot_validation": 2300,
-    "confidential_core_lowering_validation": 2479,
-    "confidential_core_shell_boundary_lowering_validation": 2482,
-    "confidential_core_shell_boundary_slot_validation": 2231,
-    "confidential_core_slot_validation": 2174,
-    "confidential_core_validation": 2223,
+    "canonical_pathoram_pair_validation": 403411,
+    "confidential_core_kernel_finish_slot_validation": 5242,
+    "confidential_core_kernel_interface_slot_finish_boundary_validation": 3344,
+    "confidential_core_kernel_interface_slot_validation": 3251,
+    "confidential_core_lowering_validation": 3278,
+    "confidential_core_shell_boundary_lowering_validation": 3409,
+    "confidential_core_shell_boundary_slot_validation": 3455,
+    "confidential_core_slot_validation": 3280,
+    "confidential_core_validation": 5851,
     "confidential_fragment_validation": 0,
-    "confidential_proof_family_assurance_validation": 2526,
-    "confidential_proof_family_boundary_validation": 2585,
-    "confidential_proof_family_finish_slot_boundary_validation": 2438,
-    "confidential_proof_family_kernel_interface_validation": 2536,
-    "confidential_proof_family_refinement_boundary_validation": 2520,
-    "confidential_proof_family_slot_assurance_validation": 2567,
-    "confidential_proof_family_slot_boundary_validation": 2711,
-    "confidential_proof_family_validation": 2594,
-    "controller_observer_validation": 2437,
-    "correctness": 2334,
-    "fresh_coin_validation": 13844,
-    "kernel_confinement_boundary_validation": 1667,
-    "kernel_dsl_validation": 2292,
-    "kernel_finish_boundary_validation": 1650,
-    "kernel_interface_confinement_boundary_validation": 1700,
-    "kernel_interface_singleton_boundary_validation": 1760,
-    "kernel_interface_validation": 1844,
-    "kernel_lowering_validation": 2298,
-    "kernel_model_alignment_validation": 5990,
-    "kernel_refinement_boundary_validation": 1682,
-    "kernel_refinement_validation": 2418,
-    "kernel_slot_boundary_validation": 2187,
-    "kernel_slot_dsl_validation": 2195,
-    "kernel_validation": 2238,
-    "leakage_auc": 3501,
-    "mutual_information": 3535,
-    "overheads": 191995,
+    "confidential_proof_family_assurance_validation": 3785,
+    "confidential_proof_family_boundary_validation": 3702,
+    "confidential_proof_family_finish_slot_boundary_validation": 3866,
+    "confidential_proof_family_kernel_interface_validation": 5869,
+    "confidential_proof_family_refinement_boundary_validation": 6157,
+    "confidential_proof_family_slot_assurance_validation": 3827,
+    "confidential_proof_family_slot_boundary_validation": 3888,
+    "confidential_proof_family_validation": 4134,
+    "controller_observer_validation": 6287,
+    "correctness": 2938,
+    "fresh_coin_validation": 17147,
+    "kernel_confinement_boundary_validation": 2039,
+    "kernel_dsl_validation": 5946,
+    "kernel_finish_boundary_validation": 2085,
+    "kernel_interface_confinement_boundary_validation": 2124,
+    "kernel_interface_singleton_boundary_validation": 2015,
+    "kernel_interface_validation": 2108,
+    "kernel_lowering_validation": 3169,
+    "kernel_model_alignment_validation": 10990,
+    "kernel_refinement_boundary_validation": 2138,
+    "kernel_refinement_validation": 3330,
+    "kernel_slot_boundary_validation": 5082,
+    "kernel_slot_dsl_validation": 5362,
+    "kernel_validation": 3377,
+    "leakage_auc": 4356,
+    "mutual_information": 4491,
+    "overheads": 234863,
     "paper_main_family_boundary_validation": 0,
     "paper_main_slot_boundary_validation": 0,
-    "pathoram_hidden_validation": 1718,
-    "pathoram_pair_validation": 9335,
-    "runtime_boundary_validation": 934,
-    "runtime_confidential_statement_trace_bridge_boundary_validation": 557,
-    "runtime_implementation_confidential_statement_trace_bridge_refinement_boundary_validation": 3393,
-    "runtime_implementation_confinement_boundary_validation": 31853,
-    "runtime_implementation_interface_validation": 2293,
-    "runtime_implementation_kernel_machine_confinement_boundary_validation": 31843,
-    "runtime_implementation_kernel_meeting_boundary_validation": 30668,
-    "runtime_implementation_kernel_meeting_confinement_boundary_validation": 59753,
-    "runtime_implementation_public_bridge_observer_refinement_boundary_validation": 20225,
-    "runtime_implementation_residual_helper_shell_machine_refinement_boundary_validation": 19437,
-    "runtime_implementation_shared_kernel_machine_refinement_boundary_validation": 32527,
-    "runtime_implementation_shared_kernel_refinement_boundary_validation": 31605,
-    "runtime_implementation_slot_adapter_machine_refinement_boundary_validation": 2991,
-    "runtime_implementation_small_confidential_kernel_machine_refinement_boundary_validation": 30595,
-    "runtime_kernel_machine_finish_boundary_validation": 2307,
-    "runtime_kernel_machine_finish_witness_validation": 2140,
-    "runtime_public_bridge_boundary_validation": 556,
-    "runtime_residual_helper_shell_boundary_validation": 1659,
-    "runtime_shared_confidential_kernel_boundary_validation": 2302,
-    "runtime_slot_adapter_boundary_validation": 542,
-    "runtime_small_confidential_kernel_boundary_validation": 2149,
-    "seeded_witness_validation": 6359,
-    "shell_boundary_lowering_validation": 2135,
-    "shell_boundary_slot_validation": 2281,
-    "shell_boundary_validation": 2152,
-    "static_checks": 2006,
-    "tamper_validation": 589773,
-    "total_probe_ms": 1660172,
-    "trace_equivalence": 106065,
-    "trusted_kernel_validation": 2271,
-    "witness_validation": 1780
+    "pathoram_hidden_validation": 2760,
+    "pathoram_pair_validation": 11197,
+    "runtime_boundary_validation": 1263,
+    "runtime_confidential_statement_trace_bridge_boundary_validation": 2778,
+    "runtime_implementation_confidential_statement_trace_bridge_refinement_boundary_validation": 7290,
+    "runtime_implementation_confinement_boundary_validation": 41957,
+    "runtime_implementation_interface_validation": 5246,
+    "runtime_implementation_kernel_machine_confinement_boundary_validation": 41502,
+    "runtime_implementation_kernel_meeting_boundary_validation": 39945,
+    "runtime_implementation_kernel_meeting_confinement_boundary_validation": 73794,
+    "runtime_implementation_public_bridge_observer_refinement_boundary_validation": 27353,
+    "runtime_implementation_residual_helper_shell_machine_refinement_boundary_validation": 24027,
+    "runtime_implementation_shared_kernel_machine_refinement_boundary_validation": 42500,
+    "runtime_implementation_shared_kernel_refinement_boundary_validation": 41356,
+    "runtime_implementation_slot_adapter_machine_refinement_boundary_validation": 6237,
+    "runtime_implementation_small_confidential_kernel_machine_refinement_boundary_validation": 40146,
+    "runtime_kernel_machine_finish_boundary_validation": 3393,
+    "runtime_kernel_machine_finish_witness_validation": 5555,
+    "runtime_public_bridge_boundary_validation": 3591,
+    "runtime_residual_helper_shell_boundary_validation": 4739,
+    "runtime_shared_confidential_kernel_boundary_validation": 6441,
+    "runtime_slot_adapter_boundary_validation": 2059,
+    "runtime_small_confidential_kernel_boundary_validation": 5586,
+    "seeded_witness_validation": 10540,
+    "shell_boundary_lowering_validation": 3276,
+    "shell_boundary_slot_validation": 3362,
+    "shell_boundary_validation": 3376,
+    "static_checks": 5763,
+    "tamper_validation": 761971,
+    "total_probe_ms": 2156728,
+    "trace_equivalence": 129742,
+    "trusted_kernel_validation": 5821,
+    "witness_validation": 2201
   },
   "runtime_overheads": {
     "cases": [
@@ -516,7 +516,7 @@
           "physical_reads": 1,
           "physical_writes": 1,
           "rejected": false,
-          "trace_json_bytes": 9533
+          "trace_json_bytes": 9953
         },
         "raw": {
           "error": "confidential object last uses raw backend",
@@ -575,7 +575,7 @@
                 "name": "last"
               }
             ],
-            "trace_json_bytes": 9533
+            "trace_json_bytes": 9953
           }
         ]
       },
@@ -601,7 +601,7 @@
           "physical_reads": 17,
           "physical_writes": 5,
           "rejected": false,
-          "trace_json_bytes": 20107
+          "trace_json_bytes": 20527
         },
         "raw": {
           "error": "confidential object TOKENS uses raw backend",
@@ -674,7 +674,7 @@
                 "name": "lastAuth"
               }
             ],
-            "trace_json_bytes": 20107
+            "trace_json_bytes": 20527
           }
         ]
       },
@@ -718,7 +718,7 @@
           "physical_reads": 18,
           "physical_writes": 9,
           "rejected": false,
-          "trace_json_bytes": 24084
+          "trace_json_bytes": 24504
         },
         "full_scan_64": {
           "bytes_read": 24568.0,
@@ -728,7 +728,7 @@
           "physical_reads": 130,
           "physical_writes": 65,
           "rejected": false,
-          "trace_json_bytes": 107843
+          "trace_json_bytes": 108263
         },
         "oram": {
           "bytes_read": 56644.0,
@@ -742,7 +742,7 @@
           "physical_reads_with_call_start": 67,
           "physical_writes": 49,
           "rejected": false,
-          "trace_json_bytes": 101008
+          "trace_json_bytes": 101428
         },
         "oram_64": {
           "bytes_read": 56644.0,
@@ -756,7 +756,7 @@
           "physical_reads_with_call_start": 67,
           "physical_writes": 49,
           "rejected": false,
-          "trace_json_bytes": 101008
+          "trace_json_bytes": 101428
         },
         "oram_improves_physical_writes": true,
         "oram_improves_physical_writes_baseline": "full_scan_64",
@@ -831,7 +831,7 @@
                 "name": "total"
               }
             ],
-            "trace_json_bytes": 24084
+            "trace_json_bytes": 24504
           },
           {
             "artifact_json_bytes": 16271,
@@ -867,7 +867,7 @@
                 "name": "total"
               }
             ],
-            "trace_json_bytes": 107843
+            "trace_json_bytes": 108263
           },
           {
             "artifact_json_bytes": 16532,
@@ -918,7 +918,7 @@
                 "name": "total"
               }
             ],
-            "trace_json_bytes": 101008
+            "trace_json_bytes": 101428
           }
         ]
       },
@@ -962,7 +962,7 @@
           "physical_reads": 18,
           "physical_writes": 9,
           "rejected": false,
-          "trace_json_bytes": 24157
+          "trace_json_bytes": 24577
         },
         "full_scan_64": {
           "bytes_read": 24568.0,
@@ -972,7 +972,7 @@
           "physical_reads": 130,
           "physical_writes": 65,
           "rejected": false,
-          "trace_json_bytes": 107916
+          "trace_json_bytes": 108336
         },
         "oram": {
           "bytes_read": 56644.0,
@@ -986,7 +986,7 @@
           "physical_reads_with_call_start": 67,
           "physical_writes": 49,
           "rejected": false,
-          "trace_json_bytes": 101071
+          "trace_json_bytes": 101491
         },
         "oram_64": {
           "bytes_read": 56644.0,
@@ -1000,7 +1000,7 @@
           "physical_reads_with_call_start": 67,
           "physical_writes": 49,
           "rejected": false,
-          "trace_json_bytes": 101071
+          "trace_json_bytes": 101491
         },
         "oram_improves_physical_writes": true,
         "oram_improves_physical_writes_baseline": "full_scan_64",
@@ -1075,7 +1075,7 @@
                 "name": "total"
               }
             ],
-            "trace_json_bytes": 24157
+            "trace_json_bytes": 24577
           },
           {
             "artifact_json_bytes": 16271,
@@ -1111,7 +1111,7 @@
                 "name": "total"
               }
             ],
-            "trace_json_bytes": 107916
+            "trace_json_bytes": 108336
           },
           {
             "artifact_json_bytes": 16532,
@@ -1162,7 +1162,7 @@
                 "name": "total"
               }
             ],
-            "trace_json_bytes": 101071
+            "trace_json_bytes": 101491
           }
         ]
       },
@@ -1224,7 +1224,7 @@
           "physical_reads": 64,
           "physical_writes": 24,
           "rejected": false,
-          "trace_json_bytes": 54555
+          "trace_json_bytes": 54975
         },
         "oram": {
           "bytes_read": 196056.0,
@@ -1238,7 +1238,7 @@
           "physical_reads_with_call_start": 225,
           "physical_writes": 176,
           "rejected": false,
-          "trace_json_bytes": 326148
+          "trace_json_bytes": 326568
         },
         "oram_improves_physical_writes": false,
         "oram_improves_physical_writes_baseline": "full_scan",
@@ -1254,7 +1254,7 @@
           "physical_reads_with_call_start": 1373,
           "physical_writes": 1320,
           "rejected": false,
-          "trace_json_bytes": 4461440
+          "trace_json_bytes": 4461860
         },
         "oram_private_posmap_16384": {
           "bytes_read": 3626648.0,
@@ -1268,7 +1268,7 @@
           "physical_reads_with_call_start": 3346,
           "physical_writes": 3290,
           "rejected": false,
-          "trace_json_bytes": 11724190
+          "trace_json_bytes": 11724610
         },
         "oram_private_posmap_4096": {
           "bytes_read": 2733308.0,
@@ -1282,7 +1282,7 @@
           "physical_reads_with_call_start": 2535,
           "physical_writes": 2480,
           "rejected": false,
-          "trace_json_bytes": 8068368
+          "trace_json_bytes": 8068788
         },
         "raw": {
           "error": "confidential object allowances uses raw backend",
@@ -1355,7 +1355,7 @@
                 "name": "balances"
               }
             ],
-            "trace_json_bytes": 54555
+            "trace_json_bytes": 54975
           },
           {
             "artifact_json_bytes": 30551,
@@ -1416,7 +1416,7 @@
                 "name": "balances"
               }
             ],
-            "trace_json_bytes": 326148
+            "trace_json_bytes": 326568
           },
           {
             "artifact_json_bytes": 30576,
@@ -1477,7 +1477,7 @@
                 "name": "balances"
               }
             ],
-            "trace_json_bytes": 4461440
+            "trace_json_bytes": 4461860
           },
           {
             "artifact_json_bytes": 30391,
@@ -1538,7 +1538,7 @@
                 "name": "balances"
               }
             ],
-            "trace_json_bytes": 8068368
+            "trace_json_bytes": 8068788
           },
           {
             "artifact_json_bytes": 30395,
@@ -1599,7 +1599,7 @@
                 "name": "balances"
               }
             ],
-            "trace_json_bytes": 11724190
+            "trace_json_bytes": 11724610
           }
         ]
       },
@@ -1625,7 +1625,7 @@
           "physical_reads": 16,
           "physical_writes": 8,
           "rejected": false,
-          "trace_json_bytes": 21554
+          "trace_json_bytes": 21974
         },
         "raw": {
           "error": "confidential object records uses raw backend",
@@ -1684,7 +1684,7 @@
                 "name": "records"
               }
             ],
-            "trace_json_bytes": 21554
+            "trace_json_bytes": 21974
           }
         ]
       }
@@ -1765,7 +1765,7 @@
             "name": "last"
           }
         ],
-        "trace_json_bytes": 9533
+        "trace_json_bytes": 9953
       },
       {
         "artifact_json_bytes": 4734,
@@ -1832,7 +1832,7 @@
             "name": "lastAuth"
           }
         ],
-        "trace_json_bytes": 20107
+        "trace_json_bytes": 20527
       },
       {
         "artifact_json_bytes": 6530,
@@ -1899,7 +1899,7 @@
             "name": "total"
           }
         ],
-        "trace_json_bytes": 24084
+        "trace_json_bytes": 24504
       },
       {
         "artifact_json_bytes": 16271,
@@ -1935,7 +1935,7 @@
             "name": "total"
           }
         ],
-        "trace_json_bytes": 107843
+        "trace_json_bytes": 108263
       },
       {
         "artifact_json_bytes": 16532,
@@ -1986,7 +1986,7 @@
             "name": "total"
           }
         ],
-        "trace_json_bytes": 101008
+        "trace_json_bytes": 101428
       },
       {
         "artifact_json_bytes": 6530,
@@ -2053,7 +2053,7 @@
             "name": "total"
           }
         ],
-        "trace_json_bytes": 24157
+        "trace_json_bytes": 24577
       },
       {
         "artifact_json_bytes": 16271,
@@ -2089,7 +2089,7 @@
             "name": "total"
           }
         ],
-        "trace_json_bytes": 107916
+        "trace_json_bytes": 108336
       },
       {
         "artifact_json_bytes": 16532,
@@ -2140,7 +2140,7 @@
             "name": "total"
           }
         ],
-        "trace_json_bytes": 101071
+        "trace_json_bytes": 101491
       },
       {
         "artifact_json_bytes": 10549,
@@ -2207,7 +2207,7 @@
             "name": "balances"
           }
         ],
-        "trace_json_bytes": 54555
+        "trace_json_bytes": 54975
       },
       {
         "artifact_json_bytes": 30551,
@@ -2268,7 +2268,7 @@
             "name": "balances"
           }
         ],
-        "trace_json_bytes": 326148
+        "trace_json_bytes": 326568
       },
       {
         "artifact_json_bytes": 30576,
@@ -2329,7 +2329,7 @@
             "name": "balances"
           }
         ],
-        "trace_json_bytes": 4461440
+        "trace_json_bytes": 4461860
       },
       {
         "artifact_json_bytes": 30391,
@@ -2390,7 +2390,7 @@
             "name": "balances"
           }
         ],
-        "trace_json_bytes": 8068368
+        "trace_json_bytes": 8068788
       },
       {
         "artifact_json_bytes": 30395,
@@ -2451,7 +2451,7 @@
             "name": "balances"
           }
         ],
-        "trace_json_bytes": 11724190
+        "trace_json_bytes": 11724610
       },
       {
         "artifact_json_bytes": 5475,
@@ -2504,7 +2504,7 @@
             "name": "records"
           }
         ],
-        "trace_json_bytes": 21554
+        "trace_json_bytes": 21974
       }
     ]
   },
@@ -3426,14 +3426,14 @@
       "files": [
         {
           "file": "runtime/uo-evm/src/engine.rs",
-          "nonempty_loc": 1676
+          "nonempty_loc": 1860
         },
         {
           "file": "runtime/uo-evm/src/shell.rs",
-          "nonempty_loc": 558
+          "nonempty_loc": 555
         }
       ],
-      "total_nonempty_loc": 2234
+      "total_nonempty_loc": 2415
     },
     "trusted_runtime_surface": {
       "file_count": 4,
@@ -3444,7 +3444,7 @@
         },
         {
           "file": "runtime/uo-evm/src/state.rs",
-          "nonempty_loc": 952
+          "nonempty_loc": 1041
         },
         {
           "file": "runtime/uo-evm/src/theorem.rs",
@@ -3452,10 +3452,10 @@
         },
         {
           "file": "crates/uo-core/src/trace.rs",
-          "nonempty_loc": 10334
+          "nonempty_loc": 10337
         }
       ],
-      "total_nonempty_loc": 12139
+      "total_nonempty_loc": 12231
     }
   },
   "wp6_closure_audit": [
