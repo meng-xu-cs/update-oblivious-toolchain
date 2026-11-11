@@ -269,8 +269,8 @@ theorem ImportedProofRelevantManifestObjectView.exists_oramObjectManifest_of_val
                 translationSurrogateOramScheme, translationPathOramScheme,
                 translationIsPathOramScheme, translationPathOramPositionMapShapeWellFormed] at hShape
           have hStashBound :
-              oram.stash_bound = max (stateObject.capacity.getD 1) 1 := by
-            by_cases hEq : oram.stash_bound = max (stateObject.capacity.getD 1) 1
+              oram.stash_bound = translationPathOramStashBound (stateObject.capacity.getD 1) := by
+            by_cases hEq : oram.stash_bound = translationPathOramStashBound (stateObject.capacity.getD 1)
             · exact hEq
             · simp [validateImportedOramShape, hOram, hPathScheme, hEq,
                 translationSurrogateOramScheme, translationPathOramScheme,
@@ -325,6 +325,10 @@ theorem ImportedProofRelevantManifestObjectView.exists_oramObjectManifest_of_val
               , pathOramScheme
               , translationOramBucketHeaderBytes
               , oramBucketHeaderBytes
+              , pathOramStashBound
+              , pathOramStashBoundLimit
+              , translationPathOramStashBound
+              , translationPathOramStashBoundLimit
               , hPathScheme
               ] using
               And.intro hPathScheme <|
@@ -387,8 +391,8 @@ theorem ImportedProofRelevantManifestObjectView.exists_oramObjectManifest_of_val
                   translationPathOramPrivatePosmapScheme, translationIsPathOramScheme,
                   translationPathOramPositionMapShapeWellFormed] at hShape
             have hStashBound :
-                oram.stash_bound = max (stateObject.capacity.getD 1) 1 := by
-              by_cases hEq : oram.stash_bound = max (stateObject.capacity.getD 1) 1
+                oram.stash_bound = translationPathOramStashBound (stateObject.capacity.getD 1) := by
+              by_cases hEq : oram.stash_bound = translationPathOramStashBound (stateObject.capacity.getD 1)
               · exact hEq
               · simp [validateImportedOramShape, hOram, hPrivateScheme, hEq,
                   translationSurrogateOramScheme, translationPathOramScheme,
@@ -448,6 +452,10 @@ theorem ImportedProofRelevantManifestObjectView.exists_oramObjectManifest_of_val
                 , privatePathOramScheme
                 , translationOramBucketHeaderBytes
                 , oramBucketHeaderBytes
+                , pathOramStashBound
+                , pathOramStashBoundLimit
+                , translationPathOramStashBound
+                , translationPathOramStashBoundLimit
                 , hPrivateScheme
                 ] using
                 And.intro hPrivateScheme <|

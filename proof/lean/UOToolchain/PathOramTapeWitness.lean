@@ -2113,7 +2113,7 @@ def wellFormedPrivatePathOramObjectCheck (object : OramObjectManifest) : Bool :=
     decide (object.blocksPerBucket = pathOramBlocksPerBucket) &&
     decide (object.bucketSize = oramBucketHeaderBytes + object.blocksPerBucket * object.blockSize) &&
     decide (0 < object.bucketCount) &&
-    decide (object.stashBound = max object.capacity 1) &&
+    decide (object.stashBound = pathOramStashBound object.capacity) &&
     decide (object.recursionDepth = 1) &&
     decide (object.metadataPagesPerAccess = object.metadataPages + 1) &&
     decide (object.bucketsPerAccess = object.treeHeight + 1) &&

@@ -246,17 +246,17 @@
     {
       "accepted": true,
       "boundary_events": 14,
-      "certificate_json_bytes": 48273,
+      "certificate_json_bytes": 46392,
       "controller_accesses": 6,
       "controller_phase_count": 33,
       "entrypoint": "transferFrom(address,address,address,uint256)",
       "exit_events": 40,
-      "gas_used": 7485,
+      "gas_used": 7427,
       "lean_stdout": "validated runtime controller observer certificate for transferFrom(address,address,address,uint256)",
-      "page_trace_events": 690,
+      "page_trace_events": 660,
       "scenario": "ERC20Lite/pathoram/transferFrom",
       "setup_calls": 2,
-      "shared_resource_events": 723
+      "shared_resource_events": 693
     }
   ]
 }

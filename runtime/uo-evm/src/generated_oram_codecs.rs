@@ -3199,11 +3199,13 @@ pub(super) fn path_entries_from_storage(
         .directory_page_bytes
         .max(parameters.bucket_size)
         .max(8);
+    // One payload opened per metadata page and per bucket; the allocator's
+    // event log grows with the operations it is planned for.
     let mut allocator = AllocatorSession::new(AllocatorPlan {
         arena_bytes: scratch.saturating_mul(4),
         max_stack_words: 0,
         scratch_bytes: scratch,
-        max_kernel_ops: 0,
+        max_kernel_ops: parameters.metadata_pages + parameters.bucket_count,
     })?;
     let mut position_map =
         repeat_boxed_masked_usize_options(parameters.capacity, &MaskedUsizeOption::none())?;
@@ -3263,11 +3265,12 @@ pub(super) fn path_position_map_from_storage(
     directory_pages: &[Box<[u8]>],
 ) -> Result<Box<[MaskedUsizeOption]>> {
     let scratch = parameters.directory_page_bytes.max(8);
+    // One payload opened per position-map page.
     let mut allocator = AllocatorSession::new(AllocatorPlan {
         arena_bytes: scratch.saturating_mul(4),
         max_stack_words: 0,
         scratch_bytes: scratch,
-        max_kernel_ops: 0,
+        max_kernel_ops: parameters.metadata_pages,
     })?;
     let position_map =
         decode_path_position_map_pages(spec, parameters, cipher, directory_pages, &mut allocator)?;

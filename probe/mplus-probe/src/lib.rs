@@ -67,6 +67,29 @@ struct BenchArtifacts {
     /// The benchmark with its multi-access map on the scalable
     /// `path_oram_private_posmap_v1` route, above the local scheme's cap.
     private_posmap: Option<CompiledArtifact>,
+    /// The `private_posmap` variant with that map at a large capacity
+    /// (`LARGE_PRIVATE_POSMAP_CAPACITY`), for the overhead report only: it
+    /// shows how an access's cost grows with the capacity.
+    private_posmap_large: Option<CompiledArtifact>,
+}
+
+/// The capacity of the large private-scheme overhead variant: the largest
+/// power of two whose `transferFrom` fits the per-call allocator bounds, which
+/// are sized from the kernel steps and do not grow with the map's pages.
+const LARGE_PRIVATE_POSMAP_CAPACITY: usize = 1 << 12;
+
+/// The overhead-report label of the large private-scheme variant.
+const LARGE_PRIVATE_POSMAP_LABEL: &str = "oram_private_posmap_4096";
+
+/// ERC20Lite with its `balances` map on the private scheme at this capacity.
+fn erc20_private_posmap_artifact(balances_capacity: usize) -> Result<CompiledArtifact> {
+    let mut metadata = load_metadata("benches/raw/ERC20Lite.private-posmap.yaml")?;
+    let balances = metadata
+        .state
+        .get_mut("balances")
+        .ok_or_else(|| anyhow!("ERC20Lite private-posmap metadata missing balances state"))?;
+    balances.capacity = Some(balances_capacity);
+    compile_artifact_from_metadata("benches/raw/ERC20Lite.sol", &metadata, ProgramMode::Uo)
 }
 
 #[derive(Clone)]
@@ -3476,7 +3499,7 @@ fn static_drift_check_inventory() -> JsonValue {
         {
             "name": "path_oram_deployed_stash_parameters_pinned",
             "work_package": "W5.3",
-            "target": "the deployed Path-ORAM `Z = 5` / `stash_bound = max(capacity, 1)` parameters in `crates/uo-core/src/manifest.rs`",
+            "target": "the deployed Path-ORAM `Z = 5` / `stash_bound = min(max(capacity, 1), 114)` parameters in `crates/uo-core/src/manifest.rs`",
             "report_field": "kernel_model_alignment_validation.path_oram_deployed_stash_parameters_pinned",
         },
     ])
@@ -3664,7 +3687,7 @@ fn explicit_assumption_summary() -> JsonValue {
         {
             "assumption": "stashOverflowBounded",
             "meaning": "bounds stash-overflow failure for the deployed parameters",
-            "status": "explicit Lean assumption in PathOramLocalPosmapV1SecurityAssumptions; W5.3 pairs the assumption with the runtime stash-overflow provenance record (Stefanov et al. JACM 2018 Theorem 5.1 at Z = 5; CCS 2013 fallback) and the static-drift check `path_oram_deployed_stash_parameters_pinned` pinning the deployed Z = 5 / stash_bound = max(capacity, 1) parameters in crates/uo-core/src/manifest.rs",
+            "status": "explicit Lean assumption in PathOramLocalPosmapV1SecurityAssumptions; W5.3 pairs the assumption with the runtime stash-overflow provenance record (Stefanov et al. JACM 2018 Theorem 5.1 at Z = 5; CCS 2013 fallback) and the static-drift check `path_oram_deployed_stash_parameters_pinned` pinning the deployed Z = 5 / stash_bound = min(max(capacity, 1), 114) parameters in crates/uo-core/src/manifest.rs",
         },
         {
             "assumption": "PaperMainRuntimeKernelBoundary / PaperMainRuntimeKernelSlotBoundary",
@@ -3697,6 +3720,7 @@ fn compile_suite() -> Result<BTreeMap<&'static str, BenchArtifacts>> {
             oram: None,
             fullscan64: None,
             private_posmap: None,
+            private_posmap_large: None,
         },
     );
     suite.insert(
@@ -3715,6 +3739,7 @@ fn compile_suite() -> Result<BTreeMap<&'static str, BenchArtifacts>> {
             oram: None,
             fullscan64: None,
             private_posmap: None,
+            private_posmap_large: None,
         },
     );
     suite.insert(
@@ -3741,6 +3766,7 @@ fn compile_suite() -> Result<BTreeMap<&'static str, BenchArtifacts>> {
                 ProgramMode::Uo,
             )?),
             private_posmap: None,
+            private_posmap_large: None,
         },
     );
     suite.insert(
@@ -3767,6 +3793,9 @@ fn compile_suite() -> Result<BTreeMap<&'static str, BenchArtifacts>> {
                 "benches/raw/ERC20Lite.private-posmap.yaml",
                 ProgramMode::Uo,
             )?),
+            private_posmap_large: Some(erc20_private_posmap_artifact(
+                LARGE_PRIVATE_POSMAP_CAPACITY,
+            )?),
         },
     );
     suite.insert(
@@ -3785,6 +3814,7 @@ fn compile_suite() -> Result<BTreeMap<&'static str, BenchArtifacts>> {
             oram: None,
             fullscan64: None,
             private_posmap: None,
+            private_posmap_large: None,
         },
     );
     Ok(suite)
@@ -32306,8 +32336,9 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && workspace_cargo_toml_source
             .contains("tiny-keccak = { version = \"=2.0.2\", features = [\"keccak\"] }");
     // W5.3: pin the deployed Path-ORAM parameter regime in the manifest
-    // source. The JACM Theorem 5.1 stash bound applies at Z = 5 with
-    // stash_bound = max(capacity, 1); the static-drift check below rejects
+    // source. The Path ORAM stash theorem applies at Z = 5 with
+    // stash_bound = min(max(capacity, 1), 114), which bounds a stash overflow
+    // by 14 * 0.6002^114 < 2^-80 per access; the static-drift check below rejects
     // representative drift in the manifest's Path-ORAM construction or
     // validation logic. The matching Lean provenance record is
     // `pathOramLocalPosmapV1_stashOverflowProvenance` and the bundle
@@ -32315,12 +32346,16 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
     // `PathOramLocalPosmapV1SecurityAssumptions.stashOverflowProvenance`.
     let path_oram_deployed_stash_parameters_pinned = manifest_alignment_source
         .contains("let blocks_per_bucket = 5usize;")
-        && manifest_alignment_source.contains("let stash_bound = capacity.max(1);")
+        && manifest_alignment_source
+            .contains("pub const PATH_ORAM_STASH_BOUND_LIMIT: usize = 114;")
+        && manifest_alignment_source.contains("capacity.clamp(1, PATH_ORAM_STASH_BOUND_LIMIT)")
+        && manifest_alignment_source.contains("let stash_bound = path_oram_stash_bound(capacity);")
         && manifest_alignment_source.contains("if self.blocks_per_bucket != 5 {")
         && manifest_alignment_source.contains("bail!(\"path ORAM requires 5 blocks per bucket\");")
-        && manifest_alignment_source.contains("if self.stash_bound != capacity.max(1) {")
         && manifest_alignment_source
-            .contains("bail!(\"path ORAM stash_bound must equal max(capacity, 1)\");");
+            .contains("if self.stash_bound != path_oram_stash_bound(capacity) {")
+        && manifest_alignment_source
+            .contains("\"path ORAM stash_bound must equal min(max(capacity, 1), {})\",");
     // W6.1: pin the hostile-host SGX observer surface — page-region
     // names, controller-phase vocabulary, page-event-kind /
     // exit-event-kind vocabularies, shared-resource pattern literal,
@@ -50448,7 +50483,7 @@ fn run_engineering_cost(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Resul
             "sparse_metadata_setting": "fixed public metadata pages",
             "dirty_bitmap_setting": "fixed public write schedules, not host-visible dirty-bit elision",
             "oram_z": 5,
-            "stash_bound": "max(capacity, 1)",
+            "stash_bound": "min(max(capacity, 1), 114)",
             "position_map_policy": "local position map up to capacity 128; private position-map route above 128",
             "compact_budget_bytes": std::env::var("UO_CANONICAL_CERT_BUDGET_BYTES").unwrap_or_else(|_| (64 * 1024 * 1024u64).to_string()),
             "heavy_budget_bytes": std::env::var("UO_HEAVY_ARTIFACT_BUDGET_BYTES").unwrap_or_else(|_| (20 * 1024 * 1024 * 1024u64).to_string()),
@@ -51259,6 +51294,14 @@ fn append_overhead_workload(
                 .with_context(|| format!("{benchmark}/oram_private_posmap"))
         })
         .transpose()?;
+    let private_posmap_large = artifacts
+        .private_posmap_large
+        .as_ref()
+        .map(|artifact| {
+            run_scenario(artifact, setup, target, getters)
+                .with_context(|| format!("{benchmark}/{LARGE_PRIVATE_POSMAP_LABEL}"))
+        })
+        .transpose()?;
 
     let mut variants = Vec::new();
     let raw_row =
@@ -51404,6 +51447,35 @@ fn append_overhead_workload(
             private_artifact,
             target.entrypoint,
             "oram_private_posmap",
+        ));
+    }
+
+    if let Some(large) = private_posmap_large {
+        let large_artifact = artifacts.private_posmap_large.as_ref().unwrap();
+        let large_row = overhead_matrix_row(
+            benchmark,
+            LARGE_PRIVATE_POSMAP_LABEL,
+            large_artifact,
+            target.entrypoint,
+            &large,
+        )?;
+        case[LARGE_PRIVATE_POSMAP_LABEL] = scenario_overhead(&large);
+        append_call_start_decode(
+            &mut case[LARGE_PRIVATE_POSMAP_LABEL],
+            large_artifact,
+            target.entrypoint,
+            &large,
+        )?;
+        case["variants"]
+            .as_array_mut()
+            .expect("variants is an array")
+            .push(large_row.clone());
+        matrix.push(large_row);
+        cost_formula.push(scenario_cost_formula(
+            &large,
+            large_artifact,
+            target.entrypoint,
+            LARGE_PRIVATE_POSMAP_LABEL,
         ));
     }
 
@@ -53993,6 +54065,7 @@ mod tests {
             oram: None,
             fullscan64: None,
             private_posmap: None,
+            private_posmap_large: None,
         };
         let report = check_authscan_correctness(&artifacts).unwrap();
         assert_eq!(report["equivalent"].as_bool(), Some(true));

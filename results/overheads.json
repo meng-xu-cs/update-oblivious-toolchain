@@ -1044,8 +1044,8 @@
           "cost_model": "uo-modeled-resource-cost-v1",
           "entrypoint": "transferFrom(address,address,address,uint256)",
           "formula_exact": true,
-          "gas_used": 7485,
-          "manifest_public_gas_budget": 7485
+          "gas_used": 7427,
+          "manifest_public_gas_budget": 7427
         },
         {
           "backend": "oram_private_posmap",
@@ -1053,8 +1053,17 @@
           "cost_model": "uo-modeled-resource-cost-v1",
           "entrypoint": "transferFrom(address,address,address,uint256)",
           "formula_exact": true,
-          "gas_used": 13285,
-          "manifest_public_gas_budget": 13285
+          "gas_used": 11255,
+          "manifest_public_gas_budget": 11255
+        },
+        {
+          "backend": "oram_private_posmap_4096",
+          "cost_formula": "modeled_static_budget",
+          "cost_model": "uo-modeled-resource-cost-v1",
+          "entrypoint": "transferFrom(address,address,address,uint256)",
+          "formula_exact": true,
+          "gas_used": 67399,
+          "manifest_public_gas_budget": 67399
         }
       ],
       "ct_gas_only": {
@@ -1079,34 +1088,48 @@
         "trace_json_bytes": 54555
       },
       "oram": {
-        "bytes_read": 198768.0,
-        "bytes_read_with_call_start": 260936.0,
-        "bytes_written": 198768.0,
-        "call_start_bytes": 62168.0,
-        "call_start_reads": 50,
+        "bytes_read": 196056.0,
+        "bytes_read_with_call_start": 256868.0,
+        "bytes_written": 196056.0,
+        "call_start_bytes": 60812.0,
+        "call_start_reads": 49,
         "executable": true,
-        "gas_used": 7485,
-        "physical_reads": 178,
-        "physical_reads_with_call_start": 228,
-        "physical_writes": 178,
+        "gas_used": 7427,
+        "physical_reads": 176,
+        "physical_reads_with_call_start": 225,
+        "physical_writes": 176,
         "rejected": false,
-        "trace_json_bytes": 332124
+        "trace_json_bytes": 326148
       },
       "oram_improves_physical_writes": false,
       "oram_improves_physical_writes_baseline": "full_scan",
       "oram_private_posmap": {
-        "bytes_read": 428640.0,
-        "bytes_read_with_call_start": 546680.0,
-        "bytes_written": 428640.0,
-        "call_start_bytes": 118040.0,
-        "call_start_reads": 98,
+        "bytes_read": 346776.0,
+        "bytes_read_with_call_start": 443672.0,
+        "bytes_written": 346776.0,
+        "call_start_bytes": 96896.0,
+        "call_start_reads": 80,
         "executable": true,
-        "gas_used": 13285,
-        "physical_reads": 378,
-        "physical_reads_with_call_start": 476,
-        "physical_writes": 378,
+        "gas_used": 11255,
+        "physical_reads": 308,
+        "physical_reads_with_call_start": 388,
+        "physical_writes": 308,
         "rejected": false,
-        "trace_json_bytes": 675452
+        "trace_json_bytes": 523096
+      },
+      "oram_private_posmap_4096": {
+        "bytes_read": 2594424.0,
+        "bytes_read_with_call_start": 3250040.0,
+        "bytes_written": 2594424.0,
+        "call_start_bytes": 655616.0,
+        "call_start_reads": 560,
+        "executable": true,
+        "gas_used": 67399,
+        "physical_reads": 2244,
+        "physical_reads_with_call_start": 2804,
+        "physical_writes": 2244,
+        "rejected": false,
+        "trace_json_bytes": 3114903
       },
       "raw": {
         "error": "raw confidential backends are rejected in proof-grade builds; this feature build emits the executable raw_insecure_eval control separately",
@@ -1267,15 +1290,15 @@
           "artifact_json_bytes": 30551,
           "backend": "oram",
           "benchmark": "ERC20Lite/transferFrom",
-          "bytes_read": 198768.0,
-          "bytes_read_with_call_start": 260936.0,
-          "bytes_written": 198768.0,
-          "call_start_bytes": 62168.0,
-          "call_start_reads": 50,
+          "bytes_read": 196056.0,
+          "bytes_read_with_call_start": 256868.0,
+          "bytes_written": 196056.0,
+          "call_start_bytes": 60812.0,
+          "call_start_reads": 49,
           "capacity": "64+128",
           "entrypoint": "transferFrom(address,address,address,uint256)",
           "entrypoint_resource_bounds": {
-            "max_commit_ops": 178,
+            "max_commit_ops": 176,
             "oram_bounds": [
               {
                 "accesses": 4,
@@ -1291,20 +1314,20 @@
                 "accesses": 2,
                 "buckets_per_access": 8,
                 "capacity": 128,
-                "commit_ops_for_entrypoint": 82,
-                "commit_ops_per_access": 41,
-                "metadata_pages": 32,
-                "metadata_pages_per_access": 33,
+                "commit_ops_for_entrypoint": 80,
+                "commit_ops_per_access": 40,
+                "metadata_pages": 31,
+                "metadata_pages_per_access": 32,
                 "scheme": "path_oram_local_posmap_v1"
               }
             ],
             "signature": "transferFrom(address,address,address,uint256)"
           },
           "executable": true,
-          "gas_used": 7485,
-          "physical_reads": 178,
-          "physical_reads_with_call_start": 228,
-          "physical_writes": 178,
+          "gas_used": 7427,
+          "physical_reads": 176,
+          "physical_reads_with_call_start": 225,
+          "physical_writes": 176,
           "rejected": false,
           "state_objects": [
             {
@@ -1322,50 +1345,50 @@
               "name": "balances"
             }
           ],
-          "trace_json_bytes": 332124
+          "trace_json_bytes": 326148
         },
         {
-          "artifact_json_bytes": 30562,
+          "artifact_json_bytes": 30561,
           "backend": "oram_private_posmap",
           "benchmark": "ERC20Lite/transferFrom",
-          "bytes_read": 428640.0,
-          "bytes_read_with_call_start": 546680.0,
-          "bytes_written": 428640.0,
-          "call_start_bytes": 118040.0,
-          "call_start_reads": 98,
+          "bytes_read": 346776.0,
+          "bytes_read_with_call_start": 443672.0,
+          "bytes_written": 346776.0,
+          "call_start_bytes": 96896.0,
+          "call_start_reads": 80,
           "capacity": "128+256",
           "entrypoint": "transferFrom(address,address,address,uint256)",
           "entrypoint_resource_bounds": {
-            "max_commit_ops": 378,
+            "max_commit_ops": 308,
             "oram_bounds": [
               {
                 "accesses": 4,
                 "buckets_per_access": 9,
                 "capacity": 256,
-                "commit_ops_for_entrypoint": 296,
-                "commit_ops_per_access": 74,
-                "metadata_pages": 64,
-                "metadata_pages_per_access": 65,
+                "commit_ops_for_entrypoint": 228,
+                "commit_ops_per_access": 57,
+                "metadata_pages": 47,
+                "metadata_pages_per_access": 48,
                 "scheme": "path_oram_private_posmap_v1"
               },
               {
                 "accesses": 2,
                 "buckets_per_access": 8,
                 "capacity": 128,
-                "commit_ops_for_entrypoint": 82,
-                "commit_ops_per_access": 41,
-                "metadata_pages": 32,
-                "metadata_pages_per_access": 33,
+                "commit_ops_for_entrypoint": 80,
+                "commit_ops_per_access": 40,
+                "metadata_pages": 31,
+                "metadata_pages_per_access": 32,
                 "scheme": "path_oram_local_posmap_v1"
               }
             ],
             "signature": "transferFrom(address,address,address,uint256)"
           },
           "executable": true,
-          "gas_used": 13285,
-          "physical_reads": 378,
-          "physical_reads_with_call_start": 476,
-          "physical_writes": 378,
+          "gas_used": 11255,
+          "physical_reads": 308,
+          "physical_reads_with_call_start": 388,
+          "physical_writes": 308,
           "rejected": false,
           "state_objects": [
             {
@@ -1383,7 +1406,68 @@
               "name": "balances"
             }
           ],
-          "trace_json_bytes": 675452
+          "trace_json_bytes": 523096
+        },
+        {
+          "artifact_json_bytes": 30384,
+          "backend": "oram_private_posmap_4096",
+          "benchmark": "ERC20Lite/transferFrom",
+          "bytes_read": 2594424.0,
+          "bytes_read_with_call_start": 3250040.0,
+          "bytes_written": 2594424.0,
+          "call_start_bytes": 655616.0,
+          "call_start_reads": 560,
+          "capacity": "128+4096",
+          "entrypoint": "transferFrom(address,address,address,uint256)",
+          "entrypoint_resource_bounds": {
+            "max_commit_ops": 2244,
+            "oram_bounds": [
+              {
+                "accesses": 4,
+                "buckets_per_access": 13,
+                "capacity": 4096,
+                "commit_ops_for_entrypoint": 2164,
+                "commit_ops_per_access": 541,
+                "metadata_pages": 527,
+                "metadata_pages_per_access": 528,
+                "scheme": "path_oram_private_posmap_v1"
+              },
+              {
+                "accesses": 2,
+                "buckets_per_access": 8,
+                "capacity": 128,
+                "commit_ops_for_entrypoint": 80,
+                "commit_ops_per_access": 40,
+                "metadata_pages": 31,
+                "metadata_pages_per_access": 32,
+                "scheme": "path_oram_local_posmap_v1"
+              }
+            ],
+            "signature": "transferFrom(address,address,address,uint256)"
+          },
+          "executable": true,
+          "gas_used": 67399,
+          "physical_reads": 2244,
+          "physical_reads_with_call_start": 2804,
+          "physical_writes": 2244,
+          "rejected": false,
+          "state_objects": [
+            {
+              "backend": "oram",
+              "capacity": 128,
+              "confidential": true,
+              "kind": "Map",
+              "name": "allowances"
+            },
+            {
+              "backend": "oram",
+              "capacity": 4096,
+              "confidential": true,
+              "kind": "Map",
+              "name": "balances"
+            }
+          ],
+          "trace_json_bytes": 3114903
         }
       ]
     },
@@ -1562,7 +1646,7 @@
     "public_runtime_formula": "logical_reads*3 + logical_writes*5 + physical_writes*17"
   },
   "coverage": {
-    "matrix_row_count": 30,
+    "matrix_row_count": 31,
     "metrics": [
       "gas_used",
       "physical_reads",
@@ -2421,15 +2505,15 @@
       "artifact_json_bytes": 30551,
       "backend": "oram",
       "benchmark": "ERC20Lite/transferFrom",
-      "bytes_read": 198768.0,
-      "bytes_read_with_call_start": 260936.0,
-      "bytes_written": 198768.0,
-      "call_start_bytes": 62168.0,
-      "call_start_reads": 50,
+      "bytes_read": 196056.0,
+      "bytes_read_with_call_start": 256868.0,
+      "bytes_written": 196056.0,
+      "call_start_bytes": 60812.0,
+      "call_start_reads": 49,
       "capacity": "64+128",
       "entrypoint": "transferFrom(address,address,address,uint256)",
       "entrypoint_resource_bounds": {
-        "max_commit_ops": 178,
+        "max_commit_ops": 176,
         "oram_bounds": [
           {
             "accesses": 4,
@@ -2445,20 +2529,20 @@
             "accesses": 2,
             "buckets_per_access": 8,
             "capacity": 128,
-            "commit_ops_for_entrypoint": 82,
-            "commit_ops_per_access": 41,
-            "metadata_pages": 32,
-            "metadata_pages_per_access": 33,
+            "commit_ops_for_entrypoint": 80,
+            "commit_ops_per_access": 40,
+            "metadata_pages": 31,
+            "metadata_pages_per_access": 32,
             "scheme": "path_oram_local_posmap_v1"
           }
         ],
         "signature": "transferFrom(address,address,address,uint256)"
       },
       "executable": true,
-      "gas_used": 7485,
-      "physical_reads": 178,
-      "physical_reads_with_call_start": 228,
-      "physical_writes": 178,
+      "gas_used": 7427,
+      "physical_reads": 176,
+      "physical_reads_with_call_start": 225,
+      "physical_writes": 176,
       "rejected": false,
       "state_objects": [
         {
@@ -2476,50 +2560,50 @@
           "name": "balances"
         }
       ],
-      "trace_json_bytes": 332124
+      "trace_json_bytes": 326148
     },
     {
-      "artifact_json_bytes": 30562,
+      "artifact_json_bytes": 30561,
       "backend": "oram_private_posmap",
       "benchmark": "ERC20Lite/transferFrom",
-      "bytes_read": 428640.0,
-      "bytes_read_with_call_start": 546680.0,
-      "bytes_written": 428640.0,
-      "call_start_bytes": 118040.0,
-      "call_start_reads": 98,
+      "bytes_read": 346776.0,
+      "bytes_read_with_call_start": 443672.0,
+      "bytes_written": 346776.0,
+      "call_start_bytes": 96896.0,
+      "call_start_reads": 80,
       "capacity": "128+256",
       "entrypoint": "transferFrom(address,address,address,uint256)",
       "entrypoint_resource_bounds": {
-        "max_commit_ops": 378,
+        "max_commit_ops": 308,
         "oram_bounds": [
           {
             "accesses": 4,
             "buckets_per_access": 9,
             "capacity": 256,
-            "commit_ops_for_entrypoint": 296,
-            "commit_ops_per_access": 74,
-            "metadata_pages": 64,
-            "metadata_pages_per_access": 65,
+            "commit_ops_for_entrypoint": 228,
+            "commit_ops_per_access": 57,
+            "metadata_pages": 47,
+            "metadata_pages_per_access": 48,
             "scheme": "path_oram_private_posmap_v1"
           },
           {
             "accesses": 2,
             "buckets_per_access": 8,
             "capacity": 128,
-            "commit_ops_for_entrypoint": 82,
-            "commit_ops_per_access": 41,
-            "metadata_pages": 32,
-            "metadata_pages_per_access": 33,
+            "commit_ops_for_entrypoint": 80,
+            "commit_ops_per_access": 40,
+            "metadata_pages": 31,
+            "metadata_pages_per_access": 32,
             "scheme": "path_oram_local_posmap_v1"
           }
         ],
         "signature": "transferFrom(address,address,address,uint256)"
       },
       "executable": true,
-      "gas_used": 13285,
-      "physical_reads": 378,
-      "physical_reads_with_call_start": 476,
-      "physical_writes": 378,
+      "gas_used": 11255,
+      "physical_reads": 308,
+      "physical_reads_with_call_start": 388,
+      "physical_writes": 308,
       "rejected": false,
       "state_objects": [
         {
@@ -2537,7 +2621,68 @@
           "name": "balances"
         }
       ],
-      "trace_json_bytes": 675452
+      "trace_json_bytes": 523096
+    },
+    {
+      "artifact_json_bytes": 30384,
+      "backend": "oram_private_posmap_4096",
+      "benchmark": "ERC20Lite/transferFrom",
+      "bytes_read": 2594424.0,
+      "bytes_read_with_call_start": 3250040.0,
+      "bytes_written": 2594424.0,
+      "call_start_bytes": 655616.0,
+      "call_start_reads": 560,
+      "capacity": "128+4096",
+      "entrypoint": "transferFrom(address,address,address,uint256)",
+      "entrypoint_resource_bounds": {
+        "max_commit_ops": 2244,
+        "oram_bounds": [
+          {
+            "accesses": 4,
+            "buckets_per_access": 13,
+            "capacity": 4096,
+            "commit_ops_for_entrypoint": 2164,
+            "commit_ops_per_access": 541,
+            "metadata_pages": 527,
+            "metadata_pages_per_access": 528,
+            "scheme": "path_oram_private_posmap_v1"
+          },
+          {
+            "accesses": 2,
+            "buckets_per_access": 8,
+            "capacity": 128,
+            "commit_ops_for_entrypoint": 80,
+            "commit_ops_per_access": 40,
+            "metadata_pages": 31,
+            "metadata_pages_per_access": 32,
+            "scheme": "path_oram_local_posmap_v1"
+          }
+        ],
+        "signature": "transferFrom(address,address,address,uint256)"
+      },
+      "executable": true,
+      "gas_used": 67399,
+      "physical_reads": 2244,
+      "physical_reads_with_call_start": 2804,
+      "physical_writes": 2244,
+      "rejected": false,
+      "state_objects": [
+        {
+          "backend": "oram",
+          "capacity": 128,
+          "confidential": true,
+          "kind": "Map",
+          "name": "allowances"
+        },
+        {
+          "backend": "oram",
+          "capacity": 4096,
+          "confidential": true,
+          "kind": "Map",
+          "name": "balances"
+        }
+      ],
+      "trace_json_bytes": 3114903
     },
     {
       "artifact_json_bytes": 5475,

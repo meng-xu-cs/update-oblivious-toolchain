@@ -130,7 +130,7 @@
         "4"
       ],
       "runtime_status": "executed",
-      "target_gas_used": 7485,
+      "target_gas_used": 7427,
       "target_return": null
     },
     {
@@ -150,7 +150,7 @@
         "1"
       ],
       "runtime_status": "executed",
-      "target_gas_used": 7485,
+      "target_gas_used": 7427,
       "target_return": "1"
     }
   ],

@@ -1233,9 +1233,10 @@ bounds:
             second_trace.trace.theorem_trace
         );
         assert_eq!(first_trace.trace.theorem_trace.boundary_schedule.len(), 6);
-        // Each access reads the counter, all 64 metadata pages (32 position-map
-        // and 32 stash pages), and the 9 buckets of one path.
-        assert_eq!(first_trace.trace.physical_reads.len(), 2 * (1 + 64 + 9));
+        // Each access reads the counter, all 47 metadata pages (32 position-map
+        // pages and 15 stash pages, the stash bound being capped at 114), and
+        // the 9 buckets of one path.
+        assert_eq!(first_trace.trace.physical_reads.len(), 2 * (1 + 47 + 9));
         assert_eq!(
             first_trace
                 .trace

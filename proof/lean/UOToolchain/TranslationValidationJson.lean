@@ -887,6 +887,13 @@ def translationPathOramPrivatePosmapScheme : String := "path_oram_private_posmap
 
 def translationPathOramLocalPosmapMaxCapacity : Nat := 128
 
+/-- The largest Path ORAM stash bound (`pathOramStashBoundLimit`). -/
+def translationPathOramStashBoundLimit : Nat := 114
+
+/-- A Path ORAM map's stash bound: its capacity, capped at the limit. -/
+def translationPathOramStashBound (capacity : Nat) : Nat :=
+  min (max capacity 1) translationPathOramStashBoundLimit
+
 def translationSurrogateOramScheme : String := "surrogate_public_schedule_v1"
 
 def translationOramBucketHeaderBytes : Nat := 24
@@ -1839,7 +1846,7 @@ def validateImportedOramShape
             oram.blocks_per_bucket == 5 &&
             oram.bucket_size ==
               translationOramBucketHeaderBytes + oram.blocks_per_bucket * oram.block_size &&
-            oram.stash_bound == max (stateObject.capacity.getD 1) 1 &&
+            oram.stash_bound == translationPathOramStashBound (stateObject.capacity.getD 1) &&
             oram.tree_height == log2Ceil leafCount &&
             oram.bucket_count == 2 * leafCount - 1 &&
             oram.metadata_pages_per_access == oram.metadata_pages + 1 &&
@@ -1877,7 +1884,7 @@ private def overCapacityPathOramManifestForCheck : ImportedProofRelevantManifest
       , bucket_count := 511
       , blocks_per_bucket := 5
       , tree_height := 8
-      , stash_bound := translationPathOramLocalPosmapMaxCapacity + 1
+      , stash_bound := translationPathOramStashBound (translationPathOramLocalPosmapMaxCapacity + 1)
       , recursion_depth := 0
       , metadata_pages := 1
       , metadata_pages_per_access := 2
@@ -1907,7 +1914,7 @@ private def privateOverCapacityPathOramManifestForCheck : ImportedProofRelevantM
       , bucket_count := 511
       , blocks_per_bucket := 5
       , tree_height := 8
-      , stash_bound := translationPathOramLocalPosmapMaxCapacity + 1
+      , stash_bound := translationPathOramStashBound (translationPathOramLocalPosmapMaxCapacity + 1)
       , recursion_depth := 1
       , metadata_pages := 1
       , metadata_pages_per_access := 2

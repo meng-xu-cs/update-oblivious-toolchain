@@ -11,6 +11,17 @@ pub const SURROGATE_ORAM_SCHEME: &str = "surrogate_public_schedule_v1";
 pub const PATH_ORAM_SCHEME: &str = "path_oram_local_posmap_v1";
 pub const PATH_ORAM_PRIVATE_POSMAP_SCHEME: &str = "path_oram_private_posmap_v1";
 pub const PATH_ORAM_LOCAL_POSMAP_MAX_CAPACITY: usize = 128;
+/// The largest Path ORAM stash bound. By Theorem 1 of Path ORAM (Stefanov et
+/// al.), with 5 blocks per bucket the stash exceeds `R` blocks after an access
+/// with probability at most `14 * 0.6002^R`, below `2^-80` from `R = 114`. A
+/// map's stash bound is its capacity capped at this limit, so a map no larger
+/// than the limit cannot overflow its stash.
+pub const PATH_ORAM_STASH_BOUND_LIMIT: usize = 114;
+
+/// The stash bound of a Path ORAM map of this capacity.
+pub fn path_oram_stash_bound(capacity: usize) -> usize {
+    capacity.clamp(1, PATH_ORAM_STASH_BOUND_LIMIT)
+}
 
 pub fn is_path_oram_scheme(scheme: &str) -> bool {
     scheme == PATH_ORAM_SCHEME || scheme == PATH_ORAM_PRIVATE_POSMAP_SCHEME
@@ -260,7 +271,7 @@ impl OramManifest {
                 let tree_height = log2_ceil(leaf_count);
                 let block_size = 1 + 8 + 8 + key_bytes + value_bytes;
                 let blocks_per_bucket = 5usize;
-                let stash_bound = capacity.max(1);
+                let stash_bound = path_oram_stash_bound(capacity);
                 let position_map_pages = capacity.max(1).div_ceil(8);
                 let stash_pages = stash_bound.div_ceil(8);
                 let metadata_pages = position_map_pages + stash_pages;
@@ -360,8 +371,11 @@ impl OramManifest {
                 if !leaf_count.is_power_of_two() {
                     bail!("path ORAM leaf count must be a power of two");
                 }
-                if self.stash_bound != capacity.max(1) {
-                    bail!("path ORAM stash_bound must equal max(capacity, 1)");
+                if self.stash_bound != path_oram_stash_bound(capacity) {
+                    bail!(
+                        "path ORAM stash_bound must equal min(max(capacity, 1), {})",
+                        PATH_ORAM_STASH_BOUND_LIMIT
+                    );
                 }
                 let expected_recursion_depth = if self.scheme == PATH_ORAM_PRIVATE_POSMAP_SCHEME {
                     1

@@ -53,16 +53,28 @@ The Lean development states more than it currently proves for Path ORAM:
   its bucket on the path to its leaf), and the accessed slot must have exactly
   one block, on its prior leaf and with its key. The call-start reads are not
   in the trace; they follow a fixed pattern set by the public parameters, so
-  they reveal nothing. ERC20Lite `transferFrom` on the local route makes 178
-  traced reads and 50 call-start reads (a capacity-64 map: the counter and 16
-  pages; a capacity-128 map: the counter and 32 pages), down from 432 when a
-  call read every bucket, and decrypts 94 units in all instead of 476.
+  they reveal nothing. ERC20Lite `transferFrom` on the local route makes 176
+  traced reads and 49 call-start reads (a capacity-64 map: the counter and 16
+  pages; a capacity-128 map: the counter and 31 pages), and decrypts 93
+  payloads in all; reading every bucket at call start, as calls did before,
+  added the 382 buckets of the two maps.
   `results/overheads.json` reports the call-start reads next to the traced
   counts of every ORAM row (`call_start_reads`, `call_start_bytes`,
   `physical_reads_with_call_start`, `bytes_read_with_call_start`). Every
-  access still rewrites every metadata page (the flat position map and the
-  stash, whose bound is the capacity), and its trace reads them all, so an
-  access's cost stays linear in the capacity.
+  access still rewrites every metadata page (the flat position map with its
+  keys, linear in the capacity, and the stash, at most 15 pages), and its
+  trace reads them all, so an access's cost stays linear in the capacity.
+  `results/overheads.json` also runs ERC20Lite `transferFrom` with a
+  4096-entry `balances` map on the private scheme
+  (`oram_private_posmap_4096`): 2,244 traced reads (2.6 MB) against 308
+  (347 KB) at capacity 256. A larger flat map does not fit the per-call
+  allocator bounds, which are sized from the kernel steps, not from the
+  map's pages.
+- The stash bound is the capacity capped at 114 (`pathOramStashBound`). By
+  the Path ORAM stash theorem the stash then overflows after an access with
+  probability at most `14 · 0.6002^114 < 2^-80`, which `stashOverflowBounded`
+  assumes; an overflow fails the access in band and aborts the call. A map of
+  capacity at most 114 keeps a stash as large as itself and cannot overflow.
 - Calls that abort run on both schemes (`results/abort_rollback.json`). A
   map write makes no ORAM access during the call: it is held in the enclave
   with the call's other writes, and it updates a pending view of the map's
@@ -78,7 +90,8 @@ The Lean development states more than it currently proves for Path ORAM:
   map per call, and the admitted route covers it (below). The runtime has no
   recursive position map; both schemes share one data path, a flat position
   map in encrypted metadata pages that every access scans in full, so an
-  access to a capacity-256 map reads 64 metadata pages and 9 buckets. The
+  access to a capacity-256 map reads 47 metadata pages (32 of leaves and keys,
+  15 of stash) and 9 buckets. The
   private scheme differs from the local one in its tag, its recursion-depth
   field (1) and the capacity it admits, not in what an access does or what
   the trace shows. Every access remaps the key it touches to a fresh leaf,
@@ -165,9 +178,10 @@ The Lean development states more than it currently proves for Path ORAM:
   run on every tape is the substituted run is what these samples test; it is
   not proved of the Rust runtime.
 
-Open work: replace the flat position map by a recursive one, with a stash
-bound below the capacity, so that an access reads polylogarithmically many
-units instead of every metadata page.
+Open work: replace the flat position map and its keys by an oblivious search
+tree whose nodes hold their children's leaves, so that the position map
+recurses through the tree and an operation reads `O(log n)` paths instead of
+every metadata page.
 
 ## Current Route
 
@@ -242,7 +256,7 @@ time. Multi-access calls on either scheme get the theorem from tape families
 
 | Assumption | Provenance |
 | --- | --- |
-| `stashOverflowBounded` | JACM Path ORAM stash theorem specialized to deployed `Z = 5` / `stash_bound = max(capacity, 1)` parameters |
+| `stashOverflowBounded` | JACM Path ORAM stash theorem specialized to deployed `Z = 5` / `stash_bound = min(max(capacity, 1), 114)` parameters: a stash overflows after an access with probability at most `14 · 0.6002^114 < 2^-80`, and a map of capacity at most 114 cannot overflow |
 | `bucketEncryptionINDCPA` | concrete sealed bucket/path records implemented with `ChaCha20Poly1305` and paired with RFC 8439 plus AEAD composition analysis |
 | `metadataEncryptionINDCPA` | same sealed-record crypto route for encrypted position-map metadata pages |
 

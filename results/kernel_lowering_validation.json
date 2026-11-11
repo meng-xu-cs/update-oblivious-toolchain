@@ -6316,7 +6316,7 @@
         "statement_count": 9
       },
       "entrypoint": "transferFrom(address,address,address,uint256)",
-      "kernel_lowering_bundle_json_bytes": 45988,
+      "kernel_lowering_bundle_json_bytes": 45550,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -6331,7 +6331,7 @@
           "io_scratch": {
             "live_bytes": 0,
             "peak_bytes": 648,
-            "wipe_count": 273
+            "wipe_count": 270
           },
           "peak_stack_words": 7,
           "value_scratch": {
@@ -6356,7 +6356,7 @@
         "hash_scratch_peak_bytes": 20,
         "hash_scratch_wipe_count": 3,
         "io_scratch_peak_bytes": 648,
-        "io_scratch_wipe_count": 273,
+        "io_scratch_wipe_count": 270,
         "kernel_op_count": 9,
         "kernel_step_public_object_schedule": [
           2,
@@ -6372,7 +6372,7 @@
           1,
           2
         ],
-        "resource_event_count": 566,
+        "resource_event_count": 560,
         "resource_events": [
           {
             "bytes": 8,
@@ -6580,18 +6580,6 @@
           },
           {
             "bytes": 8,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 648,
             "kind": "reserve_scratch",
             "region": "io_scratch",
             "words": null
@@ -7198,18 +7186,6 @@
           },
           {
             "bytes": 429,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 648,
             "kind": "reserve_scratch",
             "region": "io_scratch",
             "words": null
@@ -9346,18 +9322,6 @@
           },
           {
             "bytes": 429,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 648,
             "kind": "reserve_scratch",
             "region": "io_scratch",
             "words": null

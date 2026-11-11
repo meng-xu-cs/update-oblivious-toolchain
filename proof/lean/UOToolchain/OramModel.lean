@@ -66,6 +66,17 @@ def isPathOramScheme (scheme : String) : Bool :=
 def surrogateOramBlocksPerBucket : Nat := 2
 def pathOramBlocksPerBucket : Nat := 5
 
+/-- The largest Path ORAM stash bound. By the Path ORAM stash theorem, with
+`pathOramBlocksPerBucket = 5` blocks per bucket the stash exceeds `R` blocks
+after an access with probability at most `14 · 0.6002 ^ R`, below `2 ^ -80`
+from `R = 114`; `stashOverflowBounded` assumes this bound. -/
+def pathOramStashBoundLimit : Nat := 114
+
+/-- A Path ORAM map's stash bound: its capacity, capped at the limit. A map no
+larger than the limit cannot overflow its stash. -/
+def pathOramStashBound (capacity : Nat) : Nat :=
+  min (max capacity 1) pathOramStashBoundLimit
+
 structure OramPublicData where
   witness : OramEntrypointWitness
   publicArgs : List String
@@ -142,7 +153,7 @@ def WellFormedPathOramObject (object : OramObjectManifest) : Prop :=
   object.blocksPerBucket = pathOramBlocksPerBucket ∧
   object.bucketSize = oramBucketHeaderBytes + object.blocksPerBucket * object.blockSize ∧
   0 < object.bucketCount ∧
-  object.stashBound = max object.capacity 1 ∧
+  object.stashBound = pathOramStashBound object.capacity ∧
   object.recursionDepth = 0 ∧
   object.metadataPagesPerAccess = object.metadataPages + 1 ∧
   object.bucketsPerAccess = object.treeHeight + 1 ∧
@@ -153,7 +164,7 @@ def WellFormedPrivatePathOramObject (object : OramObjectManifest) : Prop :=
   object.blocksPerBucket = pathOramBlocksPerBucket ∧
   object.bucketSize = oramBucketHeaderBytes + object.blocksPerBucket * object.blockSize ∧
   0 < object.bucketCount ∧
-  object.stashBound = max object.capacity 1 ∧
+  object.stashBound = pathOramStashBound object.capacity ∧
   object.recursionDepth = 1 ∧
   object.metadataPagesPerAccess = object.metadataPages + 1 ∧
   object.bucketsPerAccess = object.treeHeight + 1 ∧

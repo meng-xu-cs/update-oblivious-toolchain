@@ -390,7 +390,7 @@ def PathOramAccessLeakage (access : OramAccessLeakage) : Prop :=
   access.blocksPerBucket = pathOramBlocksPerBucket ∧
   access.bucketSize = oramBucketHeaderBytes + access.blocksPerBucket * access.blockSize ∧
   0 < access.bucketCount ∧
-  access.stashBound = max access.capacity 1 ∧
+  access.stashBound = pathOramStashBound access.capacity ∧
   access.recursionDepth = 0 ∧
   access.metadataPagesPerAccess = access.metadataPages + 1 ∧
   access.bucketsPerAccess = access.treeHeight + 1 ∧
@@ -1352,7 +1352,7 @@ def PathOramPrivateAccessLeakage (access : OramAccessLeakage) : Prop :=
   access.blocksPerBucket = pathOramBlocksPerBucket ∧
   access.bucketSize = oramBucketHeaderBytes + access.blocksPerBucket * access.blockSize ∧
   0 < access.bucketCount ∧
-  access.stashBound = max access.capacity 1 ∧
+  access.stashBound = pathOramStashBound access.capacity ∧
   access.recursionDepth = 1 ∧
   access.metadataPagesPerAccess = access.metadataPages + 1 ∧
   access.bucketsPerAccess = access.treeHeight + 1 ∧

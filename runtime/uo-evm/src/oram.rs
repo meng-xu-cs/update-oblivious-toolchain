@@ -522,11 +522,12 @@ impl OramState {
                 .directory_page_bytes
                 .max(parameters.bucket_size)
                 .max(8);
+            // One payload sealed per metadata page.
             let mut bootstrap_allocator = AllocatorSession::new(AllocatorPlan {
                 arena_bytes: bootstrap_scratch.saturating_mul(4),
                 max_stack_words: 0,
                 scratch_bytes: bootstrap_scratch,
-                max_kernel_ops: 0,
+                max_kernel_ops: parameters.metadata_pages,
             })?;
             let directory_pages = encode_path_metadata_pages(
                 spec,

@@ -7314,7 +7314,7 @@
     {
       "accepted": true,
       "boundary_events": 14,
-      "boundary_json_bytes": 45162,
+      "boundary_json_bytes": 44724,
       "confidential_slot_program": {
         "entrypoint_id": "transferFrom(address,address,address,uint256)",
         "expected_runtime_step_count": 9,
@@ -7325,7 +7325,7 @@
         "statement_trace_count": 9
       },
       "entrypoint": "transferFrom(address,address,address,uint256)",
-      "gas_used": 7485,
+      "gas_used": 7427,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -7340,7 +7340,7 @@
           "io_scratch": {
             "live_bytes": 0,
             "peak_bytes": 648,
-            "wipe_count": 273
+            "wipe_count": 270
           },
           "peak_stack_words": 7,
           "value_scratch": {
@@ -7365,7 +7365,7 @@
         "hash_scratch_peak_bytes": 20,
         "hash_scratch_wipe_count": 3,
         "io_scratch_peak_bytes": 648,
-        "io_scratch_wipe_count": 273,
+        "io_scratch_wipe_count": 270,
         "kernel_op_count": 9,
         "kernel_step_public_object_schedule": [
           2,
@@ -7381,7 +7381,7 @@
           1,
           2
         ],
-        "resource_event_count": 566,
+        "resource_event_count": 560,
         "resource_events": [
           {
             "bytes": 8,
@@ -7589,18 +7589,6 @@
           },
           {
             "bytes": 8,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 648,
             "kind": "reserve_scratch",
             "region": "io_scratch",
             "words": null
@@ -8207,18 +8195,6 @@
           },
           {
             "bytes": 429,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 648,
             "kind": "reserve_scratch",
             "region": "io_scratch",
             "words": null
@@ -10738,18 +10714,6 @@
             "words": null
           },
           {
-            "bytes": 648,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
             "bytes": 8,
             "kind": "reserve_scratch",
             "region": "io_scratch",
@@ -10804,7 +10768,7 @@
       "lean_checker_input": "runtime kernel machine finish witness plus fixed confidential slot program",
       "lean_checker_kind": "runtime kernel machine finish boundary",
       "lean_stdout": "validated proof-grade runtime kernel machine finish boundary for transferFrom(address,address,address,uint256)",
-      "machine_finish_witness_json_bytes": 43440,
+      "machine_finish_witness_json_bytes": 43002,
       "runtime_kernel_machine_finish_witness": {
         "emitted_kernel_step_count": 9,
         "entrypoint_id": "transferFrom(address,address,address,uint256)",
@@ -10816,7 +10780,7 @@
           1,
           2
         ],
-        "resource_event_count": 566,
+        "resource_event_count": 560,
         "runtime_phase_prefix_event_count": 15
       },
       "runtime_kernel_refinement_witness": {

@@ -1315,7 +1315,7 @@ metadata: every concrete instance of `PathOramLocalPosmapV1SecurityAssumptions`
 is paired with the runtime-pinned `pathOramLocalPosmapV1_stashOverflowProvenance`
 record, which carries the JACM 2018 Theorem 5.1 citation (Stefanov et al.;
 CCS 2013 fallback), the deployed `Z = 5` parameter pin, the deployed
-stash-bound formula `max(capacity, 1)`, the working-stash capacity
+stash-bound formula `min(max(capacity, 1), 114)`, the working-stash capacity
 formula consumed by the runtime, the JACM tail-bound expression at
 `Z = 5`, and the static-drift check name pinning the deployed parameter
 regime in the Rust source (`path_oram_deployed_stash_parameters_pinned`).
@@ -1359,7 +1359,7 @@ theorem proofGrade_path_oram_local_posmap_v1_stash_overflow_provenance_blocks_pe
 /-- Paper-facing stash-overflow provenance static-drift check name
 facade. The provenance record references the named probe drift check
 that pins the Rust manifest still constructs Path-ORAM objects with the
-deployed `Z = 5` / `stash_bound = capacity.max(1)` parameter regime. -/
+deployed `Z = 5` / `stash_bound = min(max(capacity, 1), 114)` parameter regime. -/
 theorem proofGrade_path_oram_local_posmap_v1_stash_overflow_provenance_static_drift_check :
     pathOramLocalPosmapV1_stashOverflowProvenance.staticDriftCheckName =
       "path_oram_deployed_stash_parameters_pinned" :=

@@ -15,7 +15,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1325432,
+      "boundary_json_bytes": 1325829,
       "confidential_slot_program": {
         "entrypoint_id": "classify(uint256)",
         "expected_runtime_step_count": 4,
@@ -40,7 +40,7 @@
         "generated_confidential_kernel": 25055,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 26935,
-        "generated_oram_codecs": 120639,
+        "generated_oram_codecs": 120900,
         "generated_store_codec": 1683,
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
@@ -48,9 +48,9 @@
         "kernel_runtime": 23384,
         "kernel_slot_support": 3263,
         "objects": 92313,
-        "oram": 61801,
+        "oram": 61878,
         "precompiles": 240,
-        "runtime_evm_lib": 82392,
+        "runtime_evm_lib": 82446,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -257,7 +257,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1325432,
+      "boundary_json_bytes": 1325829,
       "confidential_slot_program": {
         "entrypoint_id": "classify(uint256)",
         "expected_runtime_step_count": 4,
@@ -282,7 +282,7 @@
         "generated_confidential_kernel": 25055,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 26935,
-        "generated_oram_codecs": 120639,
+        "generated_oram_codecs": 120900,
         "generated_store_codec": 1683,
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
@@ -290,9 +290,9 @@
         "kernel_runtime": 23384,
         "kernel_slot_support": 3263,
         "objects": 92313,
-        "oram": 61801,
+        "oram": 61878,
         "precompiles": 240,
-        "runtime_evm_lib": 82392,
+        "runtime_evm_lib": 82446,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -499,7 +499,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1329363,
+      "boundary_json_bytes": 1329760,
       "confidential_slot_program": {
         "entrypoint_id": "auth(bytes32)",
         "expected_runtime_step_count": 8,
@@ -524,7 +524,7 @@
         "generated_confidential_kernel": 25055,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 26935,
-        "generated_oram_codecs": 120639,
+        "generated_oram_codecs": 120900,
         "generated_store_codec": 1683,
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
@@ -532,9 +532,9 @@
         "kernel_runtime": 23384,
         "kernel_slot_support": 3263,
         "objects": 92313,
-        "oram": 61801,
+        "oram": 61878,
         "precompiles": 240,
-        "runtime_evm_lib": 82392,
+        "runtime_evm_lib": 82446,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -944,7 +944,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1329363,
+      "boundary_json_bytes": 1329760,
       "confidential_slot_program": {
         "entrypoint_id": "auth(bytes32)",
         "expected_runtime_step_count": 8,
@@ -969,7 +969,7 @@
         "generated_confidential_kernel": 25055,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 26935,
-        "generated_oram_codecs": 120639,
+        "generated_oram_codecs": 120900,
         "generated_store_codec": 1683,
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
@@ -977,9 +977,9 @@
         "kernel_runtime": 23384,
         "kernel_slot_support": 3263,
         "objects": 92313,
-        "oram": 61801,
+        "oram": 61878,
         "precompiles": 240,
-        "runtime_evm_lib": 82392,
+        "runtime_evm_lib": 82446,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -1389,7 +1389,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1327288,
+      "boundary_json_bytes": 1327685,
       "confidential_slot_program": {
         "entrypoint_id": "upsert(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -1414,7 +1414,7 @@
         "generated_confidential_kernel": 25055,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 26935,
-        "generated_oram_codecs": 120639,
+        "generated_oram_codecs": 120900,
         "generated_store_codec": 1683,
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
@@ -1422,9 +1422,9 @@
         "kernel_runtime": 23384,
         "kernel_slot_support": 3263,
         "objects": 92313,
-        "oram": 61801,
+        "oram": 61878,
         "precompiles": 240,
-        "runtime_evm_lib": 82392,
+        "runtime_evm_lib": 82446,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -1793,7 +1793,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1327288,
+      "boundary_json_bytes": 1327685,
       "confidential_slot_program": {
         "entrypoint_id": "upsert(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -1818,7 +1818,7 @@
         "generated_confidential_kernel": 25055,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 26935,
-        "generated_oram_codecs": 120639,
+        "generated_oram_codecs": 120900,
         "generated_store_codec": 1683,
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
@@ -1826,9 +1826,9 @@
         "kernel_runtime": 23384,
         "kernel_slot_support": 3263,
         "objects": 92313,
-        "oram": 61801,
+        "oram": 61878,
         "precompiles": 240,
-        "runtime_evm_lib": 82392,
+        "runtime_evm_lib": 82446,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -2197,7 +2197,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1328879,
+      "boundary_json_bytes": 1329276,
       "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
@@ -2222,7 +2222,7 @@
         "generated_confidential_kernel": 25055,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 26935,
-        "generated_oram_codecs": 120639,
+        "generated_oram_codecs": 120900,
         "generated_store_codec": 1683,
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
@@ -2230,9 +2230,9 @@
         "kernel_runtime": 23384,
         "kernel_slot_support": 3263,
         "objects": 92313,
-        "oram": 61801,
+        "oram": 61878,
         "precompiles": 240,
-        "runtime_evm_lib": 82392,
+        "runtime_evm_lib": 82446,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -2685,7 +2685,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1328879,
+      "boundary_json_bytes": 1329276,
       "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
@@ -2710,7 +2710,7 @@
         "generated_confidential_kernel": 25055,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 26935,
-        "generated_oram_codecs": 120639,
+        "generated_oram_codecs": 120900,
         "generated_store_codec": 1683,
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
@@ -2718,9 +2718,9 @@
         "kernel_runtime": 23384,
         "kernel_slot_support": 3263,
         "objects": 92313,
-        "oram": 61801,
+        "oram": 61878,
         "precompiles": 240,
-        "runtime_evm_lib": 82392,
+        "runtime_evm_lib": 82446,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -3173,7 +3173,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1330183,
+      "boundary_json_bytes": 1330580,
       "confidential_slot_program": {
         "entrypoint_id": "approve(address,address,uint256)",
         "expected_runtime_step_count": 4,
@@ -3198,7 +3198,7 @@
         "generated_confidential_kernel": 25055,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 26935,
-        "generated_oram_codecs": 120639,
+        "generated_oram_codecs": 120900,
         "generated_store_codec": 1683,
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
@@ -3206,9 +3206,9 @@
         "kernel_runtime": 23384,
         "kernel_slot_support": 3263,
         "objects": 92313,
-        "oram": 61801,
+        "oram": 61878,
         "precompiles": 240,
-        "runtime_evm_lib": 82392,
+        "runtime_evm_lib": 82446,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -3807,7 +3807,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1330183,
+      "boundary_json_bytes": 1330580,
       "confidential_slot_program": {
         "entrypoint_id": "approve(address,address,uint256)",
         "expected_runtime_step_count": 4,
@@ -3832,7 +3832,7 @@
         "generated_confidential_kernel": 25055,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 26935,
-        "generated_oram_codecs": 120639,
+        "generated_oram_codecs": 120900,
         "generated_store_codec": 1683,
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
@@ -3840,9 +3840,9 @@
         "kernel_runtime": 23384,
         "kernel_slot_support": 3263,
         "objects": 92313,
-        "oram": 61801,
+        "oram": 61878,
         "precompiles": 240,
-        "runtime_evm_lib": 82392,
+        "runtime_evm_lib": 82446,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -4441,7 +4441,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "boundary_json_bytes": 1327879,
+      "boundary_json_bytes": 1328276,
       "confidential_slot_program": {
         "entrypoint_id": "put(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -4466,7 +4466,7 @@
         "generated_confidential_kernel": 25055,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 26935,
-        "generated_oram_codecs": 120639,
+        "generated_oram_codecs": 120900,
         "generated_store_codec": 1683,
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
@@ -4474,9 +4474,9 @@
         "kernel_runtime": 23384,
         "kernel_slot_support": 3263,
         "objects": 92313,
-        "oram": 61801,
+        "oram": 61878,
         "precompiles": 240,
-        "runtime_evm_lib": 82392,
+        "runtime_evm_lib": 82446,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -4893,7 +4893,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "boundary_json_bytes": 1327879,
+      "boundary_json_bytes": 1328276,
       "confidential_slot_program": {
         "entrypoint_id": "put(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -4918,7 +4918,7 @@
         "generated_confidential_kernel": 25055,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 26935,
-        "generated_oram_codecs": 120639,
+        "generated_oram_codecs": 120900,
         "generated_store_codec": 1683,
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
@@ -4926,9 +4926,9 @@
         "kernel_runtime": 23384,
         "kernel_slot_support": 3263,
         "objects": 92313,
-        "oram": 61801,
+        "oram": 61878,
         "precompiles": 240,
-        "runtime_evm_lib": 82392,
+        "runtime_evm_lib": 82446,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -5345,7 +5345,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 1330577,
+      "boundary_json_bytes": 1330974,
       "confidential_slot_program": {
         "entrypoint_id": "add(bytes32,uint256)",
         "expected_runtime_step_count": 5,
@@ -5370,7 +5370,7 @@
         "generated_confidential_kernel": 25055,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 26935,
-        "generated_oram_codecs": 120639,
+        "generated_oram_codecs": 120900,
         "generated_store_codec": 1683,
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
@@ -5378,9 +5378,9 @@
         "kernel_runtime": 23384,
         "kernel_slot_support": 3263,
         "objects": 92313,
-        "oram": 61801,
+        "oram": 61878,
         "precompiles": 240,
-        "runtime_evm_lib": 82392,
+        "runtime_evm_lib": 82446,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -6000,7 +6000,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 1330577,
+      "boundary_json_bytes": 1330974,
       "confidential_slot_program": {
         "entrypoint_id": "add(bytes32,uint256)",
         "expected_runtime_step_count": 5,
@@ -6025,7 +6025,7 @@
         "generated_confidential_kernel": 25055,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 26935,
-        "generated_oram_codecs": 120639,
+        "generated_oram_codecs": 120900,
         "generated_store_codec": 1683,
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
@@ -6033,9 +6033,9 @@
         "kernel_runtime": 23384,
         "kernel_slot_support": 3263,
         "objects": 92313,
-        "oram": 61801,
+        "oram": 61878,
         "precompiles": 240,
-        "runtime_evm_lib": 82392,
+        "runtime_evm_lib": 82446,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -6655,7 +6655,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 1338088,
+      "boundary_json_bytes": 1338485,
       "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
@@ -6680,7 +6680,7 @@
         "generated_confidential_kernel": 25055,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 26935,
-        "generated_oram_codecs": 120639,
+        "generated_oram_codecs": 120900,
         "generated_store_codec": 1683,
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
@@ -6688,9 +6688,9 @@
         "kernel_runtime": 23384,
         "kernel_slot_support": 3263,
         "objects": 92313,
-        "oram": 61801,
+        "oram": 61878,
         "precompiles": 240,
-        "runtime_evm_lib": 82392,
+        "runtime_evm_lib": 82446,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -7899,7 +7899,7 @@
     {
       "accepted": true,
       "boundary_events": 14,
-      "boundary_json_bytes": 1368069,
+      "boundary_json_bytes": 1368028,
       "confidential_slot_program": {
         "entrypoint_id": "transferFrom(address,address,address,uint256)",
         "expected_runtime_step_count": 9,
@@ -7911,7 +7911,7 @@
         "statement_trace_count": 9
       },
       "entrypoint": "transferFrom(address,address,address,uint256)",
-      "gas_used": 7485,
+      "gas_used": 7427,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
         "allocator": 15664,
@@ -7924,7 +7924,7 @@
         "generated_confidential_kernel": 25055,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 26935,
-        "generated_oram_codecs": 120639,
+        "generated_oram_codecs": 120900,
         "generated_store_codec": 1683,
         "generated_store_helpers": 11516,
         "generated_store_surface": 6914,
@@ -7932,9 +7932,9 @@
         "kernel_runtime": 23384,
         "kernel_slot_support": 3263,
         "objects": 92313,
-        "oram": 61801,
+        "oram": 61878,
         "precompiles": 240,
-        "runtime_evm_lib": 82392,
+        "runtime_evm_lib": 82446,
         "runtime_module": 2948,
         "shell": 20977,
         "state": 35250,
@@ -7954,10 +7954,10 @@
           1,
           2
         ],
-        "resource_event_count": 566,
+        "resource_event_count": 560,
         "runtime_phase_prefix_event_count": 15
       },
-      "kernel_finish_slot_bundle_json_bytes": 45068,
+      "kernel_finish_slot_bundle_json_bytes": 44630,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -7972,7 +7972,7 @@
           "io_scratch": {
             "live_bytes": 0,
             "peak_bytes": 648,
-            "wipe_count": 273
+            "wipe_count": 270
           },
           "peak_stack_words": 7,
           "value_scratch": {
@@ -7997,7 +7997,7 @@
         "hash_scratch_peak_bytes": 20,
         "hash_scratch_wipe_count": 3,
         "io_scratch_peak_bytes": 648,
-        "io_scratch_wipe_count": 273,
+        "io_scratch_wipe_count": 270,
         "kernel_op_count": 9,
         "kernel_step_public_object_schedule": [
           2,
@@ -8013,7 +8013,7 @@
           1,
           2
         ],
-        "resource_event_count": 566,
+        "resource_event_count": 560,
         "resource_events": [
           {
             "bytes": 8,
@@ -8221,18 +8221,6 @@
           },
           {
             "bytes": 8,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 648,
             "kind": "reserve_scratch",
             "region": "io_scratch",
             "words": null
@@ -8839,18 +8827,6 @@
           },
           {
             "bytes": 429,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 648,
             "kind": "reserve_scratch",
             "region": "io_scratch",
             "words": null
@@ -10987,18 +10963,6 @@
           },
           {
             "bytes": 429,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 648,
             "kind": "reserve_scratch",
             "region": "io_scratch",
             "words": null

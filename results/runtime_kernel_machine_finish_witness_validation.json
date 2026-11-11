@@ -7195,7 +7195,7 @@
       "accepted": true,
       "boundary_events": 14,
       "entrypoint": "transferFrom(address,address,address,uint256)",
-      "gas_used": 7485,
+      "gas_used": 7427,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -7210,7 +7210,7 @@
           "io_scratch": {
             "live_bytes": 0,
             "peak_bytes": 648,
-            "wipe_count": 273
+            "wipe_count": 270
           },
           "peak_stack_words": 7,
           "value_scratch": {
@@ -7235,7 +7235,7 @@
         "hash_scratch_peak_bytes": 20,
         "hash_scratch_wipe_count": 3,
         "io_scratch_peak_bytes": 648,
-        "io_scratch_wipe_count": 273,
+        "io_scratch_wipe_count": 270,
         "kernel_op_count": 9,
         "kernel_step_public_object_schedule": [
           2,
@@ -7251,7 +7251,7 @@
           1,
           2
         ],
-        "resource_event_count": 566,
+        "resource_event_count": 560,
         "resource_events": [
           {
             "bytes": 8,
@@ -7459,18 +7459,6 @@
           },
           {
             "bytes": 8,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 648,
             "kind": "reserve_scratch",
             "region": "io_scratch",
             "words": null
@@ -8077,18 +8065,6 @@
           },
           {
             "bytes": 429,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 648,
             "kind": "reserve_scratch",
             "region": "io_scratch",
             "words": null
@@ -10608,18 +10584,6 @@
             "words": null
           },
           {
-            "bytes": 648,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
             "bytes": 8,
             "kind": "reserve_scratch",
             "region": "io_scratch",
@@ -10674,8 +10638,8 @@
       "lean_checker_input": "runtime kernel machine finish witness",
       "lean_checker_kind": "runtime kernel machine finish witness",
       "lean_stdout": "validated proof-grade runtime kernel machine finish witness for transferFrom(address,address,address,uint256)",
-      "machine_finish_witness_json_bytes": 43440,
-      "projected_finish_bundle_json_bytes": 43355,
+      "machine_finish_witness_json_bytes": 43002,
+      "projected_finish_bundle_json_bytes": 42917,
       "runtime_kernel_machine_finish_witness": {
         "emitted_kernel_step_count": 9,
         "entrypoint_id": "transferFrom(address,address,address,uint256)",
@@ -10687,7 +10651,7 @@
           1,
           2
         ],
-        "resource_event_count": 566,
+        "resource_event_count": 560,
         "runtime_phase_prefix_event_count": 15
       },
       "runtime_kernel_refinement_witness": {
@@ -10760,7 +10724,7 @@
       },
       "scenario": "ERC20Lite/pathoram/transferFrom",
       "setup_calls": 2,
-      "witness_file_bytes": 43440
+      "witness_file_bytes": 43002
     }
   ],
   "source_files": [
