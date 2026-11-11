@@ -197,7 +197,17 @@ field bindings required by `DeploymentCallAccepted`.
   bound adds the `3h + 1` nodes an operation returns to the stash to the
   Path ORAM bound; that the stash stays within it with the Path ORAM tail is
   part of `stashOverflowBounded`, assumed and not proved. The admitted route
-  covers it.
+  covers it. The AVL map's algorithm is proved in Lean over inductive trees
+  (`UOToolchain/PathOramAvlMap.lean`): with the runtime's walk, successor
+  delete, rotation rule and node-access counts, and the walk bounded by the
+  capacity's largest AVL height, a get returns the key's value and a put
+  writes, updates or deletes it, keeps the tree sorted, balanced and within
+  the capacity, and overflows exactly when it would insert into a full map
+  (`get_spec`, `put_spec`). That the runtime's `tree_get` and `tree_put`
+  follow the model is tested, not proved: `checkPathOramAvlMapReplay`
+  replays 2,400 runtime operations on maps of 1 to 31 nodes against it,
+  comparing every result, every node access's kind, every size and every
+  tree with its stored heights (`results/path_oram_avl_map_replay.json`).
   For configurations whose Path ORAM maps use either scheme, the same bundle
   gives the private scheme's theorems (`computationalUOWithOnAny`,
   `paperMain_privatePosmapV1_noninterference_moduloReleases`), and the probe

@@ -52,6 +52,16 @@
       "ok": true
     },
     {
+      "detail": "doc_anchor \"UOToolchain/PathOramAvlMap.lean\" for path-oram-private-avl-map-semantics appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:path-oram-private-avl-map-semantics",
+      "ok": true
+    },
+    {
+      "detail": "path-oram-private-avl-map-semantics declares an allowed status (Lean-proved)",
+      "name": "status-allowed:path-oram-private-avl-map-semantics",
+      "ok": true
+    },
+    {
       "detail": "doc_anchor \"admitted-package hash\" for admitted-package-identity-hash appears in docs/claim-boundary.md",
       "name": "anchor-in-doc:admitted-package-identity-hash",
       "ok": true
@@ -417,7 +427,7 @@
       "ok": true
     },
     {
-      "detail": "10 manifest entries in category claim",
+      "detail": "11 manifest entries in category claim",
       "name": "category-present:claim",
       "ok": true
     },
@@ -589,6 +599,26 @@
     {
       "detail": "artifact runtime/uo-evm/src/controller.rs referenced by computational-uo-path-oram-private exists",
       "name": "file-exists:computational-uo-path-oram-private:runtime/uo-evm/src/controller.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact runtime/uo-evm/src/avl_map_replay.rs referenced by path-oram-private-avl-map-semantics exists",
+      "name": "file-exists:path-oram-private-avl-map-semantics:runtime/uo-evm/src/avl_map_replay.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact proof/lean/UOToolchain/PathOramAvlMap.lean referenced by path-oram-private-avl-map-semantics exists",
+      "name": "file-exists:path-oram-private-avl-map-semantics:proof/lean/UOToolchain/PathOramAvlMap.lean",
+      "ok": true
+    },
+    {
+      "detail": "artifact proof/lean/UOToolchain/PathOramAvlMapReplay.lean referenced by path-oram-private-avl-map-semantics exists",
+      "name": "file-exists:path-oram-private-avl-map-semantics:proof/lean/UOToolchain/PathOramAvlMapReplay.lean",
+      "ok": true
+    },
+    {
+      "detail": "artifact runtime/uo-evm/src/generated_oram_codecs.rs referenced by path-oram-private-avl-map-semantics exists",
+      "name": "file-exists:path-oram-private-avl-map-semantics:runtime/uo-evm/src/generated_oram_codecs.rs",
       "ok": true
     },
     {
@@ -972,6 +1002,27 @@
       "status": "generated-and-checked",
       "text": "The private-position-map Path ORAM route path_oram_private_posmap_v1 lifts the local route's capacity cap and keeps a map as an oblivious AVL tree of preallocated nodes in one Path ORAM tree, each node holding its children's leaves, so the position map recurses through the tree: a get makes h node accesses and a put 3h + 1, h the largest AVL height for the capacity, each reading and writing one path, and an operation reads and writes its header and stash pages once; its Lean paper-main theorem holds over admitted configurations whose maps use either scheme, given the same bundle evidence, with the stash bounded by the Path ORAM bound plus the 3h + 1 nodes an operation returns to it (stashOverflowBounded), and the bundle is derived for ERC20Lite.transferFrom with balances on the private scheme from one runtime run per side whose leaves are substituted for every other tape, with runtime runs on sampled tapes checked against the substitution.",
       "validation_command": "cargo run -q -p mplus-probe -- --only claim-consistency --out-dir results"
+    },
+    {
+      "benchmark_result_files": [
+        "results/path_oram_avl_map_replay.json"
+      ],
+      "category": "claim",
+      "doc_anchor": "UOToolchain/PathOramAvlMap.lean",
+      "id": "path-oram-private-avl-map-semantics",
+      "lean_modules": [
+        "proof/lean/UOToolchain/PathOramAvlMap.lean",
+        "proof/lean/UOToolchain/PathOramAvlMapReplay.lean"
+      ],
+      "runtime_compiler_files": [
+        "runtime/uo-evm/src/generated_oram_codecs.rs"
+      ],
+      "source_files": [
+        "runtime/uo-evm/src/avl_map_replay.rs"
+      ],
+      "status": "Lean-proved",
+      "text": "The private scheme's AVL map algorithm, modeled over inductive trees with the runtime's walk, successor delete, rotation rule and node-access counts, implements a finite map: with the walk bounded by the capacity's largest AVL height, a get returns the key's value and a put writes, updates or deletes it, keeps the tree sorted, balanced and within the capacity, and overflows exactly when it would insert into a full map; the runtime's tree_get and tree_put are replayed against the model, not proved to follow it.",
+      "validation_command": "cargo run -q -p mplus-probe -- --only path-oram-avl-map-replay --out-dir results"
     },
     {
       "benchmark_result_files": [
@@ -1425,7 +1476,7 @@
       "validation_command": "cargo run -q -p mplus-probe -- --only acceptance-check --out-dir results"
     }
   ],
-  "entry_count": 31,
+  "entry_count": 32,
   "schema": "uo.claim_artifact_manifest.v1",
   "source_of_truth": "docs/claim-boundary.md"
 }

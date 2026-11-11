@@ -1,6 +1,6 @@
 {
   "accepted": true,
-  "artifact_json_bytes": 1451321,
+  "artifact_json_bytes": 1451618,
   "checker": "proof/lean/.lake/build/bin/checkProofGradeRuntimeSharedConfidentialKernelBoundary",
   "handwritten_runtime_public_only_theorem_checked": true,
   "lean_checker_input": "source-backed runtime shared confidential-kernel boundary",
@@ -26,7 +26,7 @@
     "kernel_runtime": 23485,
     "kernel_slot_support": 3263,
     "objects": 96131,
-    "oram": 84619,
+    "oram": 84713,
     "runtime_module": 2948,
     "state": 39379,
     "store_codec": 5892,

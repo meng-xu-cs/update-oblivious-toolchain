@@ -1383,6 +1383,10 @@ pub fn run_capacity_sweep_report() -> Result<JsonValue> {
     run_capacity_sweep()
 }
 
+pub fn run_path_oram_avl_map_replay_report() -> Result<JsonValue> {
+    run_path_oram_avl_map_replay()
+}
+
 pub fn run_abort_rollback_report() -> Result<JsonValue> {
     let suite = compile_suite()?;
     run_abort_rollback(&suite)
@@ -47144,6 +47148,161 @@ fn ensure_lean_checker(target: &'static str, description: &'static str) -> Resul
             path.display()
         ))
     }
+}
+
+/// The AVL map replay's grid: maps of one to 31 nodes, trees up to seven
+/// levels, two seeds each, with enough operations to fill, update and empty
+/// them. The runtime's tree code is slow in the debug build the probe runs.
+const AVL_MAP_REPLAY_CAPACITIES: [usize; 10] = [1, 2, 3, 4, 5, 7, 8, 12, 16, 31];
+const AVL_MAP_REPLAY_SEEDS: [u64; 2] = [0, 1];
+const AVL_MAP_REPLAY_OPERATIONS: usize = 120;
+
+/// Replay random operations on the runtime's oblivious AVL map and check them
+/// against its Lean model (`checkPathOramAvlMapReplay` over
+/// `UOToolchain/PathOramAvlMap.lean`): every result, every node access's kind,
+/// every size and every tree with the heights its pointers record.
+fn run_path_oram_avl_map_replay() -> Result<JsonValue> {
+    let checker = ensure_lean_checker("checkPathOramAvlMapReplay", "AVL map replay")?;
+    let replay = uo_evm::path_oram_avl_map_replay(
+        &AVL_MAP_REPLAY_CAPACITIES,
+        &AVL_MAP_REPLAY_SEEDS,
+        AVL_MAP_REPLAY_OPERATIONS,
+    )?;
+    let operations = replay.runs.iter().flat_map(|run| run.operations.iter());
+    let mut counts = BTreeMap::<&str, usize>::new();
+    for operation in operations {
+        let kind = if operation.get {
+            "gets"
+        } else if !operation.apply {
+            "masked_puts"
+        } else if operation.overflow {
+            "overflowing_puts"
+        } else if operation.value == 0 {
+            "deleting_puts"
+        } else {
+            "writing_puts"
+        };
+        *counts.entry(kind).or_default() += 1;
+        *counts.entry("node_accesses").or_default() += operation.real.len();
+        *counts.entry("real_node_accesses").or_default() +=
+            operation.real.iter().filter(|real| **real).count();
+    }
+    let total: usize = replay.runs.iter().map(|run| run.operations.len()).sum();
+    let (replay_path, replay_json_bytes) = write_temp_json("path-oram-avl-map-replay", &replay)?;
+    let output = Command::new(&checker).arg(&replay_path).output()?;
+    let _ = fs::remove_file(&replay_path);
+    if !output.status.success() {
+        return Err(anyhow!(
+            "Lean AVL map replay check failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    let mut rejected_tampers = Vec::new();
+    for (name, tampered) in avl_map_replay_tampers(&serde_json::to_value(&replay)?)? {
+        let (path, _) = write_temp_json(name, &tampered)?;
+        let output = Command::new(&checker).arg(&path).output()?;
+        let _ = fs::remove_file(&path);
+        if output.status.success() {
+            return Err(anyhow!(
+                "the Lean AVL map replay checker accepted a replay with {name}"
+            ));
+        }
+        rejected_tampers.push(name);
+    }
+    Ok(json!({
+        "checker": display_report_path(&checker),
+        "schema": uo_evm::PATH_ORAM_AVL_MAP_REPLAY_SCHEMA,
+        "lean_model": "proof/lean/UOToolchain/PathOramAvlMap.lean",
+        "capacities": AVL_MAP_REPLAY_CAPACITIES,
+        "seeds": AVL_MAP_REPLAY_SEEDS,
+        "operations_per_run": AVL_MAP_REPLAY_OPERATIONS,
+        "runs": replay.runs.len(),
+        "operations": total,
+        "operation_counts": counts,
+        "replay_json_bytes": replay_json_bytes,
+        "compared_with_the_lean_model": [
+            "each get's value and whether it found the key",
+            "each put's overflow flag",
+            "each node access's kind, real or dummy",
+            "the map's size after each operation",
+            "the tree after each operation, with the height each pointer records",
+        ],
+        "runtime_pointer_level_checked": [
+            "every node block lies on its leaf's path and is stored once",
+            "every tree and free-list pointer carries its node's current leaf",
+            "the tree and the free list hold every node",
+            "the stash stays within its bound",
+        ],
+        "rejected_tampers": rejected_tampers,
+        "evidence_classification": "empirically tested",
+        "rust_semantic_refinement_claimed": false,
+        "lean_stdout": String::from_utf8_lossy(&output.stdout).trim(),
+        "accepted": true,
+    }))
+}
+
+/// Copies of a replay with one recorded fact changed, which the checker
+/// must reject: an access's kind, a stored height, a get's value, and a put's
+/// overflow.
+fn avl_map_replay_tampers(replay: &JsonValue) -> Result<Vec<(&'static str, JsonValue)>> {
+    type Edit = fn(&mut JsonValue) -> bool;
+    let edits: [(&'static str, Edit); 4] = [
+        ("flipped_access_kind", |operation| {
+            match operation["real"].get_mut(0) {
+                Some(JsonValue::Bool(real)) => {
+                    *real = !*real;
+                    true
+                }
+                _ => false,
+            }
+        }),
+        ("changed_stored_height", |operation| {
+            let Some(nodes) = operation["tree"].as_array_mut() else {
+                return false;
+            };
+            for node in nodes.iter_mut() {
+                if let Some(height) = node.get(2).and_then(JsonValue::as_u64) {
+                    node[2] = json!(height + 1);
+                    return true;
+                }
+            }
+            false
+        }),
+        ("changed_get_value", |operation| {
+            if operation["get"] != json!(true) || operation["found"] != json!(true) {
+                return false;
+            }
+            let Some(value) = operation["result_value"].as_u64() else {
+                return false;
+            };
+            operation["result_value"] = json!(value + 1);
+            true
+        }),
+        ("dropped_overflow", |operation| {
+            if operation["overflow"] != json!(true) {
+                return false;
+            }
+            operation["overflow"] = json!(false);
+            true
+        }),
+    ];
+    let mut tampers = Vec::new();
+    for (name, edit) in edits {
+        let mut tampered = replay.clone();
+        let edited = tampered["runs"]
+            .as_array_mut()
+            .into_iter()
+            .flatten()
+            .flat_map(|run| run["operations"].as_array_mut().into_iter().flatten())
+            .any(edit);
+        if !edited {
+            return Err(anyhow!(
+                "the AVL map replay has nothing to tamper for {name}"
+            ));
+        }
+        tampers.push((name, tampered));
+    }
+    Ok(tampers)
 }
 
 fn lean_proofgrade_witness_checker_path() -> Result<PathBuf> {

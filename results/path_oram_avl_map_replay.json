@@ -1,0 +1,57 @@
+{
+  "accepted": true,
+  "capacities": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    7,
+    8,
+    12,
+    16,
+    31
+  ],
+  "checker": "proof/lean/.lake/build/bin/checkPathOramAvlMapReplay",
+  "compared_with_the_lean_model": [
+    "each get's value and whether it found the key",
+    "each put's overflow flag",
+    "each node access's kind, real or dummy",
+    "the map's size after each operation",
+    "the tree after each operation, with the height each pointer records"
+  ],
+  "evidence_classification": "empirically tested",
+  "lean_model": "proof/lean/UOToolchain/PathOramAvlMap.lean",
+  "lean_stdout": "runs=20 operations=2400",
+  "operation_counts": {
+    "deleting_puts": 505,
+    "gets": 744,
+    "masked_puts": 181,
+    "node_accesses": 21654,
+    "overflowing_puts": 360,
+    "real_node_accesses": 6018,
+    "writing_puts": 610
+  },
+  "operations": 2400,
+  "operations_per_run": 120,
+  "rejected_tampers": [
+    "flipped_access_kind",
+    "changed_stored_height",
+    "changed_get_value",
+    "dropped_overflow"
+  ],
+  "replay_json_bytes": 660761,
+  "runs": 20,
+  "runtime_pointer_level_checked": [
+    "every node block lies on its leaf's path and is stored once",
+    "every tree and free-list pointer carries its node's current leaf",
+    "the tree and the free list hold every node",
+    "the stash stays within its bound"
+  ],
+  "rust_semantic_refinement_claimed": false,
+  "schema": "uo-path-oram-avl-map-replay-v1",
+  "seeds": [
+    0,
+    1
+  ]
+}

@@ -1,7 +1,7 @@
 {
   "accepted": true,
   "class_counts": {
-    "advisory_nonclaim": 587,
+    "advisory_nonclaim": 590,
     "deprecated_report": 0,
     "expected_computational_difference": 101,
     "expected_negative": 1004,
@@ -255,10 +255,11 @@
         "static_checks.proofgrade_checker_import_surface_checks.69.uses_legacy_umbrella",
         "static_checks.proofgrade_checker_import_surface_checks.70.uses_legacy_umbrella",
         "static_checks.proofgrade_checker_import_surface_checks.71.uses_legacy_umbrella",
-        "static_checks.proofgrade_checker_import_surface_checks.72.uses_legacy_umbrella"
+        "static_checks.proofgrade_checker_import_surface_checks.72.uses_legacy_umbrella",
+        "static_checks.proofgrade_checker_import_surface_checks.73.uses_legacy_umbrella"
       ],
       "class_counts": {
-        "advisory_nonclaim": 163,
+        "advisory_nonclaim": 164,
         "deprecated_report": 0,
         "expected_computational_difference": 48,
         "expected_negative": 502,
@@ -818,8 +819,8 @@
         "tamper_validation.scenarios.391.accepted",
         "tamper_validation.scenarios.392.accepted"
       ],
-      "false_count": 713,
-      "false_paths": 713,
+      "false_count": 714,
+      "false_paths": 714,
       "mode": "proof_grade",
       "report": "bridge_validation",
       "required": true,
@@ -1999,6 +2000,30 @@
     },
     {
       "accepted": true,
+      "advisory_false_paths": [
+        "rust_semantic_refinement_claimed"
+      ],
+      "class_counts": {
+        "advisory_nonclaim": 1,
+        "deprecated_report": 0,
+        "expected_computational_difference": 0,
+        "expected_negative": 0,
+        "required_failure": 0,
+        "unclassified": 0
+      },
+      "declared_accepted": true,
+      "expected_false_paths": [],
+      "false_count": 1,
+      "false_paths": 1,
+      "mode": "proof_grade",
+      "report": "path_oram_avl_map_replay",
+      "required": true,
+      "required_failures": [],
+      "schema": "uo.acceptance.report.v1",
+      "unclassified_false_paths": []
+    },
+    {
+      "accepted": true,
       "advisory_false_paths": [],
       "class_counts": {
         "advisory_nonclaim": 0,
@@ -2915,10 +2940,11 @@
         "proofgrade_checker_import_surface_checks.69.uses_legacy_umbrella",
         "proofgrade_checker_import_surface_checks.70.uses_legacy_umbrella",
         "proofgrade_checker_import_surface_checks.71.uses_legacy_umbrella",
-        "proofgrade_checker_import_surface_checks.72.uses_legacy_umbrella"
+        "proofgrade_checker_import_surface_checks.72.uses_legacy_umbrella",
+        "proofgrade_checker_import_surface_checks.73.uses_legacy_umbrella"
       ],
       "class_counts": {
-        "advisory_nonclaim": 73,
+        "advisory_nonclaim": 74,
         "deprecated_report": 0,
         "expected_computational_difference": 0,
         "expected_negative": 5,
@@ -2933,8 +2959,8 @@
         "reports.3.raw_artifact.accepted",
         "reports.4.raw_artifact.accepted"
       ],
-      "false_count": 78,
-      "false_paths": 78,
+      "false_count": 79,
+      "false_paths": 79,
       "mode": "proof_grade",
       "report": "static_checks",
       "required": true,
@@ -3588,6 +3614,7 @@
     "overheads",
     "paper_main_family_boundary_validation",
     "paper_main_slot_boundary_validation",
+    "path_oram_avl_map_replay",
     "pathoram_hidden_validation",
     "pathoram_pair_validation",
     "reproducibility_manifest",

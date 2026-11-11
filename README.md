@@ -39,6 +39,9 @@ a public chain" as its main execution model.
   ORAM tree, whose nodes hold their children's leaves, so its position map
   recurses through the tree: a get or a put makes a fixed number of node
   accesses, logarithmic in the capacity, each reading and writing one path.
+  The tree's algorithm is proved in Lean to implement a finite map and keep
+  the tree balanced (`PathOramAvlMap`), and the runtime's operations are
+  replayed against that model.
   Their paper-main theorems hold over admitted
   configurations given bundle evidence (`PathOramAdmitted`), whose leaf
   obligation follows from the leaf model without seed enumeration; the

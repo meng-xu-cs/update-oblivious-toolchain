@@ -31,6 +31,7 @@ enum ReportKind {
     LatencyMemory,
     StorageGrowth,
     CapacitySweep,
+    PathOramAvlMapReplay,
     AbortRollback,
     AdmissionMatrix,
     AblationStudy,
@@ -240,6 +241,15 @@ fn main() -> Result<()> {
                 &cli.out_dir,
                 "capacity_sweep.json",
                 "capacity_sweep",
+                &report,
+            )?;
+        }
+        Some(ReportKind::PathOramAvlMapReplay) => {
+            let report = mplus_probe::run_path_oram_avl_map_replay_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "path_oram_avl_map_replay.json",
+                "path_oram_avl_map_replay",
                 &report,
             )?;
         }

@@ -170,9 +170,10 @@ The proof development is organized around these layers:
   `ScalablePathOramEvidence`, `PathOramJACMTheorem`,
   `PaperPathOramTheoremRoute`, `CoinTapes` with `PathOramFreshLeaves`, the
   enumeration-free leaf-schedule theorem for one map or several,
-  `PathOramAdmitted`, the route over admitted configurations, and
-  `PathOramTapeWitness`, the tape family of one runtime run (see
-  [`path-oram.md`](./path-oram.md#current-status)).
+  `PathOramAdmitted`, the route over admitted configurations,
+  `PathOramTapeWitness`, the tape family of one runtime run, and
+  `PathOramAvlMap`, the private scheme's AVL map algorithm and its map
+  semantics (see [`path-oram.md`](./path-oram.md#current-status)).
 - SGX/TEE observer: `SgxBoundary`, `SgxRelation`, `SgxController`,
   `SgxControllerTrace`, `SgxMicroModel`, `SgxObserverFreeze`,
   `TeeDeployment`, `DeploymentAcceptance`.
@@ -202,6 +203,8 @@ entry points are:
   alignment
 - `tamper_validation.json`: negative tests proving drifted artifacts are
   rejected
+- `path_oram_avl_map_replay.json`: runtime AVL map operations replayed
+  against the Lean model by `checkPathOramAvlMapReplay`
 - `reviewer_summary.md`: generated reviewer-facing summary
 - `reproducibility_manifest.json`: output paths, sizes, toolchain pin, and
   SHA-256 digests

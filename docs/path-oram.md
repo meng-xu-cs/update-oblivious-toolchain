@@ -216,11 +216,31 @@ The Lean development states more than it currently proves for Path ORAM:
   run on every tape is the substituted run is what these samples test; it is
   not proved of the Rust runtime.
 
-What remains open on the private scheme: the AVL map's operations are run
-against a reference map in the runtime's tests (contents, tree shape,
-pointers' leaves, free list, stash bound, and the paths every operation reads
-and writes), not proved in Lean; and the stash bound for operations that
-hold their nodes until they end is assumed (`stashOverflowBounded`). A read
+The AVL map's algorithm is proved in Lean over inductive trees
+(`UOToolchain/PathOramAvlMap.lean`). The model takes the runtime's steps: a
+get walks the key's path for `h` levels; a put walks it too, going on to the
+successor for a delete of a node with two children, changes the tree at the
+bottom of the walk, and rebalances up to the root, rotating a node whose
+children differ in height by two, double when the taller child leans the
+other way. For a map that is sorted, balanced, free of zero values and within
+its capacity, with `h` the capacity's largest AVL height, `get_spec` and
+`put_spec` prove that a get returns the key's value and a put writes,
+updates or deletes it, keeps all of that, and overflows exactly when it would
+insert into a full map; `height_le_avlHeight` is why `h` levels suffice, and
+`getAccesses_length_shape` and `putAccesses_length_shape` give each
+operation the trace shape's node-access count. The runtime is checked
+against the model by replay: `checkPathOramAvlMapReplay` reruns 2,400
+runtime operations on maps of 1 to 31 nodes (`--only path-oram-avl-map-replay`,
+`results/path_oram_avl_map_replay.json`) and compares every result, every
+node access's kind, every size and every tree with its stored heights; the
+replay also checks the pointer level the model leaves out, and the checker
+rejects a replay with one of those facts changed.
+
+What remains open on the private scheme: the runtime's pointer-level
+implementation of the AVL map (node ids, leaves, the free list, the stash)
+is replayed against the model and run against a reference map in the
+runtime's tests, not proved; and the stash bound for operations that hold
+their nodes until they end is assumed (`stashOverflowBounded`). A read
 followed by a write of the same key makes two gets where one would do, and
 the tree costs more than a flat position map below a few thousand entries.
 

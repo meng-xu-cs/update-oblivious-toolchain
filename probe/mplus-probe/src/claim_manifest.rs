@@ -153,6 +153,21 @@ const CLAIM_ENTRIES: &[ClaimEntry] = &[
         validation_command: "cargo run -q -p mplus-probe -- --only claim-consistency --out-dir results",
     },
     ClaimEntry {
+        id: "path-oram-private-avl-map-semantics",
+        category: "claim",
+        text: "The private scheme's AVL map algorithm, modeled over inductive trees with the runtime's walk, successor delete, rotation rule and node-access counts, implements a finite map: with the walk bounded by the capacity's largest AVL height, a get returns the key's value and a put writes, updates or deletes it, keeps the tree sorted, balanced and within the capacity, and overflows exactly when it would insert into a full map; the runtime's tree_get and tree_put are replayed against the model, not proved to follow it.",
+        status: STATUS_LEAN_PROVED,
+        doc_anchor: "UOToolchain/PathOramAvlMap.lean",
+        source_files: &["runtime/uo-evm/src/avl_map_replay.rs"],
+        lean_modules: &[
+            "proof/lean/UOToolchain/PathOramAvlMap.lean",
+            "proof/lean/UOToolchain/PathOramAvlMapReplay.lean",
+        ],
+        runtime_compiler_files: &["runtime/uo-evm/src/generated_oram_codecs.rs"],
+        benchmark_result_files: &["results/path_oram_avl_map_replay.json"],
+        validation_command: "cargo run -q -p mplus-probe -- --only path-oram-avl-map-replay --out-dir results",
+    },
+    ClaimEntry {
         id: "admitted-package-identity-hash",
         category: "claim",
         text: "The artifact-level admitted-package hash is a canonical SHA-256 binding over source-language tag, semantics-profile tag, source bytes, sidecar metadata, compilation mode, compiler version, toolchain digest, and package schema tag.",

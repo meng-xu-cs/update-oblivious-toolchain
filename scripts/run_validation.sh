@@ -64,6 +64,7 @@ UO_CORRECTNESS_TRIALS="${UO_CORRECTNESS_TRIALS:-4}" \
 # past a require(...) guard and checks public state rolls back on abort and
 # commits otherwise. Override UO_SWEEP_* for deeper capacity sweeps.
 cargo run -q -p mplus-probe -- --only capacity-sweep "${PROBE_ARGS[@]}"
+cargo run -q -p mplus-probe -- --only path-oram-avl-map-replay "${PROBE_ARGS[@]}"
 cargo run -q -p mplus-probe -- --only abort-rollback "${PROBE_ARGS[@]}"
 # Compiler admission matrix (Issue 20): compile-and-run every accepted DSL
 # feature and reject every unsupported one with a diagnostic that names the

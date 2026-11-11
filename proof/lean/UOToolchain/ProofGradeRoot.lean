@@ -44,6 +44,7 @@ import UOToolchain.PathOramLocalPosmapV1
 import UOToolchain.PathOramLocalPosmapV1Refinement
 import UOToolchain.ScalablePathOramEvidence
 import UOToolchain.PathOramPrivatePosmapV1
+import UOToolchain.PathOramAvlMap
 import UOToolchain.PathOramLocalPosmapV1StandardTheorem
 import UOToolchain.PathOramJACMTheorem
 import UOToolchain.PaperPathOramTheoremRoute

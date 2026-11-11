@@ -19,6 +19,10 @@ mod generated_object_helpers;
 #[path = "generated_oram_codecs.rs"]
 mod generated_oram_codecs;
 
+#[cfg(feature = "diagnostics")]
+#[path = "avl_map_replay.rs"]
+pub(crate) mod avl_map_replay;
+
 use generated_object_helpers::{
     decode_oram_directory_page_into_slice, decode_scalar_value, encode_oram_directory_page_into,
     filler_boxed_oram_payload, fixed_scalar_width, reseal_oram_payload_and_record_write,
