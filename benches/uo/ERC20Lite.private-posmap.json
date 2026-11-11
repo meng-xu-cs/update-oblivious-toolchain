@@ -10,8 +10,8 @@
     "metadata_canonicalization_sha256": "4e3a033dbb19868817f8e25a6a1631b7f390bb2ea5b6699799192377b0535003",
     "compilation_mode": "uo",
     "compiler_version": "0.1.0",
-    "toolchain_manifest_sha256": "62d21f166c883e2690f1d45d246deabb9d1505feec0e2b4706f7a994156ec958",
-    "package_sha256": "fd746863e6286627198868ae9ff1aea84b30d8e704128f65ada526959460412f"
+    "toolchain_manifest_sha256": "01ef15872cc1217f60a1046dbaa9e6699f50d3eea8c9e5fa8e00bc3cd76bbbb4",
+    "package_sha256": "852fb7a6e892cf98da363e7c3a03d43c2feaec21321e42398ac53ed8cef4e7d1"
   },
   "contract": {
     "contract": "ERC20Lite",
@@ -2134,7 +2134,7 @@
             "amount"
           ],
           "entry_input_len": 52,
-          "public_gas_budget": 50773,
+          "public_gas_budget": 41203,
           "arena_bytes": 4096,
           "max_stack_words": 64,
           "max_hash_part_bytes": 0,
@@ -2264,9 +2264,9 @@
           "uoarray_writes": 0,
           "uomap_reads": 1,
           "uomap_writes": 1,
-          "max_commit_ops": 1680,
+          "max_commit_ops": 1350,
           "oram_accesses": {
-            "1": 56
+            "1": 45
           }
         },
         "transfer(address,address,uint256)": {
@@ -2281,7 +2281,7 @@
             "amount"
           ],
           "entry_input_len": 72,
-          "public_gas_budget": 99621,
+          "public_gas_budget": 80481,
           "arena_bytes": 4160,
           "max_stack_words": 65,
           "max_hash_part_bytes": 0,
@@ -2580,9 +2580,9 @@
           "uoarray_writes": 0,
           "uomap_reads": 2,
           "uomap_writes": 2,
-          "max_commit_ops": 3360,
+          "max_commit_ops": 2700,
           "oram_accesses": {
-            "1": 112
+            "1": 90
           }
         },
         "transferFrom(address,address,address,uint256)": {
@@ -2599,7 +2599,7 @@
             "amount"
           ],
           "entry_input_len": 92,
-          "public_gas_budget": 102083,
+          "public_gas_budget": 82943,
           "arena_bytes": 4288,
           "max_stack_words": 67,
           "max_hash_part_bytes": 20,
@@ -3070,9 +3070,9 @@
           "uoarray_writes": 0,
           "uomap_reads": 3,
           "uomap_writes": 3,
-          "max_commit_ops": 3440,
+          "max_commit_ops": 2780,
           "oram_accesses": {
-            "1": 112,
+            "1": 90,
             "2": 2
           }
         }

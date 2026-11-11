@@ -5306,6 +5306,62 @@ fn run_tamper_validation() -> Result<JsonValue> {
         }),
     )?);
 
+    // Presence reuse: ERC20Lite's transferFrom, with its balances map on the
+    // private scheme, writes balances[owner] after reading it and
+    // balances[to] in a read-modify-write, so both writes reuse the presence
+    // their reads found. A manifest that counts a presence get for each write
+    // (two more gets of 11 node accesses) is rejected, in source and artifact
+    // alike, because the checker derives the count with the reuse rule.
+    let mut presence_reuse_drift = compile_artifact(
+        "benches/raw/ERC20Lite.sol",
+        "benches/raw/ERC20Lite.private-posmap.yaml",
+        ProgramMode::Uo,
+    )?;
+    let balances_object_id = presence_reuse_drift
+        .contract
+        .state
+        .iter()
+        .find(|object| object.name == "balances")
+        .map(|object| object.id)
+        .ok_or_else(|| anyhow!("presence-reuse tamper scenario missing balances"))?;
+    let presence_reuse_entry = presence_reuse_drift
+        .contract
+        .manifest
+        .entrypoints
+        .get_mut("transferFrom(address,address,address,uint256)")
+        .ok_or_else(|| anyhow!("presence-reuse tamper scenario missing transferFrom"))?;
+    let balances_accesses = presence_reuse_entry
+        .oram_accesses
+        .get_mut(&balances_object_id)
+        .ok_or_else(|| anyhow!("presence-reuse tamper scenario missing balances accesses"))?;
+    let reused_count = *balances_accesses;
+    *balances_accesses += 2 * uo_core::manifest::path_oram_tree_get_accesses(256);
+    let unreused_count = *balances_accesses;
+    scenarios.push(validate_tampered_json_pair_case(
+        "translation/presence_reuse_drift",
+        "source_artifact",
+        &presence_reuse_drift,
+        "artifact",
+        &presence_reuse_drift,
+        |source_artifact_path, artifact_path| {
+            Ok(Command::new(&translation_checker)
+                .arg("ERC20Lite")
+                .arg(source_artifact_path)
+                .arg(artifact_path)
+                .output()?)
+        },
+        json!({
+            "scenario": "translation/presence_reuse_drift",
+            "artifact_kind": "proofgrade_translation_artifacts",
+            "benchmark": "ERC20Lite/oram_private_posmap/transferFrom",
+            "entrypoint": "transferFrom(address,address,address,uint256)",
+            "object_id": balances_object_id,
+            "manifest_accesses": reused_count,
+            "tampered_accesses": unreused_count,
+            "mutation": "count a presence get for each of transferFrom's two balances writes, which reuse the presence their reads found, in both source and artifact projections",
+        }),
+    )?);
+
     // Runtime admission: flipping a confidential UO target to public while
     // leaving a UO backend is rejected before execution by the runtime (Issue
     // 08), independent of the compiler/Lean confidential-object checks.
@@ -54680,11 +54736,13 @@ mod tests {
             Some(KernelTraceRoute::PathOram)
         );
         // On the private scheme at 256 entries (tree height 11) a read of
-        // `balances` makes 11 node accesses and a write 11 + 34, so a transfer
-        // makes 2 * (11 + 45) = 112 ORAM accesses.
+        // `balances` makes 11 node accesses and a write a put of 34, reusing
+        // the presence the read of its key found, so a transfer makes
+        // 2 * (11 + 34) = 90 ORAM accesses (112 if each write made its own
+        // presence get).
         let model =
             kernel_outcome_model(&artifact, entrypoint, KernelTraceRoute::PathOram).unwrap();
-        assert_eq!(model.oram_accesses, 112);
+        assert_eq!(model.oram_accesses, 90);
         assert!(kernel_outcome_model(&artifact, entrypoint, KernelTraceRoute::Exact).is_none());
         let mut instance =
             ContractInstance::deploy_with_seed(artifact.clone(), PROBE_DEPLOY_SEED).unwrap();
@@ -54701,7 +54759,7 @@ mod tests {
             (trace, before, after)
         };
         // A transfer within the balance completes and one beyond it aborts; both
-        // leave and re-enter the enclave 112 times, and differ only in the last
+        // leave and re-enter the enclave 90 times, and differ only in the last
         // exit's length.
         let (completed, before, after) = call(0x21, 3);
         assert!(run_matches_outcome_model(&completed, entrypoint, &model));
@@ -54721,8 +54779,8 @@ mod tests {
                 .to_vec()
         };
         let (completed_schedule, aborted_schedule) = (schedule(&completed), schedule(&aborted));
-        assert_eq!(completed_schedule.len(), 2 * 112 + 2);
-        assert_eq!(aborted_schedule.len(), 2 * 112 + 2);
+        assert_eq!(completed_schedule.len(), 2 * 90 + 2);
+        assert_eq!(aborted_schedule.len(), 2 * 90 + 2);
         assert_eq!(
             completed_schedule[..completed_schedule.len() - 1],
             aborted_schedule[..aborted_schedule.len() - 1]
@@ -54732,7 +54790,7 @@ mod tests {
 
         // A model with one access fewer does not match.
         let drifted = KernelOutcomeModel {
-            oram_accesses: 111,
+            oram_accesses: 89,
             ..model
         };
         assert!(!run_matches_outcome_model(&completed, entrypoint, &drifted));

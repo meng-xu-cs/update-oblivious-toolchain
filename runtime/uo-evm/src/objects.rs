@@ -361,6 +361,12 @@ pub(crate) struct OramMapObject {
     // the call return.
     pending_view: Option<Box<[MapEntry]>>,
     pending_puts: Vec<PendingOramPut>,
+    // The private scheme: whether each of the call's writes, in order, reuses
+    // the presence the preceding get of its key found (public, from the
+    // program), the next write's index, and the last get's key and presence.
+    presence_plan: Box<[bool]>,
+    next_put: usize,
+    last_get: Option<(Value, bool)>,
 }
 
 impl OramMapObject {
@@ -375,12 +381,18 @@ impl OramMapObject {
             rng: self.rng.clone(),
             pending_view: None,
             pending_puts: Vec::new(),
+            presence_plan: Box::default(),
+            next_put: 0,
+            last_get: None,
         })
     }
 
     fn clear_pending(&mut self) {
         self.pending_view = None;
         self.pending_puts.clear();
+        self.presence_plan = Box::default();
+        self.next_put = 0;
+        self.last_get = None;
     }
 
     fn wipe_secrets(&mut self) {
@@ -572,6 +584,9 @@ impl RuntimeObject {
                     rng,
                     pending_view: None,
                     pending_puts: Vec::new(),
+                    presence_plan: Box::default(),
+                    next_put: 0,
+                    last_get: None,
                 }))
             }
         }
@@ -603,6 +618,9 @@ impl RuntimeObject {
                 rng: object.rng.clone(),
                 pending_view: None,
                 pending_puts: Vec::with_capacity(object.oram.parameters().accesses_per_call),
+                presence_plan: Box::default(),
+                next_put: 0,
+                last_get: None,
             })),
         }
     }
@@ -976,7 +994,7 @@ impl RuntimeObject {
                 object.accessed = true;
                 // A get on the private scheme's tree: one ORAM access per
                 // node access.
-                let (value, _found, transcripts, update_failed) = object.oram.tree_get(
+                let (value, found, transcripts, update_failed) = object.oram.tree_get(
                     &object.spec,
                     key,
                     allocator,
@@ -984,6 +1002,8 @@ impl RuntimeObject {
                     &mut object.rng,
                 )?;
                 record_tree_transcripts(trace, &object.spec, &object.oram, transcripts)?;
+                // A later write of the same key may reuse the presence.
+                object.last_get = Some((key.clone(), found));
                 let value = select_pending_put_value(&object.pending_puts, key, value)?;
                 Ok((value, update_failed))
             }
@@ -1053,15 +1073,38 @@ impl RuntimeObject {
                 // A write to the private scheme's tree reaches it at commit,
                 // as one put. Here a get finds whether the key is present,
                 // and the map's pending size decides whether the write
-                // overflows the map.
-                let (_value, found, transcripts, update_failed) = object.oram.tree_get(
-                    &object.spec,
-                    &key,
-                    allocator,
-                    &mut object.leaf_coin_source,
-                    &mut object.rng,
-                )?;
-                record_tree_transcripts(trace, &object.spec, &object.oram, transcripts)?;
+                // overflows the map. The tree is not written before the call
+                // commits, so a write that the program shows to follow a get
+                // of the same key reuses that get's presence instead
+                // (`uo_core::presence_reuse`); which writes do is public.
+                let reuses = object
+                    .presence_plan
+                    .get(object.next_put)
+                    .copied()
+                    .unwrap_or(false);
+                object.next_put += 1;
+                let (found, update_failed) = if reuses {
+                    let Some(last_get) = object.last_get.take() else {
+                        bail!(
+                            "write to {} reuses a presence that no get found",
+                            object.spec.name
+                        );
+                    };
+                    // The program makes the keys equal; a mismatch fails the
+                    // write.
+                    object.oram.reuse_tree_presence(&last_get, &key)
+                } else {
+                    let (_value, found, transcripts, update_failed) = object.oram.tree_get(
+                        &object.spec,
+                        &key,
+                        allocator,
+                        &mut object.leaf_coin_source,
+                        &mut object.rng,
+                    )?;
+                    record_tree_transcripts(trace, &object.spec, &object.oram, transcripts)?;
+                    (found, update_failed)
+                };
+                object.last_get = None;
                 let capacity_overflowed = object.oram.decide_pending_tree_put(
                     &object.spec,
                     &object.pending_puts,
@@ -1466,6 +1509,30 @@ impl RuntimeObject {
             if is_path_oram_scheme(&object.spec.oram_scheme) {
                 object.leaf_coin_source = PathOramLeafCoinSource::require_injected();
             }
+        }
+    }
+
+    /// Whether the object is a map on the private Path ORAM scheme.
+    pub(in crate::runtime) fn is_private_scheme_map(&self) -> bool {
+        matches!(self, Self::UoOramMap(object) if object.oram.is_tree())
+    }
+
+    /// Install a private-scheme map's presence-reuse plan for the call:
+    /// whether each of its writes, in order, reuses the presence the
+    /// preceding get of its key found.
+    pub(in crate::runtime) fn install_presence_reuse_plan(
+        &mut self,
+        plan: Box<[bool]>,
+    ) -> Result<()> {
+        match self {
+            Self::UoOramMap(object) if object.oram.is_tree() => {
+                object.presence_plan = plan;
+                object.next_put = 0;
+                object.last_get = None;
+                Ok(())
+            }
+            _ if plan.iter().all(|reuses| !reuses) => Ok(()),
+            _ => bail!("{} is not a private-scheme map", self.name()),
         }
     }
 

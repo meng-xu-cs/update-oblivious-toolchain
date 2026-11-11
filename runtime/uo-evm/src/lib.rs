@@ -1241,25 +1241,26 @@ bounds:
             second_trace.trace.theorem_trace
         );
         // The map is an AVL tree of 256 nodes, at most 11 levels high: the
-        // read is a get of 11 node accesses, and the write a get of 11 that
-        // finds whether the key is present and a put of 3 * 11 + 1 = 34 at
-        // commit, 56 node accesses in all, each an ORAM access.
+        // read is a get of 11 node accesses, and the write of the key just
+        // read reuses the presence that get found, so it makes only a put of
+        // 3 * 11 + 1 = 34 at commit: 45 node accesses in all, each an ORAM
+        // access (a write without that get would add a presence get of 11).
         let get = uo_core::manifest::path_oram_tree_get_accesses(256);
         let put = uo_core::manifest::path_oram_tree_put_accesses(256);
         assert_eq!((get, put), (11, 34));
-        let accesses = get + get + put;
+        let accesses = get + put;
         assert_eq!(
             first_trace.trace.theorem_trace.boundary_schedule.len(),
             2 * accesses + 2
         );
         // Each node access reads the counter and the 9 buckets of one path;
-        // each of the three operations' first also reads the 20 metadata
+        // each of the two operations' first also reads the 20 metadata
         // pages: the header and 19 stash pages, for a stash bound of
         // 114 + 34 = 148.
         assert_eq!(uo_core::manifest::path_oram_tree_stash_bound(256), 114 + 34);
         assert_eq!(
             first_trace.trace.physical_reads.len(),
-            accesses * (1 + 9) + 3 * 20
+            accesses * (1 + 9) + 2 * 20
         );
         assert_eq!(
             first_trace

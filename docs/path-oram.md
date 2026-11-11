@@ -40,10 +40,10 @@ The Lean development states more than it currently proves for Path ORAM:
   re-enters the enclave around each of the call's ORAM accesses
   (`kernelOramBoundarySchedule`). For example, a private-scheme ERC20Lite
   `transfer` at 256 entries (`h = 11`) reads `balances` twice (11 node
-  accesses each) and writes it twice (a presence get and a put, 11 + 34), so
-  it crosses the boundary 2 × 112 + 2 = 226 times whether it completes or
-  aborts; only the last exit's length, 32 or 0, differs, and the status
-  release erases it. With a bundle,
+  accesses each) and writes it twice, each write a put of 34 that reuses the
+  presence its key's read found, so it crosses the boundary 2 × 90 + 2 = 182
+  times whether it completes or aborts; only the last exit's length, 32 or
+  0, differs, and the status release erases it. With a bundle,
   `SeededRuntimePathOramProofBundleOn.paperMain_admittedKernelRun_localPosmapV1_noninterference_moduloReleases`
   and its private-scheme form leave only the security assumptions and the
   denotation. The probe checks the runtime's outcomes, boundary schedules,
@@ -130,7 +130,22 @@ The Lean development states more than it currently proves for Path ORAM:
   When an operation ends, each node it read takes the coin of the access that
   read it as its new leaf, every pointer to it is fixed, and the nodes return
   to the stash. A map read makes a get, and a map write a get that finds
-  whether the key is present and a put at commit. The manifest counts these
+  whether the key is present and a put at commit. The tree is written only
+  when the call commits, so every get of a key during the call finds the
+  same presence, and a write reuses it when the program shows that the most
+  recent access to its map is a get of the same key: a key expression equal
+  to the write's, built only from variables, literals and pure operators,
+  none of whose variables is bound again in between (`uo_core::presence_reuse`).
+  Such a write makes only the put. The rule reads only the program, so which
+  writes reuse a presence is public; the compiler, `uo-check` and the Lean
+  translation checker count the accesses with it, the runtime follows it
+  from the slot program it runs and checks that the two keys are equal, and
+  the tamper suite rejects a manifest that ignores it
+  (`translation/presence_reuse_drift`). For example, in ERC20Lite's
+  `transfer`, `balances[from] = fromBalance - amount` reuses the presence the
+  declaration `fromBalance = balances[from]` found, and
+  `balances[to] = balances[to] + amount` the presence of the get in its own
+  value. The manifest counts these
   node accesses as the entrypoint's ORAM accesses, and the logical-trace
   checks accept a private-scheme access with all the metadata pages or none
   (`consumeOramAccessMetadataEvents`). Every access remaps what it touches
@@ -138,14 +153,16 @@ The Lean development states more than it currently proves for Path ORAM:
   that leaves it unchanged (a write under a false predicate), on the private
   scheme every node the operation reads.
 - What the tree costs: ERC20Lite `transferFrom` with its `balances` map on
-  the private scheme makes 112 node accesses at capacity 256 (two gets of
-  11, two writes of 11 + 34), 1,320 traced reads (1.46 MB) in all where the
-  flat position map it replaces made 308 (347 KB); at capacity 4096, 2,480
-  reads (2.73 MB) against the flat map's 2,244 (2.6 MB); at capacity 16384
-  (`oram_private_posmap_16384`), 3,290 reads (3.63 MB), where a flat position
-  map is 2,048 pages read and rewritten on every access. The tree's cost grows
-  with the square of the logarithm of the capacity and the flat map's
-  linearly; the tree costs more below a few thousand entries and less above.
+  the private scheme makes 90 node accesses at capacity 256 (two gets of 11
+  and two puts of 34, each write reusing the presence its read found), 1,060
+  traced reads (1.16 MB) in all where the flat position map it replaces made
+  308 (347 KB); at capacity 4096, 1,988 reads (2.18 MB) against the flat
+  map's 2,244 (2.6 MB); at capacity 16384 (`oram_private_posmap_16384`), 2,636
+  reads (2.90 MB), where a flat position map is 2,048 pages read and
+  rewritten on every access. Without the reuse each write would add a get:
+  112, 162 and 192 node accesses. The tree's cost grows with the square of
+  the logarithm of the capacity and the flat map's linearly; the tree costs
+  more than the flat map at 256 entries and less from 4,096.
   The per-call allocator event log grows with the call's ORAM commit
   operations (`max_commit_ops`), so these large maps fit it.
 - `UOToolchain/PathOramFreshLeaves.lean` proves, without enumerating seeds,
@@ -211,7 +228,7 @@ The Lean development states more than it currently proves for Path ORAM:
   ConfidentialMixer `deposit` (262,144) and ERC20Lite `transferFrom`
   (2^44) on the local scheme, and ERC20Lite `transferFrom` with its
   capacity-256 `balances` map on the private scheme and its `allowances` map
-  on the local one (2^910: 112 node accesses of 256 leaves each, and two
+  on the local one (2^734: 90 node accesses of 256 leaves each, and two
   coins of 128 leaves; the theorem input carries the seed count as an exact
   integer). The checker validates every map of the
   configuration against the shape of one of the two schemes
@@ -278,13 +295,13 @@ spends on the proof objects it exports, the position-map witnesses and the
 execution trace's proof bundles, and the rest, its own work
 (`p50_witness_ns`, `p50_proof_objects_ns`, `p50_runtime_ns`;
 `latency_break_even` compares both). On its own work the tree is faster
-than the full scan for reads from 8,192 entries (27 ms against 36 at 8,192,
-52 against 84 at 16,384) and for an even mix from 16,384, while a write
-alone stays slower (96 ms against 87 at 16,384). Whole calls on the tree are
-slower at every capacity measured (564 ms against 405 for a read at 16,384):
+than the full scan for reads from 8,192 entries (33 ms against 42 at 8,192,
+49 against 87 at 16,384) and for an even mix from 16,384, while a write
+alone stays slower (94 ms against 86 at 16,384). Whole calls on the tree are
+slower at every capacity measured (541 ms against 417 for a read at 16,384):
 to export the position-map witnesses, the runtime decodes every bucket of the
-tree at the start and the end of each call, 467 ms of that read, where the
-full scan's time goes to the proof bundles of its 32,768-event trace (321
+tree at the start and the end of each call, 447 ms of that read, where the
+full scan's time goes to the proof bundles of its 32,768-event trace (330
 ms). A node access evicts the stash bucket by bucket, placing a block in the
 bucket at a given depth exactly when its leaf and the read leaf agree above
 that depth (the leaf count is a power of two), and moves blocks with in-place
@@ -296,9 +313,11 @@ What remains open on the private scheme: the runtime's pointer-level
 implementation of the AVL map (node ids, leaves, the free list, the stash)
 is replayed against the model and run against a reference map in the
 runtime's tests, not proved; and the stash bound for operations that hold
-their nodes until they end is assumed (`stashOverflowBounded`). A read
-followed by a write of the same key makes two gets where one would do, and
-the tree costs more than a flat position map below a few thousand entries.
+their nodes until they end is assumed (`stashOverflowBounded`). A write
+whose key the program does not show equal to a preceding get's (another key
+expression, a key read from storage, or a key variable bound again in
+between) still makes its own presence get, and the tree costs more than a
+flat position map below a few thousand entries.
 The instrumented runtime decodes every bucket of a tree twice per call to
 export the position-map witnesses its checks consume, so its calls take time
 linear in the capacity even where the ORAM's own work is logarithmic.

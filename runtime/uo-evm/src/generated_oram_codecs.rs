@@ -4069,6 +4069,17 @@ pub(super) trait TreePathStore {
     fn end_access(&mut self, record: &TreeAccessRecord) -> Result<()>;
 }
 
+/// The presence a write to the private scheme's tree reuses: that of the
+/// call's last get of the map, which the program shows to be of the write's
+/// key (`uo_core::presence_reuse`). The keys are compared without a secret
+/// branch, and a mismatch fails the write as a failed node access does.
+/// Returns the presence and whether the reuse failed.
+pub(super) fn reused_tree_presence(last_get: &(Value, bool), key: &Value) -> (bool, bool) {
+    let (last_key, found) = last_get;
+    let same = Value::confidential_eq(last_key, key);
+    (*found & same, !same)
+}
+
 /// The canonical big-endian bytes of a key, at the key type's width.
 fn tree_key_bytes(key: &Value, width: usize) -> Result<Box<[u8]>> {
     let mut out = zeroed_boxed_bytes(width)?;

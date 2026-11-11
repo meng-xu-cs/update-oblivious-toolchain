@@ -1070,6 +1070,25 @@ impl RuntimeKernelConfidentialStore for ConfidentialRuntimeShadowState {
     fn ensure_fresh_coins_consumed(&self) -> Result<()> {
         self.ensure_path_oram_leaf_coins_consumed()
     }
+
+    /// Each private-scheme map learns which of its writes reuse the presence
+    /// a preceding get of the same key found (`uo_core::presence_reuse`).
+    fn prepare_program(&mut self, program: &ConfidentialKernelSlotProgram) -> Result<()> {
+        let plan = {
+            let objects = &self.shadow.objects;
+            let is_tree = |object_id: u32| {
+                objects
+                    .get(object_id)
+                    .is_some_and(RuntimeObject::is_private_scheme_map)
+            };
+            uo_core::presence_reuse::slot_program_tree_presence_plan(program, &is_tree)
+        };
+        for (object_id, flags) in plan {
+            self.object_mut(object_id)?
+                .install_presence_reuse_plan(flags.into_boxed_slice())?;
+        }
+        Ok(())
+    }
 }
 
 impl RuntimeKernelObjectStore for PublicRuntimeShadowState {

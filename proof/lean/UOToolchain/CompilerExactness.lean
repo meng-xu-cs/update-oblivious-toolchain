@@ -722,7 +722,7 @@ theorem proofGradeManifestFieldsExactOfLookup
       entry.uomap_reads = counts.mapReads ∧
       entry.uomap_writes = counts.mapWrites) ∧
     (∃ expectedOramAccesses,
-      countOramAccessesInBodyStrings fn.body bundle.source_view.state = .ok expectedOramAccesses ∧
+      countFunctionOramAccesses fn bundle.source_view.state = .ok expectedOramAccesses ∧
       oramAccessesMatchExpected expectedOramAccesses entry.oram_accesses = true ∧
       ∀ objectId accesses,
         (objectId, accesses) ∈ expectedOramAccesses →
@@ -770,7 +770,7 @@ theorem proofGradeManifestWitnessWithExpectedOfLookup
   (hMem : fn ∈ bundle.source_view.functions)
   (hLookup : lookupEntrypoint fn.signature bundle.source_view.manifest.entrypoints = some entry) :
   ∃ expected witness,
-    countOramAccessesInBodyStrings fn.body bundle.source_view.state = .ok expected ∧
+    countFunctionOramAccesses fn bundle.source_view.state = .ok expected ∧
     witness = entry.toManifestWitnessWithExpected expected ∧
     witness.secretArgs = fn.secret_args ∧
     witness.publicGasBudget = entry.public_gas_budget ∧
@@ -798,7 +798,7 @@ theorem proofGradeExpectedOramObjectWitnessExistsOfLookup
   (hLookup : lookupEntrypoint fn.signature bundle.source_view.manifest.entrypoints = some entry) :
   ∀ {objectId accesses},
     (objectId, accesses) ∈
-        (match countOramAccessesInBodyStrings fn.body bundle.source_view.state with
+        (match countFunctionOramAccesses fn bundle.source_view.state with
         | .ok expected => expected
         | .error _ => []) →
       ∃ stateObject manifestObject object,
@@ -842,7 +842,7 @@ theorem proofGradeExpectedOramObjectWitnessesBuildOfLookup
   (hMem : fn ∈ bundle.source_view.functions)
   (hLookup : lookupEntrypoint fn.signature bundle.source_view.manifest.entrypoints = some entry) :
   ∃ expected objects,
-    countOramAccessesInBodyStrings fn.body bundle.source_view.state = .ok expected ∧
+    countFunctionOramAccesses fn bundle.source_view.state = .ok expected ∧
     bundle.source_view.buildExpectedOramObjectWitnesses expected = .ok objects ∧
     ∀ object, object ∈ objects → WellFormedOramObject object := by
   rcases
@@ -882,7 +882,7 @@ theorem proofGradeExpectedPathOramObjectWitnessExistsOfLookup
   (hLookup : lookupEntrypoint fn.signature bundle.source_view.manifest.entrypoints = some entry) :
   ∀ {objectId accesses},
     (objectId, accesses) ∈
-        (match countOramAccessesInBodyStrings fn.body bundle.source_view.state with
+        (match countFunctionOramAccesses fn bundle.source_view.state with
         | .ok expected => expected
         | .error _ => []) →
       1 < accesses →
@@ -906,7 +906,7 @@ theorem proofGradeExpectedOramObjectWitnessesAlignedOfLookup
   (hMem : fn ∈ bundle.source_view.functions)
   (hLookup : lookupEntrypoint fn.signature bundle.source_view.manifest.entrypoints = some entry) :
   ∃ expected objects,
-    countOramAccessesInBodyStrings fn.body bundle.source_view.state = .ok expected ∧
+    countFunctionOramAccesses fn bundle.source_view.state = .ok expected ∧
     bundle.source_view.buildExpectedOramObjectWitnesses expected = .ok objects ∧
     ExpectedOramObjectWitnessAlignment expected objects := by
   rcases
@@ -944,7 +944,7 @@ theorem proofGradeOramEntrypointWitnessAlignedExactOfLookup
   (hMem : fn ∈ bundle.source_view.functions)
   (hLookup : lookupEntrypoint fn.signature bundle.source_view.manifest.entrypoints = some entry) :
   ∃ expected witness,
-    countOramAccessesInBodyStrings fn.body bundle.source_view.state = .ok expected ∧
+    countFunctionOramAccesses fn bundle.source_view.state = .ok expected ∧
     bundle.source_view.toOramEntrypointWitnessFromExpected entry expected = .ok witness ∧
     witness.entrypointId = entry.signature ∧
     witness.secretArgs = fn.secret_args ∧
@@ -988,7 +988,7 @@ theorem proofGradeOramEntrypointWitnessExactOfLookup
   (hMem : fn ∈ bundle.source_view.functions)
   (hLookup : lookupEntrypoint fn.signature bundle.source_view.manifest.entrypoints = some entry) :
   ∃ expected witness,
-    countOramAccessesInBodyStrings fn.body bundle.source_view.state = .ok expected ∧
+    countFunctionOramAccesses fn bundle.source_view.state = .ok expected ∧
     bundle.source_view.toOramEntrypointWitnessFromExpected entry expected = .ok witness ∧
     witness.entrypointId = entry.signature ∧
     witness.secretArgs = fn.secret_args ∧
@@ -1010,7 +1010,7 @@ theorem proofGradeOramEntrypointWitnessObjectCountExactOfLookup
   (hMem : fn ∈ bundle.source_view.functions)
   (hLookup : lookupEntrypoint fn.signature bundle.source_view.manifest.entrypoints = some entry) :
   ∃ expected witness,
-    countOramAccessesInBodyStrings fn.body bundle.source_view.state = .ok expected ∧
+    countFunctionOramAccesses fn bundle.source_view.state = .ok expected ∧
     bundle.source_view.toOramEntrypointWitnessFromExpected entry expected = .ok witness ∧
     witness.oramObjects.length = expected.length := by
   rcases
@@ -1124,7 +1124,7 @@ theorem proofGradeOramEntrypointRecomputedSlotLoweringExactOfLookup
   (hLookup : lookupEntrypoint fn.signature bundle.source_view.manifest.entrypoints = some entry)
   (hConf : fn.confidential = true) :
   ∃ expected witness entryProgram entrySlotProgram lowered,
-    countOramAccessesInBodyStrings fn.body bundle.source_view.state = .ok expected ∧
+    countFunctionOramAccesses fn bundle.source_view.state = .ok expected ∧
     bundle.source_view.toOramEntrypointWitnessFromExpected entry expected = .ok witness ∧
     parseEntrypointConfidentialProgram entry = .ok (some entryProgram) ∧
     parseEntrypointConfidentialSlotProgram entry = .ok (some entrySlotProgram) ∧
@@ -1384,7 +1384,7 @@ structure ProofGradeCompilerFacts
           entry.uomap_reads = counts.mapReads ∧
           entry.uomap_writes = counts.mapWrites) ∧
         (∃ expectedOramAccesses,
-          countOramAccessesInBodyStrings fn.body bundle.source_view.state = .ok expectedOramAccesses ∧
+          countFunctionOramAccesses fn bundle.source_view.state = .ok expectedOramAccesses ∧
           oramAccessesMatchExpected expectedOramAccesses entry.oram_accesses = true ∧
           ∀ objectId accesses,
             (objectId, accesses) ∈ expectedOramAccesses →
@@ -1484,7 +1484,7 @@ structure ProofGradeCompilerFacts
       fn ∈ bundle.source_view.functions →
       lookupEntrypoint fn.signature bundle.source_view.manifest.entrypoints = some entry →
       ∃ expected witness,
-        countOramAccessesInBodyStrings fn.body bundle.source_view.state = .ok expected ∧
+        countFunctionOramAccesses fn bundle.source_view.state = .ok expected ∧
         witness = entry.toManifestWitnessWithExpected expected ∧
         witness.secretArgs = fn.secret_args ∧
         witness.publicGasBudget = entry.public_gas_budget ∧
@@ -1496,7 +1496,7 @@ structure ProofGradeCompilerFacts
       lookupEntrypoint fn.signature bundle.source_view.manifest.entrypoints = some entry →
       ∀ {objectId accesses},
         (objectId, accesses) ∈
-            (match countOramAccessesInBodyStrings fn.body bundle.source_view.state with
+            (match countFunctionOramAccesses fn bundle.source_view.state with
             | .ok expected => expected
             | .error _ => []) →
           ∃ stateObject manifestObject object,
@@ -1512,7 +1512,7 @@ structure ProofGradeCompilerFacts
       lookupEntrypoint fn.signature bundle.source_view.manifest.entrypoints = some entry →
       ∀ {objectId accesses},
         (objectId, accesses) ∈
-            (match countOramAccessesInBodyStrings fn.body bundle.source_view.state with
+            (match countFunctionOramAccesses fn bundle.source_view.state with
             | .ok expected => expected
             | .error _ => []) →
           1 < accesses →
@@ -1527,7 +1527,7 @@ structure ProofGradeCompilerFacts
       fn ∈ bundle.source_view.functions →
       lookupEntrypoint fn.signature bundle.source_view.manifest.entrypoints = some entry →
       ∃ expected objects,
-        countOramAccessesInBodyStrings fn.body bundle.source_view.state = .ok expected ∧
+        countFunctionOramAccesses fn bundle.source_view.state = .ok expected ∧
         bundle.source_view.buildExpectedOramObjectWitnesses expected = .ok objects ∧
         ExpectedOramObjectWitnessAlignment expected objects
   oramEntrypointWitnessAlignedExact :
@@ -1536,7 +1536,7 @@ structure ProofGradeCompilerFacts
       fn ∈ bundle.source_view.functions →
       lookupEntrypoint fn.signature bundle.source_view.manifest.entrypoints = some entry →
       ∃ expected witness,
-        countOramAccessesInBodyStrings fn.body bundle.source_view.state = .ok expected ∧
+        countFunctionOramAccesses fn bundle.source_view.state = .ok expected ∧
         bundle.source_view.toOramEntrypointWitnessFromExpected entry expected = .ok witness ∧
         witness.entrypointId = entry.signature ∧
         witness.secretArgs = fn.secret_args ∧
@@ -1549,7 +1549,7 @@ structure ProofGradeCompilerFacts
       fn ∈ bundle.source_view.functions →
       lookupEntrypoint fn.signature bundle.source_view.manifest.entrypoints = some entry →
       ∃ expected witness,
-        countOramAccessesInBodyStrings fn.body bundle.source_view.state = .ok expected ∧
+        countFunctionOramAccesses fn bundle.source_view.state = .ok expected ∧
         bundle.source_view.toOramEntrypointWitnessFromExpected entry expected = .ok witness ∧
         witness.entrypointId = entry.signature ∧
         witness.secretArgs = fn.secret_args ∧
@@ -1563,7 +1563,7 @@ structure ProofGradeCompilerFacts
       lookupEntrypoint fn.signature bundle.source_view.manifest.entrypoints = some entry →
       fn.confidential = true →
       ∃ expected witness entryProgram entrySlotProgram lowered,
-        countOramAccessesInBodyStrings fn.body bundle.source_view.state = .ok expected ∧
+        countFunctionOramAccesses fn bundle.source_view.state = .ok expected ∧
         bundle.source_view.toOramEntrypointWitnessFromExpected entry expected = .ok witness ∧
         parseEntrypointConfidentialProgram entry = .ok (some entryProgram) ∧
         parseEntrypointConfidentialSlotProgram entry = .ok (some entrySlotProgram) ∧

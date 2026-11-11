@@ -114,6 +114,12 @@ pub trait RuntimeKernelConfidentialStore: RuntimeKernelObjectStore + Sized {
     fn install_fresh_coins(&mut self, fresh_coins: Option<Self::FreshCoins>) -> Result<()>;
 
     fn ensure_fresh_coins_consumed(&self) -> Result<()>;
+
+    /// Prepare the loaded objects for the program the call runs, from the
+    /// program alone (public). By default there is nothing to prepare.
+    fn prepare_program(&mut self, _program: &ConfidentialKernelSlotProgram) -> Result<()> {
+        Ok(())
+    }
 }
 
 pub struct RuntimeKernelMachine {
@@ -385,6 +391,7 @@ impl RuntimeKernelMachine {
         })?;
         let had_injected_fresh_coins = fresh_coins.is_some();
         shadow.install_fresh_coins(fresh_coins)?;
+        shadow.prepare_program(program)?;
         let call_inputs = ConfidentialCallInputs::from_raw_args(raw_args);
         let (aborted, return_value) = {
             let runtime_effects =

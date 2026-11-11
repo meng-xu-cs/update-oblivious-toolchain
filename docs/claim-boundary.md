@@ -106,7 +106,7 @@ and its private-scheme counterpart, `UOToolchain/PathOramKernelPaperMain.lean`).
 Their boundary schedule leaves and re-enters the enclave around each of the
 call's ORAM accesses (`kernelOramBoundarySchedule`), whose number the program
 and its maps' schemes fix: a private-scheme ERC20Lite `transfer` at 256
-entries makes 112. Those theorems keep the ORAM premise, which bundle evidence
+entries makes 90, its two writes reusing the presence their reads found. Those theorems keep the ORAM premise, which bundle evidence
 discharges (see Backend Scope), and link the ORAM model's configurations to
 kernel runs through a `KernelDenotation`: every admitted configuration denotes
 an admitted run, and configurations with the same public projection denote
@@ -227,7 +227,7 @@ field bindings required by `DeploymentCallAccepted`.
   `paperMain_privatePosmapV1_noninterference_moduloReleases`), and the probe
   derives the theorem between the two sides of an ERC20Lite `transferFrom`
   pair whose capacity-256 `balances` map uses the private scheme and whose
-  `allowances` map uses the local one (2^910 coin seeds). See
+  `allowances` map uses the local one (2^734 coin seeds). See
   [`path-oram.md`](./path-oram.md).
 - On both Path ORAM schemes, a call reads only the paths it accesses. It
   starts from the map's counter and metadata pages, which its first access

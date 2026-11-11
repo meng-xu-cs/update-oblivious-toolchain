@@ -43,9 +43,9 @@ use generated_oram_codecs::{
     run_surrogate_get, run_surrogate_put, working_stash_capacity, FixedStash, MaskedUsizeOption,
 };
 use generated_oram_codecs::{
-    bootstrap_tree_storage, decide_pending_tree_put, refresh_tree_state_from_storage, run_tree_get,
-    run_tree_put, tree_entries_from_storage, tree_position_map_witness_leaves, tree_put_accesses,
-    TreeState,
+    bootstrap_tree_storage, decide_pending_tree_put, refresh_tree_state_from_storage,
+    reused_tree_presence, run_tree_get, run_tree_put, tree_entries_from_storage,
+    tree_position_map_witness_leaves, tree_put_accesses, TreeState,
 };
 #[cfg(test)]
 use generated_oram_codecs::{
@@ -802,6 +802,16 @@ impl OramState {
         rng: &mut ChaCha20Rng,
     ) -> Result<(Value, bool, Box<[OramTranscript]>, bool)> {
         run_tree_get(self, spec, key, allocator, leaf_coins, rng)
+    }
+
+    /// The presence a write to the private scheme's tree reuses from the
+    /// call's last get of the map, and whether the reuse failed.
+    pub(crate) fn reuse_tree_presence(
+        &self,
+        last_get: &(Value, bool),
+        key: &Value,
+    ) -> (bool, bool) {
+        reused_tree_presence(last_get, key)
     }
 
     /// Decide a pending write to the private scheme's tree: whether it

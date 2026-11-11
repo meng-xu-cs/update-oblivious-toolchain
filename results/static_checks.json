@@ -1213,7 +1213,7 @@
       },
       "private_posmap_artifact": {
         "accepted": true,
-        "artifact_json_bytes": 30576,
+        "artifact_json_bytes": 30573,
         "contract": "ERC20Lite",
         "function_count": 6,
         "lean_stderr": "",
@@ -1222,7 +1222,7 @@
         "manifest_object_count": 2,
         "metadata_contract": "ERC20Lite",
         "mode": "uo",
-        "source_artifact_json_bytes": 30576,
+        "source_artifact_json_bytes": 30573,
         "state_object_count": 2
       },
       "private_posmap_kernel_admission": {

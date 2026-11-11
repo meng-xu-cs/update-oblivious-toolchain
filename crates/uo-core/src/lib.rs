@@ -8,6 +8,7 @@ pub mod kernel_dsl;
 pub mod manifest;
 pub mod metadata;
 pub mod observer_coverage;
+pub mod presence_reuse;
 pub mod runtime_boundary_schema;
 pub mod scaling;
 pub mod shell_boundary;

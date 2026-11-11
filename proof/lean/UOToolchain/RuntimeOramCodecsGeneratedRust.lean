@@ -4085,6 +4085,17 @@ def generatedRustLines2 : List String :=
   , "    fn end_access(&mut self, record: &TreeAccessRecord) -> Result<()>;"
   , "}"
   , ""
+  , "/// The presence a write to the private scheme's tree reuses: that of the"
+  , "/// call's last get of the map, which the program shows to be of the write's"
+  , "/// key (`uo_core::presence_reuse`). The keys are compared without a secret"
+  , "/// branch, and a mismatch fails the write as a failed node access does."
+  , "/// Returns the presence and whether the reuse failed."
+  , "pub(super) fn reused_tree_presence(last_get: &(Value, bool), key: &Value) -> (bool, bool) {"
+  , "    let (last_key, found) = last_get;"
+  , "    let same = Value::confidential_eq(last_key, key);"
+  , "    (*found & same, !same)"
+  , "}"
+  , ""
   , "/// The canonical big-endian bytes of a key, at the key type's width."
   , "fn tree_key_bytes(key: &Value, width: usize) -> Result<Box<[u8]>> {"
   , "    let mut out = zeroed_boxed_bytes(width)?;"
@@ -4503,7 +4514,11 @@ def generatedRustLines2 : List String :=
   , "            .get_mut(level)"
   , "            .ok_or_else(|| anyhow!(\"tree cache slot {} missing\", level))?;"
   , "        node.value = Value::confidential_select(hit, value.clone(), node.value.clone())?;"
-  , "    }"
+  ]
+
+/-- Lines 4501 to 5874 of the generated Rust. -/
+def generatedRustLines3 : List String :=
+  [ "    }"
   , ""
   , "    // A delete removes the found node, or, when it has two children, moves"
   , "    // the successor's entry into it and removes the successor."
@@ -4514,11 +4529,7 @@ def generatedRustLines2 : List String :=
   , "    let mut successor_key = Value::zero_for_type(&shape.key_type);"
   , "    let mut successor_value = Value::zero_for_type(&shape.value_type);"
   , "    let mut successor_right = TreeLink::none();"
-  ]
-
-/-- Lines 4501 to 5863 of the generated Rust. -/
-def generatedRustLines3 : List String :=
-  [ "    let mut found_left = TreeLink::none();"
+  , "    let mut found_left = TreeLink::none();"
   , "    let mut found_right = TreeLink::none();"
   , "    for level in 0..height {"
   , "        let node = cache"

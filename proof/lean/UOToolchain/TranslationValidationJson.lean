@@ -1821,6 +1821,196 @@ def countOramAccessesInBodyStrings
     pure <| mergePairCounts acc
       (← collectOramStatementAccesses (← parseJsonString item) state)
 
+/-! ### Presence reuse
+
+A write to a private-scheme map makes a get that finds whether its key is
+present, unless it reuses the presence a preceding get of the same key found
+(`uo_core::presence_reuse`): the most recent access to the map is a get under
+a key expression equal to the write's, built only from variables, literals and
+pure operators, none of whose variables is bound again in between. The tree is
+written only when the call commits, so both gets find the same presence. The
+rule applies to a confidential entrypoint's linearized, straight-line body. -/
+
+/-- One step of a straight-line body, in evaluation order: a get or a write of
+a map, under a key the rule can compare (its JSON text and its variables) or
+not, or a variable bound. -/
+inductive PresenceEvent where
+  | get (objectId : Nat) (key : Option (String × List String))
+  | put (objectId : Nat) (key : Option (String × List String))
+  | bind (var : String)
+deriving Repr
+
+/-- The variables of a key built only from variables, literals and pure
+operators, or `none`. -/
+private partial def presenceKeyVars (json : Json) : Option (List String) :=
+  if (taggedPayload? json "Literal").isSome then
+    some []
+  else if let some name := taggedPayload? json "Var" then
+    match name.getStr? with
+    | .ok name => some [name]
+    | .error _ => none
+  else if let some inner := taggedPayload? json "Unary" then
+    match lookupFieldJson inner "expr" with
+    | .ok expr => presenceKeyVars expr
+    | .error _ => none
+  else if let some inner := taggedPayload? json "Binary" then
+    match lookupFieldJson inner "lhs", lookupFieldJson inner "rhs" with
+    | .ok lhs, .ok rhs => do
+        let lhsVars ← presenceKeyVars lhs
+        let rhsVars ← presenceKeyVars rhs
+        pure (lhsVars ++ rhsVars)
+    | _, _ => none
+  else if let some inner := taggedPayload? json "Keccak256" then
+    match (lookupFieldAs inner "parts" : Except String (List Json)) with
+    | .ok parts =>
+        parts.foldlM (init := []) fun acc part => do
+          pure (acc ++ (← presenceKeyVars part))
+    | .error _ => none
+  else
+    none
+
+private def presenceKey (json : Json) : Option (String × List String) :=
+  (presenceKeyVars json).map fun vars => (json.compress, vars)
+
+private partial def presenceExprEvents (json : Json) : Except String (List PresenceEvent) := do
+  if (taggedPayload? json "Literal").isSome || (taggedPayload? json "Var").isSome ||
+      (taggedPayload? json "CellGet").isSome then
+    pure []
+  else if let some inner := taggedPayload? json "Unary" then
+    presenceExprEvents (← lookupFieldJson inner "expr")
+  else if let some inner := taggedPayload? json "Binary" then
+    pure ((← presenceExprEvents (← lookupFieldJson inner "lhs")) ++
+      (← presenceExprEvents (← lookupFieldJson inner "rhs")))
+  else if let some inner := taggedPayload? json "Select" then
+    pure ((← presenceExprEvents (← lookupFieldJson inner "cond")) ++
+      (← presenceExprEvents (← lookupFieldJson inner "when_true")) ++
+      (← presenceExprEvents (← lookupFieldJson inner "when_false")))
+  else if let some inner := taggedPayload? json "ArrayGet" then
+    presenceExprEvents (← lookupFieldJson inner "index")
+  else if let some inner := taggedPayload? json "MapGet" then
+    let objectId : Nat ← lookupFieldAs inner "object_id"
+    let key ← lookupFieldJson inner "key"
+    pure ((← presenceExprEvents key) ++ [PresenceEvent.get objectId (presenceKey key)])
+  else if let some inner := taggedPayload? json "StructField" then
+    presenceExprEvents (← lookupFieldJson inner "base")
+  else if let some inner := taggedPayload? json "ArrayIndex" then
+    pure ((← presenceExprEvents (← lookupFieldJson inner "base")) ++
+      (← presenceExprEvents (← lookupFieldJson inner "index")))
+  else if let some inner := taggedPayload? json "Keccak256" then
+    let parts : List Json ← lookupFieldAs inner "parts"
+    parts.foldlM (init := []) fun acc part => do
+      pure (acc ++ (← presenceExprEvents part))
+  else
+    throw "unsupported expression shape in translation bundle"
+
+private def presenceOptionalEvents (inner : Json) (field : String) :
+    Except String (List PresenceEvent) := do
+  match ← lookupOptionalFieldJson inner field with
+  | none => pure []
+  | some json => presenceExprEvents json
+
+/-- A statement's events, or `none` if it branches or loops. -/
+private def presenceStatementEvents (json : Json) :
+    Except String (Option (List PresenceEvent)) := do
+  if let some inner := taggedPayload? json "Declare" then
+    let name : String ← lookupFieldAs inner "name"
+    pure (some ((← presenceExprEvents (← lookupFieldJson inner "value")) ++ [.bind name]))
+  else if let some inner := taggedPayload? json "Assign" then
+    let name : String ← lookupFieldAs inner "name"
+    pure (some ((← presenceExprEvents (← lookupFieldJson inner "value")) ++ [.bind name]))
+  else if let some inner := taggedPayload? json "Require" then
+    pure (some (← presenceExprEvents (← lookupFieldJson inner "cond")))
+  else if let some inner := taggedPayload? json "AbortIf" then
+    pure (some (← presenceExprEvents (← lookupFieldJson inner "cond")))
+  else if let some inner := taggedPayload? json "CellSet" then
+    pure (some ((← presenceExprEvents (← lookupFieldJson inner "value")) ++
+      (← presenceOptionalEvents inner "predicate")))
+  else if let some inner := taggedPayload? json "ArraySet" then
+    pure (some ((← presenceExprEvents (← lookupFieldJson inner "index")) ++
+      (← presenceExprEvents (← lookupFieldJson inner "value")) ++
+      (← presenceOptionalEvents inner "predicate")))
+  else if let some inner := taggedPayload? json "MapPut" then
+    let objectId : Nat ← lookupFieldAs inner "object_id"
+    let key ← lookupFieldJson inner "key"
+    pure (some ((← presenceExprEvents key) ++
+      (← presenceExprEvents (← lookupFieldJson inner "value")) ++
+      (← presenceOptionalEvents inner "predicate") ++ [.put objectId (presenceKey key)]))
+  else if let some inner := taggedPayload? json "Return" then
+    pure (some (← presenceOptionalEvents inner "value"))
+  else if (taggedPayload? json "If").isSome || (taggedPayload? json "For").isSome then
+    pure none
+  else
+    throw "unsupported statement shape in translation bundle"
+
+/-- A body's events, or `none` if it branches or loops. -/
+private def presenceBodyEvents (body : List String) :
+    Except String (Option (List PresenceEvent)) :=
+  body.foldlM (init := some []) fun acc item => do
+    match acc with
+    | none => pure none
+    | some events =>
+        match ← presenceStatementEvents (← parseJsonString item) with
+        | none => pure none
+        | some more => pure (some (events ++ more))
+
+/-- How many writes to each map `isTree` selects reuse a presence. -/
+def presenceReuseCounts (isTree : Nat → Bool) (events : List PresenceEvent) :
+    List (Nat × Nat) :=
+  let step := fun (state : List (Nat × String × List String) × List (Nat × Nat))
+      (event : PresenceEvent) =>
+    let lastGet := state.1
+    let counts := state.2
+    let forget := fun (objectId : Nat) => lastGet.filter (fun entry => entry.1 != objectId)
+    match event with
+    | .get objectId (some (text, vars)) => ((objectId, text, vars) :: forget objectId, counts)
+    | .get objectId none => (forget objectId, counts)
+    | .put objectId key =>
+        let reuses :=
+          isTree objectId &&
+            match key, lastGet.find? (fun entry => entry.1 == objectId) with
+            | some (text, _), some (_, lastText, _) => text == lastText
+            | _, _ => false
+        (forget objectId, if reuses then addPairCount objectId 1 counts else counts)
+    | .bind var => (lastGet.filter (fun entry => !entry.2.2.contains var), counts)
+  (events.foldl step ([], [])).2
+
+private def isPrivateSchemeObject
+  (state : List ImportedProofRelevantStateObjectView) (objectId : Nat) : Bool :=
+  match stateObjectById? state objectId with
+  | some object =>
+      object.backend == "oram" && object.oram_scheme == translationPathOramPrivatePosmapScheme
+  | none => false
+
+private def subtractPairCount (objectId delta : Nat) : List (Nat × Nat) → List (Nat × Nat)
+  | [] => []
+  | (currentId, currentCount) :: rest =>
+      if currentId == objectId then
+        (currentId, currentCount - delta) :: rest
+      else
+        (currentId, currentCount) :: subtractPairCount objectId delta rest
+
+/-- A function's ORAM accesses: those of its body's map operations, less, for
+a confidential entrypoint, a get's node accesses for each write to a
+private-scheme map that reuses a preceding get's presence. -/
+def countFunctionOramAccesses
+  (fn : ImportedProofRelevantFunctionView)
+  (state : List ImportedProofRelevantStateObjectView) :
+  Except String (List (Nat × Nat)) := do
+  let base ← countOramAccessesInBodyStrings fn.body state
+  if !fn.confidential then
+    return base
+  match ← presenceBodyEvents fn.body with
+  | none => pure base
+  | some events =>
+      (presenceReuseCounts (isPrivateSchemeObject state) events).foldlM (init := base)
+        fun acc entry => do
+          let capacity := ((stateObjectById? state entry.1).bind (·.capacity)).getD 0
+          let saved := entry.2 * pathOramTreeGetAccesses capacity
+          if saved ≤ lookupPairCount entry.1 acc then
+            pure (subtractPairCount entry.1 saved acc)
+          else
+            throw s!"presence reuse on object {entry.1} saves more accesses than its writes make"
+
 def oramAccessesMatchExpected
   (expected : List (Nat × Nat))
   (actual : List ImportedProofRelevantOramAccessView) : Bool :=
@@ -1958,7 +2148,7 @@ def expectedCommitOpsForFunction
   (fn : ImportedProofRelevantFunctionView) :
   Except String Nat := do
   let accessedObjects ← accessedObjectIdsInBodyStrings fn.body
-  let oramAccesses ← countOramAccessesInBodyStrings fn.body view.state
+  let oramAccesses ← countFunctionOramAccesses fn view.state
   accessedObjects.foldlM (init := 0) fun acc objectId => do
     let stateObject ←
       match stateObjectById? view.state objectId with
@@ -1990,7 +2180,7 @@ private def functionOramManifestReplayMessage
   (view : ImportedProofRelevantContractView)
   (fn : ImportedProofRelevantFunctionView)
   (entry : ImportedProofRelevantEntrypointView) : String :=
-  match countOramAccessesInBodyStrings fn.body view.state with
+  match countFunctionOramAccesses fn view.state with
   | .error err =>
       s!"{fn.signature}: failed to compute ORAM accesses: {err}"
   | .ok expected =>
@@ -2012,7 +2202,7 @@ private def functionOramAccessesMatchManifest
   (view : ImportedProofRelevantContractView)
   (fn : ImportedProofRelevantFunctionView)
   (entry : ImportedProofRelevantEntrypointView) : Bool :=
-  match countOramAccessesInBodyStrings fn.body view.state with
+  match countFunctionOramAccesses fn view.state with
   | .error _ => false
   | .ok expected =>
       oramAccessesMatchExpected expected entry.oram_accesses &&
@@ -4390,7 +4580,7 @@ theorem ImportedProofRelevantContractView.manifest_oram_accesses_exact_of_lookup
   (hMem : fn ∈ view.functions)
   (hLookup : lookupEntrypoint fn.signature view.manifest.entrypoints = some entry) :
   ∃ expected,
-    countOramAccessesInBodyStrings fn.body view.state = .ok expected ∧
+    countFunctionOramAccesses fn view.state = .ok expected ∧
     oramAccessesMatchExpected expected entry.oram_accesses = true ∧
     ∀ objectId accesses,
       (objectId, accesses) ∈ expected →
@@ -4403,7 +4593,7 @@ theorem ImportedProofRelevantContractView.manifest_oram_accesses_exact_of_lookup
       (view.structural_exactness_checks hValid).2.2.2.2.1
       hMem
       hLookup
-  cases hCounts : countOramAccessesInBodyStrings fn.body view.state with
+  cases hCounts : countFunctionOramAccesses fn view.state with
   | error err =>
       simp [functionOramAccessesMatchManifest, hCounts] at hMatch
   | ok expected =>
