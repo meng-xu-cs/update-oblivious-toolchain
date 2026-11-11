@@ -133,13 +133,15 @@ const CLAIM_ENTRIES: &[ClaimEntry] = &[
     ClaimEntry {
         id: "computational-uo-path-oram-private",
         category: "claim",
-        text: "The scalable private-position-map Path ORAM route path_oram_private_posmap_v1 executes, including several accesses to one map per call, but is not yet covered by a theorem: its Lean theorems take the empty seeded proof bundle.",
-        status: STATUS_EXPERIMENTAL,
+        text: "The private-position-map Path ORAM route path_oram_private_posmap_v1 lifts the local route's capacity cap and shares its data path, a flat position map that every access scans in full (no recursive position map); its Lean paper-main theorem holds over admitted configurations whose maps use either scheme, given the same bundle evidence, and the bundle is derived for ERC20Lite.transferFrom with balances on the private scheme from one runtime run per side whose leaves are substituted for every other tape, with runtime runs on sampled tapes checked against the substitution.",
+        status: STATUS_GENERATED_CHECKED,
         doc_anchor: "path_oram_private_posmap_v1",
         source_files: &["crates/uo-core/src/trace.rs"],
         lean_modules: &[
             "proof/lean/UOToolchain/PathOramPrivatePosmapV1.lean",
             "proof/lean/UOToolchain/RuntimeCoins.lean",
+            "proof/lean/UOToolchain/PathOramAdmitted.lean",
+            "proof/lean/UOToolchain/PathOramTapeWitness.lean",
         ],
         runtime_compiler_files: &["runtime/uo-evm/src/controller.rs"],
         benchmark_result_files: &["results/bridge_validation.json"],

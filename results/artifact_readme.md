@@ -641,17 +641,19 @@ instantiation check when the full canonical pair artifact is materialized: it
 checks that the theorem-backed `SingleAccessMap` Path-ORAM workloads share one
 common public observer across the full canonical fresh-coin families,
 including the complete `256`-seed `put` family and complete `4096`-seed `add`
-family. The remaining coverage gap is now narrower: the small canonical pairs
-are still checked by full family materialization, while very large
-canonical-pair workloads now fall back to a compact proof-grade theorem-facing
-pair theorem-input certificate instead of being skipped. Under the default
-`10 GiB`
-budget, the current report accepts the two `SingleAccessMap` canonical pairs
-directly, and validates both
-`ConfidentialMixer/pathoram/deposit-canonical-pair` and
-`ERC20Lite/pathoram/transferFrom-canonical-pair` through the compact
-proof-grade theorem-input path with their concrete explicit-size estimates
-attached.
+family. Pairs within the compact budget are checked by full family
+materialization; larger pairs are validated through a compact proof-grade
+pair theorem input instead, with their explicit-size estimates attached, and
+for each of those the Lean checker derives the tape-family theorem between
+the pair's two sides from one runtime run per side and checks four more
+runtime runs per side against it. In the compact bundle,
+`SingleAccessMap/pathoram/put-canonical-pair` is materialized in full, and
+`SingleAccessMap/pathoram/add-canonical-pair`,
+`ConfidentialMixer/pathoram/deposit-canonical-pair`,
+`ERC20Lite/pathoram/transferFrom-canonical-pair` and
+`ERC20Lite/oram_private_posmap/transferFrom-canonical-pair` (its `balances`
+map on `path_oram_private_posmap_v1`, which gets the private scheme's
+theorem) go through theorem inputs.
 `reviewer_summary.json` plus `reviewer_summary.md` condense the current
 paper-facing metrics into one machine-generated table: they record per-report
 wall-clock cost, the largest materialized and estimated artifact-size fields,
@@ -663,7 +665,7 @@ surface plus the repo-side Lean theorem/checker surface.
 Security tiers:
 
 - Exact-UO: `FixedSlotClassifier`, `AuthScan`, `ConfidentialMixer` full-scan, `ERC20Lite` full-scan, and `RegistryCRUD` use fixed-shape commits and normalized `M+` traces that are identical across secret variations in this instrumented abstract machine.
-- Computational-UO: `ConfidentialMixer` ORAM and `ERC20Lite` ORAM use the concrete `path_oram_local_posmap_v1` backend, with fixed public controller shape, rerandomized bucket/block rewrites, and theorem-facing witness extraction on the same benchmark family.
+- Computational-UO: `ConfidentialMixer` ORAM and `ERC20Lite` ORAM use the concrete `path_oram_local_posmap_v1` backend, with fixed public controller shape, rerandomized bucket/block rewrites, and theorem-facing witness extraction on the same benchmark family. `ERC20Lite` `oram_private_posmap` puts its `balances` map on `path_oram_private_posmap_v1`, which shares that data path (the runtime has no recursive position map).
 
 Unsupported / rejected:
 

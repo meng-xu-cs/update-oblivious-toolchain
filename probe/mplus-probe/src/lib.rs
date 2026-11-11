@@ -4125,6 +4125,10 @@ fn run_static_checks(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<J
         "UOToolchain.acceptedExactPackageCapstone_noninterference_moduloReleases",
         "UOToolchain.acceptedPathOramPackageCapstone_noninterference_moduloReleases",
         "UOToolchain.acceptedPrivatePosmapPathOramPackageCapstone_noninterference_moduloReleases",
+        "UOToolchain.TapePathOramPaperMainEvidenceOn.paperMain_noninterference_moduloReleases",
+        "UOToolchain.TapePathOramPaperMainEvidenceOn.paperMain_privatePosmapV1_noninterference_moduloReleases",
+        "UOToolchain.PathOramTapeWitness.TapePair.sgxViewRelation_sides",
+        "UOToolchain.PathOramTapeWitness.TapePair.sgxViewRelation_sides_private",
         "UOToolchain.proofGrade_sol_kernel_steps_eq_of_wellTyped",
         "UOToolchain.IR.evalKernelProgram_continues_of_wellTyped",
         "UOToolchain.IR.admittedKernel_exactUO",
@@ -15676,6 +15680,68 @@ fn run_tamper_validation() -> Result<JsonValue> {
         }),
     )?);
 
+    // The private scheme's route: a private-scheme map of the public
+    // configuration given the local scheme's recursion depth is neither a
+    // local- nor a private-scheme object, so the checker must reject it.
+    let private_depth_tamper =
+        "canonical_pathoram_pair_theorem_input/private_recursion_depth_drift";
+    let erc20_private_posmap = compile_artifact(
+        "benches/raw/ERC20Lite.sol",
+        "benches/raw/ERC20Lite.private-posmap.yaml",
+        ProgramMode::Uo,
+    )?;
+    let erc20_transfer_setup = [
+        CallSpec {
+            entrypoint: "mint(address,uint256)",
+            args: vec![addr(0x11), Value::uint(10)],
+        },
+        CallSpec {
+            entrypoint: "approve(address,address,uint256)",
+            args: vec![addr(0x11), addr(0x22), Value::uint(4)],
+        },
+    ];
+    let erc20_transfer_from = |to: u8| CallSpec {
+        entrypoint: "transferFrom(address,address,address,uint256)",
+        args: vec![addr(0x11), addr(0x22), addr(to), Value::uint(3)],
+    };
+    let private_theorem_input = build_canonical_pathoram_pair_theorem_input(
+        "ERC20Lite/oram_private_posmap/transferFrom-theorem-input-tamper",
+        &erc20_private_posmap,
+        &erc20_transfer_setup,
+        &erc20_transfer_from(0x33),
+        &erc20_transfer_from(0x44),
+    )?;
+    let mut tampered_private_theorem_input = serde_json::to_value(&private_theorem_input)?;
+    let private_object = tampered_private_theorem_input["cfg"]["pub_data"]["witness"]
+        ["oram_objects"]
+        .as_array_mut()
+        .and_then(|objects| {
+            objects
+                .iter_mut()
+                .find(|object| object["scheme"] == json!("path_oram_private_posmap_v1"))
+        })
+        .ok_or_else(|| anyhow!("{} found no private-scheme map", private_depth_tamper))?;
+    private_object["recursion_depth"] = json!(0);
+    scenarios.push(validate_tampered_json_case(
+        private_depth_tamper,
+        &tampered_private_theorem_input,
+        |theorem_input_path| {
+            Ok(Command::new(&canonical_pathoram_pair_theorem_input_checker)
+                .arg(theorem_input_path)
+                .arg("page_v1")
+                .arg("exit_v1")
+                .arg("shared_v1")
+                .output()?)
+        },
+        json!({
+            "scenario": private_depth_tamper,
+            "artifact_kind": "runtime_canonical_pathoram_pair_theorem_input",
+            "benchmark": "ERC20Lite/oram_private_posmap/transferFrom-canonical-pair",
+            "entrypoint": "transferFrom(address,address,address,uint256)",
+            "mutation": "give the private-scheme balances map of the public configuration the local scheme's recursion depth 0",
+        }),
+    )?);
+
     // A tape-family sample with one bucket read moved to another bucket: the
     // checker must reject it, since it is no longer the representative run with
     // the sample's tape's leaves.
@@ -17807,6 +17873,13 @@ fn run_canonical_pathoram_pair_validation(options: &ProbeRunOptions) -> Result<J
         "benches/raw/ERC20Lite.pathoram.yaml",
         ProgramMode::Uo,
     )?;
+    // Balances on the private-position-map scheme (capacity 256), allowances
+    // on the local scheme: one call reads and writes maps of both schemes.
+    let erc20_private_posmap = compile_artifact(
+        "benches/raw/ERC20Lite.sol",
+        "benches/raw/ERC20Lite.private-posmap.yaml",
+        ProgramMode::Uo,
+    )?;
     let erc20_transfer_setup = [
         CallSpec {
             entrypoint: "mint(address,uint256)",
@@ -17873,6 +17946,23 @@ fn run_canonical_pathoram_pair_validation(options: &ProbeRunOptions) -> Result<J
         validate_canonical_pathoram_pair_case(
             "ERC20Lite/pathoram/transferFrom-canonical-pair",
             &erc20_pathoram,
+            &erc20_transfer_setup,
+            &CallSpec {
+                entrypoint: "transferFrom(address,address,address,uint256)",
+                args: vec![addr(0x11), addr(0x22), addr(0x33), Value::uint(3)],
+            },
+            &CallSpec {
+                entrypoint: "transferFrom(address,address,address,uint256)",
+                args: vec![addr(0x11), addr(0x22), addr(0x44), Value::uint(3)],
+            },
+            &checker,
+            &paper_instantiation_checker,
+            &theorem_input_checker,
+            options,
+        )?,
+        validate_canonical_pathoram_pair_case(
+            "ERC20Lite/oram_private_posmap/transferFrom-canonical-pair",
+            &erc20_private_posmap,
             &erc20_transfer_setup,
             &CallSpec {
                 entrypoint: "transferFrom(address,address,address,uint256)",
@@ -53653,17 +53743,19 @@ instantiation check when the full canonical pair artifact is materialized: it
 checks that the theorem-backed `SingleAccessMap` Path-ORAM workloads share one
 common public observer across the full canonical fresh-coin families,
 including the complete `256`-seed `put` family and complete `4096`-seed `add`
-family. The remaining coverage gap is now narrower: the small canonical pairs
-are still checked by full family materialization, while very large
-canonical-pair workloads now fall back to a compact proof-grade theorem-facing
-pair theorem-input certificate instead of being skipped. Under the default
-`10 GiB`
-budget, the current report accepts the two `SingleAccessMap` canonical pairs
-directly, and validates both
-`ConfidentialMixer/pathoram/deposit-canonical-pair` and
-`ERC20Lite/pathoram/transferFrom-canonical-pair` through the compact
-proof-grade theorem-input path with their concrete explicit-size estimates
-attached.
+family. Pairs within the compact budget are checked by full family
+materialization; larger pairs are validated through a compact proof-grade
+pair theorem input instead, with their explicit-size estimates attached, and
+for each of those the Lean checker derives the tape-family theorem between
+the pair's two sides from one runtime run per side and checks four more
+runtime runs per side against it. In the compact bundle,
+`SingleAccessMap/pathoram/put-canonical-pair` is materialized in full, and
+`SingleAccessMap/pathoram/add-canonical-pair`,
+`ConfidentialMixer/pathoram/deposit-canonical-pair`,
+`ERC20Lite/pathoram/transferFrom-canonical-pair` and
+`ERC20Lite/oram_private_posmap/transferFrom-canonical-pair` (its `balances`
+map on `path_oram_private_posmap_v1`, which gets the private scheme's
+theorem) go through theorem inputs.
 `reviewer_summary.json` plus `reviewer_summary.md` condense the current
 paper-facing metrics into one machine-generated table: they record per-report
 wall-clock cost, the largest materialized and estimated artifact-size fields,
@@ -53675,7 +53767,7 @@ surface plus the repo-side Lean theorem/checker surface.
 Security tiers:
 
 - Exact-UO: `FixedSlotClassifier`, `AuthScan`, `ConfidentialMixer` full-scan, `ERC20Lite` full-scan, and `RegistryCRUD` use fixed-shape commits and normalized `M+` traces that are identical across secret variations in this instrumented abstract machine.
-- Computational-UO: `ConfidentialMixer` ORAM and `ERC20Lite` ORAM use the concrete `path_oram_local_posmap_v1` backend, with fixed public controller shape, rerandomized bucket/block rewrites, and theorem-facing witness extraction on the same benchmark family.
+- Computational-UO: `ConfidentialMixer` ORAM and `ERC20Lite` ORAM use the concrete `path_oram_local_posmap_v1` backend, with fixed public controller shape, rerandomized bucket/block rewrites, and theorem-facing witness extraction on the same benchmark family. `ERC20Lite` `oram_private_posmap` puts its `balances` map on `path_oram_private_posmap_v1`, which shares that data path (the runtime has no recursive position map).
 
 Unsupported / rejected:
 

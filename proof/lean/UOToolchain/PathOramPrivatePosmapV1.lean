@@ -24,10 +24,13 @@ def PathOramPrivatePosmapV1SecurityAssumptions.toPathOramSecurityAssumptions
   PathOramSecurityAssumptions :=
   assumptions.localPosmapAssumptions.toPathOramSecurityAssumptions
 
+/-- The private scheme's security interface: the Path ORAM view relation,
+admitting the leakage of either scheme, since a private-scheme configuration's
+leakage carries the private scheme tag and may mix local-scheme objects. -/
 abbrev pathOramPrivatePosmapV1SecurityInterface
   (assumptions : PathOramPrivatePosmapV1SecurityAssumptions) :
   OramSecurityInterface :=
-  proofGradePathOramSecurityInterface
+  pathOramAnySchemeSecurityInterface
     assumptions.toPathOramSecurityAssumptions
 
 abbrev pathOramPrivatePosmapV1NormalizedObservedSGXProofRelation
@@ -288,11 +291,9 @@ theorem SeededRuntimePathOramProofBundle.pathOramPrivatePosmapV1_computationalUO
   ComputationalUOWith
     (pathOramPrivatePosmapV1SecurityInterface assumptions)
     bundle.run := by
-  unfold pathOramPrivatePosmapV1SecurityInterface
-  simp [PathOramPrivatePosmapV1SecurityAssumptions.toPathOramSecurityAssumptions]
-  simpa using
-    bundle.computationalUOWith
-      assumptions.localPosmapAssumptions.toCanonicalLeafValueSecurityAssumptions
+  exact ComputationalUOWith.toAnyScheme
+    (bundle.computationalUOWith
+      assumptions.localPosmapAssumptions.toCanonicalLeafValueSecurityAssumptions)
 
 theorem SeededRuntimePathOramProofBundle.pathOramPrivatePosmapV1_computationalUOWith_of_symbolicCheck
   {modelTags : SGXModelTags}

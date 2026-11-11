@@ -1337,4 +1337,99 @@ theorem computationalPathOram_fromPublicViewCanonicalLeafValuesBucketLocationAnd
   · exact hPublicLocation
   · exact hShape
 
+/-! ## Either Path ORAM scheme
+
+`path_oram_local_posmap_v1` and `path_oram_private_posmap_v1` share one
+runtime data path; they differ in the scheme tag, the declared recursion depth
+and the capacity cap. `pathOramViewRelation` admits only local-scheme leakage,
+so no configuration with a private-scheme object can satisfy it.
+`pathOramAnyViewRelation` admits the leakage of either scheme and is otherwise
+the same relation. -/
+
+/-- The leakage shape of an access to a `path_oram_private_posmap_v1` object. -/
+def PathOramPrivateAccessLeakage (access : OramAccessLeakage) : Prop :=
+  access.scheme = privatePathOramScheme ∧
+  access.blocksPerBucket = pathOramBlocksPerBucket ∧
+  access.bucketSize = oramBucketHeaderBytes + access.blocksPerBucket * access.blockSize ∧
+  0 < access.bucketCount ∧
+  access.stashBound = max access.capacity 1 ∧
+  access.recursionDepth = 1 ∧
+  access.metadataPagesPerAccess = access.metadataPages + 1 ∧
+  access.bucketsPerAccess = access.treeHeight + 1 ∧
+  access.accessesPerCall = 1
+
+/-- An access to a Path ORAM object of either scheme. -/
+def PathOramAnyAccessLeakage (access : OramAccessLeakage) : Prop :=
+  PathOramAccessLeakage access ∨ PathOramPrivateAccessLeakage access
+
+def PathOramAnyLeakage (leakage : List OramAccessLeakage) : Prop :=
+  ∀ access, access ∈ leakage → PathOramAnyAccessLeakage access
+
+/-- Every ORAM object of the configuration is a Path ORAM object of either
+scheme. -/
+def PathOramAnyConfigWellFormed (cfg : OramConfig) : Prop :=
+  ∀ object, object ∈ cfg.pubData.witness.oramObjects → WellFormedAnyPathOramObject object
+
+theorem PathOramConfigWellFormed.toAny {cfg : OramConfig} (h : PathOramConfigWellFormed cfg) :
+    PathOramAnyConfigWellFormed cfg :=
+  fun object hMem => Or.inl (h object hMem)
+
+theorem PathOramLeakage.toAny {leakage : List OramAccessLeakage} (h : PathOramLeakage leakage) :
+    PathOramAnyLeakage leakage :=
+  fun access hMem => Or.inl (h access hMem)
+
+theorem isPathOramScheme_of_wellFormedAny {object : OramObjectManifest}
+    (h : WellFormedAnyPathOramObject object) : isPathOramScheme object.scheme = true := by
+  rcases h with h | h
+  · simp [isPathOramScheme, h.1]
+  · simp [isPathOramScheme, h.1]
+
+theorem pathOramPrivateAccessLeakage_of_wellFormedObject (cfg : OramConfig)
+    {object : OramObjectManifest} (hObject : WellFormedPrivatePathOramObject object) :
+    PathOramPrivateAccessLeakage (accessLeakage cfg object) := by
+  rcases hObject with
+    ⟨hScheme, hBlocks, hBucketSize, hBucketCount, hStash, hRecursion, hMetadata, hBuckets, hAccesses⟩
+  simp [PathOramPrivateAccessLeakage, accessLeakage, hScheme, hBlocks, hBucketSize, hBucketCount,
+    hStash, hRecursion, hMetadata, hBuckets, hAccesses]
+
+theorem pathOramAnyConfigWellFormed_executionLeakage {cfg : OramConfig}
+    (hCfg : PathOramAnyConfigWellFormed cfg) : PathOramAnyLeakage (executionLeakage cfg) := by
+  intro access hMem
+  unfold executionLeakage at hMem
+  rcases List.mem_map.mp hMem with ⟨object, hObjectMem, hEq⟩
+  rw [← hEq]
+  rcases hCfg object hObjectMem with hLocal | hPrivate
+  · exact Or.inl (pathOramAccessLeakage_of_wellFormedObject cfg hLocal)
+  · exact Or.inr (pathOramPrivateAccessLeakage_of_wellFormedObject cfg hPrivate)
+
+/-- `pathOramViewRelation`, admitting the leakage of either Path ORAM scheme. -/
+def pathOramAnyViewRelation
+  (assumptions : PathOramSecurityAssumptions)
+  (views₁ views₂ : Distribution ViewMPlus)
+  (leakage : List OramAccessLeakage) : Prop :=
+  PathOramAnyLeakage leakage ∧
+    OramExactProjectionRelation pathOramViewPublicPart views₁ views₂ ∧
+    pathOramStandardStorageTheorem
+      assumptions
+      (views₁.map oramStorageView)
+      (views₂.map oramStorageView)
+      leakage
+
+theorem pathOramViewRelation.toAny {assumptions : PathOramSecurityAssumptions}
+    {views₁ views₂ : Distribution ViewMPlus} {leakage : List OramAccessLeakage}
+    (h : pathOramViewRelation assumptions views₁ views₂ leakage) :
+    pathOramAnyViewRelation assumptions views₁ views₂ leakage :=
+  ⟨PathOramLeakage.toAny h.1, h.2.1, h.2.2⟩
+
+/-- The Path ORAM security interface for either scheme. -/
+abbrev pathOramAnySchemeSecurityInterface
+  (assumptions : PathOramSecurityAssumptions) : OramSecurityInterface :=
+  { localTheorem := pathOramAnyViewRelation assumptions }
+
+theorem ComputationalUOWith.toAnyScheme {assumptions : PathOramSecurityAssumptions}
+    {run : OramSemantics}
+    (h : ComputationalUOWith (proofGradePathOramSecurityInterface assumptions) run) :
+    ComputationalUOWith (pathOramAnySchemeSecurityInterface assumptions) run :=
+  fun cfg₁ cfg₂ hSame => pathOramViewRelation.toAny (h cfg₁ cfg₂ hSame)
+
 end UOToolchain

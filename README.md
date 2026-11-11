@@ -31,18 +31,20 @@ a public chain" as its main execution model.
 
 - Exact-UO is claimed for exact backends on the repository's instrumented
   abstract/runtime model: `UOCell`, `UOArray`, and full-scan `UOMap`.
-- The computational-UO route with a Lean instance is `path_oram_local_posmap_v1`,
-  the bounded local-position-map route (capped at capacity `128`). Its
-  paper-main theorem holds over admitted configurations given bundle evidence
-  (`PathOramAdmitted`), whose leaf obligation follows from the leaf model
-  without seed enumeration. The bundle is derived for a concrete
-  single-access instance, and for the multi-access entrypoints from one
-  runtime run per side, whose leaves are substituted for every other tape
-  (`PathOramTapeWitness`; runtime runs on sampled tapes are checked against
-  it). The scalable
-  `path_oram_private_posmap_v1` route is in the `UOToolchain.ProofGradeRoot`
-  import closure (`PathOramPrivatePosmapV1`, `ScalablePathOramEvidence`) and
-  executes, but it is not yet covered by a theorem. See
+- The computational-UO routes with a Lean instance are
+  `path_oram_local_posmap_v1` and `path_oram_private_posmap_v1`. The local
+  route is capped at capacity `128`; the private route lifts the cap and
+  shares the local route's data path, a flat position map in encrypted
+  metadata pages that every access scans in full (the runtime has no
+  recursive position map). Their paper-main theorems hold over admitted
+  configurations given bundle evidence (`PathOramAdmitted`), whose leaf
+  obligation follows from the leaf model without seed enumeration; the
+  private route's configurations may mix maps of both schemes. The bundle is
+  derived for a concrete single-access instance, and for the multi-access
+  entrypoints from one runtime run per side, whose leaves are substituted for
+  every other tape (`PathOramTapeWitness`; runtime runs on sampled tapes are
+  checked against it), including an ERC20Lite `transferFrom` pair whose
+  `balances` map uses the private route. See
   [`docs/path-oram.md`](docs/path-oram.md).
 - The runtime-to-Lean bridge is explicit and executable: controller
   certificate, hidden Path ORAM certificate, trusted-kernel slot bundle,

@@ -216,25 +216,22 @@ theorem runtimeOramObject_isPathOram_of_matchPublicConfig
   {oramObjects : List RuntimeOramObjectCertificate}
   {cfg : OramConfig}
   (hMatch : RuntimeOramObjectsMatchPublicConfig oramObjects cfg)
-  (hCfg : PathOramConfigWellFormed cfg)
+  (hCfg : PathOramAnyConfigWellFormed cfg)
   {object : RuntimeOramObjectCertificate}
   (hMem : object ∈ oramObjects) :
   object.isPathOram = true := by
   have hManifestMem :
       object.toOramObjectManifest ∈ cfg.pubData.witness.oramObjects :=
     runtimeOramObject_toManifest_mem_of_matchPublicConfig hMatch hMem
-  rcases hCfg object.toOramObjectManifest hManifestMem with
-    ⟨hScheme, _hBlocks, _hBucketSize, _hBucketCount, _hStash, _hRecursion,
-      _hMetadata, _hBuckets, _hAccesses⟩
-  have hObjectScheme : object.scheme = pathOramScheme := by
-    simpa [RuntimeOramObjectCertificate.toOramObjectManifest] using hScheme
-  simp [RuntimeOramObjectCertificate.isPathOram, isPathOramScheme, hObjectScheme]
+  have hScheme := isPathOramScheme_of_wellFormedAny (hCfg object.toOramObjectManifest hManifestMem)
+  simpa [RuntimeOramObjectCertificate.isPathOram, RuntimeOramObjectCertificate.toOramObjectManifest]
+    using hScheme
 
 theorem runtimeOramObjectByName?_isPathOram_of_matchPublicConfig
   {oramObjects : List RuntimeOramObjectCertificate}
   {cfg : OramConfig}
   (hMatch : RuntimeOramObjectsMatchPublicConfig oramObjects cfg)
-  (hCfg : PathOramConfigWellFormed cfg)
+  (hCfg : PathOramAnyConfigWellFormed cfg)
   {objectName : String}
   {object : RuntimeOramObjectCertificate}
   (hLookup : runtimeOramObjectByName? oramObjects objectName = some object) :
@@ -1944,7 +1941,7 @@ theorem runtimePathOramLeafScheduleScaffold_eq_projected_of_matchPublicConfig
   {oramObjects : List RuntimeOramObjectCertificate}
   {cfg : OramConfig}
   (hMatch : RuntimeOramObjectsMatchPublicConfig oramObjects cfg)
-  (hCfg : PathOramConfigWellFormed cfg) :
+  (hCfg : PathOramAnyConfigWellFormed cfg) :
   runtimePathOramLeafScheduleScaffoldOfLogicalAccesses logicalAccesses oramObjects =
     projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
       logicalAccesses
@@ -5047,7 +5044,7 @@ theorem runtimeWitness_object_isPathOram_of_matchPublicConfig
   (witness : RuntimeRefinementWitness)
   {cfg : OramConfig}
   (hMatch : witness.ObjectsMatchPublicConfig cfg)
-  (hCfg : PathOramConfigWellFormed cfg)
+  (hCfg : PathOramAnyConfigWellFormed cfg)
   {object : RuntimeOramObjectCertificate}
   (hMem : object ∈ witness.oramObjects) :
   object.isPathOram = true := by
@@ -5057,7 +5054,7 @@ theorem runtimeWitness_objectByName_isPathOram_of_matchPublicConfig
   (witness : RuntimeRefinementWitness)
   {cfg : OramConfig}
   (hMatch : witness.ObjectsMatchPublicConfig cfg)
-  (hCfg : PathOramConfigWellFormed cfg)
+  (hCfg : PathOramAnyConfigWellFormed cfg)
   {objectName : String}
   {object : RuntimeOramObjectCertificate}
   (hLookup : runtimeOramObjectByName? witness.oramObjects objectName = some object) :
@@ -5160,7 +5157,7 @@ theorem runtimeWitness_publicPathOramLeafScaffold_of_matchPublicConfig
   {cfg : OramConfig}
   (hValid : witness.Valid modelTags)
   (hMatch : witness.ObjectsMatchPublicConfig cfg)
-  (hCfg : PathOramConfigWellFormed cfg) :
+  (hCfg : PathOramAnyConfigWellFormed cfg) :
   pathOramLeafScheduleScaffoldOfPublicPart
       (pathOramViewPublicPart (viewMPlus witness.trace))
       (pathOramProjectedExecutionLeakage cfg) =

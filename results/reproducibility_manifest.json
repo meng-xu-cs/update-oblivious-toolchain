@@ -19,8 +19,8 @@
     },
     {
       "path": "acceptance.json",
-      "bytes": 152501,
-      "sha256": "c065b8fef53ed0cda6e3c82e10f5db4aafbf23a76b0e8f50f4bf547fcdef53a8"
+      "bytes": 152684,
+      "sha256": "a46e757675bdfb52a0be4557ded419e65da58d788c6f51142b1ee1877eed3a01"
     },
     {
       "path": "admission_matrix.json",
@@ -34,43 +34,43 @@
     },
     {
       "path": "artifact_readme.md",
-      "bytes": 46931,
-      "sha256": "1980cd4f4fa9a4dd4705453171c2daaf57a442abd3e62dce45d5d77852ed3f26"
+      "bytes": 47304,
+      "sha256": "dc7aed321d50b660b28def8139d999fa4bee05edd4b8682e6ec236aeece31f4e"
     },
     {
       "path": "bridge_validation.json",
-      "bytes": 25700496,
-      "sha256": "77a44a64be50109fa9dbf4f4a6e4f7a461e4d43903ebdae568b7152827e7ac33"
+      "bytes": 25701648,
+      "sha256": "e1b9be38b630f0d6f929d2b69a343d40b4a4f1ca001e9bc04fda79015e7c3f89"
     },
     {
       "path": "canonical_pathoram_pair_validation.json",
-      "bytes": 8277,
-      "sha256": "79ae8891d16e11328508da0418ee60a4f8ae2e53d4ccada720723a33b37e33e9"
+      "bytes": 10666,
+      "sha256": "a34feca87231724331e085d1e477a549cfd18d8619af051f1ecc621e38bf0175"
     },
     {
       "path": "capacity_sweep.json",
-      "bytes": 27475,
-      "sha256": "6ce4ce9892a901c7c6668f26f85a147f304c186199cd02f41ad1f5015ffa9749"
+      "bytes": 27470,
+      "sha256": "1383d944d96fb4c60dc48569733cdedead9c4eb20499f0366c73334c03d92387"
     },
     {
       "path": "claim_artifact_manifest.json",
-      "bytes": 58807,
-      "sha256": "4f9a5efc7cf5994dade3236d0211b405e4077d90ac72151419287cf7d97b6a7b"
+      "bytes": 59832,
+      "sha256": "b4e6b5bf225577894555f99f85b99351d8d69dc9695390ba1fe117ee69b1f343"
     },
     {
       "path": "claim_consistency.json",
-      "bytes": 3391,
-      "sha256": "baaedbc86788afea3dd993ea9b346bb6b4b7f36a8457b86957911932b88a00d4"
+      "bytes": 3459,
+      "sha256": "56f50a3f7f0e9f25d45234fd1c3e9db1755a8eb304ecd6461f6a38a560233743"
     },
     {
       "path": "claim_status.json",
-      "bytes": 48185,
-      "sha256": "f696e7a4bfa34ff0e569285ee43a4acbabadef200e11b00ff4b1975c776c2ba0"
+      "bytes": 49095,
+      "sha256": "0d747065fb23fc4b4f5ffd2985cd15a97db5b9e8381c322a75c1a56916644372"
     },
     {
       "path": "claim_status.md",
-      "bytes": 7125,
-      "sha256": "e106edfa8d1c544e44418d8d686927425ed596eb7f9099428afab791b2c3b7c2"
+      "bytes": 7484,
+      "sha256": "5ad37c92f0953fa0dccb464f9d6b57c083dd54dbe0fdfc2d615d9b0d43e4eceb"
     },
     {
       "path": "confidential_core_kernel_finish_slot_validation.json",
@@ -279,13 +279,13 @@
     },
     {
       "path": "reviewer_summary.json",
-      "bytes": 116543,
-      "sha256": "8c52a84d75bbaf2cc185a8d3bcc30c884ab2b301a581dc2538cabd49c410f091"
+      "bytes": 117396,
+      "sha256": "b754fdb3d4926dc9bb89113eb3869a98524f55c3ac566d7feb53c1a8328a2a9e"
     },
     {
       "path": "reviewer_summary.md",
-      "bytes": 28780,
-      "sha256": "dbfc9b6c8bd58d90badafd5cb1ce9dc100dfa9e2aedc40ca6072743b1c84ca57"
+      "bytes": 28964,
+      "sha256": "8846a8b511bd4e50139dcd37bf248475eeb29c2fa5b12ae98370f988f2408937"
     },
     {
       "path": "runtime_boundary_validation.json",
@@ -414,13 +414,13 @@
     },
     {
       "path": "static_checks.json",
-      "bytes": 64470,
-      "sha256": "a7469d102ceb2d5da8758642b16d9d0aeb863b48ed291930a418932f6ecaf3fe"
+      "bytes": 65062,
+      "sha256": "bb4b54d84e512e5dc5c2be9ffb514caf153095f5f1b3b0afbd2a6f3278de6226"
     },
     {
       "path": "tamper_validation.json",
-      "bytes": 684785,
-      "sha256": "70341419718503870e6c1b5ce1e8ec99ae43015423ad95e9c3032338d722ffc8"
+      "bytes": 685289,
+      "sha256": "68bc4952f93555e7f2c9118797ad34c1c2c5efb22ef141197212a7200cfad334"
     },
     {
       "path": "targeted-tamper/tamper_validation.json",

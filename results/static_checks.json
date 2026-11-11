@@ -93,6 +93,22 @@
     },
     {
       "print_axioms_present": true,
+      "theorem": "UOToolchain.TapePathOramPaperMainEvidenceOn.paperMain_noninterference_moduloReleases"
+    },
+    {
+      "print_axioms_present": true,
+      "theorem": "UOToolchain.TapePathOramPaperMainEvidenceOn.paperMain_privatePosmapV1_noninterference_moduloReleases"
+    },
+    {
+      "print_axioms_present": true,
+      "theorem": "UOToolchain.PathOramTapeWitness.TapePair.sgxViewRelation_sides"
+    },
+    {
+      "print_axioms_present": true,
+      "theorem": "UOToolchain.PathOramTapeWitness.TapePair.sgxViewRelation_sides_private"
+    },
+    {
+      "print_axioms_present": true,
       "theorem": "UOToolchain.proofGrade_sol_kernel_steps_eq_of_wellTyped"
     },
     {

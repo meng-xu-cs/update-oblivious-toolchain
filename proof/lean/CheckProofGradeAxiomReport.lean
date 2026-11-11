@@ -266,4 +266,52 @@ info: 'UOToolchain.PathOramTapeWitness.sampleCheck_sound' depends on axioms: [pr
 #guard_msgs in
 #print axioms UOToolchain.PathOramTapeWitness.sampleCheck_sound
 
+/--
+info: 'UOToolchain.SeededRuntimePathOramProofBundleOn.computationalUOWithOnAny' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+-/
+#guard_msgs in
+#print axioms UOToolchain.SeededRuntimePathOramProofBundleOn.computationalUOWithOnAny
+
+/--
+info: 'UOToolchain.paperMain_pathOramPrivatePosmapV1_noninterference_moduloReleases_on' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+-/
+#guard_msgs in
+#print axioms UOToolchain.paperMain_pathOramPrivatePosmapV1_noninterference_moduloReleases_on
+
+/--
+info: 'UOToolchain.SeededRuntimePaperMainBundleOn.paperMain_privatePosmapV1_noninterference_moduloReleases' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+-/
+#guard_msgs in
+#print axioms UOToolchain.SeededRuntimePaperMainBundleOn.paperMain_privatePosmapV1_noninterference_moduloReleases
+
+/--
+info: 'UOToolchain.TapePathOramPaperMainEvidenceOn.paperMain_privatePosmapV1_noninterference_moduloReleases' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+-/
+#guard_msgs in
+#print axioms UOToolchain.TapePathOramPaperMainEvidenceOn.paperMain_privatePosmapV1_noninterference_moduloReleases
+
+/--
+info: 'UOToolchain.PathOramTapeWitness.anySchemeValid_of_checkAnySchemeProofGrade' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+-/
+#guard_msgs in
+#print axioms UOToolchain.PathOramTapeWitness.anySchemeValid_of_checkAnySchemeProofGrade
+
+/--
+info: 'UOToolchain.PathOramTapeWitness.TapePair.sgxViewRelation_sides_private' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+-/
+#guard_msgs in
+#print axioms UOToolchain.PathOramTapeWitness.TapePair.sgxViewRelation_sides_private
+
 def main : IO UInt32 := pure 0

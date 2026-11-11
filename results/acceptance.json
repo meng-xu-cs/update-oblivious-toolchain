@@ -1,10 +1,10 @@
 {
   "accepted": true,
   "class_counts": {
-    "advisory_nonclaim": 574,
+    "advisory_nonclaim": 575,
     "deprecated_report": 0,
     "expected_computational_difference": 101,
-    "expected_negative": 1000,
+    "expected_negative": 1002,
     "required_failure": 0,
     "unclassified": 0
   },
@@ -261,7 +261,7 @@
         "advisory_nonclaim": 163,
         "deprecated_report": 0,
         "expected_computational_difference": 48,
-        "expected_negative": 500,
+        "expected_negative": 501,
         "required_failure": 0,
         "unclassified": 0
       },
@@ -814,10 +814,11 @@
         "tamper_validation.scenarios.387.accepted",
         "tamper_validation.scenarios.388.accepted",
         "tamper_validation.scenarios.389.accepted",
-        "tamper_validation.scenarios.390.accepted"
+        "tamper_validation.scenarios.390.accepted",
+        "tamper_validation.scenarios.391.accepted"
       ],
-      "false_count": 711,
-      "false_paths": 711,
+      "false_count": 712,
+      "false_paths": 712,
       "mode": "proof_grade",
       "report": "bridge_validation",
       "required": true,
@@ -2092,6 +2093,7 @@
         "proof_artifact_size_budget.scenarios.5.requires_enumerated_witness_family_for_theorem",
         "proof_artifact_size_budget.scenarios.6.requires_enumerated_witness_family_for_theorem",
         "proof_artifact_size_budget.scenarios.7.requires_enumerated_witness_family_for_theorem",
+        "proof_artifact_size_budget.scenarios.8.requires_enumerated_witness_family_for_theorem",
         "proof_artifact_size_budget.theorem_facing_large_artifacts_require_enumeration",
         "runtime_overheads.cases.0.full_scan.rejected",
         "runtime_overheads.cases.0.raw.executable",
@@ -2151,7 +2153,7 @@
         "runtime_overheads.matrix.17.rejected"
       ],
       "class_counts": {
-        "advisory_nonclaim": 91,
+        "advisory_nonclaim": 92,
         "deprecated_report": 0,
         "expected_computational_difference": 1,
         "expected_negative": 0,
@@ -2162,8 +2164,8 @@
       "expected_false_paths": [
         "runtime_overheads.cases.4.oram_improves_physical_writes"
       ],
-      "false_count": 92,
-      "false_paths": 92,
+      "false_count": 93,
+      "false_paths": 93,
       "mode": "advisory",
       "report": "reviewer_summary",
       "required": false,
@@ -2934,7 +2936,7 @@
         "advisory_nonclaim": 0,
         "deprecated_report": 0,
         "expected_computational_difference": 0,
-        "expected_negative": 495,
+        "expected_negative": 496,
         "required_failure": 0,
         "unclassified": 0
       },
@@ -3434,10 +3436,11 @@
         "scenarios.387.accepted",
         "scenarios.388.accepted",
         "scenarios.389.accepted",
-        "scenarios.390.accepted"
+        "scenarios.390.accepted",
+        "scenarios.391.accepted"
       ],
-      "false_count": 495,
-      "false_paths": 495,
+      "false_count": 496,
+      "false_paths": 496,
       "mode": "expected_negative",
       "report": "tamper_validation",
       "required": false,

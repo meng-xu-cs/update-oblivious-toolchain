@@ -1,6 +1,7 @@
 import UOToolchain.PaperMainReleases
 import UOToolchain.RuntimePaperInstantiation
 import UOToolchain.PathOramFreshLeaves
+import UOToolchain.PathOramPrivatePosmapV1
 
 /-!
 # Path ORAM over admitted configurations
@@ -24,6 +25,13 @@ its leaf obligation from the leaf model without enumerating seeds.
   (`paperMain_pathOramLocalPosmapV1_noninterference_moduloReleases_on`). A
   bundle over all configurations is one over `fun _ => True`
   (`SeededRuntimePaperMainBundle.toOn`).
+- Either scheme: the bundles ask only that every admitted configuration's Path
+  ORAM maps use one of the two schemes (`PathOramAnyConfigWellFormed`). With
+  local-scheme maps only, they give the local theorems above; in general they
+  give the `path_oram_private_posmap_v1` theorems, whose interface admits the
+  leakage of either scheme (`computationalUOWithOnAny`,
+  `paperMainSgxExecutionAny`,
+  `paperMain_privatePosmapV1_noninterference_moduloReleases`).
 - `ConcreteRuntimePathOramPairSlice.toPaperMainBundleOn`: a runtime pair slice,
   which the paper instantiation checker builds from a runtime certificate, is a
   bundle that admits the pair's two sides. They agree on the public projection
@@ -71,12 +79,94 @@ theorem computationalUOWithOn_true_iff {security : OramSecurityInterface} {run :
 
 /-! ## The Path ORAM reduction for one pair of runs -/
 
-/-- **The Path ORAM local theorem for one pair of runs.** For two
-configurations with the same public projection, if both runs show one public
-view, their leaf values are the canonical distribution of the scaffold that
-view fixes, their bucket traces are those of their leaf schedules, and their
-public locations and storage shapes agree, the runs satisfy the Path ORAM view
-relation. -/
+/-- **The Path ORAM view relation for one pair of runs, but its leakage
+shape.** For two configurations with the same public projection, if both runs
+show one public view, their leaf values are the canonical distribution of the
+scaffold that view fixes, their bucket traces are those of their leaf
+schedules, and their public locations and storage shapes agree, the runs agree
+on the public view and satisfy the storage theorem. Neither part depends on the
+Path ORAM scheme. -/
+theorem pathOramViewParts_of_pair
+    (assumptions : PathOramCanonicalLeafValueSecurityAssumptions)
+    {cfg₁ cfg₂ : OramConfig}
+    (hSame : sameOramPublicProjection cfg₁ cfg₂)
+    {views₁ views₂ : Distribution ViewMPlus}
+    {leafs₁ leafs₂ : Distribution PathOramLeafScheduleTrace}
+    {publicPart : OramViewPublicPart}
+    (hPublic₁ : OramConstantProjection pathOramViewPublicPart views₁ publicPart)
+    (hPublic₂ : OramConstantProjection pathOramViewPublicPart views₂ publicPart)
+    (hCanonical₁ :
+      PathOramLeafValueCanonicalOnPublicPart (leafs₁.map pathOramLeafValues) publicPart
+        (pathOramProjectedExecutionLeakage cfg₁))
+    (hCanonical₂ :
+      PathOramLeafValueCanonicalOnPublicPart (leafs₂.map pathOramLeafValues) publicPart
+        (pathOramProjectedExecutionLeakage cfg₂))
+    (hAlign₁ :
+      PathOramLeafSchedulePublicAlignment leafs₁ publicPart
+        (pathOramProjectedExecutionLeakage cfg₁))
+    (hAlign₂ :
+      PathOramLeafSchedulePublicAlignment leafs₂ publicPart
+        (pathOramProjectedExecutionLeakage cfg₂))
+    (hBucket₁ :
+      views₁.map pathOramBucketTraceOfView =
+        leafs₁.map pathOramBucketTraceOfLeafScheduleTrace)
+    (hBucket₂ :
+      views₂.map pathOramBucketTraceOfView =
+        leafs₂.map pathOramBucketTraceOfLeafScheduleTrace)
+    (hPublicLocation :
+      OramExactProjectionRelation pathOramPublicLocationTrace
+        (views₁.map fun view => pathOramStorageLocationTrace (oramStorageView view))
+        (views₂.map fun view => pathOramStorageLocationTrace (oramStorageView view)))
+    (hShape :
+      OramExactProjectionRelation (fun view => pathOramStorageShape (oramStorageView view))
+        views₁ views₂) :
+    OramExactProjectionRelation pathOramViewPublicPart views₁ views₂ ∧
+      pathOramStandardStorageTheorem
+        assumptions.toPathOramLeafValueSecurityAssumptions.toPathOramLeafSecurityAssumptions.toPathOramBucketSecurityAssumptions.toPathOramSecurityAssumptions
+        (views₁.map oramStorageView) (views₂.map oramStorageView) (executionLeakage cfg₁) := by
+  have hLeakageEq :
+      pathOramProjectedExecutionLeakage cfg₁ = pathOramProjectedExecutionLeakage cfg₂ :=
+    pathOramProjectedLeakage_eq_of_samePublicProjection hSame
+  rw [← hLeakageEq] at hCanonical₂ hAlign₂
+  have hScaffold : OramExactProjectionRelation pathOramLeafScheduleScaffold leafs₁ leafs₂ :=
+    pathOramLeafSchedulePublicAlignment_exact hAlign₁ hAlign₂
+  have hValues :
+      canonicalPathOramLeafValueRelation (leafs₁.map pathOramLeafValues)
+        (leafs₂.map pathOramLeafValues) (pathOramProjectedExecutionLeakage cfg₁) := by
+    rcases hCanonical₁ with ⟨scaffold₁, hScaffold₁, hLeafs₁⟩
+    rcases hCanonical₂ with ⟨scaffold₂, hScaffold₂, hLeafs₂⟩
+    have hEq : scaffold₁ = scaffold₂ := Option.some.inj (hScaffold₁.symm.trans hScaffold₂)
+    subst hEq
+    exact ⟨scaffold₁, hLeafs₁, hLeafs₂⟩
+  have hLeaf :
+      pathOramLeafScheduleRelationFromLeafValueRelation canonicalPathOramLeafValueRelation
+        leafs₁ leafs₂ (pathOramProjectedExecutionLeakage cfg₁) :=
+    ⟨hValues, hScaffold⟩
+  have hLocation₁ :
+      (views₁.map oramStorageView).map pathOramStorageLocationTrace =
+        views₁.map fun view => pathOramStorageLocationTrace (oramStorageView view) := by
+    simp [List.map_map, Function.comp_def]
+  have hLocation₂ :
+      (views₂.map oramStorageView).map pathOramStorageLocationTrace =
+        views₂.map fun view => pathOramStorageLocationTrace (oramStorageView view) := by
+    simp [List.map_map, Function.comp_def]
+  refine ⟨⟨publicPart, hPublic₁, hPublic₂⟩, ?_⟩
+  apply pathOramProjectedStorageTheorem_projects_to_standard
+  apply pathOramProjectedStorageTheorem_of_leafScheduleBucketLocationPublicTrace_and_shape
+    assumptions.toPathOramLeafValueSecurityAssumptions.toPathOramLeafSecurityAssumptions
+    (leafs₁ := leafs₁) (leafs₂ := leafs₂)
+  · exact hLeaf
+  · exact hScaffold
+  · rw [hLocation₁, List.map_map]
+    exact hBucket₁
+  · rw [hLocation₂, List.map_map]
+    exact hBucket₂
+  · rw [hLocation₁, hLocation₂]
+    exact hPublicLocation
+  · exact oramExactProjectionRelation_map pathOramStorageShape oramStorageView hShape
+
+/-- **The Path ORAM local theorem for one pair of runs** of local-scheme
+configurations. -/
 theorem pathOramViewRelation_of_pair
     (assumptions : PathOramCanonicalLeafValueSecurityAssumptions)
     {cfg₁ cfg₂ : OramConfig}
@@ -114,47 +204,52 @@ theorem pathOramViewRelation_of_pair
         views₁ views₂) :
     pathOramViewRelation
       assumptions.toPathOramLeafValueSecurityAssumptions.toPathOramLeafSecurityAssumptions.toPathOramBucketSecurityAssumptions.toPathOramSecurityAssumptions
-      views₁ views₂ (executionLeakage cfg₁) := by
-  have hLeakageEq :
-      pathOramProjectedExecutionLeakage cfg₁ = pathOramProjectedExecutionLeakage cfg₂ :=
-    pathOramProjectedLeakage_eq_of_samePublicProjection hSame
-  rw [← hLeakageEq] at hCanonical₂ hAlign₂
-  have hScaffold : OramExactProjectionRelation pathOramLeafScheduleScaffold leafs₁ leafs₂ :=
-    pathOramLeafSchedulePublicAlignment_exact hAlign₁ hAlign₂
-  have hValues :
-      canonicalPathOramLeafValueRelation (leafs₁.map pathOramLeafValues)
-        (leafs₂.map pathOramLeafValues) (pathOramProjectedExecutionLeakage cfg₁) := by
-    rcases hCanonical₁ with ⟨scaffold₁, hScaffold₁, hLeafs₁⟩
-    rcases hCanonical₂ with ⟨scaffold₂, hScaffold₂, hLeafs₂⟩
-    have hEq : scaffold₁ = scaffold₂ := Option.some.inj (hScaffold₁.symm.trans hScaffold₂)
-    subst hEq
-    exact ⟨scaffold₁, hLeafs₁, hLeafs₂⟩
-  have hLeaf :
-      pathOramLeafScheduleRelationFromLeafValueRelation canonicalPathOramLeafValueRelation
-        leafs₁ leafs₂ (pathOramProjectedExecutionLeakage cfg₁) :=
-    ⟨hValues, hScaffold⟩
-  have hLocation₁ :
-      (views₁.map oramStorageView).map pathOramStorageLocationTrace =
-        views₁.map fun view => pathOramStorageLocationTrace (oramStorageView view) := by
-    simp [List.map_map, Function.comp_def]
-  have hLocation₂ :
-      (views₂.map oramStorageView).map pathOramStorageLocationTrace =
-        views₂.map fun view => pathOramStorageLocationTrace (oramStorageView view) := by
-    simp [List.map_map, Function.comp_def]
-  refine ⟨pathOramConfigWellFormed_executionLeakage hCfg, ⟨publicPart, hPublic₁, hPublic₂⟩, ?_⟩
-  apply pathOramProjectedStorageTheorem_projects_to_standard
-  apply pathOramProjectedStorageTheorem_of_leafScheduleBucketLocationPublicTrace_and_shape
-    assumptions.toPathOramLeafValueSecurityAssumptions.toPathOramLeafSecurityAssumptions
-    (leafs₁ := leafs₁) (leafs₂ := leafs₂)
-  · exact hLeaf
-  · exact hScaffold
-  · rw [hLocation₁, List.map_map]
-    exact hBucket₁
-  · rw [hLocation₂, List.map_map]
-    exact hBucket₂
-  · rw [hLocation₁, hLocation₂]
-    exact hPublicLocation
-  · exact oramExactProjectionRelation_map pathOramStorageShape oramStorageView hShape
+      views₁ views₂ (executionLeakage cfg₁) :=
+  ⟨pathOramConfigWellFormed_executionLeakage hCfg,
+    pathOramViewParts_of_pair assumptions hSame hPublic₁ hPublic₂ hCanonical₁ hCanonical₂ hAlign₁ hAlign₂ hBucket₁ hBucket₂ hPublicLocation hShape⟩
+
+/-- The Path ORAM relation for one pair of runs of configurations whose
+objects are Path ORAM objects of either scheme. -/
+theorem pathOramAnyViewRelation_of_pair
+    (assumptions : PathOramCanonicalLeafValueSecurityAssumptions)
+    {cfg₁ cfg₂ : OramConfig}
+    (hSame : sameOramPublicProjection cfg₁ cfg₂)
+    (hCfg : PathOramAnyConfigWellFormed cfg₁)
+    {views₁ views₂ : Distribution ViewMPlus}
+    {leafs₁ leafs₂ : Distribution PathOramLeafScheduleTrace}
+    {publicPart : OramViewPublicPart}
+    (hPublic₁ : OramConstantProjection pathOramViewPublicPart views₁ publicPart)
+    (hPublic₂ : OramConstantProjection pathOramViewPublicPart views₂ publicPart)
+    (hCanonical₁ :
+      PathOramLeafValueCanonicalOnPublicPart (leafs₁.map pathOramLeafValues) publicPart
+        (pathOramProjectedExecutionLeakage cfg₁))
+    (hCanonical₂ :
+      PathOramLeafValueCanonicalOnPublicPart (leafs₂.map pathOramLeafValues) publicPart
+        (pathOramProjectedExecutionLeakage cfg₂))
+    (hAlign₁ :
+      PathOramLeafSchedulePublicAlignment leafs₁ publicPart
+        (pathOramProjectedExecutionLeakage cfg₁))
+    (hAlign₂ :
+      PathOramLeafSchedulePublicAlignment leafs₂ publicPart
+        (pathOramProjectedExecutionLeakage cfg₂))
+    (hBucket₁ :
+      views₁.map pathOramBucketTraceOfView =
+        leafs₁.map pathOramBucketTraceOfLeafScheduleTrace)
+    (hBucket₂ :
+      views₂.map pathOramBucketTraceOfView =
+        leafs₂.map pathOramBucketTraceOfLeafScheduleTrace)
+    (hPublicLocation :
+      OramExactProjectionRelation pathOramPublicLocationTrace
+        (views₁.map fun view => pathOramStorageLocationTrace (oramStorageView view))
+        (views₂.map fun view => pathOramStorageLocationTrace (oramStorageView view)))
+    (hShape :
+      OramExactProjectionRelation (fun view => pathOramStorageShape (oramStorageView view))
+        views₁ views₂) :
+    pathOramAnyViewRelation
+      assumptions.toPathOramLeafValueSecurityAssumptions.toPathOramLeafSecurityAssumptions.toPathOramBucketSecurityAssumptions.toPathOramSecurityAssumptions
+      views₁ views₂ (executionLeakage cfg₁) :=
+  ⟨pathOramAnyConfigWellFormed_executionLeakage hCfg,
+    pathOramViewParts_of_pair assumptions hSame hPublic₁ hPublic₂ hCanonical₁ hCanonical₂ hAlign₁ hAlign₂ hBucket₁ hBucket₂ hPublicLocation hShape⟩
 
 /-! ## Facts of one seeded family -/
 
@@ -165,7 +260,7 @@ variable {modelTags : SGXModelTags} (family : SeededRuntimePathOramWitnessFamily
 /-- The scaffold a family's public view fixes is the family's public leaf
 scaffold. -/
 theorem publicScaffold_of_publicView {cfg : OramConfig} {publicView : OramViewPublicPart}
-    (hCfg : PathOramConfigWellFormed cfg)
+    (hCfg : PathOramAnyConfigWellFormed cfg)
     (hSeedSpace : family.RealizesCanonicalLeafValueSeedSpace)
     (hPublicViewExact :
       ∀ seed, seed < family.seedCount →
@@ -226,7 +321,7 @@ selects: every field speaks of admitted configurations only. -/
 structure SeededRuntimePathOramProofBundleOn (modelTags : SGXModelTags)
     (admitted : OramConfig → Prop) where
   family : OramConfig → SeededRuntimePathOramWitnessFamily modelTags
-  cfgWellFormed : ∀ cfg, admitted cfg → PathOramConfigWellFormed cfg
+  cfgWellFormed : ∀ cfg, admitted cfg → PathOramAnyConfigWellFormed cfg
   publicView : OramConfig → OramViewPublicPart
   publicViewExact :
     ∀ cfg, admitted cfg → ∀ seed, seed < (family cfg).seedCount →
@@ -303,11 +398,13 @@ theorem storageShapeConstantProjection {cfg : OramConfig} (h : admitted cfg) :
 /-- **Path ORAM over admitted configurations.** A bundle gives the Path ORAM
 local theorem for every pair of admitted configurations with the same public
 projection. -/
-theorem computationalUOWithOn (assumptions : PathOramCanonicalLeafValueSecurityAssumptions) :
-    ComputationalUOWithOn admitted
-      (proofGradePathOramSecurityInterface
-        assumptions.toPathOramLeafValueSecurityAssumptions.toPathOramLeafSecurityAssumptions.toPathOramBucketSecurityAssumptions.toPathOramSecurityAssumptions)
-      bundle.run := by
+theorem viewPartsOn (assumptions : PathOramCanonicalLeafValueSecurityAssumptions) :
+    ∀ cfg₁ cfg₂, AdmittedSamePublic admitted cfg₁ cfg₂ →
+      OramExactProjectionRelation pathOramViewPublicPart (bundle.run cfg₁) (bundle.run cfg₂) ∧
+        pathOramStandardStorageTheorem
+          assumptions.toPathOramLeafValueSecurityAssumptions.toPathOramLeafSecurityAssumptions.toPathOramBucketSecurityAssumptions.toPathOramSecurityAssumptions
+          ((bundle.run cfg₁).map oramStorageView) ((bundle.run cfg₂).map oramStorageView)
+          (executionLeakage cfg₁) := by
   intro cfg₁ cfg₂ hPair
   obtain ⟨h₁, h₂, hSame⟩ := hPair
   have hView : bundle.publicView cfg₁ = bundle.publicView cfg₂ :=
@@ -316,7 +413,7 @@ theorem computationalUOWithOn (assumptions : PathOramCanonicalLeafValueSecurityA
   have hCanonical₂ := bundle.leafValueCanonicalOnPublicView h₂
   have hAlign₂ := bundle.leafSchedulePublicAlignment h₂
   rw [← hView] at hPublic₂ hCanonical₂ hAlign₂
-  exact pathOramViewRelation_of_pair assumptions hSame (bundle.cfgWellFormed cfg₁ h₁)
+  exact pathOramViewParts_of_pair assumptions hSame
     (bundle.publicViewConstantProjection h₁) hPublic₂
     (bundle.leafValueCanonicalOnPublicView h₁) hCanonical₂
     (bundle.leafSchedulePublicAlignment h₁) hAlign₂
@@ -326,6 +423,31 @@ theorem computationalUOWithOn (assumptions : PathOramCanonicalLeafValueSecurityA
       ((bundle.family cfg₂).publicLocationConstantProjection (bundle.publicLocationExact cfg₂ h₂)))
     (oramExactProjectionRelation_of_constant (bundle.storageShapeSafe cfg₁ cfg₂ ⟨h₁, h₂, hSame⟩)
       (bundle.storageShapeConstantProjection h₁) (bundle.storageShapeConstantProjection h₂))
+
+/-- **Path ORAM over admitted configurations, either scheme.** A bundle gives
+the Path ORAM relation, admitting the leakage of either scheme, for every pair
+of admitted configurations with the same public projection. -/
+theorem computationalUOWithOnAny (assumptions : PathOramCanonicalLeafValueSecurityAssumptions) :
+    ComputationalUOWithOn admitted
+      (pathOramAnySchemeSecurityInterface
+        assumptions.toPathOramLeafValueSecurityAssumptions.toPathOramLeafSecurityAssumptions.toPathOramBucketSecurityAssumptions.toPathOramSecurityAssumptions)
+      bundle.run :=
+  fun cfg₁ cfg₂ hPair =>
+    ⟨pathOramAnyConfigWellFormed_executionLeakage (bundle.cfgWellFormed cfg₁ hPair.1),
+      bundle.viewPartsOn assumptions cfg₁ cfg₂ hPair⟩
+
+/-- **Path ORAM over admitted local-scheme configurations.** A bundle whose
+admitted configurations hold local-scheme objects only gives the Path ORAM
+local theorem for every pair of them with the same public projection. -/
+theorem computationalUOWithOn (hLocal : ∀ cfg, admitted cfg → PathOramConfigWellFormed cfg)
+    (assumptions : PathOramCanonicalLeafValueSecurityAssumptions) :
+    ComputationalUOWithOn admitted
+      (proofGradePathOramSecurityInterface
+        assumptions.toPathOramLeafValueSecurityAssumptions.toPathOramLeafSecurityAssumptions.toPathOramBucketSecurityAssumptions.toPathOramSecurityAssumptions)
+      bundle.run :=
+  fun cfg₁ cfg₂ hPair =>
+    ⟨pathOramConfigWellFormed_executionLeakage (hLocal cfg₁ hPair.1),
+      bundle.viewPartsOn assumptions cfg₁ cfg₂ hPair⟩
 
 end SeededRuntimePathOramProofBundleOn
 
@@ -353,7 +475,7 @@ def SeededRuntimePathOramProofBundle.toOn {modelTags : SGXModelTags}
     (bundle : SeededRuntimePathOramProofBundle modelTags) :
     SeededRuntimePathOramProofBundleOn modelTags (fun _ => True) :=
   { family := bundle.family
-    cfgWellFormed := fun cfg _ => bundle.cfgWellFormed cfg
+    cfgWellFormed := fun cfg _ => (bundle.cfgWellFormed cfg).toAny
     publicView := bundle.publicView
     publicViewExact := fun cfg _ => bundle.publicViewExact cfg
     publicViewSafe := fun cfg₁ cfg₂ hPair => bundle.publicViewSafe cfg₁ cfg₂ hPair.2.2
@@ -553,13 +675,60 @@ theorem paperMain_pathOramLocalPosmapV1_noninterference_moduloReleases_on
       finalPublicStateModuloReleases := hFinal cfg₁ cfg₂ hPair
       releaseFunctions := hRelease cfg₁ cfg₂ hPair }
 
+/-- **`path_oram_private_posmap_v1` paper-main theorem modulo declared releases,
+over admitted configurations.** -/
+theorem paperMain_pathOramPrivatePosmapV1_noninterference_moduloReleases_on
+    (assumptions : PathOramPrivatePosmapV1SecurityAssumptions)
+    {admitted : OramConfig → Prop}
+    {run : OramSemantics}
+    {publicOutcome : OramConfig → SGXPublicOutcome}
+    {boundarySchedule : OramConfig → List BoundaryEvent}
+    {modelTags : SGXModelTags}
+    {finalPublicStateRollback : OramConfig → PaperMainFinalPublicStateRollback}
+    {releaseFunctions : OramConfig → PaperMainDeclaredReleaseFunctions}
+    (hOram :
+      ComputationalUOWithOn admitted (pathOramPrivatePosmapV1SecurityInterface assumptions) run)
+    (hOutcome : PublicOutcomeSafeModuloReleases (AdmittedSamePublic admitted) publicOutcome)
+    (hBoundary :
+      BoundarySafeModuloReleases (AdmittedSamePublic admitted) publicOutcome boundarySchedule)
+    (hFinal :
+      FinalPublicStateSafeModuloReleases (AdmittedSamePublic admitted) publicOutcome
+        finalPublicStateRollback)
+    (hRelease : PaperMainPublicFieldSafe (AdmittedSamePublic admitted) releaseFunctions)
+    {cfg₁ cfg₂ : OramConfig}
+    (hPair : AdmittedSamePublic admitted cfg₁ cfg₂) :
+    PaperMainPathOramReleaseConclusion
+      (pathOramPrivatePosmapV1NormalizedObservedSGXProofRelation assumptions)
+      (oramToSGXSemantics run publicOutcome boundarySchedule oramControllerMicroTrace)
+      executionLeakage
+      (oramReleaseMicroLeakage publicOutcome modelTags)
+      publicOutcome
+      finalPublicStateRollback
+      releaseFunctions
+      cfg₁
+      cfg₂ := by
+  have hSGX :=
+    computationalUOWithOn_projects_to_sgxView_moduloReleases
+      (pathOramPrivatePosmapV1SecurityInterface assumptions)
+      (modelTags := modelTags)
+      hOram hOutcome hBoundary hPair
+  exact
+    { publicOutcomeModuloReleases := hSGX.1
+      boundarySchedule := hSGX.2.1
+      storageTrace := hSGX.2.2.1
+      microTrace := hSGX.2.2.2
+      finalPublicStateModuloReleases := hFinal cfg₁ cfg₂ hPair
+      releaseFunctions := hRelease cfg₁ cfg₂ hPair }
+
 namespace SeededRuntimePaperMainBundleOn
 
 variable {modelTags : SGXModelTags} {admitted : OramConfig → Prop}
   (bundle : SeededRuntimePaperMainBundleOn modelTags admitted)
 
-/-- The SGX execution theorem over admitted pairs, from a bundle. -/
-theorem paperMainSgxExecution (assumptions : PathOramCanonicalLeafValueSecurityAssumptions) :
+/-- The SGX execution theorem over admitted local-scheme pairs, from a
+bundle. -/
+theorem paperMainSgxExecution (hLocal : ∀ cfg, admitted cfg → PathOramConfigWellFormed cfg)
+    (assumptions : PathOramCanonicalLeafValueSecurityAssumptions) :
     SGXExecutionSecurity
       (AdmittedSamePublic admitted)
       (oramNormalizedObservedSGXProofRelationWith
@@ -570,12 +739,30 @@ theorem paperMainSgxExecution (assumptions : PathOramCanonicalLeafValueSecurityA
       executionLeakage
       (oramMicroLeakage bundle.publicOutcome modelTags) :=
   computationalUOWithOn_projects_to_sgxExecution _
-    (bundle.toSeededRuntimePathOramProofBundleOn.computationalUOWithOn assumptions)
+    (bundle.toSeededRuntimePathOramProofBundleOn.computationalUOWithOn hLocal assumptions)
+    bundle.publicOutcomeSafe bundle.boundarySafe
+
+/-- The SGX execution theorem over admitted pairs of either Path ORAM scheme,
+from a bundle. -/
+theorem paperMainSgxExecutionAny (assumptions : PathOramCanonicalLeafValueSecurityAssumptions) :
+    SGXExecutionSecurity
+      (AdmittedSamePublic admitted)
+      (oramNormalizedObservedSGXProofRelationWith
+        (pathOramAnySchemeSecurityInterface
+          assumptions.toPathOramLeafValueSecurityAssumptions.toPathOramLeafSecurityAssumptions.toPathOramBucketSecurityAssumptions.toPathOramSecurityAssumptions))
+      (oramToSGXSemantics bundle.run bundle.publicOutcome bundle.boundarySchedule
+        oramControllerMicroTrace)
+      executionLeakage
+      (oramMicroLeakage bundle.publicOutcome modelTags) :=
+  computationalUOWithOn_projects_to_sgxExecution _
+    (bundle.toSeededRuntimePathOramProofBundleOn.computationalUOWithOnAny assumptions)
     bundle.publicOutcomeSafe bundle.boundarySafe
 
 /-- **The `path_oram_local_posmap_v1` paper-main theorem modulo releases for
-every admitted pair**, from a bundle. -/
+every admitted pair**, from a bundle whose admitted configurations hold
+local-scheme objects only. -/
 theorem paperMain_noninterference_moduloReleases
+    (hLocal : ∀ cfg, admitted cfg → PathOramConfigWellFormed cfg)
     (assumptions : PathOramLocalPosmapV1SecurityAssumptions)
     {finalPublicStateRollback : OramConfig → PaperMainFinalPublicStateRollback}
     {releaseFunctions : OramConfig → PaperMainDeclaredReleaseFunctions}
@@ -597,8 +784,43 @@ theorem paperMain_noninterference_moduloReleases
       cfg₁
       cfg₂ := by
   apply paperMain_pathOramLocalPosmapV1_noninterference_moduloReleases_on assumptions
-    (bundle.toSeededRuntimePathOramProofBundleOn.computationalUOWithOn
+    (bundle.toSeededRuntimePathOramProofBundleOn.computationalUOWithOn hLocal
       assumptions.toCanonicalLeafValueSecurityAssumptions)
+  · intro c₁ c₂ hPair'
+    simp [bundle.publicOutcomeSafe c₁ c₂ hPair']
+  · intro c₁ c₂ hPair'
+    simp [bundle.publicOutcomeSafe c₁ c₂ hPair', bundle.boundarySafe c₁ c₂ hPair']
+  · exact hFinal
+  · exact hRelease
+  · exact hPair
+
+/-- **The `path_oram_private_posmap_v1` paper-main theorem modulo releases for
+every admitted pair**, from a bundle whose admitted configurations hold Path
+ORAM objects of either scheme. -/
+theorem paperMain_privatePosmapV1_noninterference_moduloReleases
+    (assumptions : PathOramPrivatePosmapV1SecurityAssumptions)
+    {finalPublicStateRollback : OramConfig → PaperMainFinalPublicStateRollback}
+    {releaseFunctions : OramConfig → PaperMainDeclaredReleaseFunctions}
+    (hFinal :
+      FinalPublicStateSafeModuloReleases (AdmittedSamePublic admitted) bundle.publicOutcome
+        finalPublicStateRollback)
+    (hRelease : PaperMainPublicFieldSafe (AdmittedSamePublic admitted) releaseFunctions)
+    {cfg₁ cfg₂ : OramConfig}
+    (hPair : AdmittedSamePublic admitted cfg₁ cfg₂) :
+    PaperMainPathOramReleaseConclusion
+      (pathOramPrivatePosmapV1NormalizedObservedSGXProofRelation assumptions)
+      (oramToSGXSemantics bundle.run bundle.publicOutcome bundle.boundarySchedule
+        oramControllerMicroTrace)
+      executionLeakage
+      (oramReleaseMicroLeakage bundle.publicOutcome modelTags)
+      bundle.publicOutcome
+      finalPublicStateRollback
+      releaseFunctions
+      cfg₁
+      cfg₂ := by
+  apply paperMain_pathOramPrivatePosmapV1_noninterference_moduloReleases_on assumptions
+    (bundle.toSeededRuntimePathOramProofBundleOn.computationalUOWithOnAny
+      assumptions.localPosmapAssumptions.toCanonicalLeafValueSecurityAssumptions)
   · intro c₁ c₂ hPair'
     simp [bundle.publicOutcomeSafe c₁ c₂ hPair']
   · intro c₁ c₂ hPair'
@@ -663,7 +885,7 @@ configurations are the pair's two sides. -/
 def toPaperMainBundleOn : SeededRuntimePaperMainBundleOn modelTags pair.Admitted :=
   { family := pair.sideFamily
     cfgWellFormed := fun cfg h => by
-      rcases h with rfl | rfl <;> exact pair.lhs.cfgWellFormed
+      rcases h with rfl | rfl <;> exact pair.lhs.cfgWellFormed.toAny
     publicView := fun _ => pair.lhs.publicView
     publicViewExact := fun cfg h =>
       pair.side_cases h
@@ -753,6 +975,7 @@ theorem sgxViewRelation_sides (assumptions : PathOramLocalPosmapV1SecurityAssump
       (oramMicroLeakage (fun _ => pair.lhs.publicOutcome) modelTags pair.lhsCfg) := by
   have h :=
     pair.toPaperMainBundleOn.paperMainSgxExecution
+      (fun cfg h => by rcases h with rfl | rfl <;> exact pair.lhs.cfgWellFormed)
       assumptions.toCanonicalLeafValueSecurityAssumptions
       pair.lhsCfg pair.rhsCfg pair.admittedSamePublic_sides
   rw [oramToSGXSemantics, oramToSGXSemantics, toPaperMainBundleOn_run_lhs,
@@ -944,7 +1167,7 @@ bundle needs hold on every tape. -/
 structure TapePathOramPaperMainEvidenceOn (modelTags : SGXModelTags)
     (admitted : OramConfig → Prop) where
   tapeFamily : OramConfig → TapeRuntimePathOramWitnessFamily modelTags
-  cfgWellFormed : ∀ cfg, admitted cfg → PathOramConfigWellFormed cfg
+  cfgWellFormed : ∀ cfg, admitted cfg → PathOramAnyConfigWellFormed cfg
   publicView : OramConfig → OramViewPublicPart
   publicViewExact :
     ∀ cfg, admitted cfg → ∀ tape ∈ (tapeFamily cfg).tapes,
@@ -1024,10 +1247,11 @@ noncomputable def toBundle : SeededRuntimePaperMainBundleOn modelTags admitted :
     boundarySafe := evidence.boundarySafe }
 
 /-- **The `path_oram_local_posmap_v1` paper-main theorem over admitted
-configurations, without seed enumeration.** Tape-family evidence gives the
-theorem for every admitted pair; the leaf schedule's distribution comes from
-`multiObservedLeaves_canonical`. -/
+configurations, without seed enumeration.** Tape-family evidence over
+local-scheme configurations gives the theorem for every admitted pair; the
+leaf schedule's distribution comes from `multiObservedLeaves_canonical`. -/
 theorem paperMain_noninterference_moduloReleases
+    (hLocal : ∀ cfg, admitted cfg → PathOramConfigWellFormed cfg)
     (assumptions : PathOramLocalPosmapV1SecurityAssumptions)
     {finalPublicStateRollback : OramConfig → PaperMainFinalPublicStateRollback}
     {releaseFunctions : OramConfig → PaperMainDeclaredReleaseFunctions}
@@ -1048,7 +1272,34 @@ theorem paperMain_noninterference_moduloReleases
       releaseFunctions
       cfg₁
       cfg₂ :=
-  evidence.toBundle.paperMain_noninterference_moduloReleases assumptions hFinal hRelease hPair
+  evidence.toBundle.paperMain_noninterference_moduloReleases hLocal assumptions hFinal hRelease hPair
+
+/-- **The `path_oram_private_posmap_v1` paper-main theorem over admitted
+configurations, without seed enumeration**, for configurations with Path ORAM
+objects of either scheme. -/
+theorem paperMain_privatePosmapV1_noninterference_moduloReleases
+    (assumptions : PathOramPrivatePosmapV1SecurityAssumptions)
+    {finalPublicStateRollback : OramConfig → PaperMainFinalPublicStateRollback}
+    {releaseFunctions : OramConfig → PaperMainDeclaredReleaseFunctions}
+    (hFinal :
+      FinalPublicStateSafeModuloReleases (AdmittedSamePublic admitted) evidence.publicOutcome
+        finalPublicStateRollback)
+    (hRelease : PaperMainPublicFieldSafe (AdmittedSamePublic admitted) releaseFunctions)
+    {cfg₁ cfg₂ : OramConfig}
+    (hPair : AdmittedSamePublic admitted cfg₁ cfg₂) :
+    PaperMainPathOramReleaseConclusion
+      (pathOramPrivatePosmapV1NormalizedObservedSGXProofRelation assumptions)
+      (oramToSGXSemantics evidence.toBundle.run evidence.publicOutcome evidence.boundarySchedule
+        oramControllerMicroTrace)
+      executionLeakage
+      (oramReleaseMicroLeakage evidence.publicOutcome modelTags)
+      evidence.publicOutcome
+      finalPublicStateRollback
+      releaseFunctions
+      cfg₁
+      cfg₂ :=
+  evidence.toBundle.paperMain_privatePosmapV1_noninterference_moduloReleases assumptions hFinal
+    hRelease hPair
 
 end TapePathOramPaperMainEvidenceOn
 

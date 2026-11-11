@@ -14,7 +14,7 @@ The Lean development states more than it currently proves for Path ORAM:
   `OramConfig` constrains nothing, so no bundle exists
   (`seededRuntimePathOramProofBundle_empty` and
   `seededRuntimePaperMainBundle_empty` in `UOToolchain/RuntimeCoins.lean`).
-- `UOToolchain/PathOramAdmitted.lean` states the local-scheme route over the
+- `UOToolchain/PathOramAdmitted.lean` states the route over the
   configurations an admission predicate selects.
   `SeededRuntimePathOramProofBundleOn` and `SeededRuntimePaperMainBundleOn`
   guard every field by admission. They give the local theorem for every pair
@@ -23,7 +23,14 @@ The Lean development states more than it currently proves for Path ORAM:
   the paper-main theorem modulo releases
   (`paperMain_pathOramLocalPosmapV1_noninterference_moduloReleases_on`). With
   every configuration admitted, `ComputationalUOWithOn` is
-  `ComputationalUOWith`.
+  `ComputationalUOWith`. The bundle asks only that every admitted
+  configuration's Path ORAM maps use one of the two schemes
+  (`PathOramAnyConfigWellFormed`). Where they all use the local scheme, the
+  theorems above hold; in general, the same bundle gives the private
+  scheme's theorems (`computationalUOWithOnAny`, `paperMainSgxExecutionAny`,
+  `paperMain_privatePosmapV1_noninterference_moduloReleases`), whose
+  interface (`pathOramAnySchemeSecurityInterface`) admits the leakage of
+  either scheme, since a configuration may mix the two.
 - This bundle exists. A runtime pair slice is a bundle that admits the pair's
   two sides (`ConcreteRuntimePathOramPairSlice.toPaperMainBundleOn`), which
   agree on the public projection and differ in their secret inputs
@@ -58,15 +65,16 @@ The Lean development states more than it currently proves for Path ORAM:
   rolled back; its reads only remapped keys. Restoring the pre-call storage
   instead would leave the touched keys on the leaves the host just saw.
 - `path_oram_private_posmap_v1` executes, including several accesses to one
-  map per call, but it is not yet covered by a theorem. The runtime has no
+  map per call, and the admitted route covers it (below). The runtime has no
   recursive position map; both schemes share one data path, a flat position
   map in encrypted metadata pages that every access scans in full, so an
-  access to a capacity-256 map reads 64 metadata pages and 9 buckets. Every
-  access remaps the key it touches to a fresh leaf, including a masked write
-  that leaves the key unchanged (a write under a false predicate), so the next
-  access to the key reads an independent path. The Lean
-  runtime-witness checkers accept the private scheme's events, but the
-  per-configuration paper-main boundary is stated for the local scheme only.
+  access to a capacity-256 map reads 64 metadata pages and 9 buckets. The
+  private scheme differs from the local one in its tag, its recursion-depth
+  field (1) and the capacity it admits, not in what an access does or what
+  the trace shows. Every access remaps the key it touches to a fresh leaf,
+  including a masked write that leaves the key unchanged (a write under a
+  false predicate), so the next access to the key reads an independent path.
+  The Lean runtime-witness checkers accept the private scheme's events.
 - `UOToolchain/PathOramFreshLeaves.lean` proves, without enumerating seeds,
   that one map's leaf schedule does not depend on the accesses. Take any `n`
   accesses (hits, misses, inserts, updates, deletes, masked writes, on any
@@ -118,16 +126,27 @@ The Lean development states more than it currently proves for Path ORAM:
   substitution keeps the public view, the public locations and the storage
   shape, so a pair of valid runs with the same public values gives
   `TapePathOramPaperMainEvidenceOn` over the pair's two sides
-  (`TapePair.toEvidence`) and the theorem between them
-  (`TapePair.sgxViewRelation_sides`).
+  (`TapePair.toEvidence`) and the theorem between them: the local scheme's
+  for a configuration of local-scheme maps
+  (`TapePair.sgxViewRelation_sides`), the private scheme's for one with maps
+  of either scheme (`TapePair.sgxViewRelation_sides_private`).
 - The probe derives this for every multi-access pair from the compact
   theorem input it already checks: SingleAccessMap `add` (4,096 coin seeds),
   ConfidentialMixer `deposit` (262,144) and ERC20Lite `transferFrom`
-  (2^44). `checkCanonicalPathOramPairTheoremInput` also checks four more
+  (2^44) on the local scheme, and ERC20Lite `transferFrom` with its
+  capacity-256 `balances` map on the private scheme and its `allowances` map
+  on the local one (2^54). The checker validates every map of the
+  configuration against the shape of one of the two schemes
+  (`checkAnySchemeProofGrade`) and derives the local scheme's theorem when
+  all of them use the local scheme, the private scheme's otherwise; the
+  tamper suite gives the private map the local scheme's recursion depth to
+  see it rejected
+  (`canonical_pathoram_pair_theorem_input/private_recursion_depth_drift`).
+  `checkCanonicalPathOramPairTheoremInput` also checks four more
   runtime runs per side, deployed with other seeds and given other coins,
   and finds each equal to its side's run with that run's own tape
-  substituted (`sampleCheck`). For `transferFrom` every such run has other
-  leaves for the two keys present before the call;
+  substituted (`sampleCheck`). For both `transferFrom` pairs every such run
+  has other leaves for the two keys present before the call;
   `results/canonical_pathoram_pair_validation.json` reports the counts. The
   check compares whole witnesses, all but their seed tag, and the tamper
   suite moves one bucket read
@@ -136,10 +155,9 @@ The Lean development states more than it currently proves for Path ORAM:
   run on every tape is the substituted run is what these samples test; it is
   not proved of the Rust runtime.
 
-Open work: extend the admitted route to `path_oram_private_posmap_v1`; read
-only the accessed paths at call time instead of the whole map, which needs an
-oblivious key-to-slot index and values served from the path and stash; and
-then replace the flat position map by a recursive one.
+Open work: read only the accessed paths at call time instead of the whole
+map, which needs an oblivious key-to-slot index and values served from the
+path and stash; then replace the flat position map by a recursive one.
 
 ## Current Route
 
@@ -193,8 +211,9 @@ and storage-projection facts.
 The legacy local-position-map route is intentionally capped at capacity `128`
 (`PATH_ORAM_LOCAL_POSMAP_MAX_CAPACITY` in Rust and
 `translationPathOramLocalPosmapMaxCapacity` in the Lean imported-shape
-checker). Larger maps use `path_oram_private_posmap_v1`, which executes but is
-not yet covered by a theorem (see Current Status). Its compact symbolic certificate
+checker). Larger maps use `path_oram_private_posmap_v1`, which shares this
+data path and gets its theorem from the same admitted route (see Current
+Status). Its compact symbolic certificate
 (`ScalablePathOramCertificate`) records six shape numbers instead of
 enumerating large seed/family spaces, and `ScalablePathOramCertificate.Subenumerative`
 bounds its size and validation steps below the represented capacity. The
@@ -206,8 +225,8 @@ entrypoint (`supports_multi_access_per_entrypoint()`): every access draws fresh
 leaves and rewrites its path and the metadata pages, and the per-entrypoint
 resource bounds scale with the access count. The surrogate scheme is
 single-access, and a multi-access surrogate entrypoint is rejected at compile
-time. Multi-access calls on the local scheme get the theorem from tape
-families; no theorem covers the private scheme yet (see Current Status).
+time. Multi-access calls on either scheme get the theorem from tape families
+(see Current Status).
 
 ## Assumption Provenance
 

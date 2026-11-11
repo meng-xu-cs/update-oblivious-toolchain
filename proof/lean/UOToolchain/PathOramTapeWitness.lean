@@ -16,7 +16,10 @@ Every substituted run passes the Lean runtime-witness checks
 its public view, public locations, storage shape, outcome and boundary
 schedule are the run's. So one valid run gives a `TapeRuntimePathOramWitnessFamily`
 (`RuntimeRefinementWitness.toTapeFamily`), and a pair of runs gives the
-paper-main theorem over the pair's two sides, with no seed enumeration.
+paper-main theorem over the pair's two sides, with no seed enumeration: the
+local scheme's for a configuration of local-scheme maps
+(`TapePair.sgxViewRelation_sides`), the private scheme's for one with maps of
+either scheme (`TapePair.sgxViewRelation_sides_private`).
 -/
 
 set_option autoImplicit false
@@ -1932,7 +1935,7 @@ theorem substituteWitness_publicLocation {w : RuntimeRefinementWitness} {modelTa
 
 /-- Two valid runs of one public configuration, the pair's sides, that show
 the same public view, public locations, storage shape, outcome and boundary
-schedule. -/
+schedule. The configuration's Path ORAM objects may use either scheme. -/
 structure TapePair (modelTags : SGXModelTags) where
   cfg : OramConfig
   lhs : RuntimeRefinementWitness
@@ -1943,7 +1946,7 @@ structure TapePair (modelTags : SGXModelTags) where
   rhsNodup : (rhs.oramObjects.map (·.objectId)).Nodup
   lhsDepth : ∀ leaf ∈ lhs.oramLeafSchedule, UniformDepth leaf.bucketCount
   rhsDepth : ∀ leaf ∈ rhs.oramLeafSchedule, UniformDepth leaf.bucketCount
-  cfgWellFormed : PathOramConfigWellFormed cfg
+  cfgWellFormed : PathOramAnyConfigWellFormed cfg
   lhsMatch : lhs.ObjectsMatchPublicConfig cfg
   rhsMatch : rhs.ObjectsMatchPublicConfig cfg
   samePublicView :
@@ -2046,10 +2049,11 @@ def toEvidence : TapePathOramPaperMainEvidenceOn modelTags pair.Admitted :=
         (fun _ => rfl) (fun _ => pair.sameBoundary.symm)
     boundarySafe := fun _ _ _ => rfl }
 
-/-- **The theorem at the pair's two sides, without seed enumeration.** The
-SGX execution relation holds between the two sides' runs, over every tape of
-each side's call. -/
-theorem sgxViewRelation_sides (assumptions : PathOramLocalPosmapV1SecurityAssumptions) :
+/-- **The theorem at the pair's two sides, without seed enumeration**, for a
+configuration of local-scheme objects. The SGX execution relation holds
+between the two sides' runs, over every tape of each side's call. -/
+theorem sgxViewRelation_sides (hLocal : PathOramConfigWellFormed pair.cfg)
+    (assumptions : PathOramLocalPosmapV1SecurityAssumptions) :
     SGXViewRelation
       (pathOramLocalPosmapV1NormalizedObservedSGXProofRelation assumptions)
       ((oramToSGXSemantics pair.toEvidence.toBundle.run pair.toEvidence.publicOutcome
@@ -2058,7 +2062,25 @@ theorem sgxViewRelation_sides (assumptions : PathOramLocalPosmapV1SecurityAssump
         pair.toEvidence.boundarySchedule oramControllerMicroTrace) pair.rhsCfg)
       (executionLeakage pair.lhsCfg)
       (oramMicroLeakage pair.toEvidence.publicOutcome modelTags pair.lhsCfg) :=
-  pair.toEvidence.toBundle.paperMainSgxExecution assumptions.toCanonicalLeafValueSecurityAssumptions
+  pair.toEvidence.toBundle.paperMainSgxExecution
+    (fun cfg h => by rcases h with rfl | rfl <;> exact hLocal)
+    assumptions.toCanonicalLeafValueSecurityAssumptions
+    pair.lhsCfg pair.rhsCfg pair.admittedSamePublic_sides
+
+/-- **The `path_oram_private_posmap_v1` theorem at the pair's two sides,
+without seed enumeration**, for a configuration whose Path ORAM objects use
+either scheme (the private scheme's maps next to local-scheme maps). -/
+theorem sgxViewRelation_sides_private (assumptions : PathOramPrivatePosmapV1SecurityAssumptions) :
+    SGXViewRelation
+      (pathOramPrivatePosmapV1NormalizedObservedSGXProofRelation assumptions)
+      ((oramToSGXSemantics pair.toEvidence.toBundle.run pair.toEvidence.publicOutcome
+        pair.toEvidence.boundarySchedule oramControllerMicroTrace) pair.lhsCfg)
+      ((oramToSGXSemantics pair.toEvidence.toBundle.run pair.toEvidence.publicOutcome
+        pair.toEvidence.boundarySchedule oramControllerMicroTrace) pair.rhsCfg)
+      (executionLeakage pair.lhsCfg)
+      (oramMicroLeakage pair.toEvidence.publicOutcome modelTags pair.lhsCfg) :=
+  pair.toEvidence.toBundle.paperMainSgxExecutionAny
+    assumptions.localPosmapAssumptions.toCanonicalLeafValueSecurityAssumptions
     pair.lhsCfg pair.rhsCfg pair.admittedSamePublic_sides
 
 /-- The left side's runs are its tape family's, one per canonical schedule. -/
@@ -2085,10 +2107,71 @@ theorem tapeWitnessCheck_sound {w : RuntimeRefinementWitness} (h : tapeWitnessCh
   simp only [tapeWitnessCheck, Bool.and_eq_true, decide_eq_true_eq, List.all_eq_true] at h
   exact ⟨h.1, fun leaf hLeaf => uniformDepth_of_check (h.2 leaf hLeaf)⟩
 
+/-- The checks of a private-scheme Path ORAM object. -/
+def wellFormedPrivatePathOramObjectCheck (object : OramObjectManifest) : Bool :=
+  decide (object.scheme = privatePathOramScheme) &&
+    decide (object.blocksPerBucket = pathOramBlocksPerBucket) &&
+    decide (object.bucketSize = oramBucketHeaderBytes + object.blocksPerBucket * object.blockSize) &&
+    decide (0 < object.bucketCount) &&
+    decide (object.stashBound = max object.capacity 1) &&
+    decide (object.recursionDepth = 1) &&
+    decide (object.metadataPagesPerAccess = object.metadataPages + 1) &&
+    decide (object.bucketsPerAccess = object.treeHeight + 1) &&
+    decide (object.accessesPerCall = 1)
+
+theorem wellFormedPrivatePathOramObjectCheck_eq_true_iff (object : OramObjectManifest) :
+    wellFormedPrivatePathOramObjectCheck object = true ↔ WellFormedPrivatePathOramObject object := by
+  simp [wellFormedPrivatePathOramObjectCheck, WellFormedPrivatePathOramObject, and_assoc]
+
+/-- Every Path ORAM object of the configuration is well formed for one of the
+two schemes. -/
+def pathOramAnyConfigWellFormedCheck (cfg : OramConfig) : Bool :=
+  cfg.pubData.witness.oramObjects.all fun object =>
+    wellFormedPathOramObjectCheck object || wellFormedPrivatePathOramObjectCheck object
+
+theorem pathOramAnyConfigWellFormedCheck_eq_true_iff (cfg : OramConfig) :
+    pathOramAnyConfigWellFormedCheck cfg = true ↔ PathOramAnyConfigWellFormed cfg := by
+  simp [pathOramAnyConfigWellFormedCheck, PathOramAnyConfigWellFormed, WellFormedAnyPathOramObject,
+    wellFormedPrivatePathOramObjectCheck_eq_true_iff]
+
+/-- The runtime's pair theorem input, valid for a configuration whose Path
+ORAM objects use either scheme: `Valid` with the private scheme admitted. -/
+def AnySchemeValid (input : ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput)
+    (modelTags : SGXModelTags) : Prop :=
+  PathOramAnyConfigWellFormed input.runtimeCfg ∧
+    input.inputMatches input.lhs_input modelTags ∧
+    input.inputMatches input.rhs_input modelTags
+
+theorem anySchemeValid_of_valid {input : ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput}
+    {modelTags : SGXModelTags} (h : input.Valid modelTags) : AnySchemeValid input modelTags :=
+  ⟨h.1.toAny, h.2⟩
+
+/-- The proof-grade checks of the runtime's pair theorem input, with the
+private scheme admitted. -/
+def checkAnySchemeProofGrade (input : ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput)
+    (modelTags : SGXModelTags) : Bool :=
+  pathOramAnyConfigWellFormedCheck input.runtimeCfg &&
+    input.proofGradeInputMatchesCheck input.lhs_input modelTags &&
+    input.proofGradeInputMatchesCheck input.rhs_input modelTags
+
+theorem inputMatches_of_proofGradeInputMatches
+    {pairInput : ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput}
+    {input : ImportedCanonicalFreshCoinRuntimePathOramTheoremInput} {modelTags : SGXModelTags}
+    (h : pairInput.proofGradeInputMatches input modelTags) : pairInput.inputMatches input modelTags :=
+  ⟨importedCanonicalFreshCoinRuntimePathOramTheoremInput_proofGradeValid_implies_valid h.1, h.2⟩
+
+theorem anySchemeValid_of_checkAnySchemeProofGrade
+    {input : ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput} {modelTags : SGXModelTags}
+    (h : checkAnySchemeProofGrade input modelTags = true) : AnySchemeValid input modelTags := by
+  simp only [checkAnySchemeProofGrade, Bool.and_eq_true,
+    importedCanonicalFreshCoinRuntimePathOramPairTheoremInput_proofGradeInputMatchesCheck_eq_true_iff,
+    pathOramAnyConfigWellFormedCheck_eq_true_iff] at h
+  exact ⟨h.1.1, inputMatches_of_proofGradeInputMatches h.1.2, inputMatches_of_proofGradeInputMatches h.2⟩
+
 /-- **The runtime's theorem input gives a tape pair**: its two representative
 runs, checked valid, with the public values the input checks. -/
 def tapePairOfTheoremInput (input : ImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput)
-    {modelTags : SGXModelTags} (hValid : input.Valid modelTags)
+    {modelTags : SGXModelTags} (hValid : AnySchemeValid input modelTags)
     (hLhs : tapeWitnessCheck input.lhs_input.runtimeRepresentativeWitness = true)
     (hRhs : tapeWitnessCheck input.rhs_input.runtimeRepresentativeWitness = true) :
     TapePair modelTags :=

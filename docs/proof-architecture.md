@@ -178,7 +178,7 @@ The proof development is organized around these layers:
   routes; the release semantics is documented in
   [`claim-boundary.md`](./claim-boundary.md#declared-releases). The Path ORAM
   versions take a seeded proof bundle that cannot exist, so they hold
-  vacuously; `PathOramAdmitted` restates the local-scheme version over admitted
+  vacuously; `PathOramAdmitted` restates both schemes' versions over admitted
   configurations, where the bundle exists; see
   [`path-oram.md`](./path-oram.md#current-status).
 

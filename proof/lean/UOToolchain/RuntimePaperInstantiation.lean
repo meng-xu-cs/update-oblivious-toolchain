@@ -407,7 +407,7 @@ theorem ConcreteRuntimePathOramConfigSlice.publicScaffold
           modelTags
           hValid
           hMatch
-          slice.cfgWellFormed
+          slice.cfgWellFormed.toAny
     _ = some slice.family.publicLeafScaffold := by
         simp [SeededRuntimePathOramWitnessFamily.publicLeafScaffoldExact, hSeedCountPos]
 

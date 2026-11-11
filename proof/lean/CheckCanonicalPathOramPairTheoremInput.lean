@@ -14,6 +14,9 @@ def checkerAssumptions : PathOramLocalPosmapV1SecurityAssumptions :=
   , stashOverflowBounded := True
   }
 
+def checkerPrivateAssumptions : PathOramPrivatePosmapV1SecurityAssumptions :=
+  { localPosmapAssumptions := checkerAssumptions }
+
 /-- Runtime runs of each side's call on other tapes (other deployment seeds,
 so other leaves for the keys present before the call, and other coins). -/
 structure ImportedTapeFamilySamples where
@@ -67,26 +70,36 @@ def main (args : List String) : IO UInt32 := do
         , exitModel := exitModel
         , sharedResourceModel := sharedResourceModel
         }
+      let raw ← IO.FS.readFile path
       let theoremInput ←
-        loadAndCheckImportedProofGradeCanonicalFreshCoinRuntimePathOramPairTheoremInput
-          path
-          modelTags
-      IO.println
-        s!"validated proof-grade canonical fresh-coin path-ORAM pair theorem input for {theoremInput.runtimePublicOutcome.entrypointId}"
-      if hProofGrade : theoremInput.checkProofGrade modelTags = true then
-        have hValid : theoremInput.Valid modelTags :=
-          importedCanonicalFreshCoinRuntimePathOramPairTheoremInput_proofGradeValid_implies_valid
-            ((importedCanonicalFreshCoinRuntimePathOramPairTheoremInput_checkProofGrade_eq_true_iff
-              theoremInput modelTags).mp hProofGrade)
+        match parseImportedCanonicalFreshCoinRuntimePathOramPairTheoremInput raw with
+        | .ok theoremInput => pure theoremInput
+        | .error err =>
+            throw <| IO.userError
+              s!"failed to parse canonical fresh-coin path-ORAM pair theorem input: {err}"
+      -- The proof-grade checks, with the configuration's Path ORAM objects of
+      -- either scheme; a local-scheme configuration passes the local checks too.
+      if hProofGrade : checkAnySchemeProofGrade theoremInput modelTags = true then
+        have hValid : AnySchemeValid theoremInput modelTags :=
+          anySchemeValid_of_checkAnySchemeProofGrade hProofGrade
+        IO.println
+          s!"validated proof-grade canonical fresh-coin path-ORAM pair theorem input for {theoremInput.runtimePublicOutcome.entrypointId}"
         if hLhs : tapeWitnessCheck theoremInput.lhs_input.runtimeRepresentativeWitness = true then
           if hRhs : tapeWitnessCheck theoremInput.rhs_input.runtimeRepresentativeWitness = true then
             -- Each side's runs on every tape are its representative run with
             -- the tape's leaves; the paper-main relation holds between the sides.
-            have _ :=
-              (tapePairOfTheoremInput theoremInput hValid hLhs hRhs).sgxViewRelation_sides
-                checkerAssumptions
+            let pair := tapePairOfTheoremInput theoremInput hValid hLhs hRhs
+            let scheme ←
+              if hLocal : pathOramConfigWellFormedCheck theoremInput.runtimeCfg = true then
+                have _ :=
+                  pair.sgxViewRelation_sides
+                    ((pathOramConfigWellFormedCheck_eq_true_iff _).mp hLocal) checkerAssumptions
+                pure "path_oram_local_posmap_v1"
+              else
+                have _ := pair.sgxViewRelation_sides_private checkerPrivateAssumptions
+                pure "path_oram_private_posmap_v1"
             IO.println
-              s!"derived the Path ORAM tape-family theorem for {theoremInput.runtimePublicOutcome.entrypointId}: each side's run on every tape is its representative run with the tape's leaves, and the two sides are related"
+              s!"derived the {scheme} tape-family theorem for {theoremInput.runtimePublicOutcome.entrypointId}: each side's run on every tape is its representative run with the tape's leaves, and the two sides are related"
             match rest with
             | [samplesPath] => checkSamples theoremInput samplesPath
             | _ => pure 0

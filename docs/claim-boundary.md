@@ -185,10 +185,16 @@ field bindings required by `DeploymentCallAccepted`.
   `UOToolchain/RuntimeCoins.lean`). Calls that abort run on both schemes: map
   writes reach the ORAM at commit, masked off on abort, so an aborted call
   makes the same accesses as a committed one.
-  `path_oram_private_posmap_v1` executes, with several accesses to one map
-  per call (the capacity-256 `balances` map of the private ERC20Lite
-  benchmark), but it is not yet covered by a theorem: its Lean route inherits
-  the vacuous bundle. See [`path-oram.md`](./path-oram.md).
+  `path_oram_private_posmap_v1` lifts the local scheme's capacity cap and
+  shares its data path, a flat position map that every access scans in full:
+  the runtime has no recursive position map. The admitted route covers it.
+  For configurations whose Path ORAM maps use either scheme, the same bundle
+  gives the private scheme's theorems (`computationalUOWithOnAny`,
+  `paperMain_privatePosmapV1_noninterference_moduloReleases`), and the probe
+  derives the theorem between the two sides of an ERC20Lite `transferFrom`
+  pair whose capacity-256 `balances` map uses the private scheme and whose
+  `allowances` map uses the local one (2^54 coin seeds). See
+  [`path-oram.md`](./path-oram.md).
 - On both Path ORAM schemes, a call first reads and decrypts the whole map it
   touches (counter, metadata pages, every bucket) to rebuild it in the
   enclave; the trace records only the per-access paths. The call-start reads
@@ -229,8 +235,9 @@ The components are interpreted as follows:
   model `uo-modeled-resource-cost-v1`: a modeled resource cost, not stock EVM
   gas; there is no EVM gas schedule or bytecode backend).
 - `boundary_schedule` is the exact enclave boundary sequence.
-- `storage_trace` is exact for exact backends and related through the
-  proof-grade Path ORAM route (currently a concrete single-access instance;
+- `storage_trace` is exact for exact backends and related through the Path
+  ORAM routes over admitted configurations (instances derived for runtime
+  pairs: one single-access pair and the multi-access pairs on both schemes;
   see Backend Scope).
 - `micro_trace` is SGX-specific and is normalized/simulated from
   `L_sgx_micro`; the theorem does not claim raw page-id or full micro-event

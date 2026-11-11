@@ -47,7 +47,7 @@
       "ok": true
     },
     {
-      "detail": "computational-uo-path-oram-private declares an allowed status (experimental)",
+      "detail": "computational-uo-path-oram-private declares an allowed status (generated-and-checked)",
       "name": "status-allowed:computational-uo-path-oram-private",
       "ok": true
     },
@@ -562,6 +562,16 @@
       "ok": true
     },
     {
+      "detail": "artifact proof/lean/UOToolchain/PathOramAdmitted.lean referenced by computational-uo-path-oram-private exists",
+      "name": "file-exists:computational-uo-path-oram-private:proof/lean/UOToolchain/PathOramAdmitted.lean",
+      "ok": true
+    },
+    {
+      "detail": "artifact proof/lean/UOToolchain/PathOramTapeWitness.lean referenced by computational-uo-path-oram-private exists",
+      "name": "file-exists:computational-uo-path-oram-private:proof/lean/UOToolchain/PathOramTapeWitness.lean",
+      "ok": true
+    },
+    {
       "detail": "artifact runtime/uo-evm/src/controller.rs referenced by computational-uo-path-oram-private exists",
       "name": "file-exists:computational-uo-path-oram-private:runtime/uo-evm/src/controller.rs",
       "ok": true
@@ -860,8 +870,8 @@
     {
       "category": "claim",
       "id": "computational-uo-path-oram-private",
-      "status": "experimental",
-      "text": "The scalable private-position-map Path ORAM route path_oram_private_posmap_v1 executes, including several accesses to one map per call, but is not yet covered by a theorem: its Lean theorems take the empty seeded proof bundle.",
+      "status": "generated-and-checked",
+      "text": "The private-position-map Path ORAM route path_oram_private_posmap_v1 lifts the local route's capacity cap and shares its data path, a flat position map that every access scans in full (no recursive position map); its Lean paper-main theorem holds over admitted configurations whose maps use either scheme, given the same bundle evidence, and the bundle is derived for ERC20Lite.transferFrom with balances on the private scheme from one runtime run per side whose leaves are substituted for every other tape, with runtime runs on sampled tapes checked against the substitution.",
       "validation_command": "cargo run -q -p mplus-probe -- --only claim-consistency --out-dir results"
     },
     {
@@ -1053,8 +1063,8 @@
   "status_counts": {
     "Lean-proved": 3,
     "empirically-tested": 1,
-    "experimental": 2,
-    "generated-and-checked": 3,
+    "experimental": 1,
+    "generated-and-checked": 4,
     "non-claim": 6,
     "source-frozen": 1,
     "trusted": 15

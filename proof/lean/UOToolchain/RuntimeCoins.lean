@@ -560,7 +560,7 @@ theorem SeededRuntimePathOramProofBundle.publicScaffold
           (cfg := cfg)
           hValid
           hMatch
-          hCfg
+          hCfg.toAny
     _ = some family.publicLeafScaffold := by
         simp [SeededRuntimePathOramWitnessFamily.publicLeafScaffoldExact, hSeedCountPos]
 

@@ -23,48 +23,48 @@
       "ok": true
     },
     {
-      "detail": "README.md does not present path_oram_private_posmap_v1 as theorem-facing",
+      "detail": "README.md does not present path_oram_private_posmap_v1 as a recursive position map",
       "name": "README.md:no-promotion",
       "ok": true
     },
     {
-      "detail": "docs/claim-boundary.md does not present path_oram_private_posmap_v1 as theorem-facing",
+      "detail": "docs/claim-boundary.md does not present path_oram_private_posmap_v1 as a recursive position map",
       "name": "docs/claim-boundary.md:no-promotion",
       "ok": true
     },
     {
-      "detail": "docs/supported-subset.md does not present path_oram_private_posmap_v1 as theorem-facing",
+      "detail": "docs/supported-subset.md does not present path_oram_private_posmap_v1 as a recursive position map",
       "name": "docs/supported-subset.md:no-promotion",
       "ok": true
     },
     {
-      "detail": "docs/path-oram.md does not present path_oram_private_posmap_v1 as theorem-facing",
+      "detail": "docs/path-oram.md does not present path_oram_private_posmap_v1 as a recursive position map",
       "name": "docs/path-oram.md:no-promotion",
       "ok": true
     },
     {
-      "detail": "README.md states that path_oram_private_posmap_v1 is not yet covered by a theorem",
-      "name": "README.md:states-private-scheme-unproved",
+      "detail": "README.md states that path_oram_private_posmap_v1 has no recursive position map",
+      "name": "README.md:states-no-recursive-position-map",
       "ok": true
     },
     {
-      "detail": "docs/claim-boundary.md states that path_oram_private_posmap_v1 is not yet covered by a theorem",
-      "name": "docs/claim-boundary.md:states-private-scheme-unproved",
+      "detail": "docs/claim-boundary.md states that path_oram_private_posmap_v1 has no recursive position map",
+      "name": "docs/claim-boundary.md:states-no-recursive-position-map",
       "ok": true
     },
     {
-      "detail": "docs/supported-subset.md states that path_oram_private_posmap_v1 is not yet covered by a theorem",
-      "name": "docs/supported-subset.md:states-private-scheme-unproved",
+      "detail": "docs/supported-subset.md states that path_oram_private_posmap_v1 has no recursive position map",
+      "name": "docs/supported-subset.md:states-no-recursive-position-map",
       "ok": true
     },
     {
-      "detail": "docs/path-oram.md states that path_oram_private_posmap_v1 is not yet covered by a theorem",
-      "name": "docs/path-oram.md:states-private-scheme-unproved",
+      "detail": "docs/path-oram.md states that path_oram_private_posmap_v1 has no recursive position map",
+      "name": "docs/path-oram.md:states-no-recursive-position-map",
       "ok": true
     },
     {
-      "detail": "README names path_oram_local_posmap_v1 as the computational-UO route with a Lean instance",
-      "name": "README.md:names-local-route-with-lean-instance",
+      "detail": "README names path_oram_local_posmap_v1 and path_oram_private_posmap_v1 as the computational-UO routes with a Lean instance",
+      "name": "README.md:names-routes-with-lean-instance",
       "ok": true
     },
     {
