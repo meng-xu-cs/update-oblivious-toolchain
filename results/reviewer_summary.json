@@ -20,43 +20,43 @@
         "report": "canonical_pathoram_pair_validation"
       },
       {
-        "bytes": 7080995620368941056,
+        "bytes": 5118692820230602752,
         "estimated": true,
         "metric": "canonical_pathoram_pair_validation.scenarios[3].estimated_certificate_json_bytes",
         "report": "canonical_pathoram_pair_validation"
       },
       {
-        "bytes": 3540497810183946240,
+        "bytes": 2559346410114777088,
         "estimated": true,
         "metric": "canonical_pathoram_pair_validation.scenarios[3].lhs_estimate.estimated_family_json_bytes",
         "report": "canonical_pathoram_pair_validation"
       },
       {
-        "bytes": 3540497810183946240,
+        "bytes": 2559346410114777088,
         "estimated": true,
         "metric": "canonical_pathoram_pair_validation.scenarios[3].rhs_estimate.estimated_family_json_bytes",
         "report": "canonical_pathoram_pair_validation"
       },
       {
-        "bytes": 3540497810183946240,
+        "bytes": 2559346410114777088,
         "estimated": true,
         "metric": "fresh_coin_validation.scenarios[3].size_estimate.estimated_family_json_bytes",
         "report": "fresh_coin_validation"
       },
       {
-        "bytes": 32759611392,
+        "bytes": 23037739008,
         "estimated": true,
         "metric": "canonical_pathoram_pair_validation.scenarios[2].estimated_certificate_json_bytes",
         "report": "canonical_pathoram_pair_validation"
       },
       {
-        "bytes": 16379281408,
+        "bytes": 11518345216,
         "estimated": true,
         "metric": "canonical_pathoram_pair_validation.scenarios[2].lhs_estimate.estimated_family_json_bytes",
         "report": "canonical_pathoram_pair_validation"
       },
       {
-        "bytes": 16379281408,
+        "bytes": 11518345216,
         "estimated": true,
         "metric": "canonical_pathoram_pair_validation.scenarios[2].rhs_estimate.estimated_family_json_bytes",
         "report": "canonical_pathoram_pair_validation"
@@ -64,124 +64,124 @@
     ],
     "top_materialized_report_fields": [
       {
-        "bytes": 8658038,
+        "bytes": 6340726,
         "estimated": false,
         "metric": "canonical_pathoram_pair_validation.scenarios[0].certificate_json_bytes",
         "report": "canonical_pathoram_pair_validation"
       },
       {
-        "bytes": 8658038,
-        "estimated": false,
-        "metric": "tamper_validation.scenarios[384].artifact_json_bytes",
-        "report": "tamper_validation"
-      },
-      {
-        "bytes": 8658038,
+        "bytes": 6340726,
         "estimated": false,
         "metric": "tamper_validation.scenarios[385].artifact_json_bytes",
         "report": "tamper_validation"
       },
       {
-        "bytes": 4325990,
+        "bytes": 6340726,
+        "estimated": false,
+        "metric": "tamper_validation.scenarios[386].artifact_json_bytes",
+        "report": "tamper_validation"
+      },
+      {
+        "bytes": 3167334,
         "estimated": false,
         "metric": "fresh_coin_validation.scenarios[0].witness_family_json_bytes",
         "report": "fresh_coin_validation"
       },
       {
-        "bytes": 4325990,
+        "bytes": 3167334,
         "estimated": false,
-        "metric": "tamper_validation.scenarios[381].artifact_json_bytes",
+        "metric": "tamper_validation.scenarios[382].artifact_json_bytes",
         "report": "tamper_validation"
       },
       {
-        "bytes": 2643177,
+        "bytes": 1695053,
         "estimated": false,
         "metric": "confidential_proof_family_assurance_validation.scenarios[15].confidential_proof_bundle_family_json_bytes",
         "report": "confidential_proof_family_assurance_validation"
       },
       {
-        "bytes": 2643177,
+        "bytes": 1695053,
         "estimated": false,
         "metric": "confidential_proof_family_boundary_validation.scenarios[15].confidential_proof_bundle_family_json_bytes",
         "report": "confidential_proof_family_boundary_validation"
       },
       {
-        "bytes": 2643177,
+        "bytes": 1695053,
         "estimated": false,
         "metric": "confidential_proof_family_finish_slot_boundary_validation.scenarios[15].confidential_proof_bundle_family_json_bytes",
         "report": "confidential_proof_family_finish_slot_boundary_validation"
       },
       {
-        "bytes": 2643177,
+        "bytes": 1695053,
         "estimated": false,
         "metric": "confidential_proof_family_kernel_interface_validation.scenarios[15].confidential_proof_bundle_family_json_bytes",
         "report": "confidential_proof_family_kernel_interface_validation"
       },
       {
-        "bytes": 2643177,
+        "bytes": 1695053,
         "estimated": false,
         "metric": "confidential_proof_family_refinement_boundary_validation.scenarios[15].confidential_proof_bundle_family_json_bytes",
         "report": "confidential_proof_family_refinement_boundary_validation"
       },
       {
-        "bytes": 2643177,
+        "bytes": 1695053,
         "estimated": false,
         "metric": "confidential_proof_family_slot_assurance_validation.scenarios[15].confidential_proof_bundle_family_json_bytes",
         "report": "confidential_proof_family_slot_assurance_validation"
       },
       {
-        "bytes": 2643177,
+        "bytes": 1695053,
         "estimated": false,
         "metric": "confidential_proof_family_slot_boundary_validation.scenarios[15].confidential_proof_bundle_family_json_bytes",
         "report": "confidential_proof_family_slot_boundary_validation"
       },
       {
-        "bytes": 2643177,
+        "bytes": 1695053,
         "estimated": false,
         "metric": "confidential_proof_family_validation.scenarios[15].confidential_proof_bundle_family_json_bytes",
         "report": "confidential_proof_family_validation"
       },
       {
-        "bytes": 1694528,
-        "estimated": false,
-        "metric": "pathoram_pair_validation.scenarios[3].certificate_json_bytes",
-        "report": "pathoram_pair_validation"
-      },
-      {
-        "bytes": 1505462,
+        "bytes": 1411550,
         "estimated": false,
         "metric": "runtime_implementation_kernel_meeting_boundary_validation.scenarios[15].boundary_json_bytes",
         "report": "runtime_implementation_kernel_meeting_boundary_validation"
       },
       {
-        "bytes": 1505462,
+        "bytes": 1411550,
         "estimated": false,
         "metric": "runtime_implementation_kernel_meeting_confinement_boundary_validation.scenarios[15].boundary_json_bytes",
         "report": "runtime_implementation_kernel_meeting_confinement_boundary_validation"
       },
       {
-        "bytes": 1407863,
+        "bytes": 1369723,
         "estimated": false,
         "metric": "runtime_implementation_confinement_boundary_validation.scenarios[15].boundary_json_bytes",
         "report": "runtime_implementation_confinement_boundary_validation"
       },
       {
-        "bytes": 1406247,
+        "bytes": 1368107,
         "estimated": false,
         "metric": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios[15].boundary_json_bytes",
         "report": "runtime_implementation_kernel_machine_confinement_boundary_validation"
       },
       {
-        "bytes": 1406247,
+        "bytes": 1368107,
         "estimated": false,
         "metric": "runtime_implementation_public_bridge_observer_refinement_boundary_validation.scenarios[15].boundary_json_bytes",
         "report": "runtime_implementation_public_bridge_observer_refinement_boundary_validation"
       },
       {
-        "bytes": 1406247,
+        "bytes": 1368107,
         "estimated": false,
         "metric": "runtime_implementation_residual_helper_shell_machine_refinement_boundary_validation.scenarios[15].boundary_json_bytes",
         "report": "runtime_implementation_residual_helper_shell_machine_refinement_boundary_validation"
+      },
+      {
+        "bytes": 1368107,
+        "estimated": false,
+        "metric": "runtime_implementation_shared_kernel_machine_refinement_boundary_validation.scenarios[15].boundary_json_bytes",
+        "report": "runtime_implementation_shared_kernel_machine_refinement_boundary_validation"
       }
     ]
   },
@@ -257,7 +257,7 @@
     "all_theorem_inputs_within_compact_budget": true,
     "compact_budget_bytes": 67108864,
     "heavy_budget_bytes": 21474836480,
-    "max_checked_json_bytes": 8658038,
+    "max_checked_json_bytes": 6340726,
     "max_estimated_json_bytes": 18446744073709551615,
     "oversized_estimate_count": 7,
     "scenario_count": 9,
@@ -266,9 +266,9 @@
         "accepted": true,
         "artifact_kind": "canonical_fresh_coin_family",
         "checked_artifact_within_selected_budget": true,
-        "checked_json_bytes": 4325990,
+        "checked_json_bytes": 3167334,
         "compact_budget_bytes": 67108864,
-        "estimated_json_bytes": 4325990,
+        "estimated_json_bytes": 3167334,
         "exceeds_compact_budget": false,
         "heavy_budget_bytes": 21474836480,
         "oversized_has_non_enumerating_theorem_route": true,
@@ -283,9 +283,9 @@
         "accepted": true,
         "artifact_kind": "canonical_fresh_coin_family",
         "checked_artifact_within_selected_budget": true,
-        "checked_json_bytes": 24462,
+        "checked_json_bytes": 19936,
         "compact_budget_bytes": 67108864,
-        "estimated_json_bytes": 99545088,
+        "estimated_json_bytes": 81006592,
         "exceeds_compact_budget": true,
         "heavy_budget_bytes": 21474836480,
         "oversized_has_non_enumerating_theorem_route": true,
@@ -300,9 +300,9 @@
         "accepted": true,
         "artifact_kind": "canonical_fresh_coin_family",
         "checked_artifact_within_selected_budget": true,
-        "checked_json_bytes": 62905,
+        "checked_json_bytes": 44362,
         "compact_budget_bytes": 67108864,
-        "estimated_json_bytes": 16379281408,
+        "estimated_json_bytes": 11518345216,
         "exceeds_compact_budget": true,
         "heavy_budget_bytes": 21474836480,
         "oversized_has_non_enumerating_theorem_route": true,
@@ -317,9 +317,9 @@
         "accepted": true,
         "artifact_kind": "canonical_fresh_coin_family",
         "checked_artifact_within_selected_budget": true,
-        "checked_json_bytes": 202177,
+        "checked_json_bytes": 146405,
         "compact_budget_bytes": 67108864,
-        "estimated_json_bytes": 3540497810183946240,
+        "estimated_json_bytes": 2559346410114777088,
         "exceeds_compact_budget": true,
         "heavy_budget_bytes": 21474836480,
         "oversized_has_non_enumerating_theorem_route": true,
@@ -334,9 +334,9 @@
         "accepted": true,
         "artifact_kind": "canonical_pathoram_pair_certificate",
         "checked_artifact_within_selected_budget": true,
-        "checked_json_bytes": 8658038,
+        "checked_json_bytes": 6340726,
         "compact_budget_bytes": 67108864,
-        "estimated_json_bytes": 8658038,
+        "estimated_json_bytes": 6340726,
         "exceeds_compact_budget": false,
         "heavy_budget_bytes": 21474836480,
         "oversized_has_non_enumerating_theorem_route": true,
@@ -351,9 +351,9 @@
         "accepted": true,
         "artifact_kind": "canonical_pathoram_pair_certificate",
         "checked_artifact_within_selected_budget": true,
-        "checked_json_bytes": 58868,
+        "checked_json_bytes": 49816,
         "compact_budget_bytes": 67108864,
-        "estimated_json_bytes": 200138752,
+        "estimated_json_bytes": 163061760,
         "exceeds_compact_budget": true,
         "heavy_budget_bytes": 21474836480,
         "oversized_has_non_enumerating_theorem_route": true,
@@ -368,9 +368,9 @@
         "accepted": true,
         "artifact_kind": "canonical_pathoram_pair_certificate",
         "checked_artifact_within_selected_budget": true,
-        "checked_json_bytes": 149260,
+        "checked_json_bytes": 112174,
         "compact_budget_bytes": 67108864,
-        "estimated_json_bytes": 32759611392,
+        "estimated_json_bytes": 23037739008,
         "exceeds_compact_budget": true,
         "heavy_budget_bytes": 21474836480,
         "oversized_has_non_enumerating_theorem_route": true,
@@ -385,9 +385,9 @@
         "accepted": true,
         "artifact_kind": "canonical_pathoram_pair_certificate",
         "checked_artifact_within_selected_budget": true,
-        "checked_json_bytes": 487688,
+        "checked_json_bytes": 376144,
         "compact_budget_bytes": 67108864,
-        "estimated_json_bytes": 7080995620368941056,
+        "estimated_json_bytes": 5118692820230602752,
         "exceeds_compact_budget": true,
         "heavy_budget_bytes": 21474836480,
         "oversized_has_non_enumerating_theorem_route": true,
@@ -402,7 +402,7 @@
         "accepted": true,
         "artifact_kind": "canonical_pathoram_pair_certificate",
         "checked_artifact_within_selected_budget": true,
-        "checked_json_bytes": 1006955,
+        "checked_json_bytes": 783281,
         "compact_budget_bytes": 67108864,
         "estimated_json_bytes": 18446744073709551615,
         "exceeds_compact_budget": true,
@@ -419,78 +419,78 @@
     "theorem_facing_large_artifacts_require_enumeration": false
   },
   "proof_checking_cost_ms": {
-    "canonical_pathoram_pair_validation": 367028,
-    "confidential_core_kernel_finish_slot_validation": 4818,
-    "confidential_core_kernel_interface_slot_finish_boundary_validation": 4742,
-    "confidential_core_kernel_interface_slot_validation": 4712,
-    "confidential_core_lowering_validation": 4837,
-    "confidential_core_shell_boundary_lowering_validation": 4741,
-    "confidential_core_shell_boundary_slot_validation": 4775,
-    "confidential_core_slot_validation": 4907,
-    "confidential_core_validation": 4731,
+    "canonical_pathoram_pair_validation": 91222,
+    "confidential_core_kernel_finish_slot_validation": 2085,
+    "confidential_core_kernel_interface_slot_finish_boundary_validation": 2190,
+    "confidential_core_kernel_interface_slot_validation": 2258,
+    "confidential_core_lowering_validation": 2215,
+    "confidential_core_shell_boundary_lowering_validation": 2190,
+    "confidential_core_shell_boundary_slot_validation": 2216,
+    "confidential_core_slot_validation": 2102,
+    "confidential_core_validation": 2012,
     "confidential_fragment_validation": 0,
-    "confidential_proof_family_assurance_validation": 5254,
-    "confidential_proof_family_boundary_validation": 5380,
-    "confidential_proof_family_finish_slot_boundary_validation": 5195,
-    "confidential_proof_family_kernel_interface_validation": 5260,
-    "confidential_proof_family_refinement_boundary_validation": 5311,
-    "confidential_proof_family_slot_assurance_validation": 5368,
-    "confidential_proof_family_slot_boundary_validation": 5256,
-    "confidential_proof_family_validation": 5325,
-    "controller_observer_validation": 4906,
-    "correctness": 6673,
-    "fresh_coin_validation": 41075,
-    "kernel_confinement_boundary_validation": 4194,
-    "kernel_dsl_validation": 4743,
-    "kernel_finish_boundary_validation": 4310,
-    "kernel_interface_confinement_boundary_validation": 4254,
-    "kernel_interface_singleton_boundary_validation": 4249,
-    "kernel_interface_validation": 4232,
-    "kernel_lowering_validation": 4809,
-    "kernel_model_alignment_validation": 8220,
-    "kernel_refinement_boundary_validation": 4217,
-    "kernel_refinement_validation": 4755,
-    "kernel_slot_boundary_validation": 4826,
-    "kernel_slot_dsl_validation": 4702,
-    "kernel_validation": 4689,
-    "leakage_auc": 12503,
-    "mutual_information": 12416,
-    "overheads": 21665,
+    "confidential_proof_family_assurance_validation": 2313,
+    "confidential_proof_family_boundary_validation": 2404,
+    "confidential_proof_family_finish_slot_boundary_validation": 2381,
+    "confidential_proof_family_kernel_interface_validation": 2427,
+    "confidential_proof_family_refinement_boundary_validation": 2393,
+    "confidential_proof_family_slot_assurance_validation": 2303,
+    "confidential_proof_family_slot_boundary_validation": 2309,
+    "confidential_proof_family_validation": 2368,
+    "controller_observer_validation": 2039,
+    "correctness": 2299,
+    "fresh_coin_validation": 13554,
+    "kernel_confinement_boundary_validation": 1630,
+    "kernel_dsl_validation": 2094,
+    "kernel_finish_boundary_validation": 1808,
+    "kernel_interface_confinement_boundary_validation": 1749,
+    "kernel_interface_singleton_boundary_validation": 1827,
+    "kernel_interface_validation": 1835,
+    "kernel_lowering_validation": 2094,
+    "kernel_model_alignment_validation": 5704,
+    "kernel_refinement_boundary_validation": 1766,
+    "kernel_refinement_validation": 2263,
+    "kernel_slot_boundary_validation": 2120,
+    "kernel_slot_dsl_validation": 2153,
+    "kernel_validation": 2034,
+    "leakage_auc": 3777,
+    "mutual_information": 3682,
+    "overheads": 4562,
     "paper_main_family_boundary_validation": 0,
     "paper_main_slot_boundary_validation": 0,
-    "pathoram_hidden_validation": 4411,
-    "pathoram_pair_validation": 28450,
-    "runtime_boundary_validation": 1062,
-    "runtime_confidential_statement_trace_bridge_boundary_validation": 577,
-    "runtime_implementation_confidential_statement_trace_bridge_refinement_boundary_validation": 6185,
-    "runtime_implementation_confinement_boundary_validation": 33702,
-    "runtime_implementation_interface_validation": 2265,
-    "runtime_implementation_kernel_machine_confinement_boundary_validation": 34224,
-    "runtime_implementation_kernel_meeting_boundary_validation": 34123,
-    "runtime_implementation_kernel_meeting_confinement_boundary_validation": 61837,
-    "runtime_implementation_public_bridge_observer_refinement_boundary_validation": 22435,
-    "runtime_implementation_residual_helper_shell_machine_refinement_boundary_validation": 21802,
-    "runtime_implementation_shared_kernel_machine_refinement_boundary_validation": 33534,
-    "runtime_implementation_shared_kernel_refinement_boundary_validation": 33428,
-    "runtime_implementation_slot_adapter_machine_refinement_boundary_validation": 5701,
-    "runtime_implementation_small_confidential_kernel_machine_refinement_boundary_validation": 32564,
-    "runtime_kernel_machine_finish_boundary_validation": 4787,
-    "runtime_kernel_machine_finish_witness_validation": 4834,
-    "runtime_public_bridge_boundary_validation": 547,
-    "runtime_residual_helper_shell_boundary_validation": 1497,
-    "runtime_shared_confidential_kernel_boundary_validation": 2322,
-    "runtime_slot_adapter_boundary_validation": 530,
-    "runtime_small_confidential_kernel_boundary_validation": 2258,
-    "seeded_witness_validation": 16263,
-    "shell_boundary_lowering_validation": 4881,
-    "shell_boundary_slot_validation": 4783,
-    "shell_boundary_validation": 4779,
-    "static_checks": 2403,
-    "tamper_validation": 587080,
-    "total_probe_ms": 1705850,
-    "trace_equivalence": 94106,
-    "trusted_kernel_validation": 4738,
-    "witness_validation": 4137
+    "pathoram_hidden_validation": 1665,
+    "pathoram_pair_validation": 8762,
+    "runtime_boundary_validation": 866,
+    "runtime_confidential_statement_trace_bridge_boundary_validation": 494,
+    "runtime_implementation_confidential_statement_trace_bridge_refinement_boundary_validation": 3052,
+    "runtime_implementation_confinement_boundary_validation": 27126,
+    "runtime_implementation_interface_validation": 1946,
+    "runtime_implementation_kernel_machine_confinement_boundary_validation": 26998,
+    "runtime_implementation_kernel_meeting_boundary_validation": 26044,
+    "runtime_implementation_kernel_meeting_confinement_boundary_validation": 49803,
+    "runtime_implementation_public_bridge_observer_refinement_boundary_validation": 16764,
+    "runtime_implementation_residual_helper_shell_machine_refinement_boundary_validation": 16749,
+    "runtime_implementation_shared_kernel_machine_refinement_boundary_validation": 26412,
+    "runtime_implementation_shared_kernel_refinement_boundary_validation": 27350,
+    "runtime_implementation_slot_adapter_machine_refinement_boundary_validation": 2733,
+    "runtime_implementation_small_confidential_kernel_machine_refinement_boundary_validation": 25376,
+    "runtime_kernel_machine_finish_boundary_validation": 2036,
+    "runtime_kernel_machine_finish_witness_validation": 2114,
+    "runtime_public_bridge_boundary_validation": 519,
+    "runtime_residual_helper_shell_boundary_validation": 1296,
+    "runtime_shared_confidential_kernel_boundary_validation": 1967,
+    "runtime_slot_adapter_boundary_validation": 496,
+    "runtime_small_confidential_kernel_boundary_validation": 1985,
+    "seeded_witness_validation": 6473,
+    "shell_boundary_lowering_validation": 2202,
+    "shell_boundary_slot_validation": 2063,
+    "shell_boundary_validation": 2079,
+    "static_checks": 1800,
+    "tamper_validation": 470571,
+    "total_probe_ms": 967461,
+    "trace_equivalence": 19079,
+    "trusted_kernel_validation": 2191,
+    "witness_validation": 1770
   },
   "runtime_overheads": {
     "cases": [
@@ -732,31 +732,31 @@
         },
         "oram": {
           "bytes_read": 56644.0,
-          "bytes_read_with_call_start": 195002.0,
+          "bytes_read_with_call_start": 78416.0,
           "bytes_written": 56520.0,
-          "call_start_bytes": 138358.0,
-          "call_start_reads": 144,
+          "call_start_bytes": 21772.0,
+          "call_start_reads": 17,
           "executable": true,
           "gas_used": 3531,
           "physical_reads": 50,
-          "physical_reads_with_call_start": 194,
+          "physical_reads_with_call_start": 67,
           "physical_writes": 49,
           "rejected": false,
-          "trace_json_bytes": 156637
+          "trace_json_bytes": 101008
         },
         "oram_64": {
           "bytes_read": 56644.0,
-          "bytes_read_with_call_start": 195002.0,
+          "bytes_read_with_call_start": 78416.0,
           "bytes_written": 56520.0,
-          "call_start_bytes": 138358.0,
-          "call_start_reads": 144,
+          "call_start_bytes": 21772.0,
+          "call_start_reads": 17,
           "executable": true,
           "gas_used": 3531,
           "physical_reads": 50,
-          "physical_reads_with_call_start": 194,
+          "physical_reads_with_call_start": 67,
           "physical_writes": 49,
           "rejected": false,
-          "trace_json_bytes": 156637
+          "trace_json_bytes": 101008
         },
         "oram_improves_physical_writes": true,
         "oram_improves_physical_writes_baseline": "full_scan_64",
@@ -874,10 +874,10 @@
             "backend": "full_scan+oram",
             "benchmark": "ConfidentialMixer/deposit",
             "bytes_read": 56644.0,
-            "bytes_read_with_call_start": 195002.0,
+            "bytes_read_with_call_start": 78416.0,
             "bytes_written": 56520.0,
-            "call_start_bytes": 138358.0,
-            "call_start_reads": 144,
+            "call_start_bytes": 21772.0,
+            "call_start_reads": 17,
             "capacity": "64",
             "entrypoint": "deposit(bytes32,uint256)",
             "entrypoint_resource_bounds": {
@@ -899,7 +899,7 @@
             "executable": true,
             "gas_used": 3531,
             "physical_reads": 50,
-            "physical_reads_with_call_start": 194,
+            "physical_reads_with_call_start": 67,
             "physical_writes": 49,
             "rejected": false,
             "state_objects": [
@@ -918,7 +918,7 @@
                 "name": "total"
               }
             ],
-            "trace_json_bytes": 156637
+            "trace_json_bytes": 101008
           }
         ]
       },
@@ -976,31 +976,31 @@
         },
         "oram": {
           "bytes_read": 56644.0,
-          "bytes_read_with_call_start": 195002.0,
+          "bytes_read_with_call_start": 78416.0,
           "bytes_written": 56520.0,
-          "call_start_bytes": 138358.0,
-          "call_start_reads": 144,
+          "call_start_bytes": 21772.0,
+          "call_start_reads": 17,
           "executable": true,
           "gas_used": 3588,
           "physical_reads": 50,
-          "physical_reads_with_call_start": 194,
+          "physical_reads_with_call_start": 67,
           "physical_writes": 49,
           "rejected": false,
-          "trace_json_bytes": 156700
+          "trace_json_bytes": 101071
         },
         "oram_64": {
           "bytes_read": 56644.0,
-          "bytes_read_with_call_start": 195002.0,
+          "bytes_read_with_call_start": 78416.0,
           "bytes_written": 56520.0,
-          "call_start_bytes": 138358.0,
-          "call_start_reads": 144,
+          "call_start_bytes": 21772.0,
+          "call_start_reads": 17,
           "executable": true,
           "gas_used": 3588,
           "physical_reads": 50,
-          "physical_reads_with_call_start": 194,
+          "physical_reads_with_call_start": 67,
           "physical_writes": 49,
           "rejected": false,
-          "trace_json_bytes": 156700
+          "trace_json_bytes": 101071
         },
         "oram_improves_physical_writes": true,
         "oram_improves_physical_writes_baseline": "full_scan_64",
@@ -1118,10 +1118,10 @@
             "backend": "full_scan+oram",
             "benchmark": "ConfidentialMixer/withdraw",
             "bytes_read": 56644.0,
-            "bytes_read_with_call_start": 195002.0,
+            "bytes_read_with_call_start": 78416.0,
             "bytes_written": 56520.0,
-            "call_start_bytes": 138358.0,
-            "call_start_reads": 144,
+            "call_start_bytes": 21772.0,
+            "call_start_reads": 17,
             "capacity": "64",
             "entrypoint": "withdraw(bytes32,uint256)",
             "entrypoint_resource_bounds": {
@@ -1143,7 +1143,7 @@
             "executable": true,
             "gas_used": 3588,
             "physical_reads": 50,
-            "physical_reads_with_call_start": 194,
+            "physical_reads_with_call_start": 67,
             "physical_writes": 49,
             "rejected": false,
             "state_objects": [
@@ -1162,7 +1162,7 @@
                 "name": "total"
               }
             ],
-            "trace_json_bytes": 156700
+            "trace_json_bytes": 101071
           }
         ]
       },
@@ -1210,33 +1210,33 @@
         },
         "oram": {
           "bytes_read": 198768.0,
-          "bytes_read_with_call_start": 596372.0,
+          "bytes_read_with_call_start": 260936.0,
           "bytes_written": 198768.0,
-          "call_start_bytes": 397604.0,
-          "call_start_reads": 432,
+          "call_start_bytes": 62168.0,
+          "call_start_reads": 50,
           "executable": true,
           "gas_used": 7485,
           "physical_reads": 178,
-          "physical_reads_with_call_start": 610,
+          "physical_reads_with_call_start": 228,
           "physical_writes": 178,
           "rejected": false,
-          "trace_json_bytes": 499440
+          "trace_json_bytes": 332124
         },
         "oram_improves_physical_writes": false,
         "oram_improves_physical_writes_baseline": "full_scan",
         "oram_private_posmap": {
           "bytes_read": 428640.0,
-          "bytes_read_with_call_start": 1188548.0,
+          "bytes_read_with_call_start": 546680.0,
           "bytes_written": 428640.0,
-          "call_start_bytes": 759908.0,
-          "call_start_reads": 864,
+          "call_start_bytes": 118040.0,
+          "call_start_reads": 98,
           "executable": true,
           "gas_used": 13285,
           "physical_reads": 378,
-          "physical_reads_with_call_start": 1242,
+          "physical_reads_with_call_start": 476,
           "physical_writes": 378,
           "rejected": false,
-          "trace_json_bytes": 1010963
+          "trace_json_bytes": 675452
         },
         "raw": {
           "error": "confidential object allowances uses raw backend",
@@ -1316,10 +1316,10 @@
             "backend": "oram",
             "benchmark": "ERC20Lite/transferFrom",
             "bytes_read": 198768.0,
-            "bytes_read_with_call_start": 596372.0,
+            "bytes_read_with_call_start": 260936.0,
             "bytes_written": 198768.0,
-            "call_start_bytes": 397604.0,
-            "call_start_reads": 432,
+            "call_start_bytes": 62168.0,
+            "call_start_reads": 50,
             "capacity": "64+128",
             "entrypoint": "transferFrom(address,address,address,uint256)",
             "entrypoint_resource_bounds": {
@@ -1351,7 +1351,7 @@
             "executable": true,
             "gas_used": 7485,
             "physical_reads": 178,
-            "physical_reads_with_call_start": 610,
+            "physical_reads_with_call_start": 228,
             "physical_writes": 178,
             "rejected": false,
             "state_objects": [
@@ -1370,17 +1370,17 @@
                 "name": "balances"
               }
             ],
-            "trace_json_bytes": 499440
+            "trace_json_bytes": 332124
           },
           {
             "artifact_json_bytes": 30562,
             "backend": "oram_private_posmap",
             "benchmark": "ERC20Lite/transferFrom",
             "bytes_read": 428640.0,
-            "bytes_read_with_call_start": 1188548.0,
+            "bytes_read_with_call_start": 546680.0,
             "bytes_written": 428640.0,
-            "call_start_bytes": 759908.0,
-            "call_start_reads": 864,
+            "call_start_bytes": 118040.0,
+            "call_start_reads": 98,
             "capacity": "128+256",
             "entrypoint": "transferFrom(address,address,address,uint256)",
             "entrypoint_resource_bounds": {
@@ -1412,7 +1412,7 @@
             "executable": true,
             "gas_used": 13285,
             "physical_reads": 378,
-            "physical_reads_with_call_start": 1242,
+            "physical_reads_with_call_start": 476,
             "physical_writes": 378,
             "rejected": false,
             "state_objects": [
@@ -1431,7 +1431,7 @@
                 "name": "balances"
               }
             ],
-            "trace_json_bytes": 1010963
+            "trace_json_bytes": 675452
           }
         ]
       },
@@ -1774,10 +1774,10 @@
         "backend": "full_scan+oram",
         "benchmark": "ConfidentialMixer/deposit",
         "bytes_read": 56644.0,
-        "bytes_read_with_call_start": 195002.0,
+        "bytes_read_with_call_start": 78416.0,
         "bytes_written": 56520.0,
-        "call_start_bytes": 138358.0,
-        "call_start_reads": 144,
+        "call_start_bytes": 21772.0,
+        "call_start_reads": 17,
         "capacity": "64",
         "entrypoint": "deposit(bytes32,uint256)",
         "entrypoint_resource_bounds": {
@@ -1799,7 +1799,7 @@
         "executable": true,
         "gas_used": 3531,
         "physical_reads": 50,
-        "physical_reads_with_call_start": 194,
+        "physical_reads_with_call_start": 67,
         "physical_writes": 49,
         "rejected": false,
         "state_objects": [
@@ -1818,7 +1818,7 @@
             "name": "total"
           }
         ],
-        "trace_json_bytes": 156637
+        "trace_json_bytes": 101008
       },
       {
         "artifact_json_bytes": 6530,
@@ -1928,10 +1928,10 @@
         "backend": "full_scan+oram",
         "benchmark": "ConfidentialMixer/withdraw",
         "bytes_read": 56644.0,
-        "bytes_read_with_call_start": 195002.0,
+        "bytes_read_with_call_start": 78416.0,
         "bytes_written": 56520.0,
-        "call_start_bytes": 138358.0,
-        "call_start_reads": 144,
+        "call_start_bytes": 21772.0,
+        "call_start_reads": 17,
         "capacity": "64",
         "entrypoint": "withdraw(bytes32,uint256)",
         "entrypoint_resource_bounds": {
@@ -1953,7 +1953,7 @@
         "executable": true,
         "gas_used": 3588,
         "physical_reads": 50,
-        "physical_reads_with_call_start": 194,
+        "physical_reads_with_call_start": 67,
         "physical_writes": 49,
         "rejected": false,
         "state_objects": [
@@ -1972,7 +1972,7 @@
             "name": "total"
           }
         ],
-        "trace_json_bytes": 156700
+        "trace_json_bytes": 101071
       },
       {
         "artifact_json_bytes": 10549,
@@ -2046,10 +2046,10 @@
         "backend": "oram",
         "benchmark": "ERC20Lite/transferFrom",
         "bytes_read": 198768.0,
-        "bytes_read_with_call_start": 596372.0,
+        "bytes_read_with_call_start": 260936.0,
         "bytes_written": 198768.0,
-        "call_start_bytes": 397604.0,
-        "call_start_reads": 432,
+        "call_start_bytes": 62168.0,
+        "call_start_reads": 50,
         "capacity": "64+128",
         "entrypoint": "transferFrom(address,address,address,uint256)",
         "entrypoint_resource_bounds": {
@@ -2081,7 +2081,7 @@
         "executable": true,
         "gas_used": 7485,
         "physical_reads": 178,
-        "physical_reads_with_call_start": 610,
+        "physical_reads_with_call_start": 228,
         "physical_writes": 178,
         "rejected": false,
         "state_objects": [
@@ -2100,17 +2100,17 @@
             "name": "balances"
           }
         ],
-        "trace_json_bytes": 499440
+        "trace_json_bytes": 332124
       },
       {
         "artifact_json_bytes": 30562,
         "backend": "oram_private_posmap",
         "benchmark": "ERC20Lite/transferFrom",
         "bytes_read": 428640.0,
-        "bytes_read_with_call_start": 1188548.0,
+        "bytes_read_with_call_start": 546680.0,
         "bytes_written": 428640.0,
-        "call_start_bytes": 759908.0,
-        "call_start_reads": 864,
+        "call_start_bytes": 118040.0,
+        "call_start_reads": 98,
         "capacity": "128+256",
         "entrypoint": "transferFrom(address,address,address,uint256)",
         "entrypoint_resource_bounds": {
@@ -2142,7 +2142,7 @@
         "executable": true,
         "gas_used": 13285,
         "physical_reads": 378,
-        "physical_reads_with_call_start": 1242,
+        "physical_reads_with_call_start": 476,
         "physical_writes": 378,
         "rejected": false,
         "state_objects": [
@@ -2161,7 +2161,7 @@
             "name": "balances"
           }
         ],
-        "trace_json_bytes": 1010963
+        "trace_json_bytes": 675452
       },
       {
         "artifact_json_bytes": 5475,
@@ -2904,7 +2904,7 @@
         },
         {
           "file": "proof/lean/UOToolchain/RuntimeImplementationInterface.lean",
-          "nonempty_loc": 19263
+          "nonempty_loc": 19285
         },
         {
           "file": "proof/lean/UOToolchain/RuntimeImplementationInterfaceJson.lean",
@@ -2948,11 +2948,11 @@
         },
         {
           "file": "proof/lean/UOToolchain/RuntimeOramCodecSemantics.lean",
-          "nonempty_loc": 2451
+          "nonempty_loc": 2518
         },
         {
           "file": "proof/lean/UOToolchain/RuntimeOramCodecsGeneratedRust.lean",
-          "nonempty_loc": 3347
+          "nonempty_loc": 3622
         },
         {
           "file": "proof/lean/UOToolchain/RuntimeOramHelperSemantics.lean",
@@ -3124,7 +3124,7 @@
         }
       ],
       "root": "proof/lean",
-      "total_nonempty_loc": 119463
+      "total_nonempty_loc": 119827
     },
     "measurement": "non-empty source lines",
     "outer_runtime_risk_surface": {

@@ -22,6 +22,8 @@ use generated_object_helpers::{
     filler_boxed_oram_payload, fixed_scalar_width, reseal_oram_payload_and_record_write,
     seal_boxed_oram_payload, with_opened_oram_payload,
 };
+use generated_oram_codecs::path_entries_from_storage;
+pub(crate) use generated_oram_codecs::select_pending_put_value;
 use generated_oram_codecs::{
     bootstrap_empty_path_buckets, bootstrap_filler_buckets, bootstrap_oram_counter_slot,
     bootstrap_surrogate_directory_pages, clone_boxed_map_entries, cold_clone_oram_state,
@@ -336,9 +338,28 @@ impl OramState {
         }
     }
 
-    pub(crate) fn public_state_snapshot_value(&self) -> serde_json::Value {
-        let entries = self
-            .entries
+    /// The map's contents for the public-state snapshot of a public map, read
+    /// from storage: a Path ORAM map's values live only in its blocks, which
+    /// a call reads only along the paths it accesses.
+    pub(crate) fn public_state_snapshot_value(
+        &self,
+        spec: &StateObject,
+    ) -> Result<serde_json::Value> {
+        let stored_entries;
+        let entries: &[MapEntry] = if self.parameters.is_path_oram() {
+            stored_entries = path_entries_from_storage(
+                spec,
+                &self.parameters,
+                &self.cipher,
+                &self.storage.directory_pages,
+                &self.storage.buckets,
+                &self.empty_entry,
+            )?;
+            &stored_entries
+        } else {
+            &self.entries
+        };
+        let entries = entries
             .iter()
             .map(|entry| {
                 json!({
@@ -348,11 +369,11 @@ impl OramState {
                 })
             })
             .collect::<Vec<_>>();
-        json!({
+        Ok(json!({
             "kind": "oram_map",
             "access_counter": self.access_counter,
             "entries": entries,
-        })
+        }))
     }
 
     #[cfg(test)]
@@ -381,6 +402,29 @@ impl OramState {
                 .collect(),
             self.stash.to_vec(),
         )
+    }
+
+    /// The map's contents as stored: every bucket and the stash.
+    #[cfg(test)]
+    pub(crate) fn stored_entries_for_test(&self, spec: &StateObject) -> Vec<MapEntry> {
+        path_entries_from_storage(
+            spec,
+            &self.parameters,
+            &self.cipher,
+            &self.storage.directory_pages,
+            &self.storage.buckets,
+            &self.empty_entry,
+        )
+        .unwrap()
+        .iter()
+        .map(|entry| {
+            MapEntry::new(
+                entry.is_occupied(),
+                entry.key().clone(),
+                entry.value().clone(),
+            )
+        })
+        .collect()
     }
 
     #[cfg(test)]
@@ -419,6 +463,9 @@ impl OramState {
         cold_clone_oram_state(spec, self)
     }
 
+    /// The map's slots as the call sees them. On a Path ORAM map they are its
+    /// directory, each slot's occupancy and key with no value: the values
+    /// live only in the blocks.
     pub(crate) fn clone_logical_entries(&self) -> Result<Box<[MapEntry]>> {
         clone_boxed_map_entries(&self.entries)
     }
@@ -486,6 +533,7 @@ impl OramState {
                 &parameters,
                 &cipher,
                 position_map.as_ref(),
+                entries.as_ref(),
                 stash.as_slice(),
                 &mut bootstrap_allocator,
                 rng,
@@ -538,7 +586,6 @@ impl OramState {
                 &self.parameters,
                 &self.cipher,
                 &self.storage.directory_pages,
-                &self.storage.buckets,
                 allocator,
                 &self.empty_entry,
                 &mut self.position_map,
@@ -813,11 +860,12 @@ mod tests {
                 .unwrap()
                 .into_vec();
         let mut position_map = vec![None; state.parameters.capacity];
+        // The directory holds each slot's key; the value lives in the block.
         for block in &stash {
             entries[block.slot_index] = MapEntry {
                 occupied: block.occupied,
                 key: block.key.clone(),
-                value: block.value.clone(),
+                value: Value::uint(0),
             };
             position_map[block.slot_index] = Some(block.leaf);
         }
@@ -839,6 +887,7 @@ mod tests {
             &state.parameters,
             &state.cipher,
             &masked_position_map,
+            &state.entries,
             &stash,
             &mut allocator,
             &mut rng,
@@ -871,21 +920,31 @@ mod tests {
             .into_boxed_slice()
     }
 
+    /// Reseal the metadata pages with this position map, these directory keys
+    /// (slot, key), and this stash.
     fn reseal_path_oram_metadata(
         state: &mut OramState,
         spec: &StateObject,
         position_map: &[Option<usize>],
+        directory: &[(usize, Value)],
         stash: &[OramBlock],
         seed: u64,
     ) {
         let mut rng = ChaCha20Rng::seed_from_u64(seed);
         let mut allocator = allocator_for_path_oram(&state.parameters);
         let masked_position_map = masked_position_map_from_options(position_map);
+        let mut entries =
+            repeat_boxed_map_entries(state.parameters.capacity, &empty_map_entry(spec).unwrap())
+                .unwrap();
+        for (slot, key) in directory {
+            entries[*slot] = MapEntry::new(true, key.clone(), Value::uint(0));
+        }
         state.storage.directory_pages = encode_path_metadata_pages(
             spec,
             &state.parameters,
             &state.cipher,
             &masked_position_map,
+            &entries,
             stash,
             &mut allocator,
             &mut rng,
@@ -1377,11 +1436,15 @@ mod tests {
                 value: Value::uint(index as u128),
             })
             .collect::<Vec<_>>();
+        let directory =
+            repeat_boxed_map_entries(parameters.capacity, &empty_map_entry(&spec).unwrap())
+                .unwrap();
         let pages = encode_path_metadata_pages(
             &spec,
             &parameters,
             &cipher,
             &position_map,
+            &directory,
             &stash,
             &mut encode_allocator,
             &mut rng,
@@ -1419,11 +1482,15 @@ mod tests {
         let position_map_options = vec![None; parameters.capacity];
         let position_map = masked_position_map_from_options(&position_map_options);
         let stash = Vec::<OramBlock>::new();
+        let directory =
+            repeat_boxed_map_entries(parameters.capacity, &empty_map_entry(&spec).unwrap())
+                .unwrap();
         let pages = encode_path_metadata_pages(
             &spec,
             &parameters,
             &cipher,
             &position_map,
+            &directory,
             &stash,
             &mut encode_allocator,
             &mut rng,
@@ -1555,7 +1622,82 @@ mod tests {
     }
 
     #[test]
-    fn path_oram_refresh_rejects_duplicate_live_slot_across_stash_and_bucket() {
+    fn path_oram_refresh_reads_no_bucket() {
+        // A call starts from the metadata pages alone: corrupting every
+        // bucket leaves the refresh untouched.
+        let spec = path_oram_spec();
+        let original_stash = vec![OramBlock {
+            occupied: true,
+            slot_index: 2,
+            leaf: 1,
+            key: Value::Address([0x33; 20]),
+            value: Value::uint(4),
+        }];
+        let mut state = path_oram_state_with_stash(&spec, original_stash, 0xB0C7);
+        for bucket in state.storage.buckets.iter_mut() {
+            bucket.fill(0xFF);
+        }
+        let mut allocator = allocator_for_path_oram(&state.parameters);
+        let cloned = state.clone_for_tx(&spec, &mut allocator).unwrap();
+        assert_eq!(cloned.position_map[2].to_option(), Some(1));
+        assert!(cloned.entries[2].matches_key(&Value::Address([0x33; 20])));
+        assert_eq!(cloned.entries[2].value(), &Value::uint(0));
+    }
+
+    #[test]
+    fn path_oram_get_reads_the_value_from_the_keys_block() {
+        // The value comes from the key's block once its path is read; the
+        // directory holds no value.
+        let spec = path_oram_spec();
+        let mut rng = ChaCha20Rng::seed_from_u64(0x7A1E);
+        let mut state = OramState::instantiate(&spec, &mut rng).unwrap();
+        let leaf = 2usize;
+        let block = OramBlock {
+            occupied: true,
+            slot_index: 3,
+            leaf,
+            key: Value::Address([0x77; 20]),
+            value: Value::uint(41),
+        };
+        let mut position_map = vec![None; state.parameters.capacity];
+        position_map[3] = Some(leaf);
+        reseal_path_oram_metadata(
+            &mut state,
+            &spec,
+            &position_map,
+            &[(3, Value::Address([0x77; 20]))],
+            &[],
+            0x7A1F,
+        );
+        let leaf_bucket = state.parameters.leaf_count() - 1 + leaf;
+        let bucket = oram_bucket_with_live_blocks(&spec, 0, leaf_bucket, 1, &[block]).unwrap();
+        let aad = super::oram_bucket_aad(&spec, leaf_bucket);
+        let mut payload = oram_bucket_bytes(&bucket, &spec).unwrap();
+        state.storage.buckets[leaf_bucket] = state
+            .cipher
+            .seal_and_wipe_boxed(aad.as_bytes(), &mut payload, &mut rng)
+            .unwrap();
+
+        let mut allocator = allocator_for_path_oram(&state.parameters);
+        state.refresh_from_storage(&spec, &mut allocator).unwrap();
+        let mut leaf_coins = PathOramLeafCoinSource::random();
+        let (value, transcript, failed) = state
+            .get(
+                &spec,
+                &Value::Address([0x77; 20]),
+                &mut allocator,
+                &mut leaf_coins,
+                &mut rng,
+            )
+            .unwrap();
+        allocator.finish().unwrap();
+        assert!(!failed);
+        assert_eq!(value, Value::uint(41));
+        assert_eq!(transcript.path_leaf, Some(leaf));
+    }
+
+    #[test]
+    fn path_oram_get_reports_duplicate_live_block_in_band() {
         let spec = path_oram_spec();
         let mut rng = ChaCha20Rng::seed_from_u64(0xBAD5EED);
         let mut state = OramState::instantiate(&spec, &mut rng).unwrap();
@@ -1575,6 +1717,7 @@ mod tests {
             &mut state,
             &spec,
             &position_map,
+            &[(0, Value::Address([0x44; 20]))],
             std::slice::from_ref(&duplicate),
             0xBAD5EED,
         );
@@ -1587,16 +1730,22 @@ mod tests {
             .unwrap();
 
         let mut allocator = allocator_for_path_oram(&state.parameters);
-        let err = state
-            .refresh_from_storage(&spec, &mut allocator)
-            .unwrap_err();
-        assert!(err
-            .to_string()
-            .contains("contains duplicate live blocks for slot 0"));
+        state.refresh_from_storage(&spec, &mut allocator).unwrap();
+        let mut leaf_coins = PathOramLeafCoinSource::random();
+        let (_value, _transcript, failed) = state
+            .get(
+                &spec,
+                &Value::Address([0x44; 20]),
+                &mut allocator,
+                &mut leaf_coins,
+                &mut rng,
+            )
+            .unwrap();
+        assert!(failed);
     }
 
     #[test]
-    fn path_oram_refresh_rejects_position_map_leaf_mismatch() {
+    fn path_oram_get_reports_position_map_leaf_mismatch_in_band() {
         let spec = path_oram_spec();
         let mut rng = ChaCha20Rng::seed_from_u64(0xBADC0DE);
         let mut state = OramState::instantiate(&spec, &mut rng).unwrap();
@@ -1616,21 +1765,28 @@ mod tests {
             &mut state,
             &spec,
             &position_map,
+            &[(0, Value::Address([0x55; 20]))],
             std::slice::from_ref(&block),
             0xBADC0DE,
         );
 
         let mut allocator = allocator_for_path_oram(&state.parameters);
-        let err = state
-            .refresh_from_storage(&spec, &mut allocator)
-            .unwrap_err();
-        assert!(err
-            .to_string()
-            .contains("disagrees with position map at slot 0"));
+        state.refresh_from_storage(&spec, &mut allocator).unwrap();
+        let mut leaf_coins = PathOramLeafCoinSource::random();
+        let (_value, _transcript, failed) = state
+            .get(
+                &spec,
+                &Value::Address([0x55; 20]),
+                &mut allocator,
+                &mut leaf_coins,
+                &mut rng,
+            )
+            .unwrap();
+        assert!(failed);
     }
 
     #[test]
-    fn path_oram_refresh_rejects_bucket_block_off_declared_path() {
+    fn path_oram_access_rejects_bucket_block_off_its_path() {
         let spec = path_oram_spec();
         let mut rng = ChaCha20Rng::seed_from_u64(0xFACE123);
         let mut state = OramState::instantiate(&spec, &mut rng).unwrap();
@@ -1647,7 +1803,14 @@ mod tests {
             .chain(std::iter::repeat(None))
             .take(state.parameters.capacity)
             .collect::<Vec<_>>();
-        reseal_path_oram_metadata(&mut state, &spec, &position_map, &[], 0xFACE123);
+        reseal_path_oram_metadata(
+            &mut state,
+            &spec,
+            &position_map,
+            &[(0, Value::Address([0x66; 20]))],
+            &[],
+            0xFACE123,
+        );
         let off_path_bucket = 1usize;
         assert!(!super::bucket_on_leaf_path(
             state.parameters.leaf_count(),
@@ -1663,8 +1826,19 @@ mod tests {
             .unwrap();
 
         let mut allocator = allocator_for_path_oram(&state.parameters);
+        state.refresh_from_storage(&spec, &mut allocator).unwrap();
+        // A read of an absent key whose path, to leaf 0, runs through the
+        // tampered bucket.
+        let mut leaf_coins = PathOramLeafCoinSource::require_injected();
+        leaf_coins.install(vec![0].into_boxed_slice());
         let err = state
-            .refresh_from_storage(&spec, &mut allocator)
+            .get(
+                &spec,
+                &Value::Address([0x99; 20]),
+                &mut allocator,
+                &mut leaf_coins,
+                &mut rng,
+            )
             .unwrap_err();
         assert!(err
             .to_string()

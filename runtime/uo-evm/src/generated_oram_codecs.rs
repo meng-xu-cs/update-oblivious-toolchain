@@ -300,6 +300,22 @@ impl super::PendingOramPut {
     }
 }
 
+/// What a read of `key` returns while the call's writes are pending: the
+/// value of the call's last applied write to the key, if any, and otherwise
+/// the value the ORAM access read.
+pub(crate) fn select_pending_put_value(
+    puts: &[super::PendingOramPut],
+    key: &Value,
+    oram_value: Value,
+) -> Result<Value> {
+    let mut selected = oram_value;
+    for put in puts {
+        let hit = put.apply & Value::confidential_eq(&put.key, key);
+        selected = Value::confidential_select(hit, put.value.clone(), selected)?;
+    }
+    Ok(selected)
+}
+
 impl Drop for super::PendingOramPut {
     fn drop(&mut self) {
         self.wipe_secrets();
@@ -1448,6 +1464,33 @@ pub(super) fn take_selected_stash_block(
     Ok(removed)
 }
 
+/// The value of the accessed slot's block, which the path read has put in the
+/// stash, or which was there already. A present slot has exactly one block,
+/// on its prior leaf and with its key; otherwise the access fails.
+pub(super) fn select_stash_value_for_slot(
+    stash: &FixedStash,
+    slot: &MaskedUsizeOption,
+    prior_leaf: &MaskedUsizeOption,
+    key: &Value,
+    value_type: &Type,
+) -> Result<(Value, bool)> {
+    let slot_present = slot.is_some();
+    let slot_index = slot.unwrap_or(0);
+    let prior_leaf_value = prior_leaf.unwrap_or(0);
+    let mut selected = Value::zero_for_type(value_type);
+    let mut matches = 0usize;
+    let mut agrees = true;
+    for block in stash.blocks.iter() {
+        let is_match = slot_present & block.occupied & (block.slot_index == slot_index);
+        let consistent = (block.leaf == prior_leaf_value) & Value::confidential_eq(&block.key, key);
+        selected = Value::confidential_select(is_match, block.value.clone(), selected)?;
+        matches += usize::from(is_match);
+        agrees &= !is_match | consistent;
+    }
+    let failed = slot_present & ((matches != 1) | !agrees);
+    Ok((selected, failed))
+}
+
 pub(super) fn slot_for_key(entries: &[MapEntry], key: &Value) -> MaskedUsizeOption {
     let mut selected = 0usize;
     let mut present = false;
@@ -1536,20 +1579,19 @@ pub(super) fn apply_path_put_update(
     let zero_key = Value::zero_for_type(key_type);
     let zero_value = Value::zero_for_type(&spec.value_type);
 
+    let prior_leaf = select_position_map_leaf(position_map, slot);
+    let prior_leaf_value = prior_leaf.unwrap_or(0);
+
+    // The directory keeps each slot's occupancy and key; the value lives
+    // only in the key's block.
     for (index, entry) in entries.iter_mut().enumerate() {
-        let update_here = update_existing & (index == slot_index);
         let delete_here = delete_existing & (index == slot_index);
         let insert_here = insert_new & (index == insert_slot_index);
         let prior_key = entry.key().clone();
-        let prior_value = entry.value().clone();
         let selected_key = Value::confidential_select(insert_here, key.clone(), prior_key)?;
         let next_key = Value::confidential_select(delete_here, zero_key.clone(), selected_key)?;
-        let selected_value =
-            Value::confidential_select(update_here | insert_here, value.clone(), prior_value)?;
-        let next_value =
-            Value::confidential_select(delete_here, zero_value.clone(), selected_value)?;
-        let next_occupied = (entry.is_occupied() & !delete_here) | update_here | insert_here;
-        entry.overwrite(next_occupied, next_key, next_value);
+        let next_occupied = (entry.is_occupied() & !delete_here) | insert_here;
+        entry.overwrite(next_occupied, next_key, zero_value.clone());
     }
 
     for (index, leaf) in position_map.iter_mut().enumerate() {
@@ -1563,11 +1605,14 @@ pub(super) fn apply_path_put_update(
         assign_masked_usize_option(leaf, &updated_leaf);
     }
 
-    let mut matched_slot = false;
+    let mut slot_matches = 0usize;
+    let mut slot_blocks_agree = true;
     let mut inserted_slot = false;
     for block in stash.blocks.iter_mut() {
         let was_occupied = block.occupied;
         let slot_match = was_occupied & slot_present & (block.slot_index == slot_index);
+        let consistent = (block.leaf == prior_leaf_value) & Value::confidential_eq(&block.key, key);
+        slot_blocks_agree &= !slot_match | consistent;
         let update_here = update_existing & slot_match;
         let remap_here = (update_existing | keep_existing) & slot_match;
         let delete_here = delete_existing & slot_match;
@@ -1596,7 +1641,7 @@ pub(super) fn apply_path_put_update(
             next_key,
             next_value,
         );
-        matched_slot |= slot_match;
+        slot_matches += usize::from(slot_match);
         inserted_slot |= insert_here;
     }
 
@@ -1604,7 +1649,10 @@ pub(super) fn apply_path_put_update(
         .blocks
         .iter()
         .fold(0usize, |acc, block| acc + usize::from(block.occupied));
-    let update_failed = ((update_existing | delete_existing | keep_existing) & !matched_slot)
+    // A present slot has exactly one block, on its prior leaf and with its
+    // key.
+    let update_failed = ((update_existing | delete_existing | keep_existing)
+        & ((slot_matches != 1) | !slot_blocks_agree))
         | (insert_new & !inserted_slot)
         | (insert_new & (insert_slot_index >= entries.len()));
     let _ = spec;
@@ -1713,7 +1761,7 @@ pub(super) fn run_path_get(
     let fresh_leaf_option = MaskedUsizeOption::some(fresh_leaf);
     let no_next_leaf = MaskedUsizeOption::none();
     let next_leaf = masked_select_option_usize(slot_present, &fresh_leaf_option, &no_next_leaf);
-    let return_value = select_entry_value_for_slot(&state.entries, &slot, &spec.value_type)?;
+    let mut return_value = Value::zero_for_type(&spec.value_type);
     let (writes, update_failed) = rewrite_path_for_access(
         state,
         spec,
@@ -1721,8 +1769,13 @@ pub(super) fn run_path_get(
         allocator,
         rng,
         |_entries, position_map, stash, _rng| {
+            // The map's values live only in its blocks: the key's block is
+            // in the stash once its path has been read.
+            let (value, block_failed) =
+                select_stash_value_for_slot(stash, &slot, &prior_leaf, key, &spec.value_type)?;
+            return_value = value;
             apply_path_get_update(position_map, stash, &slot, &next_leaf);
-            Ok(false)
+            Ok(block_failed)
         },
     )?;
     let mut transcript = path_access_transcript(state, spec, access_leaf)?;
@@ -2393,10 +2446,42 @@ pub(super) fn encode_path_stash_page_into(
     Ok(())
 }
 
+/// Where a position-map page keeps its slots' keys: after the page's leaf
+/// labels, one fixed-width key per slot, the directory that finds a key's
+/// slot without reading the buckets.
+pub(super) fn path_directory_keys_start() -> usize {
+    ORAM_DIRECTORY_PAGE_ENTRIES * ORAM_LEAF_LABEL_BYTES
+}
+
+pub(super) fn path_directory_key_width(
+    spec: &StateObject,
+    parameters: &OramParameters,
+) -> Result<usize> {
+    let key_type = spec
+        .key_type
+        .as_ref()
+        .ok_or_else(|| anyhow!("map {} missing key type", spec.name))?;
+    let key_len = fixed_scalar_width(key_type)?;
+    let keys_end = ORAM_DIRECTORY_PAGE_ENTRIES
+        .checked_mul(key_len)
+        .and_then(|keys_len| keys_len.checked_add(path_directory_keys_start()))
+        .ok_or_else(|| anyhow!("ORAM directory key range overflow for {}", spec.name))?;
+    if keys_end > parameters.directory_page_bytes {
+        bail!(
+            "ORAM position-map page for {} cannot hold its slots' keys: {} > {}",
+            spec.name,
+            keys_end,
+            parameters.directory_page_bytes
+        );
+    }
+    Ok(key_len)
+}
+
 pub(super) fn encode_path_position_map_page_into(
     spec: &StateObject,
     parameters: &OramParameters,
     position_map: &[MaskedUsizeOption],
+    entries: &[MapEntry],
     out: &mut [u8],
 ) -> Result<()> {
     if out.len() != parameters.directory_page_bytes {
@@ -2419,6 +2504,44 @@ pub(super) fn encode_path_position_map_page_into(
             "writing Path-ORAM position-map page entry",
         )?;
     }
+    let key_len = path_directory_key_width(spec, parameters)?;
+    let key_type = spec
+        .key_type
+        .as_ref()
+        .ok_or_else(|| anyhow!("map {} missing key type", spec.name))?;
+    let zero_key = Value::zero_for_type(key_type);
+    for (index, entry) in entries.iter().take(ORAM_DIRECTORY_PAGE_ENTRIES).enumerate() {
+        // A vacant slot's key bytes are zero.
+        let key =
+            Value::confidential_select(entry.is_occupied(), entry.key().clone(), zero_key.clone())?;
+        let start = path_directory_keys_start() + index * key_len;
+        let target = out.get_mut(start..start + key_len).ok_or_else(|| {
+            anyhow!(
+                "ORAM directory key range {}..{} missing despite exact page size for {}",
+                start,
+                start + key_len,
+                spec.name
+            )
+        })?;
+        let mut key_cursor = 0usize;
+        let mut overflowed = false;
+        let mut copy_chunk = |chunk: &[u8]| {
+            if overflowed {
+                return;
+            }
+            match write_exact_range(target, key_cursor, chunk, "writing ORAM directory key") {
+                Ok(end) => key_cursor = end,
+                Err(_) => overflowed = true,
+            }
+        };
+        key.visit_canonical_chunks(&mut copy_chunk);
+        if overflowed || key_cursor != key_len {
+            bail!(
+                "ORAM directory key encoding drifted from exact key width for {}",
+                spec.name
+            );
+        }
+    }
     Ok(())
 }
 
@@ -2427,6 +2550,7 @@ pub(super) fn encode_path_metadata_pages(
     parameters: &OramParameters,
     cipher: &StoreCipher,
     position_map: &[MaskedUsizeOption],
+    entries: &[MapEntry],
     stash: &[OramBlock],
     allocator: &mut AllocatorSession,
     rng: &mut ChaCha20Rng,
@@ -2439,6 +2563,7 @@ pub(super) fn encode_path_metadata_pages(
             spec,
             parameters,
             directory_page_entries(position_map, page),
+            directory_page_entries(entries, page),
             payload.as_mut(),
         )?;
         let aad = oram_meta_aad(spec, page);
@@ -2488,6 +2613,7 @@ pub(super) fn rewrite_path_metadata_pages_in_place(
     parameters: &OramParameters,
     cipher: &StoreCipher,
     position_map: &[MaskedUsizeOption],
+    entries: &[MapEntry],
     stash: &[OramBlock],
     allocator: &mut AllocatorSession,
     rng: &mut ChaCha20Rng,
@@ -2515,6 +2641,7 @@ pub(super) fn rewrite_path_metadata_pages_in_place(
             spec,
             parameters,
             directory_page_entries(position_map, page),
+            directory_page_entries(entries, page),
             payload.as_mut(),
         )?;
         reseal_oram_payload_and_record_write(
@@ -2569,6 +2696,7 @@ pub(super) fn decode_path_metadata_pages(
 ) -> Result<(Box<[MaskedUsizeOption]>, FixedStash)> {
     let mut position_map =
         repeat_boxed_masked_usize_options(parameters.capacity, &MaskedUsizeOption::none())?;
+    let mut entries = repeat_boxed_map_entries(parameters.capacity, &empty_map_entry(spec)?)?;
     let mut stash = fixed_stash_with_capacity(spec, working_stash_capacity(parameters)?)?;
     decode_path_metadata_pages_into(
         spec,
@@ -2577,6 +2705,7 @@ pub(super) fn decode_path_metadata_pages(
         pages,
         allocator,
         &mut position_map,
+        &mut entries,
         &mut stash,
     )?;
     Ok((position_map, stash))
@@ -2589,6 +2718,7 @@ pub(super) fn decode_path_metadata_pages_into(
     pages: &[Box<[u8]>],
     allocator: &mut AllocatorSession,
     position_map: &mut [MaskedUsizeOption],
+    entries: &mut [MapEntry],
     stash: &mut FixedStash,
 ) -> Result<()> {
     let required_metadata_pages = parameters
@@ -2608,7 +2738,15 @@ pub(super) fn decode_path_metadata_pages_into(
             spec.name
         );
     }
-    decode_path_position_map_pages_into(spec, parameters, cipher, pages, allocator, position_map)?;
+    decode_path_position_map_pages_into(
+        spec,
+        parameters,
+        cipher,
+        pages,
+        allocator,
+        position_map,
+        Some(entries),
+    )?;
     let required_stash_capacity = working_stash_capacity(parameters)?;
     clear_fixed_stash(stash);
     if stash.capacity() < required_stash_capacity {
@@ -2710,6 +2848,7 @@ pub(super) fn load_path_buckets_into_stash(
                     allocator,
                     |payload| {
                         decode_bucket_payload(spec, bucket_index, payload, |block| {
+                            validate_loaded_path_block(spec, parameters, bucket_index, &block)?;
                             push_fixed_stash(stash, block)
                         })
                     },
@@ -2719,6 +2858,42 @@ pub(super) fn load_path_buckets_into_stash(
         },
     );
     load_result
+}
+
+/// A block a path read loads: its slot and leaf in range, and its bucket on the
+/// path to its leaf.
+pub(super) fn validate_loaded_path_block(
+    spec: &StateObject,
+    parameters: &OramParameters,
+    bucket_index: usize,
+    block: &OramBlock,
+) -> Result<()> {
+    let occupied = block.occupied;
+    if occupied & (block.slot_index >= parameters.capacity) {
+        bail!(
+            "decoded ORAM live block for {} references out-of-range slot {}",
+            spec.name,
+            block.slot_index
+        );
+    }
+    let leaf_in_range = block.leaf < parameters.leaf_count();
+    if occupied & !leaf_in_range {
+        bail!(
+            "decoded ORAM live block for {} carries out-of-range leaf {}",
+            spec.name,
+            block.leaf
+        );
+    }
+    let leaf = masked_select_usize(leaf_in_range, block.leaf, 0);
+    if occupied & !bucket_on_leaf_path(parameters.leaf_count(), bucket_index, leaf) {
+        bail!(
+            "decoded ORAM bucket {} for {} carries leaf {} off its path",
+            bucket_index,
+            spec.name,
+            block.leaf
+        );
+    }
+    Ok(())
 }
 
 pub(super) fn rebuild_path_buckets_from_stash(
@@ -2845,6 +3020,7 @@ where
         &state.parameters,
         &state.cipher,
         &working_position_map,
+        &working_entries,
         working_stash.as_slice(),
         allocator,
         rng,
@@ -2968,18 +3144,33 @@ pub(super) fn reconstruct_path_entries_from_storage_into(
     Ok(())
 }
 
+/// The state a call starts from: each slot's leaf and key (the directory) and
+/// the stash, decoded from the metadata pages, the pages every access reads.
+/// No bucket is read: an access reads the buckets of its path, and takes the
+/// key's value from its block once the path read has put it in the stash.
 pub(super) fn refresh_path_state_from_storage(
     spec: &StateObject,
     parameters: &OramParameters,
     cipher: &StoreCipher,
     directory_pages: &[Box<[u8]>],
-    buckets: &[Box<[u8]>],
     allocator: &mut AllocatorSession,
     empty_entry: &MapEntry,
     position_map: &mut [MaskedUsizeOption],
     stash: &mut FixedStash,
     entries: &mut [MapEntry],
 ) -> Result<()> {
+    if entries.len() != parameters.capacity {
+        bail!(
+            "entry buffer length {} mismatched required public bound {} for {}",
+            entries.len(),
+            parameters.capacity,
+            spec.name
+        );
+    }
+    for entry in entries.iter_mut() {
+        entry.wipe_secrets();
+        assign_map_entry(entry, empty_entry);
+    }
     decode_path_metadata_pages_into(
         spec,
         parameters,
@@ -2987,20 +3178,61 @@ pub(super) fn refresh_path_state_from_storage(
         directory_pages,
         allocator,
         position_map,
+        entries,
         stash,
     )?;
+    Ok(())
+}
+
+/// The map's contents, read from every bucket and the stash. A call never
+/// reads them this way; this serves the public-state snapshot of a public map
+/// and the tests.
+pub(super) fn path_entries_from_storage(
+    spec: &StateObject,
+    parameters: &OramParameters,
+    cipher: &StoreCipher,
+    directory_pages: &[Box<[u8]>],
+    buckets: &[Box<[u8]>],
+    empty_entry: &MapEntry,
+) -> Result<Box<[MapEntry]>> {
+    let scratch = parameters
+        .directory_page_bytes
+        .max(parameters.bucket_size)
+        .max(8);
+    let mut allocator = AllocatorSession::new(AllocatorPlan {
+        arena_bytes: scratch.saturating_mul(4),
+        max_stack_words: 0,
+        scratch_bytes: scratch,
+        max_kernel_ops: 0,
+    })?;
+    let mut position_map =
+        repeat_boxed_masked_usize_options(parameters.capacity, &MaskedUsizeOption::none())?;
+    let mut directory = repeat_boxed_map_entries(parameters.capacity, empty_entry)?;
+    let mut stash = fixed_stash_with_capacity(spec, working_stash_capacity(parameters)?)?;
+    decode_path_metadata_pages_into(
+        spec,
+        parameters,
+        cipher,
+        directory_pages,
+        &mut allocator,
+        &mut position_map,
+        &mut directory,
+        &mut stash,
+    )?;
+    let mut entries = repeat_boxed_map_entries(parameters.capacity, empty_entry)?;
     reconstruct_path_entries_from_storage_into(
         spec,
         parameters,
         cipher,
         buckets,
-        allocator,
+        &mut allocator,
         empty_entry,
-        position_map,
-        stash,
-        entries,
+        &position_map,
+        &stash,
+        &mut entries,
     )?;
-    Ok(())
+    allocator.finish()?;
+    Ok(entries)
 }
 
 pub(super) fn decode_path_position_map_pages(
@@ -3019,6 +3251,7 @@ pub(super) fn decode_path_position_map_pages(
         pages,
         allocator,
         &mut position_map,
+        None,
     )?;
     Ok(position_map)
 }
@@ -3042,6 +3275,9 @@ pub(super) fn path_position_map_from_storage(
     Ok(position_map)
 }
 
+/// Decodes each slot's leaf and, when `directory` is given, its key: the
+/// directory a call finds a key's slot in. A directory entry holds no value;
+/// the value lives in the key's block.
 pub(super) fn decode_path_position_map_pages_into(
     spec: &StateObject,
     parameters: &OramParameters,
@@ -3049,6 +3285,7 @@ pub(super) fn decode_path_position_map_pages_into(
     pages: &[Box<[u8]>],
     allocator: &mut AllocatorSession,
     position_map: &mut [MaskedUsizeOption],
+    mut directory: Option<&mut [MapEntry]>,
 ) -> Result<()> {
     if position_map.len() != parameters.capacity {
         bail!(
@@ -3058,6 +3295,23 @@ pub(super) fn decode_path_position_map_pages_into(
             spec.name
         );
     }
+    if let Some(entries) = directory.as_deref() {
+        if entries.len() != parameters.capacity {
+            bail!(
+                "directory buffer length {} mismatched public bound {} for {}",
+                entries.len(),
+                parameters.capacity,
+                spec.name
+            );
+        }
+    }
+    let key_type = spec
+        .key_type
+        .as_ref()
+        .ok_or_else(|| anyhow!("map {} missing key type", spec.name))?;
+    let key_len = path_directory_key_width(spec, parameters)?;
+    let zero_key = Value::zero_for_type(key_type);
+    let zero_value = Value::zero_for_type(&spec.value_type);
     let required_position_pages = parameters.position_map_pages();
     if pages.len() < required_position_pages {
         bail!(
@@ -3124,6 +3378,27 @@ pub(super) fn decode_path_position_map_pages_into(
                         )
                     })?;
                     *target = MaskedUsizeOption::new(present, leaf);
+                    if let Some(entries) = directory.as_deref_mut() {
+                        let key_start = path_directory_keys_start() + entry_index * key_len;
+                        let key = decode_scalar_value(
+                            key_type,
+                            read_exact_range(
+                                payload,
+                                key_start,
+                                key_len,
+                                "reading ORAM directory key",
+                            )?,
+                        )?;
+                        let key = Value::confidential_select(present, key, zero_key.clone())?;
+                        let entry = entries.get_mut(next_slot).ok_or_else(|| {
+                            anyhow!(
+                                "directory slot {} missing despite public capacity guard for {}",
+                                next_slot,
+                                spec.name
+                            )
+                        })?;
+                        entry.overwrite(present, key, zero_value.clone());
+                    }
                     next_slot += 1;
                 }
                 Ok(())

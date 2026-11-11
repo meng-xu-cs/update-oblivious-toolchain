@@ -1,6 +1,9 @@
 use crate::controller::CallRecorder;
 use crate::freshness::derive_path_oram_leaf_seed;
-use crate::oram::{MapEntry, OramState, OramTranscript, PathOramLeafCoinSource, PendingOramPut};
+use crate::oram::{
+    select_pending_put_value, MapEntry, OramState, OramTranscript, PathOramLeafCoinSource,
+    PendingOramPut,
+};
 use anyhow::{anyhow, bail, Result};
 use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
@@ -775,7 +778,7 @@ impl RuntimeObject {
                 json!({"kind": "map", "name": &object.spec.name, "entries": entries})
             }
             Self::UoOramMap(object) => {
-                let state = object.oram.public_state_snapshot_value();
+                let state = object.oram.public_state_snapshot_value(&object.spec)?;
                 json!({"kind": "oram_map", "name": &object.spec.name, "state": state})
             }
         }))
@@ -986,13 +989,9 @@ impl RuntimeObject {
                     transcript,
                 )?;
                 // Writes earlier in the call reach the ORAM at commit; until
-                // then a read takes its value from the pending view.
-                let value = match object.pending_view.as_deref() {
-                    Some(view) => {
-                        select_small_map_value_for_key(view, key, &object.spec.value_type)?
-                    }
-                    None => value,
-                };
+                // then a read of a key the call wrote takes the last write's
+                // value.
+                let value = select_pending_put_value(&object.pending_puts, key, value)?;
                 Ok((value, update_failed))
             }
             _ => bail!("{} is not a map", self.name()),
@@ -1054,9 +1053,13 @@ impl RuntimeObject {
                     &object.spec.value_type,
                     &object.spec.name,
                 )?;
-                object
-                    .pending_puts
-                    .push(PendingOramPut::new(apply, key, value));
+                // A write that overflows the map aborts the call and takes no
+                // effect, so later reads in the call do not see it.
+                object.pending_puts.push(PendingOramPut::new(
+                    apply & !capacity_overflowed,
+                    key,
+                    value,
+                ));
                 trace.logical_write("uooram_put", &object.spec.name, "oblivious");
                 object.dirty = true;
                 Ok(capacity_overflowed)
@@ -2410,7 +2413,7 @@ mod tests {
         }
         old_allocator.finish().unwrap();
         let expected_entries = match &old {
-            RuntimeObject::UoOramMap(map) => map.oram.logical_state_snapshot_for_test().0,
+            RuntimeObject::UoOramMap(map) => map.oram.stored_entries_for_test(&spec),
             _ => unreachable!(),
         };
 
@@ -2431,7 +2434,7 @@ mod tests {
                 .unwrap();
             assert!(!overflowed);
             // The write is pending: it makes no access, and a read later in
-            // the call sees it through the pending view.
+            // the call sees it through the call's pending writes.
             assert_eq!(recorder.physical_write_count(), 0);
             let (read, _) = new.get_map(&key, &mut recorder, &mut allocator).unwrap();
             assert_eq!(read, Value::uint(23));
@@ -2446,7 +2449,7 @@ mod tests {
             assert!(recorder.physical_write_count() > writes_before_commit);
             match committed {
                 RuntimeObject::UoOramMap(map) => {
-                    let entries = map.oram.logical_state_snapshot_for_test().0;
+                    let entries = map.oram.stored_entries_for_test(&spec);
                     let written = entries.iter().any(|entry| *entry == written_entry());
                     assert_eq!(written, !aborted);
                     if aborted {

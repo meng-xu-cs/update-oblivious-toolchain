@@ -236,6 +236,9 @@ def PositionMapEntryLeafBounded
   | none => True
   | some leaf => leaf < leafCount
 
+/-- A decoded position-map page: its slots' leaves, and the bytes after them.
+The runtime writes each slot's key there (`encodePathDirectoryPageBytes`), the
+directory a call finds a key's slot in; the leaf decoder does not read them. -/
 structure DecodedPathPositionMapPage where
   entries : List (Option Nat)
   padding : List Nat
@@ -672,6 +675,15 @@ def encodePathPositionMapPageBytes
 def encodePositionMapEntryFields : List (List Nat) → List Nat
   | [] => []
   | field :: fields => field ++ encodePositionMapEntryFields fields
+
+/-- A position-map page as the runtime writes it: the page's leaf labels, then
+each slot's key bytes (the directory), then zeros. -/
+def encodePathDirectoryPageBytes
+    (directoryPageBytes : Nat)
+    (leafFields : List (List Nat))
+    (keyBytes : List Nat) : List Nat :=
+  encodePathPositionMapPageBytes directoryPageBytes
+    (encodePositionMapEntryFields leafFields ++ keyBytes)
 
 def PositionMapEntryFieldsEncode
     (leafCount : Nat) :
@@ -2343,6 +2355,63 @@ theorem decodePathPositionMapPageExact_encodePositionMapEntryFields
   unfold decodePathPositionMapPageExact?
   rw [if_pos ⟨hPageLen, hDirectoryBytes⟩]
   simp [encodePathPositionMapPageBytes, zeroPadTo, hPrefixLen, hEntryDecode]
+
+/-- **The leaf decoder reads a directory page's leaves**: the keys the runtime
+writes after the leaves stay in the page's padding, so the decoded leaves are
+those of a page without keys. -/
+theorem decodePathPositionMapPageExact_encodePathDirectoryPageBytes
+    {leafCount directoryPageBytes : Nat}
+    {fields : List (List Nat)}
+    {entries : List (Option Nat)}
+    {keyBytes : List Nat}
+    (hFields : PositionMapEntryFieldsEncode leafCount fields entries)
+    (hEntryCount : entries.length = directoryPageEntries)
+    (hDirectoryBytes : pathPositionMapEntryBytes + keyBytes.length ≤ directoryPageBytes) :
+    decodePathPositionMapPageExact? leafCount directoryPageBytes
+        (encodePathDirectoryPageBytes directoryPageBytes fields keyBytes) =
+      some
+        { entries := entries
+        , padding :=
+            keyBytes ++
+              List.replicate
+                (directoryPageBytes - pathPositionMapEntryBytes - keyBytes.length) 0
+        } := by
+  have hPrefixLen :
+      (encodePositionMapEntryFields fields).length =
+        pathPositionMapEntryBytes := by
+    rw [encodePositionMapEntryFields_length hFields, hEntryCount]
+    rfl
+  have hPageLen :
+      (encodePathDirectoryPageBytes directoryPageBytes fields keyBytes).length =
+        directoryPageBytes := by
+    unfold encodePathDirectoryPageBytes
+    exact encodePathPositionMapPageBytes_length
+      (by rw [List.length_append, hPrefixLen]; exact hDirectoryBytes)
+  have hEntryDecode :
+      decodePositionMapEntriesExact? leafCount directoryPageEntries
+          (encodePositionMapEntryFields fields) =
+        some entries := by
+    rw [← hEntryCount]
+    exact decodePositionMapEntriesExact_encodePositionMapEntryFields hFields
+  have hLeafBytes : pathPositionMapEntryBytes ≤ directoryPageBytes := by omega
+  unfold decodePathPositionMapPageExact?
+  rw [if_pos ⟨hPageLen, hLeafBytes⟩]
+  have hTake :
+      (encodePathDirectoryPageBytes directoryPageBytes fields keyBytes).take
+          pathPositionMapEntryBytes =
+        encodePositionMapEntryFields fields := by
+    unfold encodePathDirectoryPageBytes encodePathPositionMapPageBytes zeroPadTo
+    rw [List.append_assoc, List.take_left' hPrefixLen]
+  have hDrop :
+      (encodePathDirectoryPageBytes directoryPageBytes fields keyBytes).drop
+          pathPositionMapEntryBytes =
+        keyBytes ++
+          List.replicate
+            (directoryPageBytes - pathPositionMapEntryBytes - keyBytes.length) 0 := by
+    unfold encodePathDirectoryPageBytes encodePathPositionMapPageBytes zeroPadTo
+    rw [List.append_assoc, List.drop_left' hPrefixLen, List.length_append, hPrefixLen,
+      Nat.sub_sub]
+  rw [hTake, hEntryDecode, hDrop]
 
 theorem encodePathPositionMapPagesBytes_length
     {directoryPageBytes : Nat}

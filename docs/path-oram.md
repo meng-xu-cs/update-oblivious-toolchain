@@ -40,26 +40,36 @@ The Lean development states more than it currently proves for Path ORAM:
   theorem at the pair's two sides (`sgxViewRelation_sides`), which relates
   the left and right runtime families. That pair makes one ORAM access; the
   multi-access pairs get the theorem from tape families (below).
-- Every call that touches a Path ORAM map first reads the whole map: the
-  runtime opens the map's counter, every metadata page, and every bucket and
-  rebuilds the map's contents inside the enclave
-  (`refresh_path_state_from_storage`), and keys and values come from that
-  copy. The per-access path reads and rewrites keep the stored tree in Path
-  ORAM form and are what the trace records; the call-start reads are not in
-  the trace. They follow a fixed pattern set by the public parameters, so
-  they reveal nothing, but a call's cost is linear in the map's capacity:
-  ERC20Lite `transferFrom` on the local route makes 178 traced reads and 432
-  call-start reads (a capacity-64 map: the counter, 16 pages, 127 buckets; a
-  capacity-128 map: the counter, 32 pages, 255 buckets). `results/overheads.json`
-  reports these next to the traced counts of every ORAM row
-  (`call_start_reads`, `call_start_bytes`, `physical_reads_with_call_start`,
-  `bytes_read_with_call_start`). A recursive position map would not change
-  this cost, so it waits on reading only the accessed paths.
+- A call reads only the paths it accesses. Each position-map page holds,
+  after its slots' leaves, each slot's key: the directory in which an access
+  finds its key's slot (`encode_path_position_map_page_into`). A call starts
+  from the map's counter and metadata pages, the units its first access
+  reads, and rebuilds the directory and the stash in the enclave
+  (`refresh_path_state_from_storage`); it reads no bucket. An access reads its
+  path into the stash and takes the key's value from the key's block there
+  (`select_stash_value_for_slot`): the enclave keeps no copy of the map's
+  values, and a write held until commit is read back from the call's pending
+  writes. Each block a path read loads is checked (slot and leaf in range,
+  its bucket on the path to its leaf), and the accessed slot must have exactly
+  one block, on its prior leaf and with its key. The call-start reads are not
+  in the trace; they follow a fixed pattern set by the public parameters, so
+  they reveal nothing. ERC20Lite `transferFrom` on the local route makes 178
+  traced reads and 50 call-start reads (a capacity-64 map: the counter and 16
+  pages; a capacity-128 map: the counter and 32 pages), down from 432 when a
+  call read every bucket, and decrypts 94 units in all instead of 476.
+  `results/overheads.json` reports the call-start reads next to the traced
+  counts of every ORAM row (`call_start_reads`, `call_start_bytes`,
+  `physical_reads_with_call_start`, `bytes_read_with_call_start`). Every
+  access still rewrites every metadata page (the flat position map and the
+  stash, whose bound is the capacity), and its trace reads them all, so an
+  access's cost stays linear in the capacity.
 - Calls that abort run on both schemes (`results/abort_rollback.json`). A
-  map write makes no ORAM access during the call: it updates an in-enclave
-  pending view of the map, which later reads in the call return and which
-  decides whether the write overflows the map (a write of a new key to a full
-  map aborts the call, as on the full-scan route). At commit each write makes
+  map write makes no ORAM access during the call: it is held in the enclave
+  with the call's other writes, and it updates a pending view of the map's
+  directory, which decides whether the write overflows the map (a write of a
+  new key to a full map aborts the call, as on the full-scan route). A later
+  read in the call returns the value of the call's last write to its key, if
+  there is one, and otherwise the value its access read. At commit each write makes
   one ORAM access, with the write masked off if the call aborted, so an
   aborted call makes the same accesses as a committed one and nothing is
   rolled back; its reads only remapped keys. Restoring the pre-call storage
@@ -155,9 +165,9 @@ The Lean development states more than it currently proves for Path ORAM:
   run on every tape is the substituted run is what these samples test; it is
   not proved of the Rust runtime.
 
-Open work: read only the accessed paths at call time instead of the whole
-map, which needs an oblivious key-to-slot index and values served from the
-path and stash; then replace the flat position map by a recursive one.
+Open work: replace the flat position map by a recursive one, with a stash
+bound below the capacity, so that an access reads polylogarithmically many
+units instead of every metadata page.
 
 ## Current Route
 

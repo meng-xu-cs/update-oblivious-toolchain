@@ -10,8 +10,8 @@
     "metadata_canonicalization_sha256": "c1df4a10d8ee6873e75c029c626a766ae62b669436cd0b4d8b93148bdac3f6f1",
     "compilation_mode": "uo",
     "compiler_version": "0.1.0",
-    "toolchain_manifest_sha256": "bb57c5da89ff5aed97ad9677b170ef6881fda8f970e6fc9e9748431a79d2afb8",
-    "package_sha256": "2ba6cc9fda5a72fed835ff3014748210a246749e270314fd17c22d214c22ed25"
+    "toolchain_manifest_sha256": "895b3e4eea035024b04aa64743e8e4c3f8efeaf1003796b5498164a7488e1931",
+    "package_sha256": "fc8212b62492e80b43e4705c502b137e758f63da6f5cf542001e3afdbe9fb852"
   },
   "contract": {
     "contract": "ERC20Lite",

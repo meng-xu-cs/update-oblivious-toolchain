@@ -195,12 +195,15 @@ field bindings required by `DeploymentCallAccepted`.
   pair whose capacity-256 `balances` map uses the private scheme and whose
   `allowances` map uses the local one (2^54 coin seeds). See
   [`path-oram.md`](./path-oram.md).
-- On both Path ORAM schemes, a call first reads and decrypts the whole map it
-  touches (counter, metadata pages, every bucket) to rebuild it in the
-  enclave; the trace records only the per-access paths. The call-start reads
-  follow a public pattern, so the leakage claim is unaffected, but the cost of
-  a call is linear in the map's capacity, and `results/overheads.json` lists
-  those reads beside the traced counts (`call_start_reads`).
+- On both Path ORAM schemes, a call reads only the paths it accesses. It
+  starts from the map's counter and metadata pages, which its first access
+  also reads, and rebuilds each slot's leaf and key and the stash in the
+  enclave; a read takes the key's value from the key's block once its path is
+  read. The call-start reads follow a public pattern and are not in the
+  trace, so the leakage claim is unaffected; `results/overheads.json` lists
+  them beside the traced counts (`call_start_reads`). Every access rewrites
+  every metadata page, and its trace reads them all, so its cost is linear in
+  the map's capacity.
 - Legacy/surrogate ORAM paths remain available for benchmarking and historical
   comparison, not for the strengthened proof-grade claim.
 - Executable insecure raw baselines (the `insecure-eval-raw` evaluation feature,

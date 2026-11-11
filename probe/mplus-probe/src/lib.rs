@@ -13518,9 +13518,16 @@ fn run_tamper_validation() -> Result<JsonValue> {
         tampered_runtime_implementation_oram_get
             .generated_oram_codecs_source
             .replace(
-                "let return_value = select_entry_value_for_slot(&state.entries, &slot, &spec.value_type)?;",
-                "let return_value = self.entries.iter().find(|entry| entry.matches_key(key)).map(|entry| entry.value().clone()).unwrap_or_else(|| Value::zero_for_type(&spec.value_type));",
+                "selected = Value::confidential_select(is_match, block.value.clone(), selected)?;",
+                "if is_match { selected = block.value.clone(); }",
             );
+    if tampered_runtime_implementation_oram_get.generated_oram_codecs_source
+        == runtime_implementation_interface.generated_oram_codecs_source
+    {
+        return Err(anyhow!(
+            "path_oram_get_lookup_drift found no masked read-value selector to replace"
+        ));
+    }
     scenarios.push(validate_tampered_json_case(
         "runtime_implementation_interface/path_oram_get_lookup_drift",
         &tampered_runtime_implementation_oram_get,
@@ -13534,7 +13541,41 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "artifact_kind": "proofgrade_runtime_implementation_interface",
             "benchmark": "SingleAccessMap/pathoram/get",
             "entrypoint": target.entrypoint,
-            "mutation": "replace the masked Path ORAM read-value selector in generated_oram_codecs.rs with the older `.iter().find(...)` lookup so the strengthened implementation interface must reject early-exit secret-dependent return-value selection inside path_get",
+            "mutation": "replace the masked selection of the read value from the key's stash block in generated_oram_codecs.rs with a branch on the match, so the strengthened implementation interface must reject secret-dependent return-value selection inside path_get",
+        }),
+    )?);
+    // A call starts from the metadata pages alone: an interface whose refresh
+    // takes the buckets again, to rebuild the map's values at call start, must
+    // be rejected.
+    let mut tampered_runtime_implementation_oram_refresh = runtime_implementation_interface.clone();
+    tampered_runtime_implementation_oram_refresh.generated_oram_codecs_source =
+        tampered_runtime_implementation_oram_refresh
+            .generated_oram_codecs_source
+            .replace(
+                "pub(super) fn refresh_path_state_from_storage(\n    spec: &StateObject,\n    parameters: &OramParameters,\n    cipher: &StoreCipher,\n    directory_pages: &[Box<[u8]>],\n    allocator: &mut AllocatorSession,",
+                "pub(super) fn refresh_path_state_from_storage(\n    spec: &StateObject,\n    parameters: &OramParameters,\n    cipher: &StoreCipher,\n    directory_pages: &[Box<[u8]>],\n    buckets: &[Box<[u8]>],\n    allocator: &mut AllocatorSession,",
+            );
+    if tampered_runtime_implementation_oram_refresh.generated_oram_codecs_source
+        == runtime_implementation_interface.generated_oram_codecs_source
+    {
+        return Err(anyhow!(
+            "path_oram_refresh_reads_buckets found no call-start refresh to replace"
+        ));
+    }
+    scenarios.push(validate_tampered_json_case(
+        "runtime_implementation_interface/path_oram_refresh_reads_buckets",
+        &tampered_runtime_implementation_oram_refresh,
+        |interface_path| {
+            Ok(Command::new(&runtime_implementation_interface_checker)
+                .arg(interface_path)
+                .output()?)
+        },
+        json!({
+            "scenario": "runtime_implementation_interface/path_oram_refresh_reads_buckets",
+            "artifact_kind": "proofgrade_runtime_implementation_interface",
+            "benchmark": "SingleAccessMap/pathoram/get",
+            "entrypoint": target.entrypoint,
+            "mutation": "give the Path ORAM call-start refresh in generated_oram_codecs.rs the buckets again, so that it could rebuild the map's values at call start; the implementation interface pins a refresh that takes only the metadata pages",
         }),
     )?);
     let tampered_runtime_implementation_oram_get_boundary =
@@ -13555,7 +13596,7 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
             "benchmark": "SingleAccessMap/pathoram/get",
             "entrypoint": target.entrypoint,
-            "mutation": "replace the masked Path ORAM read-value selector in generated_oram_codecs.rs with the older `.iter().find(...)` lookup while keeping the emitted kernel-interface bundle fixed, so the stronger combined confinement boundary must reject early-exit secret-dependent return-value selection inside path_get",
+            "mutation": "replace the masked selection of the read value from the key's stash block in generated_oram_codecs.rs with a branch on the match while keeping the emitted kernel-interface bundle fixed, so the stronger combined confinement boundary must reject secret-dependent return-value selection inside path_get",
         }),
     )?);
     let mut tampered_runtime_implementation_oram_put = runtime_implementation_interface.clone();
@@ -29046,9 +29087,9 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
 	        && generated_oram_codecs_source.contains("pub(super) fn apply_path_put_update(")
 	        && generated_oram_codecs_source.contains(") -> Result<bool> {")
 	        && generated_oram_codecs_source
-	            .contains(
-	                "let update_failed = ((update_existing | delete_existing | keep_existing) & !matched_slot)",
-	            )
+	            .contains("let update_failed = ((update_existing | delete_existing | keep_existing)")
+	        && generated_oram_codecs_source.contains("& ((slot_matches != 1) | !slot_blocks_agree))")
+	        && generated_oram_codecs_source.contains("pub(super) fn select_stash_value_for_slot(")
 	        && generated_oram_codecs_source.contains("| (insert_new & !inserted_slot)")
 	        && generated_oram_codecs_source
 	            .contains("| (insert_new & (insert_slot_index >= entries.len()));")
@@ -52993,11 +53034,12 @@ fn artifact_capacity_label(artifact: &CompiledArtifact) -> Option<String> {
 }
 
 /// What a call reads at its start, outside the trace: for each Path ORAM map
-/// the entrypoint touches, the runtime opens the counter, every metadata
-/// page, and every bucket, and rebuilds the map's contents in the enclave
-/// (`refresh_path_state_from_storage`); keys and values come from that copy.
-/// The pattern is fixed by the public parameters, so it reveals nothing, but
-/// it makes a call's cost linear in the map's capacity. Lengths are the
+/// the entrypoint touches, the runtime opens the counter and every metadata
+/// page, the units the map's first traced access reads, to rebuild each
+/// slot's leaf and key (the directory) and the stash in the enclave
+/// (`refresh_path_state_from_storage`). It reads no bucket: an access reads
+/// its path, and takes the key's value from the key's block. The pattern is
+/// fixed by the public parameters, so it reveals nothing. Lengths are the
 /// stored ciphertext lengths the trace records for the same units.
 fn call_start_decode(
     artifact: &CompiledArtifact,
@@ -53036,9 +53078,8 @@ fn call_start_decode(
         };
         let counter = traced_len("counter")?;
         let page = traced_len("meta")?;
-        let bucket = traced_len("bucket")?;
-        reads += 1 + oram.metadata_pages + oram.bucket_count;
-        bytes += counter + oram.metadata_pages * page + oram.bucket_count * bucket;
+        reads += 1 + oram.metadata_pages;
+        bytes += counter + oram.metadata_pages * page;
     }
     Ok((reads, bytes))
 }
