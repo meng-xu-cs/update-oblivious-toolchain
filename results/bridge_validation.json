@@ -513980,6 +513980,34 @@
       },
       {
         "print_axioms_present": true,
+        "theorem": "UOToolchain.IR.kernelOramBoundarySchedule_safe"
+      },
+      {
+        "print_axioms_present": true,
+        "theorem": "UOToolchain.paperMain_admittedKernelRun_pathOramLocalPosmapV1_noninterference_moduloReleases"
+      },
+      {
+        "print_axioms_present": true,
+        "theorem": "UOToolchain.paperMain_admittedKernelRun_pathOramPrivatePosmapV1_noninterference_moduloReleases"
+      },
+      {
+        "print_axioms_present": true,
+        "theorem": "UOToolchain.paperMain_checkedKernel_pathOramLocalPosmapV1_noninterference_moduloReleases"
+      },
+      {
+        "print_axioms_present": true,
+        "theorem": "UOToolchain.paperMain_checkedKernel_pathOramPrivatePosmapV1_noninterference_moduloReleases"
+      },
+      {
+        "print_axioms_present": true,
+        "theorem": "UOToolchain.SeededRuntimePathOramProofBundleOn.paperMain_admittedKernelRun_localPosmapV1_noninterference_moduloReleases"
+      },
+      {
+        "print_axioms_present": true,
+        "theorem": "UOToolchain.SeededRuntimePathOramProofBundleOn.paperMain_admittedKernelRun_privatePosmapV1_noninterference_moduloReleases"
+      },
+      {
+        "print_axioms_present": true,
         "theorem": "UOToolchain.RuntimeImplementationKernelMachineConfinementBoundary.paperEndToEndConfinementWithPublicOnlyHandwrittenShell"
       },
       {
@@ -514536,6 +514564,11 @@
       },
       {
         "file": "proof/lean/UOToolchain/KernelAdmission.lean",
+        "forbidden_import_hits": [],
+        "restricted": true
+      },
+      {
+        "file": "proof/lean/UOToolchain/PathOramKernelPaperMain.lean",
         "forbidden_import_hits": [],
         "restricted": true
       }

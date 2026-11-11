@@ -82,6 +82,7 @@ import UOToolchain.KernelExactTrace
 import UOToolchain.KernelFlow
 import UOToolchain.KernelPaperMain
 import UOToolchain.KernelAdmission
+import UOToolchain.PathOramKernelPaperMain
 import UOToolchain.ProofGrade
 
 /-!

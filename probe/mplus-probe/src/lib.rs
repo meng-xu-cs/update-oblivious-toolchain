@@ -4124,6 +4124,7 @@ fn run_static_checks(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<J
         "proof/lean/UOToolchain/KernelFlow.lean",
         "proof/lean/UOToolchain/KernelPaperMain.lean",
         "proof/lean/UOToolchain/KernelAdmission.lean",
+        "proof/lean/UOToolchain/PathOramKernelPaperMain.lean",
     ]
     .into_iter()
     .map(|relative_path| {
@@ -4175,6 +4176,13 @@ fn run_static_checks(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<J
         "UOToolchain.paperMain_admittedKernelRun_exact_noninterference_moduloReleases",
         "UOToolchain.IR.KernelProgram.admissionCheck_sound",
         "UOToolchain.paperMain_checkedKernel_exact_noninterference_moduloReleases",
+        "UOToolchain.IR.kernelOramBoundarySchedule_safe",
+        "UOToolchain.paperMain_admittedKernelRun_pathOramLocalPosmapV1_noninterference_moduloReleases",
+        "UOToolchain.paperMain_admittedKernelRun_pathOramPrivatePosmapV1_noninterference_moduloReleases",
+        "UOToolchain.paperMain_checkedKernel_pathOramLocalPosmapV1_noninterference_moduloReleases",
+        "UOToolchain.paperMain_checkedKernel_pathOramPrivatePosmapV1_noninterference_moduloReleases",
+        "UOToolchain.SeededRuntimePathOramProofBundleOn.paperMain_admittedKernelRun_localPosmapV1_noninterference_moduloReleases",
+        "UOToolchain.SeededRuntimePathOramProofBundleOn.paperMain_admittedKernelRun_privatePosmapV1_noninterference_moduloReleases",
         "UOToolchain.RuntimeImplementationKernelMachineConfinementBoundary.paperEndToEndConfinementWithPublicOnlyHandwrittenShell",
         "UOToolchain.RuntimePaperNativeKernelAssumptions.paperEndToEndConfinementWithPublicOnlyHandwrittenShell",
     ]
@@ -51942,10 +51950,10 @@ struct ExperimentOutcome {
     /// backend, e.g. the ORAM route).
     exact_encoding_matches: Option<bool>,
     /// Whether every run's public outcome and enclave-boundary schedule are the
-    /// ones the Lean models predict (`None` off the exact route).
+    /// ones the Lean models predict (`None` off the exact and Path ORAM routes).
     outcome_model_matches: Option<bool>,
     /// Whether every run's final public-state record is the one the Lean model
-    /// predicts (`None` off the exact route).
+    /// predicts (`None` off the exact and Path ORAM routes).
     final_public_state_model_matches: Option<bool>,
 }
 
@@ -52359,22 +52367,76 @@ fn trace_matches_exact_encoding(
         && lengths_consistent
 }
 
-/// What the Lean models of an exact-route run's public observables
-/// (`kernelPublicOutcome` and `kernelBoundarySchedule` in
-/// `UOToolchain/KernelPaperMain.lean`) take from the artifact.
+/// The trace route of a confidential kernel program, as `checkKernelAdmission`
+/// reports it (`traceRoute` in `UOToolchain/KernelAdmission.lean`): exact when
+/// every object it accesses is on a full-scan backend, Path ORAM when the
+/// others are on an ORAM backend. The Lean models of the public outcome, the
+/// boundary schedule, and the final public-state record cover both routes
+/// (`UOToolchain/KernelPaperMain.lean` and
+/// `UOToolchain/PathOramKernelPaperMain.lean`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum KernelTraceRoute {
+    Exact,
+    PathOram,
+}
+
+/// `None` when the entrypoint is not a confidential kernel program of a UO
+/// build or accesses a raw object.
+fn kernel_trace_route(artifact: &CompiledArtifact, entrypoint: &str) -> Option<KernelTraceRoute> {
+    if artifact.contract.mode != ProgramMode::Uo {
+        return None;
+    }
+    let function = artifact
+        .contract
+        .functions
+        .iter()
+        .find(|function| function.signature == entrypoint)?;
+    let program = function.confidential_program.as_ref()?;
+    let mut accesses = Vec::new();
+    for statement in program.body.iter() {
+        exact_statement_accesses(statement, &mut accesses);
+    }
+    let mut route = KernelTraceRoute::Exact;
+    for object_id in accesses {
+        let object = artifact
+            .contract
+            .state
+            .iter()
+            .find(|object| object.id == object_id)?;
+        match object.backend {
+            BackendKind::FullScan => {}
+            BackendKind::Oram => route = KernelTraceRoute::PathOram,
+            BackendKind::Raw => return None,
+        }
+    }
+    Some(route)
+}
+
+/// What the Lean models of a run's public observables (`kernelPublicOutcome`
+/// and `kernelBoundarySchedule` in `UOToolchain/KernelPaperMain.lean`,
+/// `kernelOramBoundarySchedule` in `UOToolchain/PathOramKernelPaperMain.lean`)
+/// take from the artifact.
 struct KernelOutcomeModel {
     entry_input_len: usize,
     return_length: usize,
     returns_value: bool,
     gas: u64,
+    /// The call's ORAM accesses: the manifest's per-object counts, which the
+    /// program and its maps' schemes fix; none on the exact route.
+    oram_accesses: usize,
 }
 
 fn kernel_outcome_model(
     artifact: &CompiledArtifact,
     entrypoint: &str,
+    route: KernelTraceRoute,
 ) -> Option<KernelOutcomeModel> {
     let entry = artifact.contract.manifest.entrypoints.get(entrypoint)?;
     let program = entry.confidential_program.as_ref()?;
+    let oram_accesses = entry.oram_accesses.values().sum::<usize>();
+    if (route == KernelTraceRoute::PathOram) != (oram_accesses > 0) {
+        return None;
+    }
     Some(KernelOutcomeModel {
         entry_input_len: entry.entry_input_len,
         return_length: entry.return_canonical_len.unwrap_or(0),
@@ -52383,6 +52445,7 @@ fn kernel_outcome_model(
             Some(ConfidentialKernelStatement::Return { value: Some(_) })
         ),
         gas: entry.public_gas_budget,
+        oram_accesses,
     })
 }
 
@@ -52390,7 +52453,9 @@ fn kernel_outcome_model(
 /// A run that completes with a return value has the declared return length as
 /// its output shape and exit length; any other run, an abort or a completed
 /// call without a return value, has the empty output shape and exits with
-/// nothing. The gas is the entrypoint's modeled cost either way.
+/// nothing. The gas is the entrypoint's modeled cost either way. Between the
+/// entry and the exit, the call leaves and re-enters the enclave around each of
+/// its ORAM accesses, completed or not.
 fn run_matches_outcome_model(
     trace: &uo_core::ExecutionTrace,
     entrypoint: &str,
@@ -52406,16 +52471,19 @@ fn run_matches_outcome_model(
     } else {
         uo_core::OutputShape::default()
     };
-    let schedule = [
-        BoundaryEvent::enter(entrypoint, model.entry_input_len),
-        BoundaryEvent::exit(entrypoint, shape.return_length),
-    ];
+    let mut schedule = Vec::with_capacity(2 * model.oram_accesses + 2);
+    schedule.push(BoundaryEvent::enter(entrypoint, model.entry_input_len));
+    for _ in 0..model.oram_accesses {
+        schedule.push(BoundaryEvent::exit("oram_access", 0));
+        schedule.push(BoundaryEvent::enter("oram_access", 0));
+    }
+    schedule.push(BoundaryEvent::exit(entrypoint, shape.return_length));
     outcome.entrypoint_id == entrypoint
         && outcome.output_shape == shape
         && outcome.return_payload.is_some() == returned
         && outcome.encrypted_return_payload.is_none()
         && outcome.gas_used == model.gas
-        && certificate.boundary_schedule() == schedule
+        && certificate.boundary_schedule() == schedule.as_slice()
 }
 
 /// Whether a run's final public-state record is the modeled one
@@ -52489,11 +52557,10 @@ fn run_binary_experiment(
     let mut class1_hashes = Vec::new();
     let prediction = exact_encoding_prediction(artifact, entrypoint);
     let mut exact_encoding_matches = prediction.as_ref().map(|_| true);
-    let outcome_model = prediction
-        .as_ref()
-        .and_then(|_| kernel_outcome_model(artifact, entrypoint));
-    let mut outcome_model_matches = prediction.as_ref().map(|_| outcome_model.is_some());
-    let mut final_public_state_model_matches = prediction.as_ref().map(|_| true);
+    let route = kernel_trace_route(artifact, entrypoint);
+    let outcome_model = route.and_then(|route| kernel_outcome_model(artifact, entrypoint, route));
+    let mut outcome_model_matches = route.map(|_| outcome_model.is_some());
+    let mut final_public_state_model_matches = route.map(|_| true);
     for args in class0 {
         let bracketed = run_target_call_with_public_state(artifact, setup, entrypoint, args)?;
         let result = &bracketed.result;
@@ -54364,9 +54431,9 @@ mod tests {
     // Only used by the strict-default-build tests below, which the
     // insecure-eval-raw feature compiles out.
     use super::{
-        b32, exact_encoding_prediction, kernel_outcome_model, run_matches_final_public_state_model,
-        run_matches_outcome_model, trace_matches_exact_encoding, KernelOutcomeModel,
-        PROBE_DEPLOY_SEED,
+        b32, exact_encoding_prediction, kernel_outcome_model, kernel_trace_route,
+        run_matches_final_public_state_model, run_matches_outcome_model,
+        trace_matches_exact_encoding, KernelOutcomeModel, KernelTraceRoute, PROBE_DEPLOY_SEED,
     };
     #[cfg(not(feature = "insecure-eval-raw"))]
     use super::{
@@ -54426,8 +54493,13 @@ mod tests {
         )
         .unwrap();
         let entrypoint = "withdraw(bytes32,uint256)";
-        let model = kernel_outcome_model(&artifact, entrypoint).unwrap();
+        assert_eq!(
+            kernel_trace_route(&artifact, entrypoint),
+            Some(KernelTraceRoute::Exact)
+        );
+        let model = kernel_outcome_model(&artifact, entrypoint, KernelTraceRoute::Exact).unwrap();
         assert!(model.returns_value);
+        assert_eq!(model.oram_accesses, 0);
         let mut instance =
             ContractInstance::deploy_with_seed(artifact.clone(), PROBE_DEPLOY_SEED).unwrap();
         instance
@@ -54461,6 +54533,78 @@ mod tests {
 
         let drifted = KernelOutcomeModel {
             return_length: 64,
+            ..model
+        };
+        assert!(!run_matches_outcome_model(&completed, entrypoint, &drifted));
+    }
+
+    #[test]
+    fn path_oram_route_follows_the_outcome_and_final_state_models() {
+        let artifact = compile_artifact(
+            "benches/raw/ERC20Lite.sol",
+            "benches/raw/ERC20Lite.private-posmap.yaml",
+            ProgramMode::Uo,
+        )
+        .unwrap();
+        let entrypoint = "transfer(address,address,uint256)";
+        assert_eq!(
+            kernel_trace_route(&artifact, entrypoint),
+            Some(KernelTraceRoute::PathOram)
+        );
+        // On the private scheme at 256 entries (tree height 11) a read of
+        // `balances` makes 11 node accesses and a write 11 + 34, so a transfer
+        // makes 2 * (11 + 45) = 112 ORAM accesses.
+        let model =
+            kernel_outcome_model(&artifact, entrypoint, KernelTraceRoute::PathOram).unwrap();
+        assert_eq!(model.oram_accesses, 112);
+        assert!(kernel_outcome_model(&artifact, entrypoint, KernelTraceRoute::Exact).is_none());
+        let mut instance =
+            ContractInstance::deploy_with_seed(artifact.clone(), PROBE_DEPLOY_SEED).unwrap();
+        instance
+            .call("mint(address,uint256)", vec![addr(0x11), Value::uint(50)])
+            .unwrap();
+        let mut call = |to: u8, amount: u64| {
+            let before = instance.public_state_digest().unwrap();
+            let trace = instance
+                .call(entrypoint, vec![addr(0x11), addr(to), Value::uint(amount)])
+                .unwrap()
+                .trace;
+            let after = instance.public_state_digest().unwrap();
+            (trace, before, after)
+        };
+        // A transfer within the balance completes and one beyond it aborts; both
+        // leave and re-enter the enclave 112 times, and differ only in the last
+        // exit's length.
+        let (completed, before, after) = call(0x21, 3);
+        assert!(run_matches_outcome_model(&completed, entrypoint, &model));
+        assert!(run_matches_final_public_state_model(
+            &completed, &before, &after
+        ));
+        let (aborted, before, after) = call(0x22, 90);
+        assert!(run_matches_outcome_model(&aborted, entrypoint, &model));
+        assert!(run_matches_final_public_state_model(
+            &aborted, &before, &after
+        ));
+        let schedule = |trace: &uo_core::ExecutionTrace| {
+            trace
+                .runtime_controller_observer_certificate()
+                .unwrap()
+                .boundary_schedule()
+                .to_vec()
+        };
+        let (completed_schedule, aborted_schedule) = (schedule(&completed), schedule(&aborted));
+        assert_eq!(completed_schedule.len(), 2 * 112 + 2);
+        assert_eq!(aborted_schedule.len(), 2 * 112 + 2);
+        assert_eq!(
+            completed_schedule[..completed_schedule.len() - 1],
+            aborted_schedule[..aborted_schedule.len() - 1]
+        );
+        assert_eq!(completed_schedule.last().unwrap().output_len, 32);
+        assert_eq!(aborted_schedule.last().unwrap().output_len, 0);
+
+        // A model with one access fewer does not match.
+        let drifted = KernelOutcomeModel {
+            oram_accesses: 111,
             ..model
         };
         assert!(!run_matches_outcome_model(&completed, entrypoint, &drifted));

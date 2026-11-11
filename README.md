@@ -43,9 +43,12 @@ a public chain" as its main execution model.
   the tree balanced (`PathOramAvlMap`), and the runtime's operations are
   replayed against that model.
   Their paper-main theorems hold over admitted
-  configurations given bundle evidence (`PathOramAdmitted`), whose leaf
-  obligation follows from the leaf model without seed enumeration; the
-  private route's configurations may mix maps of both schemes. The bundle is
+  configurations given bundle evidence (`PathOramAdmitted`), with the public
+  outcome, boundary schedule, and final-state premises discharged from the
+  kernel models for admitted programs (`PathOramKernelPaperMain`). The
+  bundle's leaf obligation follows from the leaf model without seed
+  enumeration; the private route's configurations may mix maps of both
+  schemes. The bundle is
   derived for a concrete single-access instance, and for the multi-access
   entrypoints from one runtime run per side, whose leaves are substituted for
   every other tape (`PathOramTapeWitness`; runtime runs on sampled tapes are

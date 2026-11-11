@@ -141,6 +141,60 @@ info: 'UOToolchain.paperMain_checkedKernel_exact_noninterference_moduloReleases'
 #print axioms UOToolchain.paperMain_checkedKernel_exact_noninterference_moduloReleases
 
 /--
+info: 'UOToolchain.IR.kernelOramBoundarySchedule_safe' depends on axioms: [propext]
+-/
+#guard_msgs in
+#print axioms UOToolchain.IR.kernelOramBoundarySchedule_safe
+
+/--
+info: 'UOToolchain.paperMain_admittedKernelRun_pathOramLocalPosmapV1_noninterference_moduloReleases' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+-/
+#guard_msgs in
+#print axioms UOToolchain.paperMain_admittedKernelRun_pathOramLocalPosmapV1_noninterference_moduloReleases
+
+/--
+info: 'UOToolchain.paperMain_admittedKernelRun_pathOramPrivatePosmapV1_noninterference_moduloReleases' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+-/
+#guard_msgs in
+#print axioms UOToolchain.paperMain_admittedKernelRun_pathOramPrivatePosmapV1_noninterference_moduloReleases
+
+/--
+info: 'UOToolchain.paperMain_checkedKernel_pathOramLocalPosmapV1_noninterference_moduloReleases' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+-/
+#guard_msgs in
+#print axioms UOToolchain.paperMain_checkedKernel_pathOramLocalPosmapV1_noninterference_moduloReleases
+
+/--
+info: 'UOToolchain.paperMain_checkedKernel_pathOramPrivatePosmapV1_noninterference_moduloReleases' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+-/
+#guard_msgs in
+#print axioms UOToolchain.paperMain_checkedKernel_pathOramPrivatePosmapV1_noninterference_moduloReleases
+
+/--
+info: 'UOToolchain.SeededRuntimePathOramProofBundleOn.paperMain_admittedKernelRun_localPosmapV1_noninterference_moduloReleases' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+-/
+#guard_msgs in
+#print axioms UOToolchain.SeededRuntimePathOramProofBundleOn.paperMain_admittedKernelRun_localPosmapV1_noninterference_moduloReleases
+
+/--
+info: 'UOToolchain.SeededRuntimePathOramProofBundleOn.paperMain_admittedKernelRun_privatePosmapV1_noninterference_moduloReleases' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+-/
+#guard_msgs in
+#print axioms UOToolchain.SeededRuntimePathOramProofBundleOn.paperMain_admittedKernelRun_privatePosmapV1_noninterference_moduloReleases
+
+/--
 info: 'UOToolchain.PathOramFreshLeaves.observedLeaves_canonical' depends on axioms: [propext, Classical.choice, Quot.sound]
 -/
 #guard_msgs in

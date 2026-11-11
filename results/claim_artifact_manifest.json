@@ -52,6 +52,16 @@
       "ok": true
     },
     {
+      "detail": "doc_anchor \"kernelOramBoundarySchedule\" for path-oram-kernel-premises appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:path-oram-kernel-premises",
+      "ok": true
+    },
+    {
+      "detail": "path-oram-kernel-premises declares an allowed status (Lean-proved)",
+      "name": "status-allowed:path-oram-kernel-premises",
+      "ok": true
+    },
+    {
       "detail": "doc_anchor \"UOToolchain/PathOramAvlMap.lean\" for path-oram-private-avl-map-semantics appears in docs/claim-boundary.md",
       "name": "anchor-in-doc:path-oram-private-avl-map-semantics",
       "ok": true
@@ -427,7 +437,7 @@
       "ok": true
     },
     {
-      "detail": "11 manifest entries in category claim",
+      "detail": "12 manifest entries in category claim",
       "name": "category-present:claim",
       "ok": true
     },
@@ -474,6 +484,11 @@
     {
       "detail": "artifact proof/lean/UOToolchain/KernelAdmission.lean referenced by paper-update-obliviousness-theorem exists",
       "name": "file-exists:paper-update-obliviousness-theorem:proof/lean/UOToolchain/KernelAdmission.lean",
+      "ok": true
+    },
+    {
+      "detail": "artifact proof/lean/UOToolchain/PathOramKernelPaperMain.lean referenced by paper-update-obliviousness-theorem exists",
+      "name": "file-exists:paper-update-obliviousness-theorem:proof/lean/UOToolchain/PathOramKernelPaperMain.lean",
       "ok": true
     },
     {
@@ -599,6 +614,31 @@
     {
       "detail": "artifact runtime/uo-evm/src/controller.rs referenced by computational-uo-path-oram-private exists",
       "name": "file-exists:computational-uo-path-oram-private:runtime/uo-evm/src/controller.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact crates/uo-core/src/manifest.rs referenced by path-oram-kernel-premises exists",
+      "name": "file-exists:path-oram-kernel-premises:crates/uo-core/src/manifest.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact proof/lean/UOToolchain/PathOramKernelPaperMain.lean referenced by path-oram-kernel-premises exists",
+      "name": "file-exists:path-oram-kernel-premises:proof/lean/UOToolchain/PathOramKernelPaperMain.lean",
+      "ok": true
+    },
+    {
+      "detail": "artifact proof/lean/UOToolchain/KernelPaperMain.lean referenced by path-oram-kernel-premises exists",
+      "name": "file-exists:path-oram-kernel-premises:proof/lean/UOToolchain/KernelPaperMain.lean",
+      "ok": true
+    },
+    {
+      "detail": "artifact proof/lean/UOToolchain/PathOramAdmitted.lean referenced by path-oram-kernel-premises exists",
+      "name": "file-exists:path-oram-kernel-premises:proof/lean/UOToolchain/PathOramAdmitted.lean",
+      "ok": true
+    },
+    {
+      "detail": "artifact runtime/uo-evm/src/controller.rs referenced by path-oram-kernel-premises exists",
+      "name": "file-exists:path-oram-kernel-premises:runtime/uo-evm/src/controller.rs",
       "ok": true
     },
     {
@@ -897,7 +937,8 @@
         "proof/lean/UOToolchain/PaperMainTheorem.lean",
         "proof/lean/UOToolchain/PaperMainReleases.lean",
         "proof/lean/UOToolchain/KernelPaperMain.lean",
-        "proof/lean/UOToolchain/KernelAdmission.lean"
+        "proof/lean/UOToolchain/KernelAdmission.lean",
+        "proof/lean/UOToolchain/PathOramKernelPaperMain.lean"
       ],
       "runtime_compiler_files": [
         "runtime/uo-evm/src/lib.rs"
@@ -1003,6 +1044,29 @@
       "status": "generated-and-checked",
       "text": "The private-position-map Path ORAM route path_oram_private_posmap_v1 lifts the local route's capacity cap and keeps a map as an oblivious AVL tree of preallocated nodes in one Path ORAM tree, each node holding its children's leaves, so the position map recurses through the tree: a get makes h node accesses and a put 3h + 1, h the largest AVL height for the capacity, each reading and writing one path, and an operation reads and writes its header and stash pages once; its Lean paper-main theorem holds over admitted configurations whose maps use either scheme, given the same bundle evidence, with the stash bounded by the Path ORAM bound plus the 3h + 1 nodes an operation returns to it (stashOverflowBounded), and the bundle is derived for ERC20Lite.transferFrom with balances on the private scheme from one runtime run per side whose leaves are substituted for every other tape, with runtime runs on sampled tapes checked against the substitution.",
       "validation_command": "cargo run -q -p mplus-probe -- --only claim-consistency --out-dir results"
+    },
+    {
+      "benchmark_result_files": [
+        "results/trace_equivalence.json",
+        "results/static_checks.json"
+      ],
+      "category": "claim",
+      "doc_anchor": "kernelOramBoundarySchedule",
+      "id": "path-oram-kernel-premises",
+      "lean_modules": [
+        "proof/lean/UOToolchain/PathOramKernelPaperMain.lean",
+        "proof/lean/UOToolchain/KernelPaperMain.lean",
+        "proof/lean/UOToolchain/PathOramAdmitted.lean"
+      ],
+      "runtime_compiler_files": [
+        "runtime/uo-evm/src/controller.rs"
+      ],
+      "source_files": [
+        "crates/uo-core/src/manifest.rs"
+      ],
+      "status": "Lean-proved",
+      "text": "On both Path ORAM routes, the paper-main theorems' public outcome, boundary schedule, final public-state record and release premises are discharged for entrypoints whose kernel program is admitted, from the same kernel models as on the exact route, given a denotation of the admitted configurations as admitted kernel runs that keeps the public projection; the modeled boundary schedule leaves and re-enters the enclave around each of the call's ORAM accesses, whose number the program and its maps' schemes fix. The runtime's outcomes, boundary schedules and final records are checked against the models on every Path ORAM experiment run, not proved to follow them.",
+      "validation_command": "cargo run -q -p mplus-probe -- --only trace-equivalence --out-dir results"
     },
     {
       "benchmark_result_files": [
@@ -1477,7 +1541,7 @@
       "validation_command": "cargo run -q -p mplus-probe -- --only acceptance-check --out-dir results"
     }
   ],
-  "entry_count": 32,
+  "entry_count": 33,
   "schema": "uo.claim_artifact_manifest.v1",
   "source_of_truth": "docs/claim-boundary.md"
 }

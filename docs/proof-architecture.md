@@ -109,8 +109,8 @@ event's output length is the return length, so it reveals whether the call
 completed; the release erasure therefore clears it when the status is
 released (`boundaryWithoutStatusRelease`). Encrypted returns are outside the
 model. The probe checks the runtime's public outcomes, boundary schedules, and
-final public-state records against these models on every exact-route
-experiment run, completed or aborted (`outcome_model_matches` and
+final public-state records against these models on every exact-route and Path
+ORAM experiment run, completed or aborted (`outcome_model_matches` and
 `final_public_state_model_matches` in `trace_equivalence.json`). Confidential
 calls report the same record as public ones: the digests of the public state
 before the call, as the call left it, and as committed, the digest of the
@@ -133,6 +133,27 @@ object. An entrypoint that accesses an ORAM map is reported on the `path_oram`
 route: the exact theorem covers neither its storage trace nor its boundary
 schedule, which include the Path ORAM accesses. An entrypoint that accesses a
 raw object is on no supported route and is not admitted.
+
+`UOToolchain.PathOramKernelPaperMain` discharges the same premises on the
+`path_oram` route. The public outcome and the final public-state record are
+the kernel models of the run an ORAM configuration denotes; their safety rests
+on the flow analysis and on the program writing only confidential objects, not
+on how a map is stored. The boundary schedule is the runtime controller
+certificate's for a call with the entrypoint's number of ORAM accesses
+(`kernelOramBoundarySchedule`, equal to
+`RuntimeControllerCertificate.boundarySchedule` and, with no accesses, to
+`kernelBoundarySchedule`): enter, an exit and a re-entry around each access,
+and exit with the return length, so only the last event depends on the run.
+A `KernelDenotation` links the ORAM model's configurations to kernel runs:
+admitted configurations denote admitted runs, and configurations with the same
+public projection denote runs with the same public projection. With it,
+`paperMain_admittedKernelRun_pathOramLocalPosmapV1_noninterference_moduloReleases`
+and `paperMain_admittedKernelRun_pathOramPrivatePosmapV1_noninterference_moduloReleases`
+instantiate the Path ORAM theorems over admitted configurations, keeping only
+their ORAM premise (`ComputationalUOWithOn`); the `checkedKernel` forms take a
+passing admission check instead of the policy agreement, and the
+`SeededRuntimePathOramProofBundleOn` forms take the ORAM premise from a
+bundle, leaving the Path ORAM security assumptions and the denotation.
 
 ## Runtime Bridge
 

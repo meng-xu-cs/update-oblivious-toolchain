@@ -99,10 +99,24 @@ conditions are decided per entrypoint on the compiled artifacts by
 entrypoint of the benchmark artifacts is admitted
 (`kernel_admission_*` in `results/static_checks.json`). Entrypoints that access
 an ORAM map are reported on the `path_oram` route, which this exact theorem does
-not cover. That the runtime emits the modeled observables is a refinement
-obligation, not proved. The probe checks all four against the models on every
-exact-route experiment run (`exact_encoding_matches`, `outcome_model_matches`,
-and `final_public_state_model_matches` in `results/trace_equivalence.json`).
+not cover. On that route the same models discharge the Path ORAM theorems'
+outcome, boundary, final-state, and release premises
+(`paperMain_admittedKernelRun_pathOramLocalPosmapV1_noninterference_moduloReleases`
+and its private-scheme counterpart, `UOToolchain/PathOramKernelPaperMain.lean`).
+Their boundary schedule leaves and re-enters the enclave around each of the
+call's ORAM accesses (`kernelOramBoundarySchedule`), whose number the program
+and its maps' schemes fix: a private-scheme ERC20Lite `transfer` at 256
+entries makes 112. Those theorems keep the ORAM premise, which bundle evidence
+discharges (see Backend Scope), and link the ORAM model's configurations to
+kernel runs through a `KernelDenotation`: every admitted configuration denotes
+an admitted run, and configurations with the same public projection denote
+runs that agree on contract, entrypoint, public arguments, public environment,
+and public store. That the runtime emits the modeled observables is a
+refinement obligation, not proved. The probe checks all four against the
+models on every exact-route experiment run, and the outcome, boundary
+schedule, and final public-state record on every Path ORAM experiment run
+(`exact_encoding_matches`, `outcome_model_matches`, and
+`final_public_state_model_matches` in `results/trace_equivalence.json`).
 The record's digests are the runtime's own: its initial, candidate, and
 committed digests must each be the digest of the public state just before the
 call, which must also be the state just after it; its delta digest must be that

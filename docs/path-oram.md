@@ -31,6 +31,25 @@ The Lean development states more than it currently proves for Path ORAM:
   `paperMain_privatePosmapV1_noninterference_moduloReleases`), whose
   interface (`pathOramAnySchemeSecurityInterface`) admits the leakage of
   either scheme, since a configuration may mix the two.
+- Those theorems also take the public outcome, boundary schedule, final
+  public-state record, and release functions as premises. For an entrypoint
+  whose kernel program is admitted, the kernel models discharge them
+  (`UOToolchain/PathOramKernelPaperMain.lean`), as on the exact route: the
+  outcome and the final record are the models of the run a configuration
+  denotes (`KernelDenotation`), and the boundary schedule leaves and
+  re-enters the enclave around each of the call's ORAM accesses
+  (`kernelOramBoundarySchedule`). For example, a private-scheme ERC20Lite
+  `transfer` at 256 entries (`h = 11`) reads `balances` twice (11 node
+  accesses each) and writes it twice (a presence get and a put, 11 + 34), so
+  it crosses the boundary 2 × 112 + 2 = 226 times whether it completes or
+  aborts; only the last exit's length, 32 or 0, differs, and the status
+  release erases it. With a bundle,
+  `SeededRuntimePathOramProofBundleOn.paperMain_admittedKernelRun_localPosmapV1_noninterference_moduloReleases`
+  and its private-scheme form leave only the security assumptions and the
+  denotation. The probe checks the runtime's outcomes, boundary schedules,
+  and final records against the models on every Path ORAM experiment run
+  (`outcome_model_matches`, `final_public_state_model_matches` in
+  `results/trace_equivalence.json`).
 - This bundle exists. A runtime pair slice is a bundle that admits the pair's
   two sides (`ConcreteRuntimePathOramPairSlice.toPaperMainBundleOn`), which
   agree on the public projection and differ in their secret inputs

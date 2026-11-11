@@ -75,6 +75,7 @@ const CLAIM_ENTRIES: &[ClaimEntry] = &[
             "proof/lean/UOToolchain/PaperMainReleases.lean",
             "proof/lean/UOToolchain/KernelPaperMain.lean",
             "proof/lean/UOToolchain/KernelAdmission.lean",
+            "proof/lean/UOToolchain/PathOramKernelPaperMain.lean",
         ],
         runtime_compiler_files: &["runtime/uo-evm/src/lib.rs"],
         benchmark_result_files: &[
@@ -151,6 +152,22 @@ const CLAIM_ENTRIES: &[ClaimEntry] = &[
         runtime_compiler_files: &["runtime/uo-evm/src/controller.rs"],
         benchmark_result_files: &["results/bridge_validation.json", "results/capacity_sweep.json"],
         validation_command: "cargo run -q -p mplus-probe -- --only claim-consistency --out-dir results",
+    },
+    ClaimEntry {
+        id: "path-oram-kernel-premises",
+        category: "claim",
+        text: "On both Path ORAM routes, the paper-main theorems' public outcome, boundary schedule, final public-state record and release premises are discharged for entrypoints whose kernel program is admitted, from the same kernel models as on the exact route, given a denotation of the admitted configurations as admitted kernel runs that keeps the public projection; the modeled boundary schedule leaves and re-enters the enclave around each of the call's ORAM accesses, whose number the program and its maps' schemes fix. The runtime's outcomes, boundary schedules and final records are checked against the models on every Path ORAM experiment run, not proved to follow them.",
+        status: STATUS_LEAN_PROVED,
+        doc_anchor: "kernelOramBoundarySchedule",
+        source_files: &["crates/uo-core/src/manifest.rs"],
+        lean_modules: &[
+            "proof/lean/UOToolchain/PathOramKernelPaperMain.lean",
+            "proof/lean/UOToolchain/KernelPaperMain.lean",
+            "proof/lean/UOToolchain/PathOramAdmitted.lean",
+        ],
+        runtime_compiler_files: &["runtime/uo-evm/src/controller.rs"],
+        benchmark_result_files: &["results/trace_equivalence.json", "results/static_checks.json"],
+        validation_command: "cargo run -q -p mplus-probe -- --only trace-equivalence --out-dir results",
     },
     ClaimEntry {
         id: "path-oram-private-avl-map-semantics",
