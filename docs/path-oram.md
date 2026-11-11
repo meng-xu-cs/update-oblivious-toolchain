@@ -181,7 +181,17 @@ The Lean development states more than it currently proves for Path ORAM:
 Open work: replace the flat position map and its keys by an oblivious search
 tree whose nodes hold their children's leaves, so that the position map
 recurses through the tree and an operation reads `O(log n)` paths instead of
-every metadata page.
+every metadata page. The runtime's generated codecs hold that map, which no
+scheme uses yet: an AVL tree of `n` preallocated nodes, the free ones on a
+list, in one Path ORAM tree. A get makes `h` node accesses and a put
+`3h + 1`, where `h` is the largest height of an AVL tree of `n` nodes (16 for
+4096 nodes), whether it inserts, updates, deletes or does nothing; each access
+reads one path, under the node's leaf or a fresh one, and writes it back.
+When an operation ends, the nodes it read get fresh leaves and return to the
+stash, which therefore needs room for `3h + 1` blocks beyond the Path ORAM
+bound. Its tests run it against a reference map on an in-memory bucket store
+and check the tree's shape, its pointers' leaves, the free list and the number
+of paths every operation reads and writes.
 
 ## Current Route
 

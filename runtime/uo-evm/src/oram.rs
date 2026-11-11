@@ -1845,4 +1845,429 @@ mod tests {
             .to_string()
             .contains(&format!("carries leaf {leaf} off its path")));
     }
+
+    mod tree {
+        //! The oblivious AVL map against a reference map, on an in-memory
+        //! bucket store: contents, tree shape, pointers, free list, stash
+        //! bound, and the fixed number of path reads and writes.
+        use super::super::generated_oram_codecs::{
+            bucket_on_leaf_path, clone_tree_node, tree_avl_height, tree_bootstrap_nodes, tree_get,
+            tree_get_accesses, tree_key_lt, tree_place_nodes, tree_put, tree_put_accesses,
+            TreeHeader, TreeLink, TreeNode, TreePathStore, TreeShape, TreeStash,
+        };
+        use anyhow::Result;
+        use rand::{Rng, SeedableRng};
+        use rand_chacha::ChaCha20Rng;
+        use std::collections::BTreeMap;
+        use uo_core::{ScalarType, Type, Value};
+
+        struct MemoryTreeStore {
+            buckets: Vec<Box<[TreeNode]>>,
+            empty: TreeNode,
+            accesses: usize,
+            first_accesses: usize,
+            ended_accesses: usize,
+            ended_operations: usize,
+            reads: usize,
+            writes: usize,
+        }
+
+        impl TreePathStore for MemoryTreeStore {
+            fn begin_access(&mut self, first: bool) -> Result<()> {
+                if first {
+                    self.accesses = 0;
+                    self.first_accesses = 0;
+                    self.ended_accesses = 0;
+                    self.ended_operations = 0;
+                    self.reads = 0;
+                    self.writes = 0;
+                }
+                self.accesses += 1;
+                self.first_accesses += usize::from(first);
+                Ok(())
+            }
+
+            fn load_bucket(&mut self, index: usize, stash: &mut TreeStash) -> Result<()> {
+                self.reads += 1;
+                for slot in self.buckets[index].iter_mut() {
+                    stash.append(slot)?;
+                    *slot = clone_tree_node(&self.empty);
+                }
+                Ok(())
+            }
+
+            fn store_bucket(&mut self, index: usize, blocks: &[TreeNode]) -> Result<()> {
+                self.writes += 1;
+                self.buckets[index] = blocks.iter().map(clone_tree_node).collect();
+                Ok(())
+            }
+
+            fn end_access(&mut self) -> Result<()> {
+                self.ended_accesses += 1;
+                Ok(())
+            }
+
+            fn end_operation(&mut self, _header: &TreeHeader, _stash: &TreeStash) -> Result<()> {
+                self.ended_operations += 1;
+                Ok(())
+            }
+        }
+
+        struct Fixture {
+            shape: TreeShape,
+            store: MemoryTreeStore,
+            stash: TreeStash,
+            header: TreeHeader,
+            levels: usize,
+            rng: ChaCha20Rng,
+        }
+
+        impl Fixture {
+            /// An operation of `accesses` node accesses: each reads and
+            /// writes one path; the first reads the header and the stash and
+            /// the operation writes them once.
+            fn assert_operation_shape(&self, accesses: usize) {
+                let store = &self.store;
+                assert_eq!(store.accesses, accesses);
+                assert_eq!(store.first_accesses, 1);
+                assert_eq!(store.ended_accesses, accesses);
+                assert_eq!(store.ended_operations, 1);
+                assert_eq!(store.reads, accesses * self.levels);
+                assert_eq!(store.writes, accesses * self.levels);
+            }
+        }
+
+        fn key_type() -> Type {
+            Type::Scalar(ScalarType::Address)
+        }
+
+        fn value_type() -> Type {
+            Type::Scalar(ScalarType::Uint(256))
+        }
+
+        /// The Path ORAM stash bound plus the nodes an operation returns.
+        fn default_stash_bound(capacity: usize) -> usize {
+            capacity.clamp(1, 114 + tree_put_accesses(tree_avl_height(capacity)))
+        }
+
+        fn fixture(capacity: usize, seed: u64, stash_bound: usize) -> Fixture {
+            let leaf_count = capacity.max(2).next_power_of_two();
+            let levels = leaf_count.trailing_zeros() as usize + 1;
+            let avl_height = tree_avl_height(capacity);
+            let shape = TreeShape {
+                capacity,
+                leaf_count,
+                blocks_per_bucket: 5,
+                avl_height,
+                stash_bound,
+                key_type: key_type(),
+                value_type: value_type(),
+                key_width: 20,
+            };
+            let empty = TreeNode::empty(&key_type(), &value_type());
+            let working = shape.stash_bound + shape.blocks_per_bucket * levels;
+            let mut stash = TreeStash::with_capacity(shape.stash_bound, working, &empty).unwrap();
+            let mut rng = ChaCha20Rng::seed_from_u64(seed);
+            let mut coins = || Ok(rng.gen_range(0..leaf_count));
+            let (header, nodes) = tree_bootstrap_nodes(&shape, &mut coins).unwrap();
+            let mut buckets: Vec<Box<[TreeNode]>> = (0..2 * leaf_count - 1)
+                .map(|_| (0..5).map(|_| clone_tree_node(&empty)).collect())
+                .collect();
+            tree_place_nodes(&shape, &nodes, &mut buckets, &mut stash).unwrap();
+            Fixture {
+                shape,
+                store: MemoryTreeStore {
+                    buckets,
+                    empty,
+                    accesses: 0,
+                    first_accesses: 0,
+                    ended_accesses: 0,
+                    ended_operations: 0,
+                    reads: 0,
+                    writes: 0,
+                },
+                stash,
+                header,
+                levels,
+                rng,
+            }
+        }
+
+        fn address(byte: u8) -> Value {
+            Value::Address([byte; 20])
+        }
+
+        fn key_bytes(key: &Value) -> Vec<u8> {
+            match key {
+                Value::Address(bytes) => bytes.to_vec(),
+                _ => unreachable!(),
+            }
+        }
+
+        /// Decode every block and check the whole structure.
+        fn check(fixture: &Fixture, expected: &BTreeMap<Vec<u8>, Value>) {
+            let shape = &fixture.shape;
+            let mut nodes: BTreeMap<usize, &TreeNode> = BTreeMap::new();
+            for (index, bucket) in fixture.store.buckets.iter().enumerate() {
+                for block in bucket.iter().filter(|block| block.occupied) {
+                    assert!(
+                        bucket_on_leaf_path(shape.leaf_count, index, block.leaf),
+                        "block {} off its path",
+                        block.id
+                    );
+                    assert!(
+                        nodes.insert(block.id, block).is_none(),
+                        "duplicate block {}",
+                        block.id
+                    );
+                }
+            }
+            for block in fixture
+                .stash
+                .blocks
+                .iter()
+                .take(fixture.stash.persistent)
+                .filter(|block| block.occupied)
+            {
+                assert!(
+                    nodes.insert(block.id, block).is_none(),
+                    "duplicate block {}",
+                    block.id
+                );
+            }
+            assert_eq!(nodes.len(), shape.capacity, "a node block was lost");
+            assert!(
+                fixture.stash.len() <= shape.stash_bound,
+                "stash over its bound"
+            );
+
+            let mut contents = BTreeMap::new();
+            fn walk(
+                nodes: &BTreeMap<usize, &TreeNode>,
+                link: &TreeLink,
+                low: Option<&Value>,
+                high: Option<&Value>,
+                width: usize,
+                contents: &mut BTreeMap<Vec<u8>, Value>,
+            ) -> usize {
+                if !link.present {
+                    return 0;
+                }
+                let node = nodes[&link.id];
+                assert_eq!(
+                    node.leaf, link.leaf,
+                    "pointer to node {} has a stale leaf",
+                    node.id
+                );
+                assert!(node.in_tree, "tree pointer to free node {}", node.id);
+                if let Some(low) = low {
+                    assert!(tree_key_lt(low, &node.key, width).unwrap());
+                }
+                if let Some(high) = high {
+                    assert!(tree_key_lt(&node.key, high, width).unwrap());
+                }
+                let left = walk(nodes, &node.left, low, Some(&node.key), width, contents);
+                let right = walk(nodes, &node.right, Some(&node.key), high, width, contents);
+                assert_eq!(left, node.left.height, "stale left height at {}", node.id);
+                assert_eq!(
+                    right, node.right.height,
+                    "stale right height at {}",
+                    node.id
+                );
+                assert!(left.abs_diff(right) <= 1, "node {} unbalanced", node.id);
+                contents.insert(key_bytes(&node.key), node.value.clone());
+                let height = 1 + left.max(right);
+                assert_eq!(
+                    height, link.height,
+                    "stale height in pointer to {}",
+                    node.id
+                );
+                height
+            }
+            let height = walk(
+                &nodes,
+                &fixture.header.root,
+                None,
+                None,
+                shape.key_width,
+                &mut contents,
+            );
+            assert!(height <= shape.avl_height);
+            assert_eq!(
+                &contents, expected,
+                "contents differ from the reference map"
+            );
+            assert_eq!(fixture.header.size, expected.len());
+
+            let mut free = 0usize;
+            let mut link = fixture.header.free.duplicate();
+            while link.present {
+                let node = nodes[&link.id];
+                assert_eq!(
+                    node.leaf, link.leaf,
+                    "free-list pointer to {} is stale",
+                    node.id
+                );
+                assert!(!node.in_tree, "free list reaches tree node {}", node.id);
+                free += 1;
+                assert!(free <= shape.capacity, "free list cycles");
+                link = node.left.duplicate();
+            }
+            assert_eq!(free + expected.len(), shape.capacity);
+        }
+
+        /// Run random operations against a reference map, checking the whole
+        /// structure after each. Returns at the first operation that reports
+        /// a failure, which only `failure_allowed` permits; reports whether
+        /// one did.
+        fn run_with(
+            capacity: usize,
+            seed: u64,
+            operations: usize,
+            stash_bound: usize,
+            failure_allowed: bool,
+        ) -> bool {
+            let mut fixture = fixture(capacity, seed, stash_bound);
+            let mut expected = BTreeMap::new();
+            let key_space = (2 * capacity + 3).min(250) as u8;
+            let leaf_count = fixture.shape.leaf_count;
+            let get_accesses = tree_get_accesses(fixture.shape.avl_height);
+            let put_accesses = tree_put_accesses(fixture.shape.avl_height);
+            for _ in 0..operations {
+                let key = address(fixture.rng.gen_range(1..=key_space));
+                let roll: f64 = fixture.rng.gen();
+                let mut coin_rng = ChaCha20Rng::seed_from_u64(fixture.rng.gen());
+                let mut coins = || Ok(coin_rng.gen_range(0..leaf_count));
+                if roll < 0.3 {
+                    let (value, failed) = tree_get(
+                        &fixture.shape,
+                        &mut fixture.store,
+                        &mut fixture.stash,
+                        &mut fixture.header,
+                        &key,
+                        &mut coins,
+                    )
+                    .unwrap();
+                    if failed {
+                        assert!(failure_allowed, "a get failed");
+                        return true;
+                    }
+                    let want = expected
+                        .get(&key_bytes(&key))
+                        .cloned()
+                        .unwrap_or_else(|| Value::uint(0));
+                    assert_eq!(value, want);
+                    fixture.assert_operation_shape(get_accesses);
+                } else {
+                    let value = if roll < 0.55 {
+                        Value::uint(0)
+                    } else {
+                        Value::uint(fixture.rng.gen_range(1..1000u64))
+                    };
+                    let apply = fixture.rng.gen::<f64>() < 0.9;
+                    let (overflow, failed) = tree_put(
+                        &fixture.shape,
+                        &mut fixture.store,
+                        &mut fixture.stash,
+                        &mut fixture.header,
+                        &key,
+                        &value,
+                        apply,
+                        &mut coins,
+                    )
+                    .unwrap();
+                    if failed {
+                        assert!(failure_allowed, "a put failed");
+                        return true;
+                    }
+                    fixture.assert_operation_shape(put_accesses);
+                    let present = expected.contains_key(&key_bytes(&key));
+                    let zero = value == Value::uint(0);
+                    let full = expected.len() >= capacity;
+                    assert_eq!(overflow, apply && !present && !zero && full);
+                    if apply {
+                        if zero {
+                            expected.remove(&key_bytes(&key));
+                        } else if present || !full {
+                            expected.insert(key_bytes(&key), value);
+                        }
+                    }
+                }
+                check(&fixture, &expected);
+            }
+            false
+        }
+
+        fn run(capacity: usize, seed: u64, operations: usize) {
+            run_with(
+                capacity,
+                seed,
+                operations,
+                default_stash_bound(capacity),
+                false,
+            );
+        }
+
+        #[test]
+        fn tree_avl_height_matches_fibonacci_bound() {
+            for (capacity, height) in [
+                (1, 1),
+                (2, 2),
+                (4, 3),
+                (16, 5),
+                (64, 8),
+                (256, 11),
+                (4096, 16),
+                (16384, 19),
+            ] {
+                assert_eq!(tree_avl_height(capacity), height, "capacity {capacity}");
+            }
+        }
+
+        #[test]
+        fn tree_key_order_is_big_endian() {
+            let low = Value::Address([0x10; 20]);
+            let mut high_bytes = [0x10; 20];
+            high_bytes[19] = 0x11;
+            let high = Value::Address(high_bytes);
+            assert!(tree_key_lt(&low, &high, 20).unwrap());
+            assert!(!tree_key_lt(&high, &low, 20).unwrap());
+            assert!(!tree_key_lt(&low, &low, 20).unwrap());
+        }
+
+        #[test]
+        fn tree_map_matches_a_reference_map() {
+            for capacity in [1, 2, 3, 5, 8] {
+                for seed in 0..3 {
+                    run(capacity, seed, 60);
+                }
+            }
+        }
+
+        #[test]
+        fn tree_map_of_16_nodes_matches_a_reference_map() {
+            for seed in 0..3 {
+                run(16, seed, 60);
+            }
+        }
+
+        #[test]
+        fn tree_map_of_33_nodes_matches_a_reference_map() {
+            run(33, 0, 40);
+        }
+
+        #[test]
+        fn tree_map_with_a_stash_smaller_than_the_map_matches_a_reference_map() {
+            // 40 nodes and a stash of 30 blocks: room for the 22 nodes a put
+            // may return to it and a few more, as the 114 + 3h + 1 bound
+            // leaves room for those nodes above Path ORAM's 114.
+            assert!(!run_with(40, 7, 40, 30, false));
+        }
+
+        #[test]
+        fn tree_map_reports_a_stash_overflow() {
+            // A stash of two blocks cannot take back the nodes a put reads.
+            assert!(run_with(16, 3, 40, 2, true));
+        }
+    }
 }
