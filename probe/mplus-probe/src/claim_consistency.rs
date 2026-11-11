@@ -2,12 +2,12 @@
 //!
 //! The Path ORAM claim language must agree across README, the topic docs, the
 //! Lean proof-grade root, and the Rust admission surface. Both schemes have
-//! Lean instances, derived the same way, and share one data path: a flat
-//! position map in encrypted metadata pages that every access scans in full.
-//! `path_oram_private_posmap_v1` lifts the local scheme's capacity cap but has
-//! no recursive position map, so no doc may present it as recursive or as
-//! sublinear in the map's capacity, and every doc that mentions it must say
-//! that it has no recursive position map.
+//! Lean instances. `path_oram_local_posmap_v1` keeps a flat position map in
+//! encrypted metadata pages that every access scans in full, so no doc may
+//! present it as recursive or as sublinear in the map's capacity.
+//! `path_oram_private_posmap_v1` keeps the map as an oblivious AVL tree whose
+//! nodes hold their children's leaves, so its position map recurses through
+//! the tree, and every doc must say so.
 //!
 //! This probe fails closed: any disagreement drives `accepted: false`.
 
@@ -51,13 +51,13 @@ fn check(name: &str, ok: bool, detail: impl Into<String>) -> Check {
     }
 }
 
-/// A line that presents the private-posmap scheme as a recursive position map
-/// or as sublinear in the map's capacity. The runtime has no recursive
-/// position map, so any such line overclaims; a line that negates it ("no
-/// recursive position map", "not sublinear") is a status note.
-fn promotes_private_scheme(doc: &str) -> Option<String> {
+/// A line that presents the local-posmap scheme as a recursive position map
+/// or as sublinear in the map's capacity. Its position map is flat, so any
+/// such line overclaims; a line that negates it ("no recursive position
+/// map", "not sublinear") is a status note.
+fn promotes_local_scheme(doc: &str) -> Option<String> {
     for line in doc.lines() {
-        if !line.contains(PRIVATE_SCHEME) {
+        if !line.contains(LOCAL_SCHEME) {
             continue;
         }
         let lowered = line.to_lowercase();
@@ -67,7 +67,7 @@ fn promotes_private_scheme(doc: &str) -> Option<String> {
         for marker in ["recursive", "sublinear", "polylogarithmic"] {
             if lowered.contains(marker) {
                 return Some(format!(
-                    "line presents {PRIVATE_SCHEME} as `{marker}`: {line}"
+                    "line presents {LOCAL_SCHEME} as `{marker}`: {line}"
                 ));
             }
         }
@@ -101,26 +101,27 @@ pub fn run_claim_consistency_report() -> Result<JsonValue> {
         ));
     }
 
-    // No doc may present the private-posmap scheme as a recursive position map.
+    // No doc may present the local-posmap scheme as a recursive position map.
     for (name, body) in &docs {
-        match promotes_private_scheme(body) {
+        match promotes_local_scheme(body) {
             Some(detail) => checks.push(check(&format!("{name}:no-promotion"), false, detail)),
             None => checks.push(check(
                 &format!("{name}:no-promotion"),
                 true,
-                format!("{name} does not present {PRIVATE_SCHEME} as a recursive position map"),
+                format!("{name} does not present {LOCAL_SCHEME} as a recursive position map"),
             )),
         }
     }
 
-    // Every doc must state that the runtime has no recursive position map
-    // (compared with whitespace collapsed, so line wrapping does not matter).
+    // Every doc must state that the private scheme's map is an oblivious AVL
+    // tree (compared with whitespace collapsed, so line wrapping does not
+    // matter).
     for (name, body) in &docs {
         let collapsed = body.split_whitespace().collect::<Vec<_>>().join(" ");
         checks.push(check(
-            &format!("{name}:states-no-recursive-position-map"),
-            collapsed.contains("no recursive position map"),
-            format!("{name} states that {PRIVATE_SCHEME} has no recursive position map"),
+            &format!("{name}:states-oblivious-avl-tree"),
+            collapsed.contains("oblivious AVL tree"),
+            format!("{name} states that {PRIVATE_SCHEME} keeps its map as an oblivious AVL tree"),
         ));
     }
 
@@ -186,22 +187,23 @@ mod tests {
     use super::*;
 
     #[test]
-    fn private_scheme_promotion_is_detected() {
-        let doc = format!("The {PRIVATE_SCHEME} route keeps a recursive position map.");
-        assert!(promotes_private_scheme(&doc).is_some());
-        let doc = format!("An access on {PRIVATE_SCHEME} costs sublinear time in the capacity.");
-        assert!(promotes_private_scheme(&doc).is_some());
-        let note = format!("The {PRIVATE_SCHEME} route has no recursive position map.");
-        assert!(promotes_private_scheme(&note).is_none());
-        let note = format!("An access on {PRIVATE_SCHEME} is not sublinear in the capacity.");
-        assert!(promotes_private_scheme(&note).is_none());
+    fn local_scheme_promotion_is_detected() {
+        let doc = format!("The {LOCAL_SCHEME} route keeps a recursive position map.");
+        assert!(promotes_local_scheme(&doc).is_some());
+        let doc = format!("An access on {LOCAL_SCHEME} costs sublinear time in the capacity.");
+        assert!(promotes_local_scheme(&doc).is_some());
+        let note = format!("The {LOCAL_SCHEME} route has no recursive position map.");
+        assert!(promotes_local_scheme(&note).is_none());
+        let note = format!("An access on {LOCAL_SCHEME} is not sublinear in the capacity.");
+        assert!(promotes_local_scheme(&note).is_none());
+        let other = format!("The {PRIVATE_SCHEME} position map recurses through its tree.");
+        assert!(promotes_local_scheme(&other).is_none());
     }
 
     #[test]
     fn per_case_rejection_is_not_a_promotion() {
-        let doc =
-            format!("A multi-access {PRIVATE_SCHEME} entrypoint is rejected at compile time.");
-        assert!(promotes_private_scheme(&doc).is_none());
+        let doc = format!("A {LOCAL_SCHEME} map above capacity 128 is rejected at compile time.");
+        assert!(promotes_local_scheme(&doc).is_none());
     }
 
     #[test]

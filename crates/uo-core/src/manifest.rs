@@ -23,6 +23,67 @@ pub fn path_oram_stash_bound(capacity: usize) -> usize {
     capacity.clamp(1, PATH_ORAM_STASH_BOUND_LIMIT)
 }
 
+/// The private scheme keeps a map as an AVL tree of `capacity` nodes in one
+/// Path ORAM tree. This is the largest height of an AVL tree of `capacity`
+/// nodes, counted in nodes: the largest `h` whose smallest AVL tree,
+/// `F(h + 2) - 1` nodes, fits, and at least 1.
+pub fn path_oram_tree_avl_height(capacity: usize) -> usize {
+    let mut fib_prev = 1usize; // F(h + 1)
+    let mut fib = 2usize; // F(h + 2), from h = 1
+    let mut height = 0usize;
+    while fib - 1 <= capacity {
+        height += 1;
+        let next = fib.saturating_add(fib_prev);
+        fib_prev = fib;
+        fib = next;
+    }
+    height.max(1)
+}
+
+/// The node accesses of a get on the private scheme's tree: one per level.
+pub fn path_oram_tree_get_accesses(capacity: usize) -> usize {
+    path_oram_tree_avl_height(capacity)
+}
+
+/// The node accesses of a put on the private scheme's tree: one per level
+/// to walk, one to pop the free list, and two per level to rebalance.
+pub fn path_oram_tree_put_accesses(capacity: usize) -> usize {
+    3 * path_oram_tree_avl_height(capacity) + 1
+}
+
+/// The private scheme's stash bound: the Path ORAM bound plus the nodes an
+/// operation returns to the stash when it ends, and at most the capacity.
+pub fn path_oram_tree_stash_bound(capacity: usize) -> usize {
+    capacity.clamp(
+        1,
+        PATH_ORAM_STASH_BOUND_LIMIT + path_oram_tree_put_accesses(capacity),
+    )
+}
+
+/// The bytes of one node block of the private scheme's tree: the flags, the
+/// node's id and leaf, its key and value, and each child's id, leaf and
+/// subtree height.
+pub fn path_oram_tree_node_block_size(key_bytes: usize, value_bytes: usize) -> usize {
+    1 + 8 + 8 + key_bytes + value_bytes + 2 * (8 + 8 + 1)
+}
+
+/// The ORAM accesses one map operation makes. An access to a local- or
+/// surrogate-scheme map is one access. On the private scheme a get makes a
+/// get's node accesses, and a put makes a get's to find whether the key is
+/// present and a put's when the call commits.
+pub fn oram_accesses_per_map_operation(scheme: &str, capacity: usize, is_put: bool) -> usize {
+    if scheme == PATH_ORAM_PRIVATE_POSMAP_SCHEME {
+        let get = path_oram_tree_get_accesses(capacity);
+        if is_put {
+            get + path_oram_tree_put_accesses(capacity)
+        } else {
+            get
+        }
+    } else {
+        1
+    }
+}
+
 pub fn is_path_oram_scheme(scheme: &str) -> bool {
     scheme == PATH_ORAM_SCHEME || scheme == PATH_ORAM_PRIVATE_POSMAP_SCHEME
 }
@@ -258,12 +319,13 @@ impl OramManifest {
                     accesses_per_call: 1,
                 })
             }
-            scheme @ (PATH_ORAM_SCHEME | PATH_ORAM_PRIVATE_POSMAP_SCHEME) => {
-                if scheme == PATH_ORAM_SCHEME && capacity > PATH_ORAM_LOCAL_POSMAP_MAX_CAPACITY {
+            PATH_ORAM_SCHEME => {
+                if capacity > PATH_ORAM_LOCAL_POSMAP_MAX_CAPACITY {
                     bail!(
-                        "{} supports capacities up to {} in the current proof-grade route; use a recursive/private position map before admitting capacity {}",
+                        "{} supports capacities up to {} in the current proof-grade route; use {} before admitting capacity {}",
                         PATH_ORAM_SCHEME,
                         PATH_ORAM_LOCAL_POSMAP_MAX_CAPACITY,
+                        PATH_ORAM_PRIVATE_POSMAP_SCHEME,
                         capacity
                     );
                 }
@@ -276,18 +338,40 @@ impl OramManifest {
                 let stash_pages = stash_bound.div_ceil(8);
                 let metadata_pages = position_map_pages + stash_pages;
                 Ok(Self {
-                    scheme: scheme.into(),
+                    scheme: PATH_ORAM_SCHEME.into(),
                     block_size,
                     bucket_size: 24 + blocks_per_bucket * block_size,
                     bucket_count: 2 * leaf_count - 1,
                     blocks_per_bucket,
                     tree_height,
                     stash_bound,
-                    recursion_depth: if scheme == PATH_ORAM_PRIVATE_POSMAP_SCHEME {
-                        1
-                    } else {
-                        0
-                    },
+                    recursion_depth: 0,
+                    metadata_pages,
+                    metadata_pages_per_access: metadata_pages + 1,
+                    buckets_per_access: tree_height + 1,
+                    accesses_per_call: 1,
+                })
+            }
+            PATH_ORAM_PRIVATE_POSMAP_SCHEME => {
+                // An AVL tree of `capacity` nodes in one Path ORAM tree: the
+                // metadata is a header page (the root, the free list's head,
+                // the size) and the stash pages.
+                let leaf_count = capacity.max(2).next_power_of_two();
+                let tree_height = log2_ceil(leaf_count);
+                let block_size = path_oram_tree_node_block_size(key_bytes, value_bytes);
+                let blocks_per_bucket = 5usize;
+                let stash_bound = path_oram_tree_stash_bound(capacity);
+                let stash_pages = stash_bound.div_ceil(8);
+                let metadata_pages = 1 + stash_pages;
+                Ok(Self {
+                    scheme: PATH_ORAM_PRIVATE_POSMAP_SCHEME.into(),
+                    block_size,
+                    bucket_size: 24 + blocks_per_bucket * block_size,
+                    bucket_count: 2 * leaf_count - 1,
+                    blocks_per_bucket,
+                    tree_height,
+                    stash_bound,
+                    recursion_depth: 1,
                     metadata_pages,
                     metadata_pages_per_access: metadata_pages + 1,
                     buckets_per_access: tree_height + 1,
@@ -371,7 +455,15 @@ impl OramManifest {
                 if !leaf_count.is_power_of_two() {
                     bail!("path ORAM leaf count must be a power of two");
                 }
-                if self.stash_bound != path_oram_stash_bound(capacity) {
+                if self.scheme == PATH_ORAM_PRIVATE_POSMAP_SCHEME {
+                    if self.stash_bound != path_oram_tree_stash_bound(capacity) {
+                        bail!(
+                            "{} stash_bound must equal min(max(capacity, 1), {} + 3h + 1), h the AVL height of the capacity",
+                            PATH_ORAM_PRIVATE_POSMAP_SCHEME,
+                            PATH_ORAM_STASH_BOUND_LIMIT
+                        );
+                    }
+                } else if self.stash_bound != path_oram_stash_bound(capacity) {
                     bail!(
                         "path ORAM stash_bound must equal min(max(capacity, 1), {})",
                         PATH_ORAM_STASH_BOUND_LIMIT

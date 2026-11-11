@@ -1,5 +1,6 @@
 import UOToolchain.CompilerInvariant
 import UOToolchain.IRSemantics
+import UOToolchain.PathOramTreeShape
 
 namespace UOToolchain
 
@@ -60,7 +61,8 @@ def surrogateOramScheme : String := "surrogate_public_schedule_v1"
 def pathOramScheme : String := "path_oram_local_posmap_v1"
 def privatePathOramScheme : String := "path_oram_private_posmap_v1"
 
-/-- The two Path ORAM schemes, which share one runtime data path. -/
+/-- The two Path ORAM schemes: a flat position map (local) and an oblivious
+AVL tree whose nodes hold their children's leaves (private). -/
 def isPathOramScheme (scheme : String) : Bool :=
   scheme == pathOramScheme || scheme == privatePathOramScheme
 def surrogateOramBlocksPerBucket : Nat := 2
@@ -76,6 +78,13 @@ def pathOramStashBoundLimit : Nat := 114
 larger than the limit cannot overflow its stash. -/
 def pathOramStashBound (capacity : Nat) : Nat :=
   min (max capacity 1) pathOramStashBoundLimit
+
+/-- The private scheme's stash bound: an operation of its AVL map returns
+the nodes it read, up to a put's `pathOramTreePutAccesses`, to the stash when
+it ends, so the stash bound is the Path ORAM limit plus those nodes, and at
+most the capacity. -/
+def pathOramTreeStashBound (capacity : Nat) : Nat :=
+  pathOramTreeStashBoundWith pathOramStashBoundLimit capacity
 
 structure OramPublicData where
   witness : OramEntrypointWitness
@@ -164,7 +173,7 @@ def WellFormedPrivatePathOramObject (object : OramObjectManifest) : Prop :=
   object.blocksPerBucket = pathOramBlocksPerBucket ∧
   object.bucketSize = oramBucketHeaderBytes + object.blocksPerBucket * object.blockSize ∧
   0 < object.bucketCount ∧
-  object.stashBound = pathOramStashBound object.capacity ∧
+  object.stashBound = pathOramTreeStashBound object.capacity ∧
   object.recursionDepth = 1 ∧
   object.metadataPagesPerAccess = object.metadataPages + 1 ∧
   object.bucketsPerAccess = object.treeHeight + 1 ∧
@@ -175,9 +184,8 @@ def WellFormedOramObject (object : OramObjectManifest) : Prop :=
     WellFormedPathOramObject object ∨
     WellFormedPrivatePathOramObject object
 
-/-- A Path ORAM object of either scheme. The local and private position-map
-schemes share one runtime data path, so both admit several accesses per call;
-only the surrogate scheme is single-access. -/
+/-- A Path ORAM object of either scheme. Both admit several accesses per
+call; only the surrogate scheme is single-access. -/
 def WellFormedAnyPathOramObject (object : OramObjectManifest) : Prop :=
   WellFormedPathOramObject object ∨ WellFormedPrivatePathOramObject object
 

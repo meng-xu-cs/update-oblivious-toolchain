@@ -82,6 +82,12 @@ pub struct AllocatorPlan {
     pub max_stack_words: usize,
     pub scratch_bytes: usize,
     pub max_kernel_ops: usize,
+    /// The entrypoint's commit operations (the manifest's `max_commit_ops`):
+    /// on an ORAM map the pages and buckets its accesses write, each of which
+    /// an access also opens or seals at most once more, so the call's ORAM
+    /// work reserves and wipes scratch at most four times per operation.
+    #[serde(default)]
+    pub max_commit_ops: usize,
 }
 
 impl AllocatorPlan {
@@ -91,6 +97,7 @@ impl AllocatorPlan {
             max_stack_words,
             scratch_bytes: arena_bytes / 4,
             max_kernel_ops: 0,
+            max_commit_ops: 0,
         }
     }
 
@@ -108,6 +115,7 @@ impl AllocatorPlan {
         } else {
             canonical_kernel_steps.len()
         };
+        plan.max_commit_ops = entry.max_commit_ops;
         plan
     }
 }
@@ -265,6 +273,7 @@ fn resource_event_capacity(plan: &AllocatorPlan) -> usize {
         .saturating_add(plan.max_stack_words)
         .saturating_mul(128)
         .saturating_add(128)
+        .saturating_add(plan.max_commit_ops.saturating_mul(4))
 }
 
 fn runtime_kernel_region(region: ScratchRegion) -> RuntimeKernelScratchRegionWitness {
@@ -422,6 +431,7 @@ mod tests {
             max_stack_words: 64,
             scratch_bytes: 1024,
             max_kernel_ops: 1,
+            max_commit_ops: 0,
         })
         .unwrap();
         session.record_kernel_op().unwrap();
@@ -435,6 +445,7 @@ mod tests {
             max_stack_words: 64,
             scratch_bytes: 1024,
             max_kernel_ops: 4,
+            max_commit_ops: 0,
         })
         .unwrap();
         session
@@ -450,6 +461,7 @@ mod tests {
             max_stack_words: 64,
             scratch_bytes: 1024,
             max_kernel_ops: 4,
+            max_commit_ops: 0,
         })
         .unwrap();
         session.record_kernel_op().unwrap();
@@ -469,6 +481,7 @@ mod tests {
             max_stack_words: 64,
             scratch_bytes: 1024,
             max_kernel_ops: 4,
+            max_commit_ops: 0,
         })
         .unwrap();
         {

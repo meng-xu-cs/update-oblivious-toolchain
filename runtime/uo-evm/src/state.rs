@@ -398,6 +398,7 @@ impl ContractRuntime {
                 max_stack_words: 64,
                 scratch_bytes: 1024,
                 max_kernel_ops: 16,
+                max_commit_ops: 0,
             },
             &[],
         )?;
@@ -858,6 +859,7 @@ fn public_state_snapshot_allocator() -> Result<AllocatorSession> {
         max_stack_words: 0,
         scratch_bytes: 1 << 20,
         max_kernel_ops: 0,
+        max_commit_ops: 0,
     })
 }
 

@@ -251,6 +251,7 @@ theorem ImportedProofRelevantManifestObjectView.exists_oramObjectManifest_of_val
             · exact hEq
             · simp [validateImportedOramShape, hOram, hPathScheme, hEq,
                 translationSurrogateOramScheme, translationPathOramScheme,
+                translationPathOramPrivatePosmapScheme,
                 translationIsPathOramScheme, translationPathOramPositionMapShapeWellFormed] at hShape
           have hBucketSize :
               oram.bucket_size =
@@ -261,12 +262,14 @@ theorem ImportedProofRelevantManifestObjectView.exists_oramObjectManifest_of_val
             · exact hEq
             · simp [validateImportedOramShape, hOram, hPathScheme, hEq,
                 translationSurrogateOramScheme, translationPathOramScheme,
+                translationPathOramPrivatePosmapScheme,
                 translationIsPathOramScheme, translationPathOramPositionMapShapeWellFormed] at hShape
           have hBucketCount : 0 < oram.bucket_count := by
             by_cases hPos : 0 < oram.bucket_count
             · exact hPos
             · simp [validateImportedOramShape, hOram, hPathScheme, hPos,
                 translationSurrogateOramScheme, translationPathOramScheme,
+                translationPathOramPrivatePosmapScheme,
                 translationIsPathOramScheme, translationPathOramPositionMapShapeWellFormed] at hShape
           have hStashBound :
               oram.stash_bound = translationPathOramStashBound (stateObject.capacity.getD 1) := by
@@ -274,12 +277,14 @@ theorem ImportedProofRelevantManifestObjectView.exists_oramObjectManifest_of_val
             · exact hEq
             · simp [validateImportedOramShape, hOram, hPathScheme, hEq,
                 translationSurrogateOramScheme, translationPathOramScheme,
+                translationPathOramPrivatePosmapScheme,
                 translationIsPathOramScheme, translationPathOramPositionMapShapeWellFormed] at hShape
           have hRecursionDepth : oram.recursion_depth = 0 := by
             by_cases hEq : oram.recursion_depth = 0
             · exact hEq
             · simp [validateImportedOramShape, hOram, hPathScheme, hEq,
                 translationSurrogateOramScheme, translationPathOramScheme,
+                translationPathOramPrivatePosmapScheme,
                 translationIsPathOramScheme, translationPathOramPositionMapShapeWellFormed] at hShape
           have hMetadataPagesPerAccess :
               oram.metadata_pages_per_access = oram.metadata_pages + 1 := by
@@ -287,6 +292,7 @@ theorem ImportedProofRelevantManifestObjectView.exists_oramObjectManifest_of_val
             · exact hEq
             · simp [validateImportedOramShape, hOram, hPathScheme, hEq,
                 translationSurrogateOramScheme, translationPathOramScheme,
+                translationPathOramPrivatePosmapScheme,
                 translationIsPathOramScheme, translationPathOramPositionMapShapeWellFormed] at hShape
           have hBucketsPerAccess :
               oram.buckets_per_access = oram.tree_height + 1 := by
@@ -294,12 +300,14 @@ theorem ImportedProofRelevantManifestObjectView.exists_oramObjectManifest_of_val
             · exact hEq
             · simp [validateImportedOramShape, hOram, hPathScheme, hEq,
                 translationSurrogateOramScheme, translationPathOramScheme,
+                translationPathOramPrivatePosmapScheme,
                 translationIsPathOramScheme, translationPathOramPositionMapShapeWellFormed] at hShape
           have hAccessesPerCall : oram.accesses_per_call = 1 := by
             by_cases hEq : oram.accesses_per_call = 1
             · exact hEq
             · simp [validateImportedOramShape, hOram, hPathScheme, hEq,
                 translationSurrogateOramScheme, translationPathOramScheme,
+                translationPathOramPrivatePosmapScheme,
                 translationIsPathOramScheme, translationPathOramPositionMapShapeWellFormed] at hShape
           have hWellFormedPath :
               WellFormedPathOramObject
@@ -391,8 +399,8 @@ theorem ImportedProofRelevantManifestObjectView.exists_oramObjectManifest_of_val
                   translationPathOramPrivatePosmapScheme, translationIsPathOramScheme,
                   translationPathOramPositionMapShapeWellFormed] at hShape
             have hStashBound :
-                oram.stash_bound = translationPathOramStashBound (stateObject.capacity.getD 1) := by
-              by_cases hEq : oram.stash_bound = translationPathOramStashBound (stateObject.capacity.getD 1)
+                oram.stash_bound = translationPathOramTreeStashBound (stateObject.capacity.getD 1) := by
+              by_cases hEq : oram.stash_bound = translationPathOramTreeStashBound (stateObject.capacity.getD 1)
               · exact hEq
               · simp [validateImportedOramShape, hOram, hPrivateScheme, hEq,
                   translationSurrogateOramScheme, translationPathOramScheme,
@@ -452,9 +460,9 @@ theorem ImportedProofRelevantManifestObjectView.exists_oramObjectManifest_of_val
                 , privatePathOramScheme
                 , translationOramBucketHeaderBytes
                 , oramBucketHeaderBytes
-                , pathOramStashBound
+                , pathOramTreeStashBound
                 , pathOramStashBoundLimit
-                , translationPathOramStashBound
+                , translationPathOramTreeStashBound
                 , translationPathOramStashBoundLimit
                 , hPrivateScheme
                 ] using

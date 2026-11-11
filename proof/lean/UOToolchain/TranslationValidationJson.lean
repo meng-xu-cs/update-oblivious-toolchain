@@ -1,5 +1,6 @@
 import Lean.Data.Json
 import UOToolchain.RuntimeKernelDslJson
+import UOToolchain.PathOramTreeShape
 
 open Lean
 
@@ -894,6 +895,11 @@ def translationPathOramStashBoundLimit : Nat := 114
 def translationPathOramStashBound (capacity : Nat) : Nat :=
   min (max capacity 1) translationPathOramStashBoundLimit
 
+/-- The private scheme's stash bound (`pathOramTreeStashBound`): the limit
+plus the nodes an operation of its AVL map returns to the stash. -/
+def translationPathOramTreeStashBound (capacity : Nat) : Nat :=
+  pathOramTreeStashBoundWith translationPathOramStashBoundLimit capacity
+
 def translationSurrogateOramScheme : String := "surrogate_public_schedule_v1"
 
 def translationOramBucketHeaderBytes : Nat := 24
@@ -963,6 +969,19 @@ private def log2Ceil (value : Nat) : Nat :=
 
 private def totalCommitOps (oram : ImportedProofRelevantOramView) : Nat :=
   oram.metadata_pages_per_access + oram.buckets_per_access
+
+/-- The ORAM accesses one map operation makes (`isPut`: a write): one, or on
+the private scheme a get's node accesses of its AVL map, and for a write
+also a put's, made when the call commits. -/
+def translationOramAccessesPerMapOperation
+  (object : ImportedProofRelevantStateObjectView)
+  (isPut : Bool) : Nat :=
+  if object.oram_scheme == translationPathOramPrivatePosmapScheme then
+    let capacity := object.capacity.getD 0
+    pathOramTreeGetAccesses capacity +
+      (if isPut then pathOramTreePutAccesses capacity else 0)
+  else
+    1
 
 mutual
 
@@ -1102,7 +1121,7 @@ private partial def collectOramExprAccesses
     match stateObjectById? state objectId with
     | some object =>
         if object.backend == "oram" then
-          pure <| addPairCount objectId 1 keyCounts
+          pure <| addPairCount objectId (translationOramAccessesPerMapOperation object false) keyCounts
         else
           pure keyCounts
     | none => throw s!"unknown object id {objectId}"
@@ -1200,7 +1219,7 @@ private partial def collectOramStatementAccesses
         let counts :=
           mergePairCounts (mergePairCounts keyCounts valueCounts) predicateCounts
         if object.backend == "oram" then
-          pure <| addPairCount objectId 1 counts
+          pure <| addPairCount objectId (translationOramAccessesPerMapOperation object true) counts
         else
           pure counts
     | none => throw s!"unknown object id {objectId}"
@@ -1846,7 +1865,11 @@ def validateImportedOramShape
             oram.blocks_per_bucket == 5 &&
             oram.bucket_size ==
               translationOramBucketHeaderBytes + oram.blocks_per_bucket * oram.block_size &&
-            oram.stash_bound == translationPathOramStashBound (stateObject.capacity.getD 1) &&
+            oram.stash_bound ==
+              (if oram.scheme == translationPathOramPrivatePosmapScheme then
+                translationPathOramTreeStashBound (stateObject.capacity.getD 1)
+              else
+                translationPathOramStashBound (stateObject.capacity.getD 1)) &&
             oram.tree_height == log2Ceil leafCount &&
             oram.bucket_count == 2 * leafCount - 1 &&
             oram.metadata_pages_per_access == oram.metadata_pages + 1 &&
@@ -1914,7 +1937,7 @@ private def privateOverCapacityPathOramManifestForCheck : ImportedProofRelevantM
       , bucket_count := 511
       , blocks_per_bucket := 5
       , tree_height := 8
-      , stash_bound := translationPathOramStashBound (translationPathOramLocalPosmapMaxCapacity + 1)
+      , stash_bound := translationPathOramTreeStashBound (translationPathOramLocalPosmapMaxCapacity + 1)
       , recursion_depth := 1
       , metadata_pages := 1
       , metadata_pages_per_access := 2

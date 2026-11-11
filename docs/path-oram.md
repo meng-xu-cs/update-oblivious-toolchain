@@ -60,44 +60,75 @@ The Lean development states more than it currently proves for Path ORAM:
   added the 382 buckets of the two maps.
   `results/overheads.json` reports the call-start reads next to the traced
   counts of every ORAM row (`call_start_reads`, `call_start_bytes`,
-  `physical_reads_with_call_start`, `bytes_read_with_call_start`). Every
-  access still rewrites every metadata page (the flat position map with its
-  keys, linear in the capacity, and the stash, at most 15 pages), and its
-  trace reads them all, so an access's cost stays linear in the capacity.
-  `results/overheads.json` also runs ERC20Lite `transferFrom` with a
-  4096-entry `balances` map on the private scheme
-  (`oram_private_posmap_4096`): 2,244 traced reads (2.6 MB) against 308
-  (347 KB) at capacity 256. A larger flat map does not fit the per-call
-  allocator bounds, which are sized from the kernel steps, not from the
-  map's pages.
+  `physical_reads_with_call_start`, `bytes_read_with_call_start`). On the
+  local scheme every access still rewrites every metadata page (the flat
+  position map with its keys, linear in the capacity, and the stash, at most
+  15 pages), and its trace reads them all, so an access's cost grows linearly
+  with the capacity; the scheme is capped at 128. The private scheme's
+  accesses are those of its AVL map (below).
 - The stash bound is the capacity capped at 114 (`pathOramStashBound`). By
   the Path ORAM stash theorem the stash then overflows after an access with
   probability at most `14 · 0.6002^114 < 2^-80`, which `stashOverflowBounded`
   assumes; an overflow fails the access in band and aborts the call. A map of
   capacity at most 114 keeps a stash as large as itself and cannot overflow.
+  The private scheme's AVL map holds the nodes an operation reads in the
+  enclave until the operation ends and then returns them to the stash (the
+  deferred write-back of Wang et al., Oblivious Data Structures, CCS 2014),
+  so its stash bound adds a put's `3h + 1` node accesses to the limit:
+  `min(max(capacity, 1), 114 + 3h + 1)` (`pathOramTreeStashBound`; 148 at
+  capacity 256, 172 at 16384). That the stash then holds at most 114 blocks
+  besides those nodes, with the same tail, is part of what
+  `stashOverflowBounded` assumes: the stash theorem is stated for one access
+  at a time, not for operations that hold their nodes until they end.
 - Calls that abort run on both schemes (`results/abort_rollback.json`). A
   map write makes no ORAM access during the call: it is held in the enclave
   with the call's other writes, and it updates a pending view of the map's
   directory, which decides whether the write overflows the map (a write of a
-  new key to a full map aborts the call, as on the full-scan route). A later
+  new key to a full map aborts the call, as on the full-scan route); on the
+  private scheme a write instead makes a get, which finds whether the key is
+  present, and the map's size with the call's pending writes applied
+  decides. A later
   read in the call returns the value of the call's last write to its key, if
   there is one, and otherwise the value its access read. At commit each write makes
   one ORAM access, with the write masked off if the call aborted, so an
   aborted call makes the same accesses as a committed one and nothing is
   rolled back; its reads only remapped keys. Restoring the pre-call storage
   instead would leave the touched keys on the leaves the host just saw.
-- `path_oram_private_posmap_v1` executes, including several accesses to one
-  map per call, and the admitted route covers it (below). The runtime has no
-  recursive position map; both schemes share one data path, a flat position
-  map in encrypted metadata pages that every access scans in full, so an
-  access to a capacity-256 map reads 47 metadata pages (32 of leaves and keys,
-  15 of stash) and 9 buckets. The
-  private scheme differs from the local one in its tag, its recursion-depth
-  field (1) and the capacity it admits, not in what an access does or what
-  the trace shows. Every access remaps the key it touches to a fresh leaf,
-  including a masked write that leaves the key unchanged (a write under a
-  false predicate), so the next access to the key reads an independent path.
-  The Lean runtime-witness checkers accept the private scheme's events.
+- `path_oram_private_posmap_v1` keeps a map as an oblivious AVL tree in one
+  Path ORAM tree (the tree section of `generated_oram_codecs.rs`): `n`
+  preallocated nodes, the free ones on a list, each node one block that holds
+  its key and value and its children's ids, leaves and subtree heights. The
+  position map recurses through the tree: the first metadata page holds the
+  root's leaf, the free list's head and the size, and every other node's leaf
+  is in its parent (a free node's in the previous free node). A get makes `h`
+  node accesses and a put `3h + 1`, `h` the largest height of an AVL tree of
+  `n` nodes (11 for 256 nodes, 16 for 4096, 19 for 16384), whether the put
+  inserts, updates, deletes or does nothing; every choice is masked. Each
+  node access is one ORAM access: it reads and rewrites the access counter and
+  one path, a node's under its leaf or a fresh leaf's, and evicts the path
+  before writing it back; an operation's first access also reads the
+  metadata pages (the header and the stash pages) and its last writes them.
+  When an operation ends, each node it read takes the coin of the access that
+  read it as its new leaf, every pointer to it is fixed, and the nodes return
+  to the stash. A map read makes a get, and a map write a get that finds
+  whether the key is present and a put at commit. The manifest counts these
+  node accesses as the entrypoint's ORAM accesses, and the logical-trace
+  checks accept a private-scheme access with all the metadata pages or none
+  (`consumeOramAccessMetadataEvents`). Every access remaps what it touches
+  to a fresh leaf: on the local scheme the key, including under a masked write
+  that leaves it unchanged (a write under a false predicate), on the private
+  scheme every node the operation reads.
+- What the tree costs: ERC20Lite `transferFrom` with its `balances` map on
+  the private scheme makes 112 node accesses at capacity 256 (two gets of
+  11, two writes of 11 + 34), 1,320 traced reads (1.46 MB) in all where the
+  flat position map it replaces made 308 (347 KB); at capacity 4096, 2,480
+  reads (2.73 MB) against the flat map's 2,244 (2.6 MB); at capacity 16384
+  (`oram_private_posmap_16384`), 3,290 reads (3.63 MB), where a flat position
+  map is 2,048 pages read and rewritten on every access. The tree's cost grows
+  with the square of the logarithm of the capacity and the flat map's
+  linearly; the tree costs more below a few thousand entries and less above.
+  The per-call allocator event log grows with the call's ORAM commit
+  operations (`max_commit_ops`), so these large maps fit it.
 - `UOToolchain/PathOramFreshLeaves.lean` proves, without enumerating seeds,
   that one map's leaf schedule does not depend on the accesses. Take any `n`
   accesses (hits, misses, inserts, updates, deletes, masked writes, on any
@@ -112,14 +143,17 @@ The Lean development states more than it currently proves for Path ORAM:
   call, so the statement covers keys written by earlier calls. Every
   transition the Lean replay accepts is a step of this model
   (`replay_runLeaves` for one map, `replay_runLeaves_interleaved` for a
-  replay that interleaves several), on either scheme, since both share one
-  data path. The
+  replay that interleaves several), on either scheme: a private-scheme node
+  access is a read hit (a node read under its leaf, whose coin becomes its
+  next leaf) or a read miss (a dummy access, whose coin is the path read),
+  with the tree's nodes as the slots. The
   model is generic in the slot type, so it also covers a call on several maps
   in any interleaving, each map's leaves and coins below its own leaf count:
   the schedule is distributed as the canonical leaf-value distribution of the
-  call's scaffold (`multiObservedLeaves_canonical`). The runtime draws two
-  coins for a write and one for a read, which it uses as the path when the key
-  is absent and as the next leaf when it is present. A read uses one of its
+  call's scaffold (`multiObservedLeaves_canonical`). On the local scheme the
+  runtime draws two coins for a write and one for a read, which it uses as the
+  path when the key is absent and as the next leaf when it is present; on the
+  private scheme it draws one coin per node access. A read uses one of its
   two model coins either way, so every runtime tape stands for the same number
   of model tapes, and uniform model tapes give uniform runtime coins.
 - The bundle's leaf obligation follows from this model, without seed
@@ -158,7 +192,9 @@ The Lean development states more than it currently proves for Path ORAM:
   ConfidentialMixer `deposit` (262,144) and ERC20Lite `transferFrom`
   (2^44) on the local scheme, and ERC20Lite `transferFrom` with its
   capacity-256 `balances` map on the private scheme and its `allowances` map
-  on the local one (2^54). The checker validates every map of the
+  on the local one (2^910: 112 node accesses of 256 leaves each, and two
+  coins of 128 leaves; the theorem input carries the seed count as an exact
+  integer). The checker validates every map of the
   configuration against the shape of one of the two schemes
   (`checkAnySchemeProofGrade`) and derives the local scheme's theorem when
   all of them use the local scheme, the private scheme's otherwise; the
@@ -168,8 +204,10 @@ The Lean development states more than it currently proves for Path ORAM:
   `checkCanonicalPathOramPairTheoremInput` also checks four more
   runtime runs per side, deployed with other seeds and given other coins,
   and finds each equal to its side's run with that run's own tape
-  substituted (`sampleCheck`). For both `transferFrom` pairs every such run
-  has other leaves for the two keys present before the call;
+  substituted (`sampleCheck`). For the local `transferFrom` pair every such
+  run has other leaves for the two keys present before the call, and for the
+  private one other leaves for every node of the tree, which a deployment
+  places under fresh leaves;
   `results/canonical_pathoram_pair_validation.json` reports the counts. The
   check compares whole witnesses, all but their seed tag, and the tamper
   suite moves one bucket read
@@ -178,20 +216,13 @@ The Lean development states more than it currently proves for Path ORAM:
   run on every tape is the substituted run is what these samples test; it is
   not proved of the Rust runtime.
 
-Open work: replace the flat position map and its keys by an oblivious search
-tree whose nodes hold their children's leaves, so that the position map
-recurses through the tree and an operation reads `O(log n)` paths instead of
-every metadata page. The runtime's generated codecs hold that map, which no
-scheme uses yet: an AVL tree of `n` preallocated nodes, the free ones on a
-list, in one Path ORAM tree. A get makes `h` node accesses and a put
-`3h + 1`, where `h` is the largest height of an AVL tree of `n` nodes (16 for
-4096 nodes), whether it inserts, updates, deletes or does nothing; each access
-reads one path, under the node's leaf or a fresh one, and writes it back.
-When an operation ends, the nodes it read get fresh leaves and return to the
-stash, which therefore needs room for `3h + 1` blocks beyond the Path ORAM
-bound. Its tests run it against a reference map on an in-memory bucket store
-and check the tree's shape, its pointers' leaves, the free list and the number
-of paths every operation reads and writes.
+What remains open on the private scheme: the AVL map's operations are run
+against a reference map in the runtime's tests (contents, tree shape,
+pointers' leaves, free list, stash bound, and the paths every operation reads
+and writes), not proved in Lean; and the stash bound for operations that
+hold their nodes until they end is assumed (`stashOverflowBounded`). A read
+followed by a write of the same key makes two gets where one would do, and
+the tree costs more than a flat position map below a few thousand entries.
 
 ## Current Route
 
@@ -245,9 +276,9 @@ and storage-projection facts.
 The legacy local-position-map route is intentionally capped at capacity `128`
 (`PATH_ORAM_LOCAL_POSMAP_MAX_CAPACITY` in Rust and
 `translationPathOramLocalPosmapMaxCapacity` in the Lean imported-shape
-checker). Larger maps use `path_oram_private_posmap_v1`, which shares this
-data path and gets its theorem from the same admitted route (see Current
-Status). Its compact symbolic certificate
+checker). Larger maps use `path_oram_private_posmap_v1`, which keeps them
+as an oblivious AVL tree and gets its theorem from the same admitted route
+(see Current Status). Its compact symbolic certificate
 (`ScalablePathOramCertificate`) records six shape numbers instead of
 enumerating large seed/family spaces, and `ScalablePathOramCertificate.Subenumerative`
 bounds its size and validation steps below the represented capacity. The

@@ -1339,9 +1339,11 @@ theorem computationalPathOram_fromPublicViewCanonicalLeafValuesBucketLocationAnd
 
 /-! ## Either Path ORAM scheme
 
-`path_oram_local_posmap_v1` and `path_oram_private_posmap_v1` share one
-runtime data path; they differ in the scheme tag, the declared recursion depth
-and the capacity cap. `pathOramViewRelation` admits only local-scheme leakage,
+`path_oram_local_posmap_v1` keeps a flat position map;
+`path_oram_private_posmap_v1` keeps an oblivious AVL tree whose nodes hold
+their children's leaves, each node access one Path ORAM access, with a stash
+bound that adds the nodes an operation returns to the stash. Both reveal one
+leaf per access counter. `pathOramViewRelation` admits only local-scheme leakage,
 so no configuration with a private-scheme object can satisfy it.
 `pathOramAnyViewRelation` admits the leakage of either scheme and is otherwise
 the same relation. -/
@@ -1352,7 +1354,7 @@ def PathOramPrivateAccessLeakage (access : OramAccessLeakage) : Prop :=
   access.blocksPerBucket = pathOramBlocksPerBucket ∧
   access.bucketSize = oramBucketHeaderBytes + access.blocksPerBucket * access.blockSize ∧
   0 < access.bucketCount ∧
-  access.stashBound = pathOramStashBound access.capacity ∧
+  access.stashBound = pathOramTreeStashBound access.capacity ∧
   access.recursionDepth = 1 ∧
   access.metadataPagesPerAccess = access.metadataPages + 1 ∧
   access.bucketsPerAccess = access.treeHeight + 1 ∧

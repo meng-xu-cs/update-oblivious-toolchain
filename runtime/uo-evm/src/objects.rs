@@ -972,6 +972,21 @@ impl RuntimeObject {
                     select_small_map_value_for_key(&object.entries, key, &object.spec.value_type)?;
                 Ok((value, false))
             }
+            Self::UoOramMap(object) if object.oram.is_tree() => {
+                object.accessed = true;
+                // A get on the private scheme's tree: one ORAM access per
+                // node access.
+                let (value, _found, transcripts, update_failed) = object.oram.tree_get(
+                    &object.spec,
+                    key,
+                    allocator,
+                    &mut object.leaf_coin_source,
+                    &mut object.rng,
+                )?;
+                record_tree_transcripts(trace, &object.spec, &object.oram, transcripts)?;
+                let value = select_pending_put_value(&object.pending_puts, key, value)?;
+                Ok((value, update_failed))
+            }
             Self::UoOramMap(object) => {
                 object.accessed = true;
                 trace.record_oram_access(object.spec.id, object.oram.parameters());
@@ -1032,6 +1047,39 @@ impl RuntimeObject {
                 )?;
                 object.dirty = true;
                 Ok(capacity_overflowed)
+            }
+            Self::UoOramMap(object) if object.oram.is_tree() => {
+                object.accessed = true;
+                // A write to the private scheme's tree reaches it at commit,
+                // as one put. Here a get finds whether the key is present,
+                // and the map's pending size decides whether the write
+                // overflows the map.
+                let (_value, found, transcripts, update_failed) = object.oram.tree_get(
+                    &object.spec,
+                    &key,
+                    allocator,
+                    &mut object.leaf_coin_source,
+                    &mut object.rng,
+                )?;
+                record_tree_transcripts(trace, &object.spec, &object.oram, transcripts)?;
+                let capacity_overflowed = object.oram.decide_pending_tree_put(
+                    &object.spec,
+                    &object.pending_puts,
+                    found,
+                    &key,
+                    &value,
+                    apply,
+                )?;
+                // A write that overflows the map aborts the call and takes no
+                // effect, so later reads in the call do not see it.
+                object.pending_puts.push(PendingOramPut::new(
+                    apply & !capacity_overflowed,
+                    key,
+                    value,
+                ));
+                trace.logical_write("uooram_put", &object.spec.name, "oblivious");
+                object.dirty = true;
+                Ok(capacity_overflowed | update_failed)
             }
             Self::UoOramMap(object) if is_path_oram_scheme(&object.spec.oram_scheme) => {
                 object.accessed = true;
@@ -1315,7 +1363,23 @@ impl RuntimeObject {
             (Self::UoOramMap(new), Self::UoOramMap(old)) => {
                 let mut next = new;
                 if next.accessed {
-                    if is_path_oram_scheme(&next.spec.oram_scheme) {
+                    if next.oram.is_tree() {
+                        // The call's writes reach the tree now, in order, one
+                        // put each, masked off if the call aborted.
+                        let pending_puts = std::mem::take(&mut next.pending_puts);
+                        for put in pending_puts.iter() {
+                            let transcripts = next.oram.commit_tree_put(
+                                &next.spec,
+                                put,
+                                aborted,
+                                allocator,
+                                &mut next.leaf_coin_source,
+                                &mut next.rng,
+                            )?;
+                            record_tree_transcripts(trace, &next.spec, &next.oram, transcripts)?;
+                        }
+                        next.leaf_coin_source.ensure_exhausted(&next.spec.name)?;
+                    } else if is_path_oram_scheme(&next.spec.oram_scheme) {
                         // The call's writes reach the ORAM now, in order, one
                         // access each. An aborted call's writes are masked off
                         // but still make their accesses, so the call leaves the
@@ -1421,12 +1485,31 @@ impl RuntimeObject {
 
     pub(in crate::runtime) fn ensure_path_oram_leaf_coins_consumed(&self) -> Result<()> {
         match self {
-            Self::UoOramMap(object) if is_path_oram_scheme(&object.spec.oram_scheme) => object
-                .leaf_coin_source
-                .ensure_reserved_for_writes(&object.spec.name, object.pending_puts.len()),
+            Self::UoOramMap(object) if is_path_oram_scheme(&object.spec.oram_scheme) => {
+                object.leaf_coin_source.ensure_reserved_for_writes(
+                    &object.spec.name,
+                    object.pending_puts.len(),
+                    object.oram.coins_per_pending_write(),
+                )
+            }
             _ => Ok(()),
         }
     }
+}
+
+/// Record a tree operation's node accesses in the call trace, one ORAM
+/// access each.
+fn record_tree_transcripts(
+    trace: &mut CallRecorder,
+    spec: &StateObject,
+    oram: &OramState,
+    transcripts: Box<[OramTranscript]>,
+) -> Result<()> {
+    for transcript in transcripts.into_vec() {
+        trace.record_oram_access(spec.id, oram.parameters());
+        record_oram_transcript(trace, spec, oram.path_bucket_count(), transcript)?;
+    }
+    Ok(())
 }
 
 /// Record one ORAM access in the call trace: its logical and physical
@@ -1532,6 +1615,7 @@ mod tests {
             max_stack_words: 0,
             scratch_bytes: 1024,
             max_kernel_ops: 0,
+            max_commit_ops: 0,
         })
         .unwrap()
     }

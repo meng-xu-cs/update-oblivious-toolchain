@@ -1,7 +1,7 @@
 {
   "accepted": true,
   "class_counts": {
-    "advisory_nonclaim": 581,
+    "advisory_nonclaim": 587,
     "deprecated_report": 0,
     "expected_computational_difference": 101,
     "expected_negative": 1004,
@@ -1845,6 +1845,7 @@
         "cases.4.full_scan.rejected",
         "cases.4.oram.rejected",
         "cases.4.oram_private_posmap.rejected",
+        "cases.4.oram_private_posmap_16384.rejected",
         "cases.4.oram_private_posmap_4096.rejected",
         "cases.4.raw.executable",
         "cases.4.raw_insecure_eval.rejected",
@@ -1855,6 +1856,7 @@
         "cases.4.variants.4.rejected",
         "cases.4.variants.5.rejected",
         "cases.4.variants.6.rejected",
+        "cases.4.variants.7.rejected",
         "cases.5.ct_gas_only.rejected",
         "cases.5.full_scan.rejected",
         "cases.5.raw.executable",
@@ -1890,13 +1892,14 @@
         "matrix.24.rejected",
         "matrix.25.rejected",
         "matrix.26.rejected",
-        "matrix.27.executable",
-        "matrix.28.rejected",
+        "matrix.27.rejected",
+        "matrix.28.executable",
         "matrix.29.rejected",
-        "matrix.30.rejected"
+        "matrix.30.rejected",
+        "matrix.31.rejected"
       ],
       "class_counts": {
-        "advisory_nonclaim": 95,
+        "advisory_nonclaim": 98,
         "deprecated_report": 0,
         "expected_computational_difference": 1,
         "expected_negative": 0,
@@ -1907,8 +1910,8 @@
       "expected_false_paths": [
         "cases.4.oram_improves_physical_writes"
       ],
-      "false_count": 96,
-      "false_paths": 96,
+      "false_count": 99,
+      "false_paths": 99,
       "mode": "evaluation",
       "report": "overheads",
       "required": false,
@@ -2128,6 +2131,7 @@
         "runtime_overheads.cases.4.full_scan.rejected",
         "runtime_overheads.cases.4.oram.rejected",
         "runtime_overheads.cases.4.oram_private_posmap.rejected",
+        "runtime_overheads.cases.4.oram_private_posmap_16384.rejected",
         "runtime_overheads.cases.4.oram_private_posmap_4096.rejected",
         "runtime_overheads.cases.4.raw.executable",
         "runtime_overheads.cases.4.variants.0.executable",
@@ -2135,6 +2139,7 @@
         "runtime_overheads.cases.4.variants.2.rejected",
         "runtime_overheads.cases.4.variants.3.rejected",
         "runtime_overheads.cases.4.variants.4.rejected",
+        "runtime_overheads.cases.4.variants.5.rejected",
         "runtime_overheads.cases.5.full_scan.rejected",
         "runtime_overheads.cases.5.raw.executable",
         "runtime_overheads.cases.5.variants.0.executable",
@@ -2156,11 +2161,12 @@
         "runtime_overheads.matrix.14.rejected",
         "runtime_overheads.matrix.15.rejected",
         "runtime_overheads.matrix.16.rejected",
-        "runtime_overheads.matrix.17.executable",
-        "runtime_overheads.matrix.18.rejected"
+        "runtime_overheads.matrix.17.rejected",
+        "runtime_overheads.matrix.18.executable",
+        "runtime_overheads.matrix.19.rejected"
       ],
       "class_counts": {
-        "advisory_nonclaim": 95,
+        "advisory_nonclaim": 98,
         "deprecated_report": 0,
         "expected_computational_difference": 1,
         "expected_negative": 0,
@@ -2171,8 +2177,8 @@
       "expected_false_paths": [
         "runtime_overheads.cases.4.oram_improves_physical_writes"
       ],
-      "false_count": 96,
-      "false_paths": 96,
+      "false_count": 99,
+      "false_paths": 99,
       "mode": "advisory",
       "report": "reviewer_summary",
       "required": false,

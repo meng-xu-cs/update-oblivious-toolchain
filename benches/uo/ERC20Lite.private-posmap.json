@@ -10,8 +10,8 @@
     "metadata_canonicalization_sha256": "4e3a033dbb19868817f8e25a6a1631b7f390bb2ea5b6699799192377b0535003",
     "compilation_mode": "uo",
     "compiler_version": "0.1.0",
-    "toolchain_manifest_sha256": "914117fd017b77087c73d797858350d908c55e9d7575db009a5d37e089466b4a",
-    "package_sha256": "cec4f9ade6b59b32567f11999c3ad2dd7d71a12c20b723258cc31adae3bfa1e1"
+    "toolchain_manifest_sha256": "7730823c19935ee02357a73552332049869d6aab58c41aad8dc4b6359df53c7e",
+    "package_sha256": "9ee231a1f670646e1214c1b10eade514cc6567278eb61a5b54bc10073667e031"
   },
   "contract": {
     "contract": "ERC20Lite",
@@ -1698,15 +1698,15 @@
           "key_type": "address",
           "oram": {
             "scheme": "path_oram_private_posmap_v1",
-            "block_size": 69,
-            "bucket_size": 369,
+            "block_size": 103,
+            "bucket_size": 539,
             "bucket_count": 511,
             "blocks_per_bucket": 5,
             "tree_height": 8,
-            "stash_bound": 114,
+            "stash_bound": 148,
             "recursion_depth": 1,
-            "metadata_pages": 47,
-            "metadata_pages_per_access": 48,
+            "metadata_pages": 20,
+            "metadata_pages_per_access": 21,
             "buckets_per_access": 9,
             "accesses_per_call": 1
           }
@@ -2033,7 +2033,7 @@
             "owner"
           ],
           "entry_input_len": 20,
-          "public_gas_budget": 3678,
+          "public_gas_budget": 11595,
           "arena_bytes": 4096,
           "max_stack_words": 64,
           "max_hash_part_bytes": 0,
@@ -2122,9 +2122,9 @@
           "uoarray_writes": 0,
           "uomap_reads": 1,
           "uomap_writes": 0,
-          "max_commit_ops": 57,
+          "max_commit_ops": 330,
           "oram_accesses": {
-            "1": 1
+            "1": 11
           }
         },
         "mint(address,uint256)": {
@@ -2134,7 +2134,7 @@
             "amount"
           ],
           "entry_input_len": 52,
-          "public_gas_budget": 5359,
+          "public_gas_budget": 50773,
           "arena_bytes": 4096,
           "max_stack_words": 64,
           "max_hash_part_bytes": 0,
@@ -2264,9 +2264,9 @@
           "uoarray_writes": 0,
           "uomap_reads": 1,
           "uomap_writes": 1,
-          "max_commit_ops": 114,
+          "max_commit_ops": 1680,
           "oram_accesses": {
-            "1": 2
+            "1": 56
           }
         },
         "transfer(address,address,uint256)": {
@@ -2281,7 +2281,7 @@
             "amount"
           ],
           "entry_input_len": 72,
-          "public_gas_budget": 8793,
+          "public_gas_budget": 99621,
           "arena_bytes": 4160,
           "max_stack_words": 65,
           "max_hash_part_bytes": 0,
@@ -2580,9 +2580,9 @@
           "uoarray_writes": 0,
           "uomap_reads": 2,
           "uomap_writes": 2,
-          "max_commit_ops": 228,
+          "max_commit_ops": 3360,
           "oram_accesses": {
-            "1": 4
+            "1": 112
           }
         },
         "transferFrom(address,address,address,uint256)": {
@@ -2599,7 +2599,7 @@
             "amount"
           ],
           "entry_input_len": 92,
-          "public_gas_budget": 11255,
+          "public_gas_budget": 102083,
           "arena_bytes": 4288,
           "max_stack_words": 67,
           "max_hash_part_bytes": 20,
@@ -3070,9 +3070,9 @@
           "uoarray_writes": 0,
           "uomap_reads": 3,
           "uomap_writes": 3,
-          "max_commit_ops": 308,
+          "max_commit_ops": 3440,
           "oram_accesses": {
-            "1": 4,
+            "1": 112,
             "2": 2
           }
         }

@@ -463,6 +463,9 @@ pub(super) fn repeat_boxed_oram_blocks(len: usize, block: &OramBlock) -> Result<
 }
 
 pub(super) fn cold_clone_oram_state(spec: &StateObject, state: &OramState) -> Result<OramState> {
+    if let Some(tree) = state.tree.as_ref() {
+        return cold_clone_tree_oram_state(state, tree);
+    }
     Ok(OramState {
         parameters: state.parameters.clone(),
         empty_entry: clone_map_entry(&state.empty_entry),
@@ -472,6 +475,26 @@ pub(super) fn cold_clone_oram_state(spec: &StateObject, state: &OramState) -> Re
             &MaskedUsizeOption::none(),
         )?,
         stash: FixedStash::with_capacity(spec, working_stash_capacity(&state.parameters)?)?,
+        tree: None,
+        storage: clone_oram_storage(&state.storage),
+        access_counter: state.access_counter,
+        cipher: state.cipher.clone_for_runtime_state(),
+    })
+}
+
+/// A private-scheme map keeps no flat slots: its tree state is decoded from
+/// the metadata pages when a call starts.
+fn cold_clone_tree_oram_state(state: &OramState, tree: &TreeState) -> Result<OramState> {
+    Ok(OramState {
+        parameters: state.parameters.clone(),
+        empty_entry: clone_map_entry(&state.empty_entry),
+        entries: repeat_boxed_map_entries(0, &state.empty_entry)?,
+        position_map: repeat_boxed_masked_usize_options(0, &MaskedUsizeOption::none())?,
+        stash: FixedStash::placeholder(),
+        tree: Some(TreeState::cold(
+            &tree.shape,
+            state.parameters.buckets_per_access,
+        )?),
         storage: clone_oram_storage(&state.storage),
         access_counter: state.access_counter,
         cipher: state.cipher.clone_for_runtime_state(),
@@ -502,6 +525,7 @@ impl OramState {
             entries: Box::<[MapEntry]>::default(),
             position_map: Box::<[MaskedUsizeOption]>::default(),
             stash: FixedStash::placeholder(),
+            tree: None,
             storage: super::OramStorage {
                 directory_pages: Box::<[Box<[u8]>]>::default(),
                 buckets: Box::<[Box<[u8]>]>::default(),
@@ -521,6 +545,9 @@ impl OramState {
         }
         for block in &mut self.stash.blocks {
             block.wipe_secrets();
+        }
+        if let Some(tree) = self.tree.as_mut() {
+            tree.wipe_secrets();
         }
         for page in &mut self.storage.directory_pages {
             page.fill(0);
@@ -640,16 +667,19 @@ impl PathOramLeafCoinSource {
     }
 
     /// Before commit an injected tape may still hold the coins of the writes
-    /// pending until commit, two per write (each write is one put access,
-    /// which draws the miss leaf and the next leaf), and no more. A tape that
-    /// is short fails when the commit draws from it.
+    /// pending until commit, `coins_per_write` per write, and no more: two on
+    /// the local scheme (each write is one put access, which draws the miss
+    /// leaf and the next leaf), and a put's node accesses on the private
+    /// scheme's tree. A tape that is short fails when the commit draws from
+    /// it.
     pub(crate) fn ensure_reserved_for_writes(
         &self,
         object_name: &str,
         pending_writes: usize,
+        coins_per_write: usize,
     ) -> Result<()> {
         let reserved = pending_writes
-            .checked_mul(2)
+            .checked_mul(coins_per_write)
             .ok_or_else(|| anyhow!("path ORAM object {object_name} has too many pending writes"))?;
         match self {
             Self::Random { .. } => Ok(()),
@@ -3206,6 +3236,7 @@ pub(super) fn path_entries_from_storage(
         max_stack_words: 0,
         scratch_bytes: scratch,
         max_kernel_ops: parameters.metadata_pages + parameters.bucket_count,
+        max_commit_ops: 0,
     })?;
     let mut position_map =
         repeat_boxed_masked_usize_options(parameters.capacity, &MaskedUsizeOption::none())?;
@@ -3271,6 +3302,7 @@ pub(super) fn path_position_map_from_storage(
         max_stack_words: 0,
         scratch_bytes: scratch,
         max_kernel_ops: parameters.metadata_pages,
+        max_commit_ops: 0,
     })?;
     let position_map =
         decode_path_position_map_pages(spec, parameters, cipher, directory_pages, &mut allocator)?;
@@ -3802,21 +3834,13 @@ pub(crate) struct TreeShape {
     pub(super) key_type: Type,
     pub(super) value_type: Type,
     pub(super) key_width: usize,
+    pub(super) value_width: usize,
 }
 
 /// The largest height of an AVL tree of `capacity` nodes, counted in nodes:
 /// the largest `h` whose smallest AVL tree, `F(h + 2) - 1` nodes, fits.
 pub(super) fn tree_avl_height(capacity: usize) -> usize {
-    let mut fib_prev = 1usize; // F(h + 1)
-    let mut fib = 2usize; // F(h + 2), from h = 1
-    let mut height = 0usize;
-    while fib - 1 <= capacity {
-        height += 1;
-        let next = fib + fib_prev;
-        fib_prev = fib;
-        fib = next;
-    }
-    height.max(1)
+    uo_core::manifest::path_oram_tree_avl_height(capacity)
 }
 
 pub(super) fn tree_get_accesses(avl_height: usize) -> usize {
@@ -3973,21 +3997,35 @@ impl TreeStash {
     }
 }
 
-/// Where a tree's buckets, header and stash live. Every node access reads
-/// the access counter and one path and writes them back; an operation's
-/// first access also reads the header and the stash, and the operation
-/// writes them once its last access is done.
+/// What one node access did: whether it read a node (`real`), which node
+/// and under which leaf, the leaf whose path it read, and its coin, the
+/// node's next leaf.
+#[derive(Debug, Default)]
+pub(crate) struct TreeAccessRecord {
+    pub(super) real: bool,
+    pub(super) node_id: usize,
+    pub(super) prior_leaf: usize,
+    pub(super) read_leaf: usize,
+    pub(super) coin: usize,
+}
+
+/// Where a tree's buckets, header and stash live. Every node access draws a
+/// coin, reads the access counter and one path and writes them back; an
+/// operation's first access also reads the header and the stash, and its
+/// last access writes them before the counter.
 pub(super) trait TreePathStore {
+    /// The coin of the next node access: a fresh leaf.
+    fn coin(&mut self) -> Result<usize>;
     /// A node access begins (`first`: the operation's first).
     fn begin_access(&mut self, first: bool) -> Result<()>;
     /// Move a bucket's blocks into the stash.
     fn load_bucket(&mut self, index: usize, stash: &mut TreeStash) -> Result<()>;
     /// Replace a bucket's blocks.
     fn store_bucket(&mut self, index: usize, blocks: &[TreeNode]) -> Result<()>;
-    /// A node access ends.
-    fn end_access(&mut self) -> Result<()>;
-    /// The operation ends with this header and stash.
+    /// The operation's header and stash are final.
     fn end_operation(&mut self, header: &TreeHeader, stash: &TreeStash) -> Result<()>;
+    /// A node access ends.
+    fn end_access(&mut self, record: &TreeAccessRecord) -> Result<()>;
 }
 
 /// The canonical big-endian bytes of a key, at the key type's width.
@@ -4032,6 +4070,7 @@ struct TreeOpCache {
     slots: Box<[TreeNode]>,
     coins: Box<[usize]>,
     used: usize,
+    last_record: Option<TreeAccessRecord>,
 }
 
 impl TreeOpCache {
@@ -4046,6 +4085,7 @@ impl TreeOpCache {
             slots: slots.finish()?,
             coins: coins.finish()?,
             used: 0,
+            last_record: None,
         })
     }
 
@@ -4114,10 +4154,12 @@ fn evict_tree_path<S: TreePathStore>(
 }
 
 /// One node access: read the path of `link` if `want` and the operation has
-/// not read the node yet, else the path of `coin`; take the node out of the
-/// stash into the cache; evict the path and write it back. Returns the
+/// not read the node yet, else the path of a fresh coin; take the node out of
+/// the stash into the cache; evict the path and write it back. Returns the
 /// node's cache slot and whether the access failed: the node was missing,
-/// duplicated or under another leaf, or the stash overflowed.
+/// duplicated or under another leaf, or the stash overflowed. The last
+/// access of an operation ends in `tree_finish`, once the operation has
+/// written the header and the stash.
 fn tree_access<S: TreePathStore>(
     shape: &TreeShape,
     store: &mut S,
@@ -4125,11 +4167,18 @@ fn tree_access<S: TreePathStore>(
     cache: &mut TreeOpCache,
     link: &TreeLink,
     want: bool,
-    coin: usize,
 ) -> Result<(usize, bool)> {
     let slot = cache.used;
     if slot >= cache.slots.len() {
         bail!("tree operation made more accesses than its public schedule");
+    }
+    let coin = store.coin()?;
+    if coin >= shape.leaf_count {
+        bail!(
+            "tree access coin {} outside leaf count {}",
+            coin,
+            shape.leaf_count
+        );
     }
     store.begin_access(slot == 0)?;
     let real = want & link.present & !cache.contains(link);
@@ -4146,7 +4195,18 @@ fn tree_access<S: TreePathStore>(
     let failed = real & ((count != 1) | (node.leaf != link.leaf));
     evict_tree_path(shape, store, stash, read_leaf)?;
     let overflowed = stash.compact()?;
-    store.end_access()?;
+    let record = TreeAccessRecord {
+        real,
+        node_id: masked_select_usize(real, link.id, 0),
+        prior_leaf: masked_select_usize(real, link.leaf, 0),
+        read_leaf,
+        coin,
+    };
+    if slot + 1 < cache.slots.len() {
+        store.end_access(&record)?;
+    } else {
+        cache.last_record = Some(record);
+    }
     let target = cache
         .slots
         .get_mut(slot)
@@ -4170,9 +4230,8 @@ fn tree_fetch<S: TreePathStore>(
     cache: &mut TreeOpCache,
     link: &TreeLink,
     want: bool,
-    coin: usize,
 ) -> Result<(TreeNode, bool)> {
-    let (_, failed) = tree_access(shape, store, stash, cache, link, want, coin)?;
+    let (_, failed) = tree_access(shape, store, stash, cache, link, want)?;
     let wanted = TreeLink::select(want, link, &TreeLink::none());
     Ok((cache.find(&wanted, &stash.empty)?, failed))
 }
@@ -4228,29 +4287,34 @@ fn tree_finish<S: TreePathStore>(
         overflowed |= stash.push_persistent(node)?;
     }
     store.end_operation(header, stash)?;
+    let record = cache
+        .last_record
+        .take()
+        .ok_or_else(|| anyhow!("tree operation ended without its last access"))?;
+    store.end_access(&record)?;
     Ok(overflowed)
 }
 
 /// Read the value of `key`: walk `avl_height` levels from the root, a dummy
-/// access once the walk has found the key or fallen off the tree.
-pub(super) fn tree_get<S: TreePathStore, C: FnMut() -> Result<usize>>(
+/// access once the walk has found the key or fallen off the tree. Returns
+/// the value (zero if absent), whether the key is present, and whether an
+/// access failed.
+pub(super) fn tree_get<S: TreePathStore>(
     shape: &TreeShape,
     store: &mut S,
     stash: &mut TreeStash,
     header: &mut TreeHeader,
     key: &Value,
-    coins: &mut C,
-) -> Result<(Value, bool)> {
+) -> Result<(Value, bool, bool)> {
     let accesses = tree_get_accesses(shape.avl_height);
     let mut cache = TreeOpCache::new(accesses, &stash.empty)?;
     let mut current = header.root.duplicate();
     let mut active = current.present;
     let mut value = Value::zero_for_type(&shape.value_type);
+    let mut found_any = false;
     let mut failed = false;
     for _ in 0..accesses {
-        let coin = coins()?;
-        let (slot, access_failed) =
-            tree_access(shape, store, stash, &mut cache, &current, active, coin)?;
+        let (slot, access_failed) = tree_access(shape, store, stash, &mut cache, &current, active)?;
         failed |= access_failed;
         let node = cache
             .slots
@@ -4260,19 +4324,20 @@ pub(super) fn tree_get<S: TreePathStore, C: FnMut() -> Result<usize>>(
         let found = real & Value::confidential_eq(&node.key, key);
         let less = real & tree_key_lt(key, &node.key, shape.key_width)?;
         value = Value::confidential_select(found, node.value.clone(), value)?;
+        found_any |= found;
         let next = TreeLink::select(less, &node.left, &node.right);
         active = real & !found & next.present;
         current = TreeLink::select(active, &next, &TreeLink::none());
     }
     failed |= tree_finish(store, stash, header, &mut cache)?;
-    Ok((value, failed))
+    Ok((value, found_any, failed))
 }
 
 /// Write `value` to `key` if `apply`: an insert, an update, or a delete when
 /// `value` is zero. Every put makes `tree_put_accesses` accesses. Returns
 /// whether an insert found the map full (the call aborts, and nothing
 /// changes) and whether an access found the stored tree wrong.
-pub(super) fn tree_put<S: TreePathStore, C: FnMut() -> Result<usize>>(
+pub(super) fn tree_put<S: TreePathStore>(
     shape: &TreeShape,
     store: &mut S,
     stash: &mut TreeStash,
@@ -4280,7 +4345,6 @@ pub(super) fn tree_put<S: TreePathStore, C: FnMut() -> Result<usize>>(
     key: &Value,
     value: &Value,
     apply: bool,
-    coins: &mut C,
 ) -> Result<(bool, bool)> {
     let height = shape.avl_height;
     let accesses = tree_put_accesses(height);
@@ -4301,9 +4365,7 @@ pub(super) fn tree_put<S: TreePathStore, C: FnMut() -> Result<usize>>(
     let mut found_two_children = false;
     let mut depth = 0usize;
     for level in 0..height {
-        let coin = coins()?;
-        let (slot, access_failed) =
-            tree_access(shape, store, stash, &mut cache, &current, active, coin)?;
+        let (slot, access_failed) = tree_access(shape, store, stash, &mut cache, &current, active)?;
         failed |= access_failed;
         let node = cache
             .slots
@@ -4339,9 +4401,8 @@ pub(super) fn tree_put<S: TreePathStore, C: FnMut() -> Result<usize>>(
 
     // Pop the free list for an insert.
     let free_head = header.free.duplicate();
-    let coin = coins()?;
     let (free_slot, access_failed) =
-        tree_access(shape, store, stash, &mut cache, &free_head, insert, coin)?;
+        tree_access(shape, store, stash, &mut cache, &free_head, insert)?;
     failed |= access_failed;
     let mut new_node = {
         let node = cache
@@ -4461,24 +4522,15 @@ pub(super) fn tree_put<S: TreePathStore, C: FnMut() -> Result<usize>>(
         let heavy_right = active_level & (right_height >= left_height + 2);
         let rotate = heavy_left | heavy_right;
         let child_link = TreeLink::select(heavy_left, &parent.left, &parent.right);
-        let coin = coins()?;
         let (child, child_failed) =
-            tree_fetch(shape, store, stash, &mut cache, &child_link, rotate, coin)?;
+            tree_fetch(shape, store, stash, &mut cache, &child_link, rotate)?;
         failed |= child_failed;
         let child_leans_right = child.right.height > child.left.height;
         let child_leans_left = child.left.height > child.right.height;
         let double = (heavy_left & child_leans_right) | (heavy_right & child_leans_left);
         let grandchild_link = TreeLink::select(heavy_left, &child.right, &child.left);
-        let coin = coins()?;
-        let (grandchild, grandchild_failed) = tree_fetch(
-            shape,
-            store,
-            stash,
-            &mut cache,
-            &grandchild_link,
-            double,
-            coin,
-        )?;
+        let (grandchild, grandchild_failed) =
+            tree_fetch(shape, store, stash, &mut cache, &grandchild_link, double)?;
         failed |= grandchild_failed;
 
         // Single rotations.
@@ -4612,4 +4664,1146 @@ pub(super) fn tree_place_nodes(
         }
     }
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// The private scheme: the AVL map in sealed storage
+//
+// A `path_oram_private_posmap_v1` map keeps the AVL map above in one Path
+// ORAM tree of node blocks. Its metadata pages are a header page (the root,
+// the free list's head and the map's size) and the stash pages, eight node
+// blocks each. Every node access reads and rewrites the access counter and
+// one path; an operation's first access also reads the metadata pages, which
+// a call decodes once when it starts, and its last access rewrites them.
+// ---------------------------------------------------------------------------
+
+/// The private scheme's map in the enclave during a call: the tree's shape,
+/// its header and stash as decoded when the call started and updated by the
+/// call's operations, and the map's size with the call's pending writes
+/// applied.
+#[derive(Debug)]
+pub(crate) struct TreeState {
+    pub(super) shape: TreeShape,
+    pub(super) header: TreeHeader,
+    pub(super) stash: TreeStash,
+    pub(super) pending_size: usize,
+}
+
+impl TreeState {
+    /// A state with an empty header and stash, for `refresh_tree_state_from_storage`.
+    pub(super) fn cold(shape: &TreeShape, buckets_per_access: usize) -> Result<Self> {
+        let empty = TreeNode::empty(&shape.key_type, &shape.value_type);
+        let working = shape
+            .stash_bound
+            .checked_add(buckets_per_access.saturating_mul(shape.blocks_per_bucket))
+            .ok_or_else(|| anyhow!("tree stash capacity overflowed"))?;
+        Ok(Self {
+            shape: clone_tree_shape(shape),
+            header: TreeHeader {
+                root: TreeLink::none(),
+                free: TreeLink::none(),
+                size: 0,
+            },
+            stash: TreeStash::with_capacity(shape.stash_bound, working, &empty)?,
+            pending_size: 0,
+        })
+    }
+
+    pub(super) fn wipe_secrets(&mut self) {
+        self.header.root = TreeLink::none();
+        self.header.free = TreeLink::none();
+        self.header.size = 0;
+        for block in self.stash.blocks.iter_mut() {
+            block.wipe_secrets();
+        }
+        self.stash.fill = self.stash.persistent;
+        self.pending_size = 0;
+    }
+}
+
+pub(super) fn clone_tree_shape(shape: &TreeShape) -> TreeShape {
+    TreeShape {
+        capacity: shape.capacity,
+        leaf_count: shape.leaf_count,
+        blocks_per_bucket: shape.blocks_per_bucket,
+        avl_height: shape.avl_height,
+        stash_bound: shape.stash_bound,
+        key_type: shape.key_type.clone(),
+        value_type: shape.value_type.clone(),
+        key_width: shape.key_width,
+        value_width: shape.value_width,
+    }
+}
+
+/// The tree shape of a private-scheme map.
+pub(super) fn tree_shape_for_spec(
+    spec: &StateObject,
+    parameters: &OramParameters,
+) -> Result<TreeShape> {
+    let key_type = spec
+        .key_type
+        .as_ref()
+        .ok_or_else(|| anyhow!("map {} missing key type", spec.name))?
+        .clone();
+    let key_width = fixed_scalar_width(&key_type)?;
+    let value_width = fixed_scalar_width(&spec.value_type)?;
+    let shape = TreeShape {
+        capacity: parameters.capacity,
+        leaf_count: parameters.leaf_count(),
+        blocks_per_bucket: parameters.blocks_per_bucket,
+        avl_height: tree_avl_height(parameters.capacity),
+        stash_bound: parameters.stash_bound,
+        key_type,
+        value_type: spec.value_type.clone(),
+        key_width,
+        value_width,
+    };
+    if tree_node_block_size(&shape) != parameters.block_size {
+        bail!(
+            "tree node block size {} for {} did not match the manifest's {}",
+            tree_node_block_size(&shape),
+            spec.name,
+            parameters.block_size
+        );
+    }
+    if parameters.directory_page_bytes != TREE_STASH_PAGE_BLOCKS * parameters.block_size {
+        bail!(
+            "tree metadata page size for {} did not match its {} node blocks",
+            spec.name,
+            TREE_STASH_PAGE_BLOCKS
+        );
+    }
+    if parameters.metadata_pages != 1 + parameters.stash_bound.div_ceil(TREE_STASH_PAGE_BLOCKS) {
+        bail!(
+            "tree metadata page count for {} did not match a header page and its stash pages",
+            spec.name
+        );
+    }
+    Ok(shape)
+}
+
+/// Node blocks per stash page.
+pub(super) const TREE_STASH_PAGE_BLOCKS: usize = ORAM_DIRECTORY_PAGE_ENTRIES;
+
+/// The bytes of a node block: the flags (occupied, in the tree, each child
+/// present), the node's id and leaf, its key and value, and each child's id,
+/// leaf and subtree height.
+pub(super) fn tree_node_block_size(shape: &TreeShape) -> usize {
+    1 + ORAM_SLOT_INDEX_BYTES
+        + ORAM_LEAF_LABEL_BYTES
+        + shape.key_width
+        + shape.value_width
+        + 2 * (ORAM_SLOT_INDEX_BYTES + ORAM_LEAF_LABEL_BYTES + 1)
+}
+
+fn write_tree_link_at(out: &mut [u8], start: usize, link: &TreeLink) -> Result<usize> {
+    let id = u64::try_from(link.id).map_err(|_| anyhow!("tree link id overflow"))?;
+    let leaf = u64::try_from(link.leaf).map_err(|_| anyhow!("tree link leaf overflow"))?;
+    let height = u8::try_from(link.height).map_err(|_| anyhow!("tree link height overflow"))?;
+    let cursor = write_u64_be_at(out, start, id, "writing tree link id")?;
+    let cursor = write_u64_be_at(out, cursor, leaf, "writing tree link leaf")?;
+    write_exact_range(out, cursor, &[height], "writing tree link height")
+}
+
+fn read_tree_link_at(bytes: &[u8], start: usize, present: bool) -> Result<TreeLink> {
+    let id = usize::try_from(read_u64_be_at(bytes, start, "reading tree link id")?)
+        .map_err(|_| anyhow!("tree link id overflow"))?;
+    let leaf = usize::try_from(read_u64_be_at(bytes, start + 8, "reading tree link leaf")?)
+        .map_err(|_| anyhow!("tree link leaf overflow"))?;
+    let height = *read_exact_range(bytes, start + 16, 1, "reading tree link height")?
+        .first()
+        .ok_or_else(|| anyhow!("tree link height missing"))?;
+    Ok(TreeLink {
+        present,
+        id,
+        leaf,
+        height: usize::from(height),
+    })
+}
+
+pub(super) fn encode_tree_node_into(
+    node: &TreeNode,
+    shape: &TreeShape,
+    out: &mut [u8],
+) -> Result<()> {
+    if out.len() != tree_node_block_size(shape) {
+        bail!(
+            "unexpected tree node buffer length: {} != {}",
+            out.len(),
+            tree_node_block_size(shape)
+        );
+    }
+    let flags = u8::from(node.occupied)
+        | (u8::from(node.in_tree) << 1)
+        | (u8::from(node.left.present) << 2)
+        | (u8::from(node.right.present) << 3);
+    let mut cursor = write_exact_range(out, 0, &[flags], "writing tree node flags")?;
+    cursor = write_u64_be_at(
+        out,
+        cursor,
+        u64::try_from(node.id).map_err(|_| anyhow!("tree node id overflow"))?,
+        "writing tree node id",
+    )?;
+    cursor = write_u64_be_at(
+        out,
+        cursor,
+        u64::try_from(node.leaf).map_err(|_| anyhow!("tree node leaf overflow"))?,
+        "writing tree node leaf",
+    )?;
+    let entry_end = cursor + shape.key_width + shape.value_width;
+    let mut overflowed = false;
+    let mut copy_chunk = |chunk: &[u8]| {
+        if overflowed {
+            return;
+        }
+        match write_exact_range(out, cursor, chunk, "writing tree node entry") {
+            Ok(end) => cursor = end,
+            Err(_) => overflowed = true,
+        }
+    };
+    node.key.visit_canonical_chunks(&mut copy_chunk);
+    node.value.visit_canonical_chunks(&mut copy_chunk);
+    if overflowed || cursor != entry_end {
+        bail!("tree node entry encoding drifted from the key and value widths");
+    }
+    cursor = write_tree_link_at(out, cursor, &node.left)?;
+    cursor = write_tree_link_at(out, cursor, &node.right)?;
+    if cursor != out.len() {
+        bail!("tree node encoding drifted from the block size");
+    }
+    Ok(())
+}
+
+pub(super) fn decode_tree_node(bytes: &[u8], shape: &TreeShape) -> Result<TreeNode> {
+    if bytes.len() != tree_node_block_size(shape) {
+        bail!(
+            "unexpected tree node length: {} != {}",
+            bytes.len(),
+            tree_node_block_size(shape)
+        );
+    }
+    let flags = *read_exact_range(bytes, 0, 1, "reading tree node flags")?
+        .first()
+        .ok_or_else(|| anyhow!("tree node flags missing"))?;
+    if flags > 0x0f {
+        bail!("invalid tree node flags {flags:#x}");
+    }
+    let id = usize::try_from(read_u64_be_at(bytes, 1, "reading tree node id")?)
+        .map_err(|_| anyhow!("tree node id overflow"))?;
+    let leaf = usize::try_from(read_u64_be_at(bytes, 9, "reading tree node leaf")?)
+        .map_err(|_| anyhow!("tree node leaf overflow"))?;
+    let key_start = 1 + ORAM_SLOT_INDEX_BYTES + ORAM_LEAF_LABEL_BYTES;
+    let value_start = key_start + shape.key_width;
+    let links_start = value_start + shape.value_width;
+    let key = decode_scalar_value(
+        &shape.key_type,
+        read_exact_range(bytes, key_start, shape.key_width, "reading tree node key")?,
+    )?;
+    let value = decode_scalar_value(
+        &shape.value_type,
+        read_exact_range(
+            bytes,
+            value_start,
+            shape.value_width,
+            "reading tree node value",
+        )?,
+    )?;
+    let link_bytes = ORAM_SLOT_INDEX_BYTES + ORAM_LEAF_LABEL_BYTES + 1;
+    Ok(TreeNode {
+        occupied: flags & 1 != 0,
+        id,
+        leaf,
+        in_tree: flags & 2 != 0,
+        key,
+        value,
+        left: read_tree_link_at(bytes, links_start, flags & 4 != 0)?,
+        right: read_tree_link_at(bytes, links_start + link_bytes, flags & 8 != 0)?,
+    })
+}
+
+/// A node block a path read loads: its id, leaf and children in range, and
+/// its bucket on the path to its leaf.
+fn validate_loaded_tree_node(
+    shape: &TreeShape,
+    bucket_index: Option<usize>,
+    node: &TreeNode,
+) -> Result<()> {
+    let occupied = node.occupied;
+    let in_range = (node.id < shape.capacity)
+        & (node.leaf < shape.leaf_count)
+        & (!node.left.present | (node.left.id < shape.capacity))
+        & (!node.left.present | (node.left.leaf < shape.leaf_count))
+        & (!node.right.present | (node.right.id < shape.capacity))
+        & (!node.right.present | (node.right.leaf < shape.leaf_count));
+    if occupied & !in_range {
+        bail!("decoded tree node references an out-of-range node or leaf");
+    }
+    if let Some(index) = bucket_index {
+        let leaf = masked_select_usize(in_range, node.leaf, 0);
+        if occupied & !bucket_on_leaf_path(shape.leaf_count, index, leaf) {
+            bail!("decoded tree bucket {} holds a node off its path", index);
+        }
+    }
+    Ok(())
+}
+
+pub(super) fn encode_tree_bucket_into(
+    index: usize,
+    blocks: &[TreeNode],
+    shape: &TreeShape,
+    out: &mut [u8],
+) -> Result<()> {
+    if blocks.len() != shape.blocks_per_bucket {
+        bail!(
+            "tree bucket {} has {} blocks, not {}",
+            index,
+            blocks.len(),
+            shape.blocks_per_bucket
+        );
+    }
+    let block_size = tree_node_block_size(shape);
+    if out.len() != ORAM_BUCKET_HEADER_BYTES + shape.blocks_per_bucket * block_size {
+        bail!("unexpected tree bucket buffer length {}", out.len());
+    }
+    let live = blocks
+        .iter()
+        .fold(0usize, |acc, block| acc + usize::from(block.occupied));
+    let mut cursor = write_u64_be_at(out, 0, 0, "writing tree bucket counter")?;
+    cursor = write_u64_be_at(
+        out,
+        cursor,
+        u64::try_from(index).map_err(|_| anyhow!("tree bucket index overflow"))?,
+        "writing tree bucket index",
+    )?;
+    cursor = write_u64_be_at(
+        out,
+        cursor,
+        u64::try_from(live).map_err(|_| anyhow!("tree bucket live count overflow"))?,
+        "writing tree bucket live count",
+    )?;
+    for block in blocks {
+        let end = cursor + block_size;
+        let target = out
+            .get_mut(cursor..end)
+            .ok_or_else(|| anyhow!("tree bucket block range {}..{} missing", cursor, end))?;
+        encode_tree_node_into(block, shape, target)?;
+        cursor = end;
+    }
+    Ok(())
+}
+
+/// Decode a bucket's node blocks into the stash, checking each.
+pub(super) fn decode_tree_bucket_into_stash(
+    index: usize,
+    payload: &[u8],
+    shape: &TreeShape,
+    stash: &mut TreeStash,
+) -> Result<()> {
+    let block_size = tree_node_block_size(shape);
+    if payload.len() != ORAM_BUCKET_HEADER_BYTES + shape.blocks_per_bucket * block_size {
+        bail!("unexpected tree bucket length {}", payload.len());
+    }
+    let stored_index = usize::try_from(read_u64_be_at(payload, 8, "reading tree bucket index")?)
+        .map_err(|_| anyhow!("tree bucket index overflow"))?;
+    if stored_index != index {
+        bail!(
+            "tree bucket {} holds the payload of bucket {}",
+            index,
+            stored_index
+        );
+    }
+    let blocks = read_exact_range(
+        payload,
+        ORAM_BUCKET_HEADER_BYTES,
+        shape.blocks_per_bucket * block_size,
+        "reading tree bucket blocks",
+    )?;
+    for bytes in blocks.chunks_exact(block_size) {
+        let node = decode_tree_node(bytes, shape)?;
+        validate_loaded_tree_node(shape, Some(index), &node)?;
+        stash.append(&node)?;
+    }
+    Ok(())
+}
+
+pub(super) fn encode_tree_header_page_into(header: &TreeHeader, out: &mut [u8]) -> Result<()> {
+    out.fill(0);
+    let flags = u8::from(header.root.present) | (u8::from(header.free.present) << 1);
+    let mut cursor = write_exact_range(out, 0, &[flags], "writing tree header flags")?;
+    cursor = write_tree_link_at(out, cursor, &header.root)?;
+    cursor = write_tree_link_at(out, cursor, &header.free)?;
+    write_u64_be_at(
+        out,
+        cursor,
+        u64::try_from(header.size).map_err(|_| anyhow!("tree size overflow"))?,
+        "writing tree size",
+    )?;
+    Ok(())
+}
+
+pub(super) fn decode_tree_header_page(bytes: &[u8], shape: &TreeShape) -> Result<TreeHeader> {
+    let flags = *read_exact_range(bytes, 0, 1, "reading tree header flags")?
+        .first()
+        .ok_or_else(|| anyhow!("tree header flags missing"))?;
+    if flags > 0x03 {
+        bail!("invalid tree header flags {flags:#x}");
+    }
+    let link_bytes = ORAM_SLOT_INDEX_BYTES + ORAM_LEAF_LABEL_BYTES + 1;
+    let root = read_tree_link_at(bytes, 1, flags & 1 != 0)?;
+    let free = read_tree_link_at(bytes, 1 + link_bytes, flags & 2 != 0)?;
+    let size = usize::try_from(read_u64_be_at(
+        bytes,
+        1 + 2 * link_bytes,
+        "reading tree size",
+    )?)
+    .map_err(|_| anyhow!("tree size overflow"))?;
+    let in_range = (!root.present | ((root.id < shape.capacity) & (root.leaf < shape.leaf_count)))
+        & (!free.present | ((free.id < shape.capacity) & (free.leaf < shape.leaf_count)))
+        & (size <= shape.capacity);
+    if !in_range {
+        bail!("decoded tree header references an out-of-range node, leaf or size");
+    }
+    Ok(TreeHeader { root, free, size })
+}
+
+/// Encode stash page `page`: the persistent stash slots `8 page .. 8 page + 8`,
+/// empty past the stash bound.
+pub(super) fn encode_tree_stash_page_into(
+    stash: &TreeStash,
+    page: usize,
+    shape: &TreeShape,
+    out: &mut [u8],
+) -> Result<()> {
+    let block_size = tree_node_block_size(shape);
+    if out.len() != TREE_STASH_PAGE_BLOCKS * block_size {
+        bail!("unexpected tree stash page length {}", out.len());
+    }
+    for offset in 0..TREE_STASH_PAGE_BLOCKS {
+        let slot = page * TREE_STASH_PAGE_BLOCKS + offset;
+        let block = if slot < stash.persistent {
+            stash
+                .blocks
+                .get(slot)
+                .ok_or_else(|| anyhow!("tree stash slot {} missing", slot))?
+        } else {
+            &stash.empty
+        };
+        let start = offset * block_size;
+        let target = out
+            .get_mut(start..start + block_size)
+            .ok_or_else(|| anyhow!("tree stash page block {} missing", offset))?;
+        encode_tree_node_into(block, shape, target)?;
+    }
+    Ok(())
+}
+
+/// Decode stash page `page` into the persistent stash slots it holds.
+pub(super) fn decode_tree_stash_page_into(
+    bytes: &[u8],
+    page: usize,
+    shape: &TreeShape,
+    stash: &mut TreeStash,
+) -> Result<()> {
+    let block_size = tree_node_block_size(shape);
+    if bytes.len() != TREE_STASH_PAGE_BLOCKS * block_size {
+        bail!("unexpected tree stash page length {}", bytes.len());
+    }
+    for (offset, block_bytes) in bytes.chunks_exact(block_size).enumerate() {
+        let node = decode_tree_node(block_bytes, shape)?;
+        validate_loaded_tree_node(shape, None, &node)?;
+        let slot = page * TREE_STASH_PAGE_BLOCKS + offset;
+        if slot < stash.persistent {
+            let target = stash
+                .blocks
+                .get_mut(slot)
+                .ok_or_else(|| anyhow!("tree stash slot {} missing", slot))?;
+            *target = node;
+        } else if node.occupied {
+            bail!("tree stash page holds a node past the stash bound");
+        }
+    }
+    Ok(())
+}
+
+/// A fresh private-scheme map: every node on the free list under a fresh
+/// leaf, each in the deepest bucket on its path with room or in the stash.
+/// Returns the sealed metadata pages and buckets and the enclave state.
+pub(super) fn bootstrap_tree_storage(
+    spec: &StateObject,
+    parameters: &OramParameters,
+    cipher: &StoreCipher,
+    rng: &mut ChaCha20Rng,
+) -> Result<(Box<[Box<[u8]>]>, Box<[Box<[u8]>]>, TreeState)> {
+    let shape = tree_shape_for_spec(spec, parameters)?;
+    let mut state = TreeState::cold(&shape, parameters.buckets_per_access)?;
+    let leaf_count = shape.leaf_count;
+    let mut coins = || -> Result<usize> {
+        let draw = u64::try_from(leaf_count).map_err(|_| anyhow!("leaf count overflow"))?;
+        let word = rand::RngCore::next_u64(rng) % draw.max(1);
+        usize::try_from(word).map_err(|_| anyhow!("leaf overflow"))
+    };
+    let (header, nodes) = tree_bootstrap_nodes(&shape, &mut coins)?;
+    let empty = TreeNode::empty(&shape.key_type, &shape.value_type);
+    let mut plain = FixedBoxBuilder::new(parameters.bucket_count);
+    for _ in 0..parameters.bucket_count {
+        let mut bucket = FixedBoxBuilder::new(shape.blocks_per_bucket);
+        for _ in 0..shape.blocks_per_bucket {
+            bucket.push(clone_tree_node(&empty))?;
+        }
+        plain.push(bucket.finish()?)?;
+    }
+    let mut plain = plain.finish()?;
+    tree_place_nodes(&shape, &nodes, &mut plain, &mut state.stash)?;
+    let mut buckets = FixedBoxBuilder::new(parameters.bucket_count);
+    let mut payload = zeroed_boxed_bytes(parameters.bucket_size)?;
+    for (index, blocks) in plain.iter().enumerate() {
+        encode_tree_bucket_into(index, blocks, &shape, payload.as_mut())?;
+        buckets.push(seal_boxed_oram_payload(
+            &oram_bucket_aad(spec, index),
+            payload.as_mut(),
+            cipher,
+            rng,
+            None,
+        )?)?;
+    }
+    let mut pages = FixedBoxBuilder::new(parameters.metadata_pages);
+    let mut page_payload = zeroed_boxed_bytes(parameters.directory_page_bytes)?;
+    encode_tree_header_page_into(&header, page_payload.as_mut())?;
+    pages.push(seal_boxed_oram_payload(
+        &oram_meta_aad(spec, 0),
+        page_payload.as_mut(),
+        cipher,
+        rng,
+        None,
+    )?)?;
+    for page in 1..parameters.metadata_pages {
+        encode_tree_stash_page_into(&state.stash, page - 1, &shape, page_payload.as_mut())?;
+        pages.push(seal_boxed_oram_payload(
+            &oram_meta_aad(spec, page),
+            page_payload.as_mut(),
+            cipher,
+            rng,
+            None,
+        )?)?;
+    }
+    state.pending_size = header.size;
+    state.header = header;
+    Ok((pages.finish()?, buckets.finish()?, state))
+}
+
+/// Decode the header and the stash from the metadata pages, as a call does
+/// when it starts.
+pub(super) fn refresh_tree_state_from_storage(
+    spec: &StateObject,
+    parameters: &OramParameters,
+    cipher: &StoreCipher,
+    directory_pages: &[Box<[u8]>],
+    allocator: &mut AllocatorSession,
+    state: &mut TreeState,
+) -> Result<()> {
+    if directory_pages.len() != parameters.metadata_pages {
+        bail!(
+            "tree metadata page count {} mismatched public bound {} for {}",
+            directory_pages.len(),
+            parameters.metadata_pages,
+            spec.name
+        );
+    }
+    state.wipe_secrets();
+    let header_page = directory_pages
+        .first()
+        .ok_or_else(|| anyhow!("tree header page missing for {}", spec.name))?;
+    let shape = &state.shape;
+    let header = with_opened_oram_payload(
+        format!("{}@meta0", spec.name),
+        oram_meta_aad(spec, 0),
+        parameters.directory_page_bytes,
+        header_page,
+        cipher,
+        allocator,
+        |payload| decode_tree_header_page(payload, shape),
+    )?;
+    for page in 1..parameters.metadata_pages {
+        let sealed = directory_pages
+            .get(page)
+            .ok_or_else(|| anyhow!("tree stash page {} missing for {}", page, spec.name))?;
+        let stash = &mut state.stash;
+        with_opened_oram_payload(
+            format!("{}@meta{page}", spec.name),
+            oram_meta_aad(spec, page),
+            parameters.directory_page_bytes,
+            sealed,
+            cipher,
+            allocator,
+            |payload| decode_tree_stash_page_into(payload, page - 1, shape, stash),
+        )?;
+    }
+    state.pending_size = header.size;
+    state.header = header;
+    Ok(())
+}
+
+/// The trace of the node access in progress.
+struct TreeAccessTrace {
+    logical_accesses: FixedBoxBuilder<LogicalEvent>,
+    physical_reads: FixedBoxBuilder<PhysicalReadEvent>,
+    writes: OramWriteLog,
+    last: bool,
+}
+
+/// The sealed buckets, header and stash of a private-scheme map, as a
+/// `TreePathStore`: it opens and reseals the buckets an operation reads and
+/// writes, and records each node access as one ORAM access.
+pub(super) struct SealedTreeStore<'a> {
+    spec: &'a StateObject,
+    parameters: &'a OramParameters,
+    cipher: &'a StoreCipher,
+    storage: &'a mut super::OramStorage,
+    access_counter: &'a mut u64,
+    allocator: &'a mut AllocatorSession,
+    leaf_coins: &'a mut PathOramLeafCoinSource,
+    rng: &'a mut ChaCha20Rng,
+    shape: TreeShape,
+    accesses: usize,
+    begun: usize,
+    payload: Box<[u8]>,
+    page_payload: Box<[u8]>,
+    current: Option<TreeAccessTrace>,
+    transcripts: FixedBoxBuilder<OramTranscript>,
+}
+
+impl<'a> SealedTreeStore<'a> {
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn new(
+        spec: &'a StateObject,
+        parameters: &'a OramParameters,
+        cipher: &'a StoreCipher,
+        storage: &'a mut super::OramStorage,
+        access_counter: &'a mut u64,
+        allocator: &'a mut AllocatorSession,
+        leaf_coins: &'a mut PathOramLeafCoinSource,
+        rng: &'a mut ChaCha20Rng,
+        shape: &TreeShape,
+        accesses: usize,
+    ) -> Result<Self> {
+        if storage.buckets.len() != parameters.bucket_count
+            || storage.directory_pages.len() != parameters.metadata_pages
+        {
+            bail!(
+                "tree storage for {} did not match its public bucket and page counts",
+                spec.name
+            );
+        }
+        Ok(Self {
+            spec,
+            parameters,
+            cipher,
+            storage,
+            access_counter,
+            allocator,
+            leaf_coins,
+            rng,
+            shape: clone_tree_shape(shape),
+            accesses,
+            begun: 0,
+            payload: zeroed_boxed_bytes(parameters.bucket_size)?,
+            page_payload: zeroed_boxed_bytes(parameters.directory_page_bytes)?,
+            current: None,
+            transcripts: FixedBoxBuilder::new(accesses),
+        })
+    }
+
+    /// The operation's transcripts, one per node access.
+    pub(super) fn finish(self) -> Result<Box<[OramTranscript]>> {
+        if self.current.is_some() || self.begun != self.accesses {
+            bail!(
+                "tree operation on {} ended after {} of its {} node accesses",
+                self.spec.name,
+                self.begun,
+                self.accesses
+            );
+        }
+        self.transcripts.finish()
+    }
+
+    fn current(&mut self) -> Result<&mut TreeAccessTrace> {
+        self.current
+            .as_mut()
+            .ok_or_else(|| anyhow!("tree store used outside a node access"))
+    }
+}
+
+impl TreePathStore for SealedTreeStore<'_> {
+    fn coin(&mut self) -> Result<usize> {
+        self.leaf_coins.take_leaf(
+            self.spec.id,
+            &self.spec.name,
+            *self.access_counter,
+            self.shape.leaf_count,
+            self.rng,
+        )
+    }
+
+    fn begin_access(&mut self, first: bool) -> Result<()> {
+        if self.current.is_some() || self.begun >= self.accesses || first != (self.begun == 0) {
+            bail!(
+                "tree node access {} on {} broke its operation's public schedule",
+                self.begun,
+                self.spec.name
+            );
+        }
+        let last = self.begun + 1 == self.accesses;
+        let metadata_reads = if first {
+            self.parameters.metadata_pages
+        } else {
+            0
+        };
+        let metadata_writes = if last {
+            self.parameters.metadata_pages
+        } else {
+            0
+        };
+        let reads = 1 + metadata_reads + self.parameters.buckets_per_access;
+        let mut trace = TreeAccessTrace {
+            logical_accesses: FixedBoxBuilder::new(reads),
+            physical_reads: FixedBoxBuilder::new(reads),
+            writes: oram_write_log_with_capacity(
+                self.parameters.buckets_per_access + metadata_writes + 1,
+            )?,
+            last,
+        };
+        trace.logical_accesses.push(LogicalEvent {
+            kind: "uooram_counter".into(),
+            object: self.spec.name.clone(),
+            detail: "counter".into(),
+        })?;
+        trace.physical_reads.push(PhysicalReadEvent {
+            object: self.spec.name.clone(),
+            location: format!("{}@counter", self.spec.name),
+            len: self.storage.access_counter_slot.len(),
+        })?;
+        for page in 0..metadata_reads {
+            let sealed_len = self
+                .storage
+                .directory_pages
+                .get(page)
+                .ok_or_else(|| anyhow!("tree metadata page {} missing", page))?
+                .len();
+            trace.logical_accesses.push(LogicalEvent {
+                kind: "uooram_metadata_load".into(),
+                object: self.spec.name.clone(),
+                detail: format!("page:{page}"),
+            })?;
+            trace.physical_reads.push(PhysicalReadEvent {
+                object: self.spec.name.clone(),
+                location: format!("{}@meta{page}", self.spec.name),
+                len: sealed_len,
+            })?;
+        }
+        self.begun += 1;
+        self.current = Some(trace);
+        Ok(())
+    }
+
+    fn load_bucket(&mut self, index: usize, stash: &mut TreeStash) -> Result<()> {
+        let sealed = self
+            .storage
+            .buckets
+            .get(index)
+            .ok_or_else(|| anyhow!("tree bucket {} missing for {}", index, self.spec.name))?;
+        let sealed_len = sealed.len();
+        let shape = &self.shape;
+        with_opened_oram_payload(
+            format!("{}@bucket{}", self.spec.name, index),
+            oram_bucket_aad(self.spec, index),
+            self.parameters.bucket_size,
+            sealed,
+            self.cipher,
+            self.allocator,
+            |payload| decode_tree_bucket_into_stash(index, payload, shape, stash),
+        )?;
+        let name = self.spec.name.clone();
+        let trace = self.current()?;
+        trace.logical_accesses.push(LogicalEvent {
+            kind: "uooram_path_read".into(),
+            object: name.clone(),
+            detail: format!("bucket:{index}"),
+        })?;
+        trace.physical_reads.push(PhysicalReadEvent {
+            object: name.clone(),
+            location: format!("{}@bucket{}", name, index),
+            len: sealed_len,
+        })?;
+        Ok(())
+    }
+
+    fn store_bucket(&mut self, index: usize, blocks: &[TreeNode]) -> Result<()> {
+        encode_tree_bucket_into(index, blocks, &self.shape, self.payload.as_mut())?;
+        let trace = self
+            .current
+            .as_mut()
+            .ok_or_else(|| anyhow!("tree store used outside a node access"))?;
+        let sealed = self
+            .storage
+            .buckets
+            .get_mut(index)
+            .ok_or_else(|| anyhow!("tree bucket {} missing for {}", index, self.spec.name))?;
+        reseal_oram_payload_and_record_write(
+            &mut trace.writes,
+            format!("{}@bucket{}", self.spec.name, index),
+            oram_bucket_aad(self.spec, index),
+            self.payload.as_mut(),
+            sealed,
+            self.cipher,
+            self.rng,
+            self.allocator,
+        )
+    }
+
+    fn end_operation(&mut self, header: &TreeHeader, stash: &TreeStash) -> Result<()> {
+        let trace = self
+            .current
+            .as_mut()
+            .ok_or_else(|| anyhow!("tree store used outside a node access"))?;
+        if !trace.last {
+            bail!(
+                "tree operation on {} ended before its last access",
+                self.spec.name
+            );
+        }
+        for page in 0..self.parameters.metadata_pages {
+            if page == 0 {
+                encode_tree_header_page_into(header, self.page_payload.as_mut())?;
+            } else {
+                encode_tree_stash_page_into(
+                    stash,
+                    page - 1,
+                    &self.shape,
+                    self.page_payload.as_mut(),
+                )?;
+            }
+            let sealed = self
+                .storage
+                .directory_pages
+                .get_mut(page)
+                .ok_or_else(|| anyhow!("tree metadata page {} missing", page))?;
+            reseal_oram_payload_and_record_write(
+                &mut trace.writes,
+                format!("{}@meta{page}", self.spec.name),
+                oram_meta_aad(self.spec, page),
+                self.page_payload.as_mut(),
+                sealed,
+                self.cipher,
+                self.rng,
+                self.allocator,
+            )?;
+        }
+        Ok(())
+    }
+
+    fn end_access(&mut self, record: &TreeAccessRecord) -> Result<()> {
+        let mut trace = self
+            .current
+            .take()
+            .ok_or_else(|| anyhow!("tree store used outside a node access"))?;
+        let next_counter = self
+            .access_counter
+            .checked_add(1)
+            .ok_or_else(|| anyhow!("ORAM access counter overflow for {}", self.spec.name))?;
+        rewrite_oram_counter_in_place(
+            self.spec,
+            next_counter,
+            self.cipher,
+            self.allocator,
+            self.rng,
+            &mut self.storage.access_counter_slot,
+            &mut trace.writes,
+        )?;
+        *self.access_counter = next_counter;
+        // A real access reads a node under its leaf and gives it the coin as
+        // its next leaf; a dummy access reads the coin's path.
+        let slot = masked_select_option_usize(
+            record.real,
+            &MaskedUsizeOption::some(record.node_id),
+            &MaskedUsizeOption::none(),
+        );
+        let prior_leaf = masked_select_option_usize(
+            record.real,
+            &MaskedUsizeOption::some(record.prior_leaf),
+            &MaskedUsizeOption::none(),
+        );
+        let next_leaf = masked_select_option_usize(
+            record.real,
+            &MaskedUsizeOption::some(record.coin),
+            &MaskedUsizeOption::none(),
+        );
+        let transition = RuntimePathOramTransitionWitness {
+            object_id: self.spec.id,
+            object_name: self.spec.name.clone(),
+            bucket_count: self.parameters.bucket_count,
+            kind: masked_select_transition_kind(
+                record.real,
+                RuntimePathOramTransitionKind::ReadHit,
+                RuntimePathOramTransitionKind::ReadMiss,
+            ),
+            fresh_leaf: record.coin,
+            slot_index: slot.to_witness(),
+            prior_leaf: prior_leaf.to_witness(),
+            next_leaf: next_leaf.to_witness(),
+        };
+        self.transcripts.push(OramTranscript {
+            logical_accesses: trace.logical_accesses.finish()?,
+            physical_reads: trace.physical_reads.finish()?,
+            physical_writes: finish_oram_write_log(trace.writes)?,
+            path_leaf: Some(record.read_leaf),
+            path_transition: Some(transition),
+        })?;
+        Ok(())
+    }
+}
+
+/// A get on a private-scheme map: the value of `key` (zero if absent),
+/// whether the key is present, one transcript per node access, and whether
+/// an access failed.
+pub(super) fn run_tree_get(
+    state: &mut OramState,
+    spec: &StateObject,
+    key: &Value,
+    allocator: &mut AllocatorSession,
+    leaf_coins: &mut PathOramLeafCoinSource,
+    rng: &mut ChaCha20Rng,
+) -> Result<(Value, bool, Box<[OramTranscript]>, bool)> {
+    let tree = state
+        .tree
+        .as_mut()
+        .ok_or_else(|| anyhow!("{} has no tree state", spec.name))?;
+    let mut store = SealedTreeStore::new(
+        spec,
+        &state.parameters,
+        &state.cipher,
+        &mut state.storage,
+        &mut state.access_counter,
+        allocator,
+        leaf_coins,
+        rng,
+        &tree.shape,
+        tree_get_accesses(tree.shape.avl_height),
+    )?;
+    let (value, found, failed) = tree_get(
+        &tree.shape,
+        &mut store,
+        &mut tree.stash,
+        &mut tree.header,
+        key,
+    )?;
+    Ok((value, found, store.finish()?, failed))
+}
+
+/// A put on a private-scheme map, as a call's commit makes it: one
+/// transcript per node access, and whether it overflowed the map or an
+/// access failed.
+pub(super) fn run_tree_put(
+    state: &mut OramState,
+    spec: &StateObject,
+    key: &Value,
+    value: &Value,
+    apply: bool,
+    allocator: &mut AllocatorSession,
+    leaf_coins: &mut PathOramLeafCoinSource,
+    rng: &mut ChaCha20Rng,
+) -> Result<(Box<[OramTranscript]>, bool, bool)> {
+    let tree = state
+        .tree
+        .as_mut()
+        .ok_or_else(|| anyhow!("{} has no tree state", spec.name))?;
+    let mut store = SealedTreeStore::new(
+        spec,
+        &state.parameters,
+        &state.cipher,
+        &mut state.storage,
+        &mut state.access_counter,
+        allocator,
+        leaf_coins,
+        rng,
+        &tree.shape,
+        tree_put_accesses(tree.shape.avl_height),
+    )?;
+    let (overflow, failed) = tree_put(
+        &tree.shape,
+        &mut store,
+        &mut tree.stash,
+        &mut tree.header,
+        key,
+        value,
+        apply,
+    )?;
+    Ok((store.finish()?, overflow, failed))
+}
+
+/// A write to a private-scheme map during a call: whether the key is present
+/// once the call's pending writes apply (from `found`, what the presence get
+/// read), and so whether the write overflows the map at its pending size,
+/// which it updates. Returns whether the write overflows.
+pub(super) fn decide_pending_tree_put(
+    tree: &mut TreeState,
+    pending_puts: &[super::PendingOramPut],
+    found: bool,
+    key: &Value,
+    value: &Value,
+    apply: bool,
+) -> bool {
+    let mut present = found;
+    for put in pending_puts {
+        let hit = put.apply & Value::confidential_eq(&put.key, key);
+        present = masked_select_bool(hit, !put.value.confidential_is_zero_like(), present);
+    }
+    let value_is_zero = value.confidential_is_zero_like();
+    let full = tree.pending_size >= tree.shape.capacity;
+    let insert = apply & !present & !value_is_zero & !full;
+    let overflow = apply & !present & !value_is_zero & full;
+    let delete = apply & present & value_is_zero;
+    tree.pending_size = tree.pending_size.saturating_add(usize::from(insert));
+    tree.pending_size = tree.pending_size.saturating_sub(usize::from(delete));
+    overflow
+}
+
+/// Every node's leaf, read from all the buckets and the stash: the position
+/// map a witness records. It reads the whole map, outside any trace.
+pub(super) fn tree_position_map_witness_leaves(
+    spec: &StateObject,
+    parameters: &OramParameters,
+    cipher: &StoreCipher,
+    storage: &super::OramStorage,
+) -> Result<Box<[RuntimeMaskedUsizeOptionWitness]>> {
+    let shape = tree_shape_for_spec(spec, parameters)?;
+    let scratch = parameters
+        .directory_page_bytes
+        .max(parameters.bucket_size)
+        .max(8);
+    // One payload opened per bucket and per metadata page.
+    let mut allocator = AllocatorSession::new(AllocatorPlan {
+        arena_bytes: scratch.saturating_mul(4),
+        max_stack_words: 0,
+        scratch_bytes: scratch,
+        max_kernel_ops: parameters.bucket_count + parameters.metadata_pages,
+        max_commit_ops: 0,
+    })?;
+    let mut leaves = FixedBoxBuilder::new(shape.capacity);
+    for _ in 0..shape.capacity {
+        leaves.push(MaskedUsizeOption::none())?;
+    }
+    let mut leaves = leaves.finish()?;
+    let empty = TreeNode::empty(&shape.key_type, &shape.value_type);
+    let mut record = |node: &TreeNode| -> Result<()> {
+        if node.occupied {
+            let slot = leaves
+                .get_mut(node.id)
+                .ok_or_else(|| anyhow!("tree node {} out of range", node.id))?;
+            if slot.is_some() {
+                bail!("tree node {} stored twice", node.id);
+            }
+            *slot = MaskedUsizeOption::some(node.leaf);
+        }
+        Ok(())
+    };
+    for (index, sealed) in storage.buckets.iter().enumerate() {
+        let mut stash = TreeStash::with_capacity(0, shape.blocks_per_bucket, &empty)?;
+        with_opened_oram_payload(
+            format!("{}@bucket{}", spec.name, index),
+            oram_bucket_aad(spec, index),
+            parameters.bucket_size,
+            sealed,
+            cipher,
+            &mut allocator,
+            |payload| decode_tree_bucket_into_stash(index, payload, &shape, &mut stash),
+        )?;
+        for node in stash.blocks.iter() {
+            record(node)?;
+        }
+    }
+    let mut state = TreeState::cold(&shape, parameters.buckets_per_access)?;
+    refresh_tree_state_from_storage(
+        spec,
+        parameters,
+        cipher,
+        &storage.directory_pages,
+        &mut allocator,
+        &mut state,
+    )?;
+    for node in state.stash.blocks.iter().take(state.stash.persistent) {
+        record(node)?;
+    }
+    allocator.finish()?;
+    let mut witness = FixedBoxBuilder::new(shape.capacity);
+    for leaf in leaves.iter() {
+        if !leaf.is_some() {
+            bail!("a node of {} is missing from its tree", spec.name);
+        }
+        witness.push(leaf.to_witness())?;
+    }
+    witness.finish()
+}
+
+/// The map's entries as stored: every node in the tree, read from all the
+/// buckets and the stash, for the public-state snapshot.
+pub(super) fn tree_entries_from_storage(
+    spec: &StateObject,
+    parameters: &OramParameters,
+    cipher: &StoreCipher,
+    storage: &super::OramStorage,
+    empty_entry: &MapEntry,
+) -> Result<Box<[MapEntry]>> {
+    let shape = tree_shape_for_spec(spec, parameters)?;
+    let scratch = parameters
+        .directory_page_bytes
+        .max(parameters.bucket_size)
+        .max(8);
+    // One payload opened per bucket and per metadata page.
+    let mut allocator = AllocatorSession::new(AllocatorPlan {
+        arena_bytes: scratch.saturating_mul(4),
+        max_stack_words: 0,
+        scratch_bytes: scratch,
+        max_kernel_ops: parameters.bucket_count + parameters.metadata_pages,
+        max_commit_ops: 0,
+    })?;
+    let mut entries = repeat_boxed_map_entries(shape.capacity, empty_entry)?;
+    let empty = TreeNode::empty(&shape.key_type, &shape.value_type);
+    let mut record = |node: &TreeNode| -> Result<()> {
+        if node.occupied & node.in_tree {
+            let entry = entries
+                .get_mut(node.id)
+                .ok_or_else(|| anyhow!("tree node {} out of range", node.id))?;
+            *entry = MapEntry::new(true, node.key.clone(), node.value.clone());
+        }
+        Ok(())
+    };
+    for (index, sealed) in storage.buckets.iter().enumerate() {
+        let mut stash = TreeStash::with_capacity(0, shape.blocks_per_bucket, &empty)?;
+        with_opened_oram_payload(
+            format!("{}@bucket{}", spec.name, index),
+            oram_bucket_aad(spec, index),
+            parameters.bucket_size,
+            sealed,
+            cipher,
+            &mut allocator,
+            |payload| decode_tree_bucket_into_stash(index, payload, &shape, &mut stash),
+        )?;
+        for node in stash.blocks.iter() {
+            record(node)?;
+        }
+    }
+    let mut state = TreeState::cold(&shape, parameters.buckets_per_access)?;
+    refresh_tree_state_from_storage(
+        spec,
+        parameters,
+        cipher,
+        &storage.directory_pages,
+        &mut allocator,
+        &mut state,
+    )?;
+    for node in state.stash.blocks.iter().take(state.stash.persistent) {
+        record(node)?;
+    }
+    allocator.finish()?;
+    Ok(entries)
 }

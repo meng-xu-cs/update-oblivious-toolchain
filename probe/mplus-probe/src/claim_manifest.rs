@@ -133,12 +133,17 @@ const CLAIM_ENTRIES: &[ClaimEntry] = &[
     ClaimEntry {
         id: "computational-uo-path-oram-private",
         category: "claim",
-        text: "The private-position-map Path ORAM route path_oram_private_posmap_v1 lifts the local route's capacity cap and shares its data path, a flat position map that every access scans in full (no recursive position map); its Lean paper-main theorem holds over admitted configurations whose maps use either scheme, given the same bundle evidence, and the bundle is derived for ERC20Lite.transferFrom with balances on the private scheme from one runtime run per side whose leaves are substituted for every other tape, with runtime runs on sampled tapes checked against the substitution.",
+        text: "The private-position-map Path ORAM route path_oram_private_posmap_v1 lifts the local route's capacity cap and keeps a map as an oblivious AVL tree of preallocated nodes in one Path ORAM tree, each node holding its children's leaves, so the position map recurses through the tree: a get makes h node accesses and a put 3h + 1, h the largest AVL height for the capacity, each reading and writing one path, and an operation reads and writes its header and stash pages once; its Lean paper-main theorem holds over admitted configurations whose maps use either scheme, given the same bundle evidence, with the stash bounded by the Path ORAM bound plus the 3h + 1 nodes an operation returns to it (stashOverflowBounded), and the bundle is derived for ERC20Lite.transferFrom with balances on the private scheme from one runtime run per side whose leaves are substituted for every other tape, with runtime runs on sampled tapes checked against the substitution.",
         status: STATUS_GENERATED_CHECKED,
         doc_anchor: "path_oram_private_posmap_v1",
-        source_files: &["crates/uo-core/src/trace.rs"],
+        source_files: &[
+            "crates/uo-core/src/trace.rs",
+            "crates/uo-core/src/manifest.rs",
+            "runtime/uo-evm/src/generated_oram_codecs.rs",
+        ],
         lean_modules: &[
             "proof/lean/UOToolchain/PathOramPrivatePosmapV1.lean",
+            "proof/lean/UOToolchain/PathOramTreeShape.lean",
             "proof/lean/UOToolchain/RuntimeCoins.lean",
             "proof/lean/UOToolchain/PathOramAdmitted.lean",
             "proof/lean/UOToolchain/PathOramTapeWitness.lean",

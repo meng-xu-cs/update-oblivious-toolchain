@@ -3,7 +3,9 @@ use rand_chacha::ChaCha20Rng;
 use serde_json::json;
 use uo_allocator::{AllocatorPlan, AllocatorSession};
 use uo_core::ir::StateObject;
-use uo_core::manifest::{is_path_oram_scheme, OramManifest, SURROGATE_ORAM_SCHEME};
+use uo_core::manifest::{
+    is_path_oram_scheme, OramManifest, PATH_ORAM_PRIVATE_POSMAP_SCHEME, SURROGATE_ORAM_SCHEME,
+};
 use uo_core::trace::{LogicalEvent, PhysicalReadEvent, WriteClass};
 use uo_core::Value;
 use uo_core::{
@@ -35,6 +37,11 @@ use generated_oram_codecs::{
     rewrite_oram_counter_in_place, rewrite_surrogate_bucket_window_in_place,
     rewrite_surrogate_directory_pages_in_place, run_path_commit_put, run_path_get, run_path_put,
     run_surrogate_get, run_surrogate_put, working_stash_capacity, FixedStash, MaskedUsizeOption,
+};
+use generated_oram_codecs::{
+    bootstrap_tree_storage, decide_pending_tree_put, refresh_tree_state_from_storage, run_tree_get,
+    run_tree_put, tree_entries_from_storage, tree_position_map_witness_leaves, tree_put_accesses,
+    TreeState,
 };
 #[cfg(test)]
 use generated_oram_codecs::{
@@ -275,6 +282,8 @@ pub(crate) struct OramState {
     entries: Box<[MapEntry]>,
     position_map: Box<[MaskedUsizeOption]>,
     stash: FixedStash,
+    // The private scheme's AVL map: its shape, header and stash.
+    tree: Option<TreeState>,
     storage: OramStorage,
     access_counter: u64,
     cipher: StoreCipher,
@@ -310,16 +319,37 @@ impl OramState {
         self.parameters.bucket_count
     }
 
+    /// Whether the map is the private scheme's AVL map.
+    pub(crate) fn is_tree(&self) -> bool {
+        self.tree.is_some()
+    }
+
+    /// The node accesses of one put on the private scheme's tree, whose
+    /// coins a call's pending writes reserve; 2 on the other schemes.
+    pub(crate) fn coins_per_pending_write(&self) -> usize {
+        if self.is_tree() {
+            tree_put_accesses(generated_oram_codecs::tree_avl_height(
+                self.parameters.capacity,
+            ))
+        } else {
+            2
+        }
+    }
+
     pub(crate) fn path_position_map_witness(
         &self,
         spec: &StateObject,
     ) -> Result<RuntimePathOramPositionMapWitness> {
-        let leaves = path_position_map_witness_leaves(
-            spec,
-            &self.parameters,
-            &self.cipher,
-            &self.storage.directory_pages,
-        )?;
+        let leaves = if self.is_tree() {
+            tree_position_map_witness_leaves(spec, &self.parameters, &self.cipher, &self.storage)?
+        } else {
+            path_position_map_witness_leaves(
+                spec,
+                &self.parameters,
+                &self.cipher,
+                &self.storage.directory_pages,
+            )?
+        };
         Ok(RuntimePathOramPositionMapWitness {
             object_id: spec.id,
             object_name: spec.name.clone(),
@@ -346,7 +376,16 @@ impl OramState {
         spec: &StateObject,
     ) -> Result<serde_json::Value> {
         let stored_entries;
-        let entries: &[MapEntry] = if self.parameters.is_path_oram() {
+        let entries: &[MapEntry] = if self.is_tree() {
+            stored_entries = tree_entries_from_storage(
+                spec,
+                &self.parameters,
+                &self.cipher,
+                &self.storage,
+                &self.empty_entry,
+            )?;
+            &stored_entries
+        } else if self.parameters.is_path_oram() {
             stored_entries = path_entries_from_storage(
                 spec,
                 &self.parameters,
@@ -477,12 +516,38 @@ impl OramState {
             &self.empty_entry,
             &mut self.stash,
         );
+        if let Some(tree) = self.tree.as_mut() {
+            tree.wipe_secrets();
+        }
     }
 
     pub(crate) fn instantiate(spec: &StateObject, rng: &mut ChaCha20Rng) -> Result<Self> {
         let parameters = OramParameters::for_spec(spec)?;
         let cipher = StoreCipher::from_rng(rng);
         let empty_entry = empty_map_entry(spec)?;
+        if parameters.scheme == PATH_ORAM_PRIVATE_POSMAP_SCHEME {
+            // The private scheme's map is an AVL tree in the ORAM: no flat
+            // slots or position map in the enclave.
+            let (directory_pages, buckets, tree) =
+                bootstrap_tree_storage(spec, &parameters, &cipher, rng)?;
+            let mut state = Self {
+                parameters,
+                entries: repeat_boxed_map_entries(0, &empty_entry)?,
+                empty_entry,
+                position_map: repeat_boxed_masked_usize_options(0, &MaskedUsizeOption::none())?,
+                stash: FixedStash::placeholder(),
+                tree: Some(tree),
+                storage: OramStorage {
+                    directory_pages,
+                    buckets,
+                    access_counter_slot: bootstrap_oram_counter_slot(spec, &cipher, rng)?,
+                },
+                access_counter: 0,
+                cipher,
+            };
+            state.cold_commit();
+            return Ok(state);
+        }
         let entries = repeat_boxed_map_entries(parameters.capacity, &empty_entry)?;
         let position_map_capacity = parameters.capacity;
         if parameters.is_surrogate() {
@@ -504,6 +569,7 @@ impl OramState {
                     &MaskedUsizeOption::none(),
                 )?,
                 stash: FixedStash::placeholder(),
+                tree: None,
                 storage: OramStorage {
                     directory_pages,
                     buckets,
@@ -528,6 +594,7 @@ impl OramState {
                 max_stack_words: 0,
                 scratch_bytes: bootstrap_scratch,
                 max_kernel_ops: parameters.metadata_pages,
+                max_commit_ops: 0,
             })?;
             let directory_pages = encode_path_metadata_pages(
                 spec,
@@ -547,6 +614,7 @@ impl OramState {
                 entries,
                 position_map,
                 stash,
+                tree: None,
                 storage: OramStorage {
                     directory_pages,
                     buckets,
@@ -571,7 +639,16 @@ impl OramState {
             allocator,
             &self.storage.access_counter_slot,
         )?;
-        if self.parameters.is_surrogate() {
+        if let Some(tree) = self.tree.as_mut() {
+            refresh_tree_state_from_storage(
+                spec,
+                &self.parameters,
+                &self.cipher,
+                &self.storage.directory_pages,
+                allocator,
+                tree,
+            )?;
+        } else if self.parameters.is_surrogate() {
             decode_surrogate_entries_from_storage_into(
                 spec,
                 &self.parameters,
@@ -710,6 +787,77 @@ impl OramState {
         }
     }
 
+    /// A get on the private scheme's tree: the value, whether the key is
+    /// present, one transcript per node access, and whether one failed.
+    pub(crate) fn tree_get(
+        &mut self,
+        spec: &StateObject,
+        key: &Value,
+        allocator: &mut AllocatorSession,
+        leaf_coins: &mut PathOramLeafCoinSource,
+        rng: &mut ChaCha20Rng,
+    ) -> Result<(Value, bool, Box<[OramTranscript]>, bool)> {
+        run_tree_get(self, spec, key, allocator, leaf_coins, rng)
+    }
+
+    /// Decide a pending write to the private scheme's tree: whether it
+    /// overflows the map, given whether the presence get found the key.
+    pub(crate) fn decide_pending_tree_put(
+        &mut self,
+        spec: &StateObject,
+        pending_puts: &[PendingOramPut],
+        found: bool,
+        key: &Value,
+        value: &Value,
+        apply: bool,
+    ) -> Result<bool> {
+        let tree = self
+            .tree
+            .as_mut()
+            .ok_or_else(|| anyhow!("{} has no tree state", spec.name))?;
+        Ok(decide_pending_tree_put(
+            tree,
+            pending_puts,
+            found,
+            key,
+            value,
+            apply,
+        ))
+    }
+
+    /// A pending write to the private scheme's tree, made at commit and
+    /// masked off if the call aborted: one transcript per node access.
+    pub(crate) fn commit_tree_put(
+        &mut self,
+        spec: &StateObject,
+        put: &PendingOramPut,
+        aborted: bool,
+        allocator: &mut AllocatorSession,
+        leaf_coins: &mut PathOramLeafCoinSource,
+        rng: &mut ChaCha20Rng,
+    ) -> Result<Box<[OramTranscript]>> {
+        let (transcripts, overflowed, failed) = run_tree_put(
+            self,
+            spec,
+            &put.key,
+            &put.value,
+            put.apply & !aborted,
+            allocator,
+            leaf_coins,
+            rng,
+        )?;
+        // The call decided every write's overflow with the map's pending
+        // size, so a write that overflows or fails here means the decision
+        // and the tree disagree; stop rather than commit.
+        if overflowed | failed {
+            bail!(
+                "write to {} failed at commit; the pending size and the tree disagree",
+                spec.name
+            );
+        }
+        Ok(transcripts)
+    }
+
     pub(crate) fn commit_put(
         &mut self,
         spec: &StateObject,
@@ -796,6 +944,7 @@ mod tests {
                 .max(parameters.bucket_size)
                 .max(8),
             max_kernel_ops: 0,
+            max_commit_ops: 0,
         })
         .unwrap()
     }
@@ -1425,6 +1574,7 @@ mod tests {
             max_stack_words: 0,
             scratch_bytes: parameters.directory_page_bytes,
             max_kernel_ops: 0,
+            max_commit_ops: 0,
         })
         .unwrap();
         let position_map = masked_position_map_from_options(&vec![None; parameters.capacity]);
@@ -1456,6 +1606,7 @@ mod tests {
             max_stack_words: 0,
             scratch_bytes: parameters.directory_page_bytes,
             max_kernel_ops: 0,
+            max_commit_ops: 0,
         })
         .unwrap();
         let err =
@@ -1478,6 +1629,7 @@ mod tests {
             max_stack_words: 0,
             scratch_bytes: parameters.directory_page_bytes,
             max_kernel_ops: 0,
+            max_commit_ops: 0,
         })
         .unwrap();
         let position_map_options = vec![None; parameters.capacity];
@@ -1503,6 +1655,7 @@ mod tests {
             max_stack_words: 0,
             scratch_bytes: parameters.directory_page_bytes,
             max_kernel_ops: 0,
+            max_commit_ops: 0,
         })
         .unwrap();
         let (decoded_position_map, decoded_stash) =
@@ -1853,7 +2006,7 @@ mod tests {
         use super::super::generated_oram_codecs::{
             bucket_on_leaf_path, clone_tree_node, tree_avl_height, tree_bootstrap_nodes, tree_get,
             tree_get_accesses, tree_key_lt, tree_place_nodes, tree_put, tree_put_accesses,
-            TreeHeader, TreeLink, TreeNode, TreePathStore, TreeShape, TreeStash,
+            TreeAccessRecord, TreeHeader, TreeLink, TreeNode, TreePathStore, TreeShape, TreeStash,
         };
         use anyhow::Result;
         use rand::{Rng, SeedableRng};
@@ -1864,21 +2017,31 @@ mod tests {
         struct MemoryTreeStore {
             buckets: Vec<Box<[TreeNode]>>,
             empty: TreeNode,
+            leaf_count: usize,
+            coins: ChaCha20Rng,
+            operation_ended: bool,
             accesses: usize,
             first_accesses: usize,
             ended_accesses: usize,
             ended_operations: usize,
+            last_access_ended_after_operation: bool,
             reads: usize,
             writes: usize,
         }
 
         impl TreePathStore for MemoryTreeStore {
+            fn coin(&mut self) -> Result<usize> {
+                Ok(self.coins.gen_range(0..self.leaf_count))
+            }
+
             fn begin_access(&mut self, first: bool) -> Result<()> {
+                assert!(!self.operation_ended, "an access after the operation ended");
                 if first {
                     self.accesses = 0;
                     self.first_accesses = 0;
                     self.ended_accesses = 0;
                     self.ended_operations = 0;
+                    self.last_access_ended_after_operation = false;
                     self.reads = 0;
                     self.writes = 0;
                 }
@@ -1902,13 +2065,26 @@ mod tests {
                 Ok(())
             }
 
-            fn end_access(&mut self) -> Result<()> {
-                self.ended_accesses += 1;
+            fn end_operation(&mut self, _header: &TreeHeader, _stash: &TreeStash) -> Result<()> {
+                self.ended_operations += 1;
+                self.operation_ended = true;
                 Ok(())
             }
 
-            fn end_operation(&mut self, _header: &TreeHeader, _stash: &TreeStash) -> Result<()> {
-                self.ended_operations += 1;
+            fn end_access(&mut self, record: &TreeAccessRecord) -> Result<()> {
+                assert!(record.read_leaf < self.leaf_count);
+                assert!(record.coin < self.leaf_count);
+                if record.real {
+                    assert_eq!(record.read_leaf, record.prior_leaf);
+                } else {
+                    assert_eq!(record.read_leaf, record.coin);
+                }
+                self.ended_accesses += 1;
+                // The last access ends after the operation does.
+                if self.operation_ended {
+                    self.operation_ended = false;
+                    self.last_access_ended_after_operation = true;
+                }
                 Ok(())
             }
         }
@@ -1932,6 +2108,7 @@ mod tests {
                 assert_eq!(store.first_accesses, 1);
                 assert_eq!(store.ended_accesses, accesses);
                 assert_eq!(store.ended_operations, 1);
+                assert!(store.last_access_ended_after_operation);
                 assert_eq!(store.reads, accesses * self.levels);
                 assert_eq!(store.writes, accesses * self.levels);
             }
@@ -1963,6 +2140,7 @@ mod tests {
                 key_type: key_type(),
                 value_type: value_type(),
                 key_width: 20,
+                value_width: 32,
             };
             let empty = TreeNode::empty(&key_type(), &value_type());
             let working = shape.stash_bound + shape.blocks_per_bucket * levels;
@@ -1979,10 +2157,14 @@ mod tests {
                 store: MemoryTreeStore {
                     buckets,
                     empty,
+                    leaf_count,
+                    coins: ChaCha20Rng::seed_from_u64(seed ^ 0x5eed),
+                    operation_ended: false,
                     accesses: 0,
                     first_accesses: 0,
                     ended_accesses: 0,
                     ended_operations: 0,
+                    last_access_ended_after_operation: false,
                     reads: 0,
                     writes: 0,
                 },
@@ -2130,22 +2312,18 @@ mod tests {
             let mut fixture = fixture(capacity, seed, stash_bound);
             let mut expected = BTreeMap::new();
             let key_space = (2 * capacity + 3).min(250) as u8;
-            let leaf_count = fixture.shape.leaf_count;
             let get_accesses = tree_get_accesses(fixture.shape.avl_height);
             let put_accesses = tree_put_accesses(fixture.shape.avl_height);
             for _ in 0..operations {
                 let key = address(fixture.rng.gen_range(1..=key_space));
                 let roll: f64 = fixture.rng.gen();
-                let mut coin_rng = ChaCha20Rng::seed_from_u64(fixture.rng.gen());
-                let mut coins = || Ok(coin_rng.gen_range(0..leaf_count));
                 if roll < 0.3 {
-                    let (value, failed) = tree_get(
+                    let (value, found, failed) = tree_get(
                         &fixture.shape,
                         &mut fixture.store,
                         &mut fixture.stash,
                         &mut fixture.header,
                         &key,
-                        &mut coins,
                     )
                     .unwrap();
                     if failed {
@@ -2157,6 +2335,7 @@ mod tests {
                         .cloned()
                         .unwrap_or_else(|| Value::uint(0));
                     assert_eq!(value, want);
+                    assert_eq!(found, expected.contains_key(&key_bytes(&key)));
                     fixture.assert_operation_shape(get_accesses);
                 } else {
                     let value = if roll < 0.55 {
@@ -2173,7 +2352,6 @@ mod tests {
                         &key,
                         &value,
                         apply,
-                        &mut coins,
                     )
                     .unwrap();
                     if failed {

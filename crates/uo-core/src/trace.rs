@@ -1079,7 +1079,11 @@ pub struct CanonicalFreshCoinRuntimePathOramWitnessFamily {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct CanonicalFreshCoinRuntimePathOramTheoremInput {
-    seed_count: usize,
+    /// The canonical seed space's size, the product of the scaffold's leaf
+    /// counts, as an exact integer: a call that makes many accesses (a
+    /// private-scheme map makes one per tree node it visits) has a space far
+    /// larger than any machine word.
+    seed_count: serde_json::Number,
     representative_seed: usize,
     representative_witness: RuntimeRefinementWitness,
     public_leaf_scaffold: Box<[RuntimeOramLeafScaffoldWitness]>,
@@ -1525,12 +1529,12 @@ pub enum CanonicalFreshCoinWitnessFamilyError {
 pub enum CanonicalFreshCoinTheoremInputError {
     CanonicalSeedSpaceOverflow,
     CanonicalSeedCountMismatch {
-        seed_count: usize,
-        canonical_seed_count: usize,
+        seed_count: String,
+        canonical_seed_count: String,
     },
     RepresentativeSeedOutOfRange {
         representative_seed: usize,
-        seed_count: usize,
+        seed_count: String,
     },
     PublicLeafScaffoldMismatch,
     FreshCoinScaffoldExtractionMismatch,
@@ -5319,8 +5323,8 @@ impl CanonicalFreshCoinRuntimePathOramWitnessFamily {
 }
 
 impl CanonicalFreshCoinRuntimePathOramTheoremInput {
-    pub fn seed_count(&self) -> usize {
-        self.seed_count
+    pub fn seed_count(&self) -> &serde_json::Number {
+        &self.seed_count
     }
 
     pub fn representative_seed(&self) -> usize {
@@ -5347,7 +5351,7 @@ impl CanonicalFreshCoinRuntimePathOramTheoremInput {
         let public_fresh_coin_scaffold = representative_witness
             .path_oram_fresh_coin_scaffold()
             .ok_or(CanonicalFreshCoinTheoremInputError::FreshCoinScaffoldExtractionMismatch)?;
-        let seed_count = canonical_path_oram_leaf_seed_space_size(&public_fresh_coin_scaffold)
+        let seed_count = canonical_path_oram_leaf_seed_space_number(&public_fresh_coin_scaffold)
             .ok_or(CanonicalFreshCoinTheoremInputError::CanonicalSeedSpaceOverflow)?;
         let theorem_input = Self {
             seed_count,
@@ -5362,21 +5366,21 @@ impl CanonicalFreshCoinRuntimePathOramTheoremInput {
 
     pub fn validate(&self) -> Result<(), CanonicalFreshCoinTheoremInputError> {
         let canonical_seed_count =
-            canonical_path_oram_leaf_seed_space_size(&self.public_fresh_coin_scaffold)
+            canonical_path_oram_leaf_seed_space_number(&self.public_fresh_coin_scaffold)
                 .ok_or(CanonicalFreshCoinTheoremInputError::CanonicalSeedSpaceOverflow)?;
         if self.seed_count != canonical_seed_count {
             return Err(
                 CanonicalFreshCoinTheoremInputError::CanonicalSeedCountMismatch {
-                    seed_count: self.seed_count,
-                    canonical_seed_count,
+                    seed_count: self.seed_count.to_string(),
+                    canonical_seed_count: canonical_seed_count.to_string(),
                 },
             );
         }
-        if self.representative_seed >= self.seed_count {
+        if !decimal_exceeds_usize(&self.seed_count.to_string(), self.representative_seed) {
             return Err(
                 CanonicalFreshCoinTheoremInputError::RepresentativeSeedOutOfRange {
                     representative_seed: self.representative_seed,
-                    seed_count: self.seed_count,
+                    seed_count: self.seed_count.to_string(),
                 },
             );
         }
@@ -5817,6 +5821,36 @@ fn consume_expected_oram_logical_events(
     Ok(index)
 }
 
+/// Consume the metadata-page events after an access's counter. A private-
+/// scheme access reads the metadata pages only as its operation's first
+/// node access, so it has all of them or none; any other access has all.
+fn consume_oram_access_metadata_events(
+    logical_accesses: &[LogicalEvent],
+    index: usize,
+    object: &RuntimeOramObjectWitness,
+    object_name: &str,
+) -> Result<(usize, bool), RefinementWitnessError> {
+    let metadata_kind = object.metadata_event_kind()?;
+    let optional = object.scheme == PATH_ORAM_PRIVATE_POSMAP_SCHEME;
+    let starts_metadata = logical_accesses.get(index).is_some_and(|event| {
+        event.object == object_name
+            && event.kind == metadata_kind
+            && event.detail.starts_with("page:")
+    });
+    if optional && !starts_metadata {
+        return Ok((index, false));
+    }
+    let next = consume_expected_oram_logical_events(
+        logical_accesses,
+        index,
+        object_name,
+        metadata_kind,
+        object.metadata_pages,
+        "page:",
+    )?;
+    Ok((next, true))
+}
+
 fn reconstruct_oram_accesses_from_logical_trace(
     logical_accesses: &[LogicalEvent],
     oram_objects: &[RuntimeOramObjectWitness],
@@ -5841,22 +5875,19 @@ fn reconstruct_oram_accesses_from_logical_trace(
         let object_name = event.object.clone();
         let object = runtime_oram_object_by_name(oram_objects, &object_name)?;
         index += 1;
+        let (after_metadata, _) =
+            consume_oram_access_metadata_events(logical_accesses, index, object, &object_name)?;
         index = consume_expected_oram_logical_events(
             logical_accesses,
-            index,
-            &object_name,
-            object.metadata_event_kind()?,
-            object.metadata_pages,
-            "page:",
-        )?;
-        index = consume_expected_oram_logical_events(
-            logical_accesses,
-            index,
+            after_metadata,
             &object_name,
             object.bucket_event_kind()?,
             object.buckets_per_access,
             "bucket:",
         )?;
+        // The access certificate carries the object's per-access bounds; a
+        // private-scheme node access reads its metadata pages at most once
+        // per operation.
         accesses.push(object.access_witness());
     }
     Ok(accesses)
@@ -5909,14 +5940,9 @@ fn reconstruct_path_oram_leaf_scaffold_from_logical_trace(
         let object_name = event.object.clone();
         let object = runtime_oram_object_by_name(oram_objects, &object_name)?;
         index += 1;
-        index = consume_expected_oram_logical_events(
-            logical_accesses,
-            index,
-            &object_name,
-            object.metadata_event_kind()?,
-            object.metadata_pages,
-            "page:",
-        )?;
+        let (after_metadata, _) =
+            consume_oram_access_metadata_events(logical_accesses, index, object, &object_name)?;
+        index = after_metadata;
         index = consume_expected_oram_logical_events(
             logical_accesses,
             index,
@@ -6145,6 +6171,50 @@ pub fn canonical_path_oram_leaf_seed_space_size(
     })
 }
 
+/// The canonical seed space's size as an exact integer: the product of the
+/// scaffold's leaf counts, which may exceed any machine word.
+pub fn canonical_path_oram_leaf_seed_space_number(
+    scaffold: &[RuntimeOramLeafScaffoldWitness],
+) -> Option<serde_json::Number> {
+    // Little-endian base-10^9 limbs.
+    const BASE: u64 = 1_000_000_000;
+    let mut limbs: Vec<u64> = vec![1];
+    for step in scaffold {
+        let factor = u64::try_from(path_oram_leaf_choice_count(step.bucket_count)).ok()?;
+        let mut carry = 0u64;
+        for limb in limbs.iter_mut() {
+            let product = u128::from(*limb) * u128::from(factor) + u128::from(carry);
+            *limb = u64::try_from(product % u128::from(BASE)).ok()?;
+            carry = u64::try_from(product / u128::from(BASE)).ok()?;
+        }
+        while carry > 0 {
+            limbs.push(carry % BASE);
+            carry /= BASE;
+        }
+    }
+    while limbs.len() > 1 && limbs.last() == Some(&0) {
+        limbs.pop();
+    }
+    let mut digits = String::new();
+    for (index, limb) in limbs.iter().rev().enumerate() {
+        if index == 0 {
+            digits.push_str(&limb.to_string());
+        } else {
+            digits.push_str(&format!("{limb:09}"));
+        }
+    }
+    digits.parse::<serde_json::Number>().ok()
+}
+
+/// Whether the decimal integer `digits` exceeds `value`.
+fn decimal_exceeds_usize(digits: &str, value: usize) -> bool {
+    match digits.parse::<u128>() {
+        Ok(number) => number > value as u128,
+        // More digits than a u128 holds: larger than any usize.
+        Err(_) => !digits.is_empty() && digits.bytes().all(|byte| byte.is_ascii_digit()),
+    }
+}
+
 pub fn canonical_path_oram_leaf_values_of_seed(
     scaffold: &[RuntimeOramLeafScaffoldWitness],
     seed: usize,
@@ -6155,12 +6225,22 @@ pub fn canonical_path_oram_leaf_values_of_seed(
         output: &mut FixedBoxBuilder<usize>,
     ) -> Option<()> {
         if let Some((head, tail)) = scaffold.split_first() {
-            let tail_size = canonical_path_oram_leaf_seed_space_size(tail)?.max(1);
             if path_oram_leaf_choice_count(head.bucket_count) == 0 {
                 return None;
             }
-            output.push(seed / tail_size).ok()?;
-            go(tail, seed % tail_size, output)?;
+            // A tail whose seed space exceeds a machine word exceeds the
+            // seed, so the seed's digit here is zero.
+            match canonical_path_oram_leaf_seed_space_size(tail) {
+                Some(tail_size) => {
+                    let tail_size = tail_size.max(1);
+                    output.push(seed / tail_size).ok()?;
+                    go(tail, seed % tail_size, output)?;
+                }
+                None => {
+                    output.push(0).ok()?;
+                    go(tail, seed, output)?;
+                }
+            }
         }
         Some(())
     }
@@ -10929,7 +11009,7 @@ mod tests {
             sample_runtime_refinement_witness_with_seed(0),
         )
         .unwrap();
-        assert_eq!(theorem_input.seed_count, 16);
+        assert_eq!(theorem_input.seed_count.as_u64(), Some(16));
         assert_eq!(theorem_input.representative_seed, 3);
         assert_eq!(theorem_input.public_leaf_scaffold.len(), 1);
         assert_eq!(theorem_input.public_fresh_coin_scaffold.len(), 1);

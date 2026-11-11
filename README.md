@@ -33,10 +33,13 @@ a public chain" as its main execution model.
   abstract/runtime model: `UOCell`, `UOArray`, and full-scan `UOMap`.
 - The computational-UO routes with a Lean instance are
   `path_oram_local_posmap_v1` and `path_oram_private_posmap_v1`. The local
-  route is capped at capacity `128`; the private route lifts the cap and
-  shares the local route's data path, a flat position map in encrypted
-  metadata pages that every access scans in full (the runtime has no
-  recursive position map). Their paper-main theorems hold over admitted
+  route is capped at capacity `128` and keeps a flat position map in
+  encrypted metadata pages that every access scans in full. The private
+  route lifts the cap and keeps a map as an oblivious AVL tree in one Path
+  ORAM tree, whose nodes hold their children's leaves, so its position map
+  recurses through the tree: a get or a put makes a fixed number of node
+  accesses, logarithmic in the capacity, each reading and writing one path.
+  Their paper-main theorems hold over admitted
   configurations given bundle evidence (`PathOramAdmitted`), whose leaf
   obligation follows from the leaf model without seed enumeration; the
   private route's configurations may mix maps of both schemes. The bundle is

@@ -1232,11 +1232,27 @@ bounds:
             first_trace.trace.theorem_trace,
             second_trace.trace.theorem_trace
         );
-        assert_eq!(first_trace.trace.theorem_trace.boundary_schedule.len(), 6);
-        // Each access reads the counter, all 47 metadata pages (32 position-map
-        // pages and 15 stash pages, the stash bound being capped at 114), and
-        // the 9 buckets of one path.
-        assert_eq!(first_trace.trace.physical_reads.len(), 2 * (1 + 47 + 9));
+        // The map is an AVL tree of 256 nodes, at most 11 levels high: the
+        // read is a get of 11 node accesses, and the write a get of 11 that
+        // finds whether the key is present and a put of 3 * 11 + 1 = 34 at
+        // commit, 56 node accesses in all, each an ORAM access.
+        let get = uo_core::manifest::path_oram_tree_get_accesses(256);
+        let put = uo_core::manifest::path_oram_tree_put_accesses(256);
+        assert_eq!((get, put), (11, 34));
+        let accesses = get + get + put;
+        assert_eq!(
+            first_trace.trace.theorem_trace.boundary_schedule.len(),
+            2 * accesses + 2
+        );
+        // Each node access reads the counter and the 9 buckets of one path;
+        // each of the three operations' first also reads the 20 metadata
+        // pages: the header and 19 stash pages, for a stash bound of
+        // 114 + 34 = 148.
+        assert_eq!(uo_core::manifest::path_oram_tree_stash_bound(256), 114 + 34);
+        assert_eq!(
+            first_trace.trace.physical_reads.len(),
+            accesses * (1 + 9) + 3 * 20
+        );
         assert_eq!(
             first_trace
                 .trace
@@ -1244,7 +1260,7 @@ bounds:
                 .iter()
                 .filter(|event| event.kind == "uooram_counter")
                 .count(),
-            2
+            accesses
         );
         let read_back = first
             .call("read(bytes32)", vec![Value::Bytes32([1u8; 32])])

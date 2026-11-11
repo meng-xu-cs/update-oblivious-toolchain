@@ -91,8 +91,9 @@ pub use shell_boundary::{
     RuntimeShellBoundaryBundleError, RuntimeShellContract, RuntimeShellTrace,
 };
 pub use trace::{
-    canonical_path_oram_leaf_seed_space_size, canonical_path_oram_leaf_values_of_seed,
-    canonical_path_oram_seed_of_leaf_values, canonical_runtime_public_object_ids, classify_write,
+    canonical_path_oram_leaf_seed_space_number, canonical_path_oram_leaf_seed_space_size,
+    canonical_path_oram_leaf_values_of_seed, canonical_path_oram_seed_of_leaf_values,
+    canonical_runtime_public_object_ids, classify_write,
     extract_runtime_path_oram_fresh_coin_scaffold, extract_runtime_path_oram_fresh_coin_values,
     max_runtime_kernel_refinement_event_count, BoundaryDirection, BoundaryEvent,
     CanonicalFreshCoinRuntimePathOramTheoremInput, CanonicalFreshCoinRuntimePathOramWitnessFamily,

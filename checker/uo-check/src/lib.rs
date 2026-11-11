@@ -1239,7 +1239,7 @@ fn collect_oram_statement_accesses(
             value,
             predicate,
         } => {
-            record_oram_access(*object_id, state, counts)?;
+            record_oram_access(*object_id, true, state, counts)?;
             collect_oram_expr_accesses(key, state, counts)?;
             collect_oram_expr_accesses(value, state, counts)?;
             if let Some(predicate) = predicate {
@@ -1361,7 +1361,7 @@ fn collect_oram_expr_accesses(
         }
         Expr::ArrayGet { index, .. } => collect_oram_expr_accesses(index, state, counts),
         Expr::MapGet { object_id, key } => {
-            record_oram_access(*object_id, state, counts)?;
+            record_oram_access(*object_id, false, state, counts)?;
             collect_oram_expr_accesses(key, state, counts)
         }
         Expr::StructField { base, .. } => collect_oram_expr_accesses(base, state, counts),
@@ -1379,13 +1379,22 @@ fn collect_oram_expr_accesses(
     }
 }
 
+/// Count the ORAM accesses of one map operation (`is_put`: a write): one,
+/// or on the private scheme the node accesses of its tree operations.
 fn record_oram_access(
     object_id: u32,
+    is_put: bool,
     state: &[StateObject],
     counts: &mut BTreeMap<u32, usize>,
 ) -> Result<()> {
-    if state_object_by_id(state, object_id)?.backend == BackendKind::Oram {
-        *counts.entry(object_id).or_default() += 1;
+    let object = state_object_by_id(state, object_id)?;
+    if object.backend == BackendKind::Oram {
+        let accesses = uo_core::manifest::oram_accesses_per_map_operation(
+            &object.oram_scheme,
+            object.capacity.unwrap_or(0),
+            is_put,
+        );
+        *counts.entry(object_id).or_default() += accesses;
     }
     Ok(())
 }

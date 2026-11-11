@@ -542,6 +542,39 @@ theorem consume_logicalShape {pre : String} (hPre : pre = "page:" ∨ pre = "buc
       · exact consume_logicalShape hPre object kind count events events' hRest
       · rfl
 
+theorem startsOramMetadataEvents_logicalShape (object kind : String)
+    (events events' : List LogicalEvent)
+    (h : events.map logicalShape = events'.map logicalShape) :
+    startsOramMetadataEvents events object kind = startsOramMetadataEvents events' object kind := by
+  cases events with
+  | nil =>
+      cases events' with
+      | nil => rfl
+      | cons _ _ => simp at h
+  | cons event events =>
+      cases events' with
+      | nil => simp at h
+      | cons event' events' =>
+          simp only [List.map_cons, List.cons.injEq] at h
+          obtain ⟨hShape, _⟩ := h
+          simp only [logicalShape, Prod.mk.injEq] at hShape
+          obtain ⟨hKind, hObject, _, hPage, _⟩ := hShape
+          simp only [startsOramMetadataEvents, hKind, hObject, hPage]
+
+theorem consumeMetadata_logicalShape (object kind : String) (count : Nat) (optional : Bool)
+    (events events' : List LogicalEvent)
+    (h : events.map logicalShape = events'.map logicalShape) :
+    (consumeOramAccessMetadataEvents events object kind count optional).map
+        (List.map logicalShape) =
+      (consumeOramAccessMetadataEvents events' object kind count optional).map
+        (List.map logicalShape) := by
+  have hStarts := startsOramMetadataEvents_logicalShape object kind events events' h
+  unfold consumeOramAccessMetadataEvents
+  rw [hStarts]
+  split
+  · simp [h]
+  · exact consume_logicalShape (Or.inl rfl) object kind count events events' h
+
 theorem reconstructObserved_logicalShape (objects : List RuntimeOramObjectCertificate) :
     ∀ (fuel : Nat) (events events' : List LogicalEvent),
       events.map logicalShape = events'.map logicalShape →
@@ -577,18 +610,18 @@ theorem reconstructObserved_logicalShape (objects : List RuntimeOramObjectCertif
                   | none => rfl
                   | some bucketKind =>
                       simp only [Option.bind_some]
-                      have hPages := consume_logicalShape (Or.inl rfl) event'.object metadataKind
-                        object.metadataPages events events' hRest
-                      cases hc : consumeExpectedOramLogicalEvents events event'.object metadataKind
-                          object.metadataPages "page:" with
+                      have hPages := consumeMetadata_logicalShape event'.object metadataKind
+                        object.metadataPages object.metadataOptional events events' hRest
+                      cases hc : consumeOramAccessMetadataEvents events event'.object metadataKind
+                          object.metadataPages object.metadataOptional with
                       | none =>
-                          cases hc' : consumeExpectedOramLogicalEvents events' event'.object
-                              metadataKind object.metadataPages "page:" with
+                          cases hc' : consumeOramAccessMetadataEvents events' event'.object
+                              metadataKind object.metadataPages object.metadataOptional with
                           | none => rfl
                           | some r' => simp [hc, hc'] at hPages
                       | some r =>
-                          cases hc' : consumeExpectedOramLogicalEvents events' event'.object
-                              metadataKind object.metadataPages "page:" with
+                          cases hc' : consumeOramAccessMetadataEvents events' event'.object
+                              metadataKind object.metadataPages object.metadataOptional with
                           | none => simp [hc, hc'] at hPages
                           | some r' =>
                               simp only [hc, hc', Option.map_some, Option.some.injEq] at hPages
@@ -646,18 +679,18 @@ theorem reconstructScaffold_logicalShape (objects : List RuntimeOramObjectCertif
                   | none => rfl
                   | some bucketKind =>
                       simp only [Option.bind_some]
-                      have hPages := consume_logicalShape (Or.inl rfl) event'.object metadataKind
-                        object.metadataPages events events' hRest
-                      cases hc : consumeExpectedOramLogicalEvents events event'.object metadataKind
-                          object.metadataPages "page:" with
+                      have hPages := consumeMetadata_logicalShape event'.object metadataKind
+                        object.metadataPages object.metadataOptional events events' hRest
+                      cases hc : consumeOramAccessMetadataEvents events event'.object metadataKind
+                          object.metadataPages object.metadataOptional with
                       | none =>
-                          cases hc' : consumeExpectedOramLogicalEvents events' event'.object
-                              metadataKind object.metadataPages "page:" with
+                          cases hc' : consumeOramAccessMetadataEvents events' event'.object
+                              metadataKind object.metadataPages object.metadataOptional with
                           | none => rfl
                           | some r' => simp [hc, hc'] at hPages
                       | some r =>
-                          cases hc' : consumeExpectedOramLogicalEvents events' event'.object
-                              metadataKind object.metadataPages "page:" with
+                          cases hc' : consumeOramAccessMetadataEvents events' event'.object
+                              metadataKind object.metadataPages object.metadataOptional with
                           | none => simp [hc, hc'] at hPages
                           | some r' =>
                               simp only [hc, hc', Option.map_some, Option.some.injEq] at hPages
@@ -2113,7 +2146,7 @@ def wellFormedPrivatePathOramObjectCheck (object : OramObjectManifest) : Bool :=
     decide (object.blocksPerBucket = pathOramBlocksPerBucket) &&
     decide (object.bucketSize = oramBucketHeaderBytes + object.blocksPerBucket * object.blockSize) &&
     decide (0 < object.bucketCount) &&
-    decide (object.stashBound = pathOramStashBound object.capacity) &&
+    decide (object.stashBound = pathOramTreeStashBound object.capacity) &&
     decide (object.recursionDepth = 1) &&
     decide (object.metadataPagesPerAccess = object.metadataPages + 1) &&
     decide (object.bucketsPerAccess = object.treeHeight + 1) &&

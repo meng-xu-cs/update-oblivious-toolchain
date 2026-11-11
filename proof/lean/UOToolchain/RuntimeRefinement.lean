@@ -2041,6 +2041,96 @@ theorem runtimeOramObject_bucketEventKind_ne_counter
   split at hKind <;> simp at hKind
   all_goals subst bucketKind <;> decide
 
+/-- Whether the next logical event is a metadata page of `objectName`. -/
+def startsOramMetadataEvents
+  (events : List LogicalEvent)
+  (objectName metadataKind : String) : Bool :=
+  match events with
+  | event :: _ =>
+      event.object = objectName && event.kind = metadataKind &&
+        event.detail.startsWith "page:"
+  | [] => false
+
+/-- The metadata-page events after an access's counter: all `metadataPages`
+of them, or, when `optional` and the next event is not one, none. A node
+access of the private scheme's AVL map reads the metadata pages only as its
+operation's first access. -/
+def consumeOramAccessMetadataEvents
+  (events : List LogicalEvent)
+  (objectName metadataKind : String)
+  (metadataPages : Nat)
+  (optional : Bool) : Option (List LogicalEvent) :=
+  if optional && !startsOramMetadataEvents events objectName metadataKind then
+    some events
+  else
+    consumeExpectedOramLogicalEvents events objectName metadataKind metadataPages "page:"
+
+/-- Whether an access to this object may read no metadata pages: a node
+access of the private scheme's AVL map after its operation's first. -/
+def RuntimeOramObjectCertificate.metadataOptional
+  (object : RuntimeOramObjectCertificate) : Bool :=
+  object.scheme == privatePathOramScheme
+
+theorem consumeOramAccessMetadataEvents_runtimePathOramLeafScheduleScaffold
+  {events remaining : List LogicalEvent}
+  {oramObjects : List RuntimeOramObjectCertificate}
+  {objectName metadataKind : String}
+  {metadataPages : Nat}
+  {optional : Bool}
+  (hNotCounter : metadataKind ≠ "uooram_counter")
+  (hConsume :
+    consumeOramAccessMetadataEvents events objectName metadataKind metadataPages optional =
+      some remaining) :
+  runtimePathOramLeafScheduleScaffoldOfLogicalAccesses events oramObjects =
+    runtimePathOramLeafScheduleScaffoldOfLogicalAccesses remaining oramObjects := by
+  unfold consumeOramAccessMetadataEvents at hConsume
+  split at hConsume
+  · cases hConsume
+    rfl
+  · exact consumeExpectedOramLogicalEvents_runtimePathOramLeafScheduleScaffold hNotCounter hConsume
+
+theorem consumeOramAccessMetadataEvents_projectedPathOramLeafScheduleScaffold
+  {events remaining : List LogicalEvent}
+  {leakage : PathOramProjectedLeakage}
+  {objectName metadataKind : String}
+  {metadataPages : Nat}
+  {optional : Bool}
+  (hNotCounter : metadataKind ≠ "uooram_counter")
+  (hConsume :
+    consumeOramAccessMetadataEvents events objectName metadataKind metadataPages optional =
+      some remaining) :
+  projectedPathOramLeafScheduleScaffoldOfLogicalAccesses events leakage =
+    projectedPathOramLeafScheduleScaffoldOfLogicalAccesses remaining leakage := by
+  unfold consumeOramAccessMetadataEvents at hConsume
+  split at hConsume
+  · cases hConsume
+    rfl
+  · exact consumeExpectedOramLogicalEvents_projectedPathOramLeafScheduleScaffold hNotCounter hConsume
+
+theorem consumeOramAccessMetadataEvents_normalized_projectedPathOramLeafScheduleScaffold
+  {events remaining : List LogicalEvent}
+  {leakage : PathOramProjectedLeakage}
+  {objectName metadataKind : String}
+  {metadataPages : Nat}
+  {optional : Bool}
+  (hNotCounter : metadataKind ≠ "uooram_counter")
+  (hConsume :
+    consumeOramAccessMetadataEvents events objectName metadataKind metadataPages optional =
+      some remaining) :
+  projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+      (pathOramNormalizeLogicalAccesses events)
+      leakage =
+    projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
+      (pathOramNormalizeLogicalAccesses remaining)
+      leakage := by
+  unfold consumeOramAccessMetadataEvents at hConsume
+  split at hConsume
+  · cases hConsume
+    rfl
+  · exact
+      consumeExpectedOramLogicalEvents_normalized_projectedPathOramLeafScheduleScaffold
+        hNotCounter hConsume
+
 def reconstructObservedOramAccessesFromLogicalTraceAux
   (fuel : Nat)
   (logicalAccesses : List LogicalEvent)
@@ -2065,12 +2155,12 @@ def reconstructObservedOramAccessesFromLogicalTraceAux
             let metadataKind ← object.metadataEventKind?
             let bucketKind ← object.bucketEventKind?
             let events ←
-              consumeExpectedOramLogicalEvents
+              consumeOramAccessMetadataEvents
                 events
                 event.object
                 metadataKind
                 object.metadataPages
-                "page:"
+                object.metadataOptional
             let events ←
               consumeExpectedOramLogicalEvents
                 events
@@ -2111,12 +2201,12 @@ def reconstructPathOramLeafScaffoldFromLogicalTraceAux
             let metadataKind ← object.metadataEventKind?
             let bucketKind ← object.bucketEventKind?
             let events ←
-              consumeExpectedOramLogicalEvents
+              consumeOramAccessMetadataEvents
                 events
                 event.object
                 metadataKind
                 object.metadataPages
-                "page:"
+                object.metadataOptional
             let events ←
               consumeExpectedOramLogicalEvents
                 events
@@ -2220,12 +2310,12 @@ theorem reconstructPathOramLeafScaffoldFromLogicalTraceAux_runtime
                           exact False.elim hFalse
                       | some bucketKind =>
                           cases hConsumeMeta :
-                              consumeExpectedOramLogicalEvents
+                              consumeOramAccessMetadataEvents
                                 events
                                 event.object
                                 metadataKind
                                 object.metadataPages
-                                "page:" with
+                                object.metadataOptional with
                           | none =>
                               simp
                                 [ reconstructPathOramLeafScaffoldFromLogicalTraceAux
@@ -2290,7 +2380,7 @@ theorem reconstructPathOramLeafScaffoldFromLogicalTraceAux_runtime
                                             runtimePathOramLeafScheduleScaffoldOfLogicalAccesses
                                               afterMeta
                                               oramObjects :=
-                                        consumeExpectedOramLogicalEvents_runtimePathOramLeafScheduleScaffold
+                                        consumeOramAccessMetadataEvents_runtimePathOramLeafScheduleScaffold
                                           (runtimeOramObject_metadataEventKind_ne_counter hMeta)
                                           hConsumeMeta
                                       have hSkipBucket :
@@ -2481,12 +2571,12 @@ theorem projectedPathOramLeafScheduleScaffoldOfLogicalAccesses_normalize_of_reco
                           exact False.elim hFalse
                       | some bucketKind =>
                           cases hConsumeMeta :
-                              consumeExpectedOramLogicalEvents
+                              consumeOramAccessMetadataEvents
                                 events
                                 event.object
                                 metadataKind
                                 object.metadataPages
-                                "page:" with
+                                object.metadataOptional with
                           | none =>
                               simp
                                 [ reconstructPathOramLeafScaffoldFromLogicalTraceAux
@@ -2551,7 +2641,7 @@ theorem projectedPathOramLeafScheduleScaffoldOfLogicalAccesses_normalize_of_reco
                                             projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
                                               afterMeta
                                               leakage :=
-                                        consumeExpectedOramLogicalEvents_projectedPathOramLeafScheduleScaffold
+                                        consumeOramAccessMetadataEvents_projectedPathOramLeafScheduleScaffold
                                           (runtimeOramObject_metadataEventKind_ne_counter hMeta)
                                           hConsumeMeta
                                       have hSkipBucket :
@@ -2571,7 +2661,7 @@ theorem projectedPathOramLeafScheduleScaffoldOfLogicalAccesses_normalize_of_reco
                                             projectedPathOramLeafScheduleScaffoldOfLogicalAccesses
                                               (pathOramNormalizeLogicalAccesses afterMeta)
                                               leakage :=
-                                        consumeExpectedOramLogicalEvents_normalized_projectedPathOramLeafScheduleScaffold
+                                        consumeOramAccessMetadataEvents_normalized_projectedPathOramLeafScheduleScaffold
                                           (runtimeOramObject_metadataEventKind_ne_counter hMeta)
                                           hConsumeMeta
                                       have hSkipBucketNorm :

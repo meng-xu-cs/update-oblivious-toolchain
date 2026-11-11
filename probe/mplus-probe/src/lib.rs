@@ -21,23 +21,23 @@ use std::process::{self, Command, Output};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use uo_core::{
-    canonical_path_oram_leaf_seed_space_size, canonical_path_oram_leaf_values_of_seed,
-    runtime_boundary_obligation_ids, runtime_boundary_schema_is_mechanized_for_claim,
-    validate_runtime_boundary_schema, BackendKind, BoundaryEvent,
-    CanonicalFreshCoinRuntimePathOramTheoremInput, CanonicalFreshCoinRuntimePathOramWitnessFamily,
-    CompiledArtifact, ConfidentialKernelExpr, ConfidentialKernelSlotProgram,
-    ConfidentialKernelStatement, ContainerKind, ContractMetadata, LogicalEvent,
-    NormalizedMicroTrace, ProgramMode, PublicOutcomeTrace, RuntimeBoundaryEvidenceKind,
-    RuntimeConfidentialCoreKernelFinishSlotBundle, RuntimeKernelInterfaceBundle,
-    RuntimeKernelMachineFinishWitness, RuntimeKernelRefinementWitness, RuntimeKernelWitness,
-    RuntimeOramLeafScaffoldWitness, RuntimeOramObjectWitness, RuntimePathOramTransitionKind,
-    RuntimeRefinementWitness, RuntimeShellContract, RuntimeShellTrace,
-    SeededRuntimePaperMainFamilyBundle, SeededRuntimePaperMainSlotFamilyBundle,
-    SeededRuntimePathOramWitnessFamily, SgxControllerShapeTrace, Type, Value, WriteClass,
-    CONFIDENTIAL_KERNEL_EXPR_PROFILES, CONFIDENTIAL_KERNEL_PURE_EXPR_PROFILES,
-    CONFIDENTIAL_KERNEL_SLOT_EXPR_PROFILES, CONFIDENTIAL_KERNEL_SLOT_PURE_EXPR_PROFILES,
-    CONFIDENTIAL_KERNEL_STATEMENT_PROFILES, RUNTIME_BOUNDARY_OBLIGATIONS,
-    RUNTIME_BOUNDARY_SCHEMA_VERSION,
+    canonical_path_oram_leaf_seed_space_number, canonical_path_oram_leaf_seed_space_size,
+    canonical_path_oram_leaf_values_of_seed, runtime_boundary_obligation_ids,
+    runtime_boundary_schema_is_mechanized_for_claim, validate_runtime_boundary_schema, BackendKind,
+    BoundaryEvent, CanonicalFreshCoinRuntimePathOramTheoremInput,
+    CanonicalFreshCoinRuntimePathOramWitnessFamily, CompiledArtifact, ConfidentialKernelExpr,
+    ConfidentialKernelSlotProgram, ConfidentialKernelStatement, ContainerKind, ContractMetadata,
+    LogicalEvent, NormalizedMicroTrace, ProgramMode, PublicOutcomeTrace,
+    RuntimeBoundaryEvidenceKind, RuntimeConfidentialCoreKernelFinishSlotBundle,
+    RuntimeKernelInterfaceBundle, RuntimeKernelMachineFinishWitness,
+    RuntimeKernelRefinementWitness, RuntimeKernelWitness, RuntimeOramLeafScaffoldWitness,
+    RuntimeOramObjectWitness, RuntimePathOramTransitionKind, RuntimeRefinementWitness,
+    RuntimeShellContract, RuntimeShellTrace, SeededRuntimePaperMainFamilyBundle,
+    SeededRuntimePaperMainSlotFamilyBundle, SeededRuntimePathOramWitnessFamily,
+    SgxControllerShapeTrace, Type, Value, WriteClass, CONFIDENTIAL_KERNEL_EXPR_PROFILES,
+    CONFIDENTIAL_KERNEL_PURE_EXPR_PROFILES, CONFIDENTIAL_KERNEL_SLOT_EXPR_PROFILES,
+    CONFIDENTIAL_KERNEL_SLOT_PURE_EXPR_PROFILES, CONFIDENTIAL_KERNEL_STATEMENT_PROFILES,
+    RUNTIME_BOUNDARY_OBLIGATIONS, RUNTIME_BOUNDARY_SCHEMA_VERSION,
 };
 use uo_evm::{CallResult, ContractInstance, DiagnosticCallResult, PathOramFreshCoinPlan};
 
@@ -67,19 +67,19 @@ struct BenchArtifacts {
     /// The benchmark with its multi-access map on the scalable
     /// `path_oram_private_posmap_v1` route, above the local scheme's cap.
     private_posmap: Option<CompiledArtifact>,
-    /// The `private_posmap` variant with that map at a large capacity
-    /// (`LARGE_PRIVATE_POSMAP_CAPACITY`), for the overhead report only: it
-    /// shows how an access's cost grows with the capacity.
-    private_posmap_large: Option<CompiledArtifact>,
+    /// The `private_posmap` variant with that map at the large capacities
+    /// (`LARGE_PRIVATE_POSMAP_CAPACITIES`), for the overhead report only:
+    /// they show how an access's cost grows with the capacity.
+    private_posmap_large: Vec<(usize, CompiledArtifact)>,
 }
 
-/// The capacity of the large private-scheme overhead variant: the largest
-/// power of two whose `transferFrom` fits the per-call allocator bounds, which
-/// are sized from the kernel steps and do not grow with the map's pages.
-const LARGE_PRIVATE_POSMAP_CAPACITY: usize = 1 << 12;
+/// The capacities of the large private-scheme overhead variants.
+const LARGE_PRIVATE_POSMAP_CAPACITIES: [usize; 2] = [1 << 12, 1 << 14];
 
-/// The overhead-report label of the large private-scheme variant.
-const LARGE_PRIVATE_POSMAP_LABEL: &str = "oram_private_posmap_4096";
+/// The overhead-report label of a large private-scheme variant.
+fn large_private_posmap_label(capacity: usize) -> String {
+    format!("oram_private_posmap_{capacity}")
+}
 
 /// ERC20Lite with its `balances` map on the private scheme at this capacity.
 fn erc20_private_posmap_artifact(balances_capacity: usize) -> Result<CompiledArtifact> {
@@ -373,7 +373,9 @@ struct CollectedCanonicalFreshCoinTheoremInput {
 
 #[derive(Clone, Debug, Serialize)]
 struct CanonicalFamilySizeEstimate {
-    seed_count: usize,
+    /// The canonical seed space's size, exactly: it may exceed a machine
+    /// word.
+    seed_count: serde_json::Number,
     sampled_seed_count: usize,
     avg_witness_json_bytes: u64,
     max_witness_json_bytes: u64,
@@ -3720,7 +3722,7 @@ fn compile_suite() -> Result<BTreeMap<&'static str, BenchArtifacts>> {
             oram: None,
             fullscan64: None,
             private_posmap: None,
-            private_posmap_large: None,
+            private_posmap_large: Vec::new(),
         },
     );
     suite.insert(
@@ -3739,7 +3741,7 @@ fn compile_suite() -> Result<BTreeMap<&'static str, BenchArtifacts>> {
             oram: None,
             fullscan64: None,
             private_posmap: None,
-            private_posmap_large: None,
+            private_posmap_large: Vec::new(),
         },
     );
     suite.insert(
@@ -3766,7 +3768,7 @@ fn compile_suite() -> Result<BTreeMap<&'static str, BenchArtifacts>> {
                 ProgramMode::Uo,
             )?),
             private_posmap: None,
-            private_posmap_large: None,
+            private_posmap_large: Vec::new(),
         },
     );
     suite.insert(
@@ -3793,9 +3795,10 @@ fn compile_suite() -> Result<BTreeMap<&'static str, BenchArtifacts>> {
                 "benches/raw/ERC20Lite.private-posmap.yaml",
                 ProgramMode::Uo,
             )?),
-            private_posmap_large: Some(erc20_private_posmap_artifact(
-                LARGE_PRIVATE_POSMAP_CAPACITY,
-            )?),
+            private_posmap_large: LARGE_PRIVATE_POSMAP_CAPACITIES
+                .iter()
+                .map(|&capacity| Ok((capacity, erc20_private_posmap_artifact(capacity)?)))
+                .collect::<Result<Vec<_>>>()?,
         },
     );
     suite.insert(
@@ -3814,7 +3817,7 @@ fn compile_suite() -> Result<BTreeMap<&'static str, BenchArtifacts>> {
             oram: None,
             fullscan64: None,
             private_posmap: None,
-            private_posmap_large: None,
+            private_posmap_large: Vec::new(),
         },
     );
     Ok(suite)
@@ -25496,9 +25499,12 @@ fn estimate_canonical_fresh_coin_family_size(
     let fresh_coin_scaffold = first_witness
         .path_oram_fresh_coin_scaffold()
         .ok_or_else(|| anyhow!("fresh-coin scaffold extraction failed for {}", name))?;
-    let seed_count = canonical_path_oram_leaf_seed_space_size(&fresh_coin_scaffold)
+    let seed_count = canonical_path_oram_leaf_seed_space_number(&fresh_coin_scaffold)
         .ok_or_else(|| anyhow!("fresh-coin seed space overflow for {}", name))?;
-    let sampled_seed_count = seed_count.min(sample_seed_count);
+    // A space larger than a machine word holds more seeds than any sample.
+    let word_seed_count = canonical_path_oram_leaf_seed_space_size(&fresh_coin_scaffold);
+    let sampled_seed_count =
+        word_seed_count.map_or(sample_seed_count, |count| count.min(sample_seed_count));
     let mut total_bytes = 0u64;
     let mut max_bytes = 0u64;
 
@@ -25554,7 +25560,7 @@ fn estimate_canonical_fresh_coin_family_size(
         total_bytes / sampled_seed_count as u64
     };
     let estimated_family_json_bytes = max_bytes
-        .saturating_mul(seed_count as u64)
+        .saturating_mul(word_seed_count.map_or(u64::MAX, |count| count as u64))
         .saturating_add(1 << 20);
 
     Ok(CanonicalFamilySizeEstimate {
@@ -26303,19 +26309,38 @@ fn collect_tape_family_samples(
     let scaffold = representative
         .path_oram_fresh_coin_scaffold()
         .ok_or_else(|| anyhow!("fresh-coin scaffold extraction failed for {}", name))?;
-    let seed_count = canonical_path_oram_leaf_seed_space_size(&scaffold)
-        .ok_or_else(|| anyhow!("fresh-coin seed space overflow for {}", name))?;
+    let seed_count = canonical_path_oram_leaf_seed_space_size(&scaffold);
     (1..=TAPE_FAMILY_SAMPLES_PER_SIDE)
         .map(|sample| -> Result<RuntimeRefinementWitness> {
-            let coin_seed = (tape_family_coin_seed(sample as u64) % seed_count as u64) as usize;
-            let values =
-                canonical_path_oram_leaf_values_of_seed(&scaffold, coin_seed).ok_or_else(|| {
-                    anyhow!(
-                        "fresh-coin seed decode overflow for {} sample {}",
-                        name,
-                        sample
-                    )
-                })?;
+            let values = match seed_count {
+                Some(seed_count) => {
+                    let coin_seed =
+                        (tape_family_coin_seed(sample as u64) % seed_count as u64) as usize;
+                    canonical_path_oram_leaf_values_of_seed(&scaffold, coin_seed).ok_or_else(
+                        || {
+                            anyhow!(
+                                "fresh-coin seed decode overflow for {} sample {}",
+                                name,
+                                sample
+                            )
+                        },
+                    )?
+                }
+                // A space larger than a machine word: draw each step's leaf
+                // from its own coin.
+                None => scaffold
+                    .iter()
+                    .enumerate()
+                    .map(|(step, leaf)| {
+                        let coin = tape_family_coin_seed(
+                            (sample as u64).wrapping_mul(0x1_0000_0001) ^ step as u64,
+                        );
+                        let choices = path_oram_leaf_choice_count(leaf.bucket_count).max(1);
+                        (coin % choices as u64) as usize
+                    })
+                    .collect::<Vec<_>>()
+                    .into_boxed_slice(),
+            };
             let plan = path_oram_fresh_coin_plan_for_runtime_tape(name, representative, &values)?;
             let mut instance = prepare_instance_with_seed(artifact, setup, sample as u64)?;
             let trace = instance
@@ -32338,7 +32363,9 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
     // W5.3: pin the deployed Path-ORAM parameter regime in the manifest
     // source. The Path ORAM stash theorem applies at Z = 5 with
     // stash_bound = min(max(capacity, 1), 114), which bounds a stash overflow
-    // by 14 * 0.6002^114 < 2^-80 per access; the static-drift check below rejects
+    // by 14 * 0.6002^114 < 2^-80 per access, and the private scheme's bound
+    // min(max(capacity, 1), 114 + 3h + 1) adds the nodes its AVL map returns
+    // to the stash when an operation ends; the static-drift check below rejects
     // representative drift in the manifest's Path-ORAM construction or
     // validation logic. The matching Lean provenance record is
     // `pathOramLocalPosmapV1_stashOverflowProvenance` and the bundle
@@ -32355,7 +32382,16 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && manifest_alignment_source
             .contains("if self.stash_bound != path_oram_stash_bound(capacity) {")
         && manifest_alignment_source
-            .contains("\"path ORAM stash_bound must equal min(max(capacity, 1), {})\",");
+            .contains("\"path ORAM stash_bound must equal min(max(capacity, 1), {})\",")
+        // The private scheme's AVL map returns up to a put's 3h + 1 nodes to
+        // the stash when an operation ends, so its bound adds them.
+        && manifest_alignment_source
+            .contains("PATH_ORAM_STASH_BOUND_LIMIT + path_oram_tree_put_accesses(capacity),")
+        && manifest_alignment_source.contains("3 * path_oram_tree_avl_height(capacity) + 1")
+        && manifest_alignment_source
+            .contains("let stash_bound = path_oram_tree_stash_bound(capacity);")
+        && manifest_alignment_source
+            .contains("if self.stash_bound != path_oram_tree_stash_bound(capacity) {");
     // W6.1: pin the hostile-host SGX observer surface — page-region
     // names, controller-phase vocabulary, page-event-kind /
     // exit-event-kind vocabularies, shared-resource pattern literal,
@@ -44758,7 +44794,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let oram_state_uses_fixed_entry_buffer = oram_source.contains("entries: Box<[MapEntry]>,");
     let oram_state_uses_fixed_stash_buffer = oram_source.contains("stash: FixedStash,");
     let oram_state_fields_private = oram_source.contains(
-	        "pub(crate) struct OramState {\n    parameters: OramParameters,\n    empty_entry: MapEntry,\n    entries: Box<[MapEntry]>,\n    position_map: Box<[MaskedUsizeOption]>,\n    stash: FixedStash,\n    storage: OramStorage,\n    access_counter: u64,\n    cipher: StoreCipher,\n}",
+	        "pub(crate) struct OramState {\n    parameters: OramParameters,\n    empty_entry: MapEntry,\n    entries: Box<[MapEntry]>,\n    position_map: Box<[MaskedUsizeOption]>,\n    stash: FixedStash,\n    // The private scheme's AVL map: its shape, header and stash.\n    tree: Option<TreeState>,\n    storage: OramStorage,\n    access_counter: u64,\n    cipher: StoreCipher,\n}",
 	    );
     let oram_state_uses_fixed_position_map_buffer =
         oram_source.contains("position_map: Box<[MaskedUsizeOption]>,");
@@ -51296,12 +51332,14 @@ fn append_overhead_workload(
         .transpose()?;
     let private_posmap_large = artifacts
         .private_posmap_large
-        .as_ref()
-        .map(|artifact| {
+        .iter()
+        .map(|(capacity, artifact)| {
+            let label = large_private_posmap_label(*capacity);
             run_scenario(artifact, setup, target, getters)
-                .with_context(|| format!("{benchmark}/{LARGE_PRIVATE_POSMAP_LABEL}"))
+                .with_context(|| format!("{benchmark}/{label}"))
+                .map(|result| (label, artifact, result))
         })
-        .transpose()?;
+        .collect::<Result<Vec<_>>>()?;
 
     let mut variants = Vec::new();
     let raw_row =
@@ -51450,18 +51488,12 @@ fn append_overhead_workload(
         ));
     }
 
-    if let Some(large) = private_posmap_large {
-        let large_artifact = artifacts.private_posmap_large.as_ref().unwrap();
-        let large_row = overhead_matrix_row(
-            benchmark,
-            LARGE_PRIVATE_POSMAP_LABEL,
-            large_artifact,
-            target.entrypoint,
-            &large,
-        )?;
-        case[LARGE_PRIVATE_POSMAP_LABEL] = scenario_overhead(&large);
+    for (label, large_artifact, large) in private_posmap_large {
+        let large_row =
+            overhead_matrix_row(benchmark, &label, large_artifact, target.entrypoint, &large)?;
+        case[label.as_str()] = scenario_overhead(&large);
         append_call_start_decode(
-            &mut case[LARGE_PRIVATE_POSMAP_LABEL],
+            &mut case[label.as_str()],
             large_artifact,
             target.entrypoint,
             &large,
@@ -51475,7 +51507,7 @@ fn append_overhead_workload(
             &large,
             large_artifact,
             target.entrypoint,
-            LARGE_PRIVATE_POSMAP_LABEL,
+            &label,
         ));
     }
 
@@ -54065,7 +54097,7 @@ mod tests {
             oram: None,
             fullscan64: None,
             private_posmap: None,
-            private_posmap_large: None,
+            private_posmap_large: Vec::new(),
         };
         let report = check_authscan_correctness(&artifacts).unwrap();
         assert_eq!(report["equivalent"].as_bool(), Some(true));

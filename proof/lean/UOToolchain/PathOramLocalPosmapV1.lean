@@ -184,13 +184,25 @@ fallback citation), specialized to the deployed parameter regime:
 - working stash capacity `stash_bound + buckets_per_access *
   blocks_per_bucket` (the Rust `working_stash_capacity` formula in
   `runtime/uo-evm/src/generated_oram_codecs.rs`)
+- for `path_oram_private_posmap_v1`, whose oblivious AVL tree holds each
+  node an operation reads in the enclave until the operation ends and then
+  returns it to the stash (the deferred write-back of Wang et al., Oblivious
+  Data Structures, CCS 2014), the stash bound formula
+  `min(max(capacity, 1), 114 + 3h + 1)` (`pathOramTreeStashBound`, matching
+  `path_oram_tree_stash_bound`), where `h` is the largest height of an AVL
+  tree of `capacity` nodes and `3h + 1` the node accesses of a put: room for
+  the nodes an operation returns beside the 114 blocks of the Path ORAM bound
 
 Under these parameters, JACM Theorem 5.1 gives an exponentially small
 upper bound on stash-overflow probability: at bucket size `Z = 5` and
 stash size `R` the failure probability is bounded by `14 * 0.6002^R`
 after any polynomially-bounded access trace. The cap `R = 114` makes this
 at most `2^-80` per access, and a map no larger than the cap cannot overflow
-its stash. The repository keeps
+its stash. For the private scheme the assumption is that the stash holds at
+most 114 blocks besides the nodes the last operation returned to it, with
+the same tail; the theorem is stated for one access at a time, so this
+transfer to operations that hold their nodes until they end is assumed, not
+proved. The repository keeps
 `stashOverflowBounded` as an explicit `Prop` taken on faith from this
 literature theorem; the W5.3 work pairs the assumption with the
 deployed-parameter substitution and the named static-drift check that

@@ -12,6 +12,11 @@ structure Plan where
   maxKernelOps : Nat
   maxStackWords : Nat
   scratchBytes : Nat
+  /-- The entrypoint's commit operations (the manifest's `max_commit_ops`):
+  on an ORAM map the pages and buckets its accesses write, each opened or
+  sealed at most once more, so four resource events each bound the call's
+  ORAM work. -/
+  maxCommitOps : Nat := 0
 deriving Repr, DecidableEq
 
 structure Usage where
@@ -37,7 +42,7 @@ structure State where
 deriving Repr, DecidableEq
 
 def resourceEventCapacity (plan : Plan) : Nat :=
-  (plan.maxKernelOps + plan.maxStackWords) * 128 + 128
+  (plan.maxKernelOps + plan.maxStackWords) * 128 + 128 + plan.maxCommitOps * 4
 
 def emptyUsage : Usage :=
   { liveBytes := 0, peakBytes := 0, wipeCount := 0 }
@@ -126,7 +131,7 @@ theorem initialState_eventLogCapacity (plan : Plan) :
 
 theorem resourceEventCapacity_public_formula (plan : Plan) :
     resourceEventCapacity plan =
-      (plan.maxKernelOps + plan.maxStackWords) * 128 + 128 := by
+      (plan.maxKernelOps + plan.maxStackWords) * 128 + 128 + plan.maxCommitOps * 4 := by
   rfl
 
 theorem recordKernelOp_acceptsOnlyBelowBudget

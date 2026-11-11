@@ -186,14 +186,21 @@ field bindings required by `DeploymentCallAccepted`.
   writes reach the ORAM at commit, masked off on abort, so an aborted call
   makes the same accesses as a committed one.
   `path_oram_private_posmap_v1` lifts the local scheme's capacity cap and
-  shares its data path, a flat position map that every access scans in full:
-  the runtime has no recursive position map. The admitted route covers it.
+  keeps a map as an oblivious AVL tree whose nodes hold their children's
+  leaves, so its position map recurses through the tree: a get makes `h`
+  node accesses and a put `3h + 1`, `h` the largest AVL height for the
+  capacity, each one Path ORAM access that reads and writes one path, and an
+  operation reads and writes its header and stash pages once. Its stash
+  bound adds the `3h + 1` nodes an operation returns to the stash to the
+  Path ORAM bound; that the stash stays within it with the Path ORAM tail is
+  part of `stashOverflowBounded`, assumed and not proved. The admitted route
+  covers it.
   For configurations whose Path ORAM maps use either scheme, the same bundle
   gives the private scheme's theorems (`computationalUOWithOnAny`,
   `paperMain_privatePosmapV1_noninterference_moduloReleases`), and the probe
   derives the theorem between the two sides of an ERC20Lite `transferFrom`
   pair whose capacity-256 `balances` map uses the private scheme and whose
-  `allowances` map uses the local one (2^54 coin seeds). See
+  `allowances` map uses the local one (2^910 coin seeds). See
   [`path-oram.md`](./path-oram.md).
 - On both Path ORAM schemes, a call reads only the paths it accesses. It
   starts from the map's counter and metadata pages, which its first access
