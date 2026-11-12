@@ -17,6 +17,7 @@ belongs.
 | Which result file answers which evaluation question | [`evaluation.md`](./evaluation.md) |
 | Runtime boundary, TEE observer, and secret-state ownership | [`runtime/README.md`](./runtime/README.md) |
 | Coding-agent process and validation discipline | [`coding-agent-conventions.md`](./coding-agent-conventions.md) |
+| Open tasks from the November 2026 external review, and their status | [`review/2026-11-external-review/README.md`](../review/2026-11-external-review/README.md) |
 | Lean workspace map | [`proof/README.md`](../proof/README.md) |
 | Generated reviewer-facing result summary | [`results/reviewer_summary.md`](../results/reviewer_summary.md) |
 
@@ -58,6 +59,7 @@ belongs.
 | [`docs/coding-agent-conventions.md`](./coding-agent-conventions.md) | maintained | process rules for future changes |
 | [`proof/README.md`](../proof/README.md) | maintained | Lean workspace map |
 | [`benches/harnesses/README.md`](../benches/harnesses/README.md) | maintained | benchmark harness note |
+| [`review/2026-11-external-review/`](../review/2026-11-external-review/README.md) | tracker | validation of the November 2026 external review, Issues 22 to 50 and their status; delete once its scheduled issues are done and their facts are in the topic documents |
 | [`results/artifact_readme.md`](../results/artifact_readme.md) | generated | probe output; source is `probe/mplus-probe` |
 | [`results/reviewer_summary.md`](../results/reviewer_summary.md) | generated | probe output; source is `probe/mplus-probe` |
 | archived root paper drafts | removed | durable claims moved into maintained docs |
