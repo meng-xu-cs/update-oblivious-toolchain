@@ -257,16 +257,23 @@ it takes the deployment seed and the secret arguments. A deployment made with
 1. `ProductionCallEvidence` keeps what a caller can know: package identity,
    toolchain digest, binary, proof-root and quote hashes, build profile,
    public environment, session binding, counters and the translation
-   certificate. Remove `proof_bundle_sha256`.
+   certificate. Remove `proof_bundle_sha256`. In its place the evidence
+   names the receipt the call follows, by hash.
 2. `call_authorized` returns a `ProductionReceipt`: the hash of the request
    evidence, the hash of the previous receipt, state commitments before and
    after the call (the public-state digest and a digest of the ciphertext
    store), the hash of the public receipt, and the counters after the call.
+   A deployment issues the first receipt of its chain, which gives a caller
+   the epoch and the counters for its first call.
 3. By D2, a production build keeps the private evidence inside the runtime
    and drops it when the call ends. The receipt carries nothing derived from
    it. The Lean checkers run on diagnostics builds, as they do now.
 4. `DeploymentCallAccepted` in `DeploymentAcceptance.lean` binds the receipt
-   fields. Add a tamper scenario for each.
+   the evidence names, and `DeploymentReceiptFollows` states the chain. Add
+   a tamper case for each receipt field. The cases are tests in the
+   production build, not scenarios of `tamper_validation.json`: the probe is
+   a diagnostics build, which the production policy rejects, so it cannot
+   make a production call.
 5. Say in `docs/claim-boundary.md` (Deployment Theorem) what a production
    result then rests on: the attested binary, the theorems about the model,
    and the diagnostics-build validation of that binary's source. No
@@ -279,7 +286,15 @@ it takes the deployment seed and the secret arguments. A deployment made with
   that CI runs.
 - Receipts chain: a replayed or reordered receipt, or a changed bound field,
   is rejected.
-- The atomicity and rollback tests of Issue 06 pass on the new path.
+- The atomicity and rollback tests of Issue 06 pass on the new path. The
+  production path has no check left that can fail after the call ran, so
+  its test is that a rejected call leaves the state, the counters and the
+  last receipt untouched; the tests of a failure after the run are those of
+  the shared staging path.
+
+Two limits remain and are tracked. The digest of the ciphertext store reads
+every sealed record once per accepted call (Issue 44 makes state commitments
+incremental). And a receipt is not signed (Issue 53).
 
 ---
 
@@ -617,11 +632,20 @@ Share ciphertext pages between the committed and the staged state
 pointer. Decrypted shadows stay owned and wiped on drop. Keep the cold-state
 checks.
 
+A production receipt's digest of the ciphertext store (Issue 26) is linear
+in the store too: it reads every sealed record once per accepted call. Keep
+the digest of each object, which the store's digest is built from, and
+compute again only those of the objects a call wrote. A tree of digests
+over the buckets of a Path ORAM map, which a path write updates in
+logarithmic time, is part of Issue 44.
+
 #### Acceptance criteria
 
 - The staging time of Issue 27's breakdown does not grow with the capacity
   of untouched objects, and a call's peak memory is no longer twice the
   store.
+- The time to issue a production receipt does not grow with the capacity of
+  objects the call did not write.
 - The atomicity and rollback tests pass.
 
 ### Issue 38 — Compress scan schedules in traces and proof objects
@@ -908,3 +932,22 @@ depends on a secret.
 
 Acceptance: a test drops a call at two different points and reads the same
 nonces out of the next call's records.
+
+### Issue 53 — Authenticate production receipts under an attested key
+
+Source: Issue 26. Size: M. Depends on: Issue 26.
+
+A `ProductionReceipt` is bound by its chain and by the runtime's check at
+the next call, but it carries no signature. A caller cannot tell from the
+receipt alone that the runtime issued it: someone between the two could
+change the last receipt of a chain, and the change would show only when the
+next call is rejected. The digest of the ciphertext store after a call is
+the one field that neither the call's evidence nor its public receipt
+binds.
+
+Sign each receipt with a key that the attestation transcript binds, or
+authenticate it under the return-channel session, and state in the
+deployment theorem what a verifier of the signature may conclude.
+
+Acceptance: a changed last receipt is rejected by a check the caller can
+run, without another call.

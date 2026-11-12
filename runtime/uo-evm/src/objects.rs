@@ -690,6 +690,27 @@ impl RuntimeObject {
         }
     }
 
+    /// Hand each sealed record the object holds in storage to `visit`, in
+    /// slot order. These are the bytes a host that keeps the storage sees. A
+    /// raw object seals nothing.
+    pub(in crate::runtime) fn for_each_sealed_record(&self, visit: &mut dyn FnMut(&[u8])) {
+        match self {
+            Self::UoCell(object) => visit(&object.physical),
+            Self::UoArray(object) => {
+                for slot in object.physical_slots.iter() {
+                    visit(slot);
+                }
+            }
+            Self::UoSmallMap(object) => {
+                for slot in object.physical_slots.iter() {
+                    visit(slot);
+                }
+            }
+            Self::UoOramMap(object) => object.oram.for_each_sealed_record(visit),
+            Self::RawCell(_) | Self::RawArray(_) | Self::RawMap(_) => {}
+        }
+    }
+
     /// The object's cipher and its sealed records in storage, so that a test
     /// can compare the keys of two objects and read the records' nonces. A
     /// raw object seals nothing.

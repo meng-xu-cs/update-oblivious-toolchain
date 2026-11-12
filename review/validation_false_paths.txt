@@ -644,6 +644,7 @@ top_level_booleans:
   private_evidence_stays_inside_the_runtime: true
   probe_enables_runtime_diagnostics_feature: true
   probe_reads_runtime_telemetry_from_diagnostic_channel: true
+  production_calls_issue_chained_receipts: true
   production_errors_carry_no_runtime_freshness_value: true
   proof_grade_canonical_pair_instantiation_threads_runtime_boundary: true
   proof_grade_paper_main_bundles_discharge_minimal_runtime_boundary: true

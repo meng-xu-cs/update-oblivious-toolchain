@@ -1,7 +1,7 @@
 use crate::deployment::{
     validate_production_artifact, validate_production_call_preflight, validate_production_policy,
-    validate_production_proof_bundle, validate_production_public_environment_trace,
-    ProductionCallEvidence, ProductionRuntimePolicy,
+    validate_production_public_environment_trace, ProductionCallEvidence, ProductionReceipt,
+    ProductionRuntimePolicy,
 };
 use crate::freshness::RuntimeFreshnessState;
 use crate::return_channel::ReturnChannelSession;
@@ -131,6 +131,18 @@ fn ensure_return_channel_policy(
 pub struct ProductionContractInstance {
     inner: ContractInstance,
     policy: ProductionRuntimePolicy,
+    /// The receipt the runtime issued last, for the deployment or for the
+    /// last accepted call, and its hash. The next call must name the hash.
+    last_receipt: ProductionReceipt,
+    last_receipt_sha256: String,
+}
+
+/// What an accepted production call returns: the call's result, and the
+/// runtime's receipt for it, which follows the receipt the call named.
+#[derive(Debug)]
+pub struct ProductionCallResult {
+    pub call: CallResult,
+    pub receipt: ProductionReceipt,
 }
 
 #[cfg(feature = "diagnostics")]
@@ -144,10 +156,33 @@ impl ProductionContractInstance {
     pub fn deploy(artifact: CompiledArtifact, policy: ProductionRuntimePolicy) -> Result<Self> {
         validate_production_artifact(&artifact)?;
         validate_production_policy(&policy)?;
+        Self::from_deployed(ContractInstance::deploy(artifact)?, policy)
+    }
+
+    /// Issue the deployment's receipt, the first of the instance's chain.
+    fn from_deployed(inner: ContractInstance, policy: ProductionRuntimePolicy) -> Result<Self> {
+        let last_receipt = ProductionReceipt::for_deployment(
+            &inner.artifact,
+            &policy,
+            inner.freshness.snapshot(),
+            inner.state.public_state_digest()?,
+            inner.state.ciphertext_store_digest()?,
+        )?;
+        let last_receipt_sha256 = last_receipt.sha256()?;
         Ok(Self {
-            inner: ContractInstance::deploy(artifact)?,
+            inner,
             policy,
+            last_receipt,
+            last_receipt_sha256,
         })
+    }
+
+    /// The receipt the runtime issued last: the deployment's, until a call
+    /// is accepted, and then the last accepted call's. A caller builds the
+    /// evidence of its next call from it: its hash, its freshness epoch and
+    /// its counters.
+    pub fn last_receipt(&self) -> &ProductionReceipt {
+        &self.last_receipt
     }
 
     #[cfg(any(test, feature = "diagnostics"))]
@@ -159,10 +194,10 @@ impl ProductionContractInstance {
     ) -> Result<Self> {
         validate_production_artifact(&artifact)?;
         validate_production_policy(&policy)?;
-        Ok(Self {
-            inner: ContractInstance::deploy_with_seed(artifact, deploy_seed)?,
+        Self::from_deployed(
+            ContractInstance::deploy_with_seed(artifact, deploy_seed)?,
             policy,
-        })
+        )
     }
 
     pub fn call_authorized(
@@ -171,7 +206,7 @@ impl ProductionContractInstance {
         args: Vec<Value>,
         session: &ReturnChannelSession,
         evidence: &ProductionCallEvidence,
-    ) -> Result<CallResult> {
+    ) -> Result<ProductionCallResult> {
         let environment = self.inner.environment.clone();
         self.call_authorized_with_environment(entrypoint, args, session, environment, evidence)
     }
@@ -183,7 +218,7 @@ impl ProductionContractInstance {
         session: &ReturnChannelSession,
         environment: PublicEnvironment,
         evidence: &ProductionCallEvidence,
-    ) -> Result<CallResult> {
+    ) -> Result<ProductionCallResult> {
         validate_production_call_preflight(
             &self.inner.artifact,
             &self.policy,
@@ -191,6 +226,7 @@ impl ProductionContractInstance {
             session,
             &environment,
             self.inner.freshness.snapshot(),
+            &self.last_receipt_sha256,
         )?;
         let manifest_entry = self
             .inner
@@ -207,18 +243,30 @@ impl ProductionContractInstance {
         } else {
             None
         };
-        // Stage the call, run all production validation on the staged trace,
-        // and commit only if everything passes. A failed environment/proof-bundle
-        // check leaves committed state and freshness untouched.
+        // Stage the call, run the production checks on the staged trace and
+        // build the call's receipt from the staged state, and commit only if
+        // all of it succeeds. A failure leaves committed state, freshness
+        // and the last receipt untouched.
         let staged =
             self.inner
                 .stage_call(entrypoint, args, None, execution_session, Some(environment))?;
         validate_production_public_environment_trace(
-            &staged.trace,
+            &staged.trace.receipt,
             &expected_public_environment_projection,
         )?;
-        validate_production_proof_bundle(&self.inner.artifact, &staged.trace, evidence)?;
-        Ok(self.inner.commit_staged(staged).0)
+        let receipt = ProductionReceipt::for_call(
+            evidence,
+            &self.last_receipt,
+            &staged.trace.receipt,
+            staged.freshness.snapshot(),
+            staged.state.public_state_digest()?,
+            staged.state.ciphertext_store_digest()?,
+        )?;
+        let receipt_sha256 = receipt.sha256()?;
+        let call = self.inner.commit_staged(staged).0;
+        self.last_receipt = receipt.clone();
+        self.last_receipt_sha256 = receipt_sha256;
+        Ok(ProductionCallResult { call, receipt })
     }
 }
 
@@ -482,9 +530,9 @@ mod tests {
     use crate::deployment::{production_build_profile_sha256, ProductionRuntimePolicy};
     #[cfg(not(feature = "diagnostics"))]
     use crate::deployment::{
-        production_proof_bundle_sha256, production_public_environment_sha256,
-        production_public_environment_transcript,
+        production_public_environment_sha256, production_public_environment_transcript,
         production_translation_validation_certificate_sha256, ProductionCallEvidence,
+        ProductionReceipt,
     };
     use crate::return_channel::{
         return_channel_aad_bytes, ReturnChannelSession, RETURN_CHANNEL_SCHEME,
@@ -567,10 +615,7 @@ mod tests {
         policy: &ProductionRuntimePolicy,
         session: &ReturnChannelSession,
         environment: &PublicEnvironment,
-        freshness_epoch: u64,
-        rollback_counter: u64,
-        next_call_counter: u64,
-        proof_bundle_sha256: String,
+        previous: &ProductionReceipt,
     ) -> ProductionCallEvidence {
         let identity = artifact.admitted_package.as_ref().unwrap();
         ProductionCallEvidence {
@@ -584,10 +629,10 @@ mod tests {
             public_environment_sha256: production_public_environment_sha256(environment).unwrap(),
             session_id: session.binding().session_id.clone(),
             attestation_transcript_hash: session.binding().attestation_transcript_hash.clone(),
-            freshness_epoch,
-            rollback_counter,
-            next_call_counter,
-            proof_bundle_sha256,
+            freshness_epoch: previous.freshness_epoch,
+            rollback_counter: previous.rollback_counter,
+            next_call_counter: previous.next_call_counter,
+            previous_receipt_sha256: previous.sha256().unwrap(),
             translation_validation_certificate_sha256:
                 production_translation_validation_certificate_sha256(artifact, policy).unwrap(),
         }
@@ -1054,7 +1099,7 @@ bounds:
 
     #[cfg(not(feature = "diagnostics"))]
     #[test]
-    fn production_runtime_requires_attested_proof_bundle_session_and_freshness() {
+    fn production_runtime_requires_attested_receipt_session_and_freshness() {
         let artifact = compile_bench(
             bench_raw!("SingleAccessMap.sol"),
             include_str!(bench_raw!("SingleAccessMap.pathoram.yaml")),
@@ -1065,23 +1110,17 @@ bounds:
         let policy = production_policy();
         let session = return_channel_session();
         let environment = PublicEnvironment::default();
-        let mut probe = ContractInstance::deploy_with_seed(artifact.clone(), 91).unwrap();
-        let snapshot = probe.freshness.snapshot();
-        let probe_result = probe
-            .call_impl(entrypoint, args.clone(), None, None, None)
-            .unwrap()
-            .0;
-        let proof_hash = production_proof_bundle_sha256(&artifact, &probe_result.trace).unwrap();
-        let evidence = production_evidence(
-            &artifact,
-            &policy,
-            &session,
-            &environment,
-            snapshot.epoch,
-            snapshot.rollback_counter,
-            snapshot.next_call_counter,
-            proof_hash,
-        );
+        // A seeded deployment is replayed by its seed, so every instance
+        // deployed from it below issues this deployment receipt.
+        let deployed = ProductionContractInstance::deploy_with_authorized_seed(
+            artifact.clone(),
+            policy.clone(),
+            91,
+        )
+        .unwrap()
+        .last_receipt()
+        .clone();
+        let evidence = production_evidence(&artifact, &policy, &session, &environment, &deployed);
 
         let mut production = ProductionContractInstance::deploy_with_authorized_seed(
             artifact.clone(),
@@ -1092,13 +1131,17 @@ bounds:
         let accepted = production
             .call_authorized(entrypoint, args.clone(), &session, &evidence)
             .unwrap();
-        assert_eq!(
-            production_proof_bundle_sha256(&artifact, &accepted.trace).unwrap(),
-            evidence.proof_bundle_sha256
-        );
+        // The call's receipt follows the deployment's, is for this request
+        // and this public receipt, and is now the head of the chain.
+        accepted.receipt.follows(&deployed).unwrap();
+        accepted
+            .receipt
+            .binds_call(&evidence, accepted.call.receipt())
+            .unwrap();
+        assert_eq!(production.last_receipt(), &accepted.receipt);
 
         let mut missing_proof = evidence.clone();
-        missing_proof.proof_bundle_sha256.clear();
+        missing_proof.previous_receipt_sha256.clear();
         let mut production = ProductionContractInstance::deploy_with_authorized_seed(
             artifact.clone(),
             policy.clone(),
@@ -1110,10 +1153,10 @@ bounds:
             .unwrap_err();
         assert!(err
             .to_string()
-            .contains("proof_bundle_sha256 must be a 64-character hex SHA-256 digest"));
+            .contains("previous_receipt_sha256 must be a 64-character hex SHA-256 digest"));
 
         let mut wrong_proof = evidence.clone();
-        wrong_proof.proof_bundle_sha256 = "00".repeat(32);
+        wrong_proof.previous_receipt_sha256 = "00".repeat(32);
         let mut production = ProductionContractInstance::deploy_with_authorized_seed(
             artifact.clone(),
             policy.clone(),
@@ -1125,7 +1168,7 @@ bounds:
             .unwrap_err();
         assert!(err
             .to_string()
-            .contains("production runtime proof_bundle_sha256 mismatch"));
+            .contains("production runtime previous_receipt_sha256 mismatch"));
 
         let mut wrong_toolchain = evidence.clone();
         wrong_toolchain.toolchain_manifest_sha256 = "00".repeat(32);
@@ -1304,23 +1347,17 @@ bounds:
         let policy = production_policy();
         let session = return_channel_session();
 
-        let mut probe = ContractInstance::deploy_with_seed(artifact.clone(), 41).unwrap();
-        let snapshot = probe.freshness.snapshot();
-        let probe_result = probe
-            .call_with_environment(entrypoint, args.clone(), environment.clone())
-            .unwrap();
-        assert!(!probe_result.aborted);
-        let proof_hash = production_proof_bundle_sha256(&artifact, &probe_result.trace).unwrap();
-        let evidence = production_evidence(
-            &artifact,
-            &policy,
-            &session,
-            &environment,
-            snapshot.epoch,
-            snapshot.rollback_counter,
-            snapshot.next_call_counter,
-            proof_hash,
-        );
+        // A seeded deployment is replayed by its seed, so every instance
+        // deployed from it below issues this deployment receipt.
+        let deployed = ProductionContractInstance::deploy_with_authorized_seed(
+            artifact.clone(),
+            policy.clone(),
+            41,
+        )
+        .unwrap()
+        .last_receipt()
+        .clone();
+        let evidence = production_evidence(&artifact, &policy, &session, &environment, &deployed);
 
         let mut production = ProductionContractInstance::deploy_with_authorized_seed(
             artifact.clone(),
@@ -1337,9 +1374,10 @@ bounds:
                 &evidence,
             )
             .unwrap();
-        assert!(!accepted.aborted);
+        assert!(!accepted.call.aborted);
         assert_eq!(
             accepted
+                .call
                 .trace
                 .theorem_trace
                 .public_outcome
@@ -1603,18 +1641,30 @@ bounds:
         let policy = production_policy();
         let session = return_channel_session();
         let environment = PublicEnvironment::default();
-        let evidence = |freshness_epoch, rollback_counter, next_call_counter| {
-            production_evidence(
-                &artifact,
-                &policy,
-                &session,
-                &environment,
+        let deployed = ProductionContractInstance::deploy_with_authorized_seed(
+            artifact.clone(),
+            policy.clone(),
+            91,
+        )
+        .unwrap()
+        .last_receipt()
+        .clone();
+        let base = production_evidence(&artifact, &policy, &session, &environment, &deployed);
+        assert_eq!(
+            (
+                base.freshness_epoch,
+                base.rollback_counter,
+                base.next_call_counter
+            ),
+            (91, 0, 0)
+        );
+        let evidence =
+            |freshness_epoch, rollback_counter, next_call_counter| ProductionCallEvidence {
                 freshness_epoch,
                 rollback_counter,
                 next_call_counter,
-                "00".repeat(32),
-            )
-        };
+                ..base.clone()
+            };
         // The runtime's values are 91, 0 and 0. Each error names the field
         // that differs and says nothing more.
         for (evidence, field) in [
@@ -2143,7 +2193,7 @@ bounds:
 
     #[cfg(not(feature = "diagnostics"))]
     #[test]
-    fn production_proof_bundle_failure_rolls_back_and_preserves_freshness() {
+    fn rejected_production_call_leaves_state_freshness_and_receipt_untouched() {
         let artifact = compile_bench(
             bench_raw!("SingleAccessMap.sol"),
             include_str!(bench_raw!("SingleAccessMap.pathoram.yaml")),
@@ -2154,49 +2204,52 @@ bounds:
         let policy = production_policy();
         let session = return_channel_session();
         let environment = PublicEnvironment::default();
-        let mut probe = ContractInstance::deploy_with_seed(artifact.clone(), 91).unwrap();
-        let snapshot = probe.freshness.snapshot();
-        let probe_result = probe
-            .call_impl(entrypoint, args.clone(), None, None, None)
-            .unwrap()
-            .0;
-        let proof_hash = production_proof_bundle_sha256(&artifact, &probe_result.trace).unwrap();
-        let evidence = production_evidence(
-            &artifact,
-            &policy,
-            &session,
-            &environment,
-            snapshot.epoch,
-            snapshot.rollback_counter,
-            snapshot.next_call_counter,
-            proof_hash,
-        );
+        // A seeded deployment is replayed by its seed, so every instance
+        // deployed from it below issues this deployment receipt.
+        let deployed = ProductionContractInstance::deploy_with_authorized_seed(
+            artifact.clone(),
+            policy.clone(),
+            91,
+        )
+        .unwrap()
+        .last_receipt()
+        .clone();
+        let evidence = production_evidence(&artifact, &policy, &session, &environment, &deployed);
 
         let mut production =
             ProductionContractInstance::deploy_with_authorized_seed(artifact.clone(), policy, 91)
                 .unwrap();
         let before = production.inner.freshness.snapshot();
+        let store_before = production.inner.state.ciphertext_store_digest().unwrap();
 
-        let mut wrong_proof = evidence.clone();
-        wrong_proof.proof_bundle_sha256 = "00".repeat(32);
+        // A call that names a receipt the runtime did not issue last.
+        let mut wrong_receipt = evidence.clone();
+        wrong_receipt.previous_receipt_sha256 = "00".repeat(32);
         let err = production
-            .call_authorized(entrypoint, args.clone(), &session, &wrong_proof)
+            .call_authorized(entrypoint, args.clone(), &session, &wrong_receipt)
             .unwrap_err();
-        assert!(err
-            .to_string()
-            .contains("production runtime proof_bundle_sha256 mismatch"));
+        assert_eq!(
+            err.to_string(),
+            "production runtime previous_receipt_sha256 mismatch"
+        );
         assert_eq!(
             production.inner.freshness.snapshot(),
             before,
-            "production proof-bundle failure must not advance freshness"
+            "a rejected production call must not advance freshness"
+        );
+        assert_eq!(production.last_receipt(), &deployed);
+        assert_eq!(
+            production.inner.state.ciphertext_store_digest().unwrap(),
+            store_before
         );
 
-        // Because freshness was preserved, the original (correct) evidence still
-        // applies and a retry succeeds.
+        // Because nothing moved, the original evidence still applies and a
+        // retry succeeds.
         let accepted = production
             .call_authorized(entrypoint, args, &session, &evidence)
             .unwrap();
-        assert!(!accepted.aborted);
+        assert!(!accepted.call.aborted);
+        accepted.receipt.follows(&deployed).unwrap();
     }
 
     #[cfg(not(feature = "diagnostics"))]
@@ -2212,23 +2265,17 @@ bounds:
         let policy = production_policy();
         let session = return_channel_session();
         let environment = PublicEnvironment::default();
-        let mut probe = ContractInstance::deploy_with_seed(artifact.clone(), 91).unwrap();
-        let snapshot = probe.freshness.snapshot();
-        let probe_result = probe
-            .call_impl(entrypoint, args.clone(), None, None, None)
-            .unwrap()
-            .0;
-        let proof_hash = production_proof_bundle_sha256(&artifact, &probe_result.trace).unwrap();
-        let evidence = production_evidence(
-            &artifact,
-            &policy,
-            &session,
-            &environment,
-            snapshot.epoch,
-            snapshot.rollback_counter,
-            snapshot.next_call_counter,
-            proof_hash,
-        );
+        // A seeded deployment is replayed by its seed, so every instance
+        // deployed from it below issues this deployment receipt.
+        let deployed = ProductionContractInstance::deploy_with_authorized_seed(
+            artifact.clone(),
+            policy.clone(),
+            91,
+        )
+        .unwrap()
+        .last_receipt()
+        .clone();
+        let evidence = production_evidence(&artifact, &policy, &session, &environment, &deployed);
 
         // Valid certificate: accepted.
         let mut production = ProductionContractInstance::deploy_with_authorized_seed(

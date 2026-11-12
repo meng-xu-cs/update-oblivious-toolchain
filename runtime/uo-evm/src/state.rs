@@ -19,6 +19,8 @@ use uo_kernel_runtime::{
     RuntimeKernelObjectStore, RuntimeKernelStatementTrace,
 };
 
+const CIPHERTEXT_STORE_DIGEST_DOMAIN: &[u8] = b"uo-runtime/ciphertext-store/v1";
+
 #[derive(Debug)]
 pub(in crate::runtime) struct CommittedRuntimeState {
     objects: RuntimeObjectTable,
@@ -155,6 +157,35 @@ impl RuntimeObjectTable {
 
     fn public_state_digest(&self) -> Result<String> {
         Ok(self.public_state_snapshot()?.digest)
+    }
+
+    /// A digest of every sealed record in storage, by object and by slot. It
+    /// commits to the ciphertext that a host keeping the storage holds, and
+    /// to nothing else. Each object's records are hashed on their own, so
+    /// that the digest of an object the call left alone does not change.
+    fn ciphertext_store_digest(&self) -> Result<String> {
+        let mut store = Sha256::new();
+        store.update(CIPHERTEXT_STORE_DIGEST_DOMAIN);
+        for (object_id, object) in self.iter() {
+            let mut records = Sha256::new();
+            let mut count = 0u64;
+            let mut too_long = false;
+            object.for_each_sealed_record(&mut |record| {
+                count = count.saturating_add(1);
+                match u64::try_from(record.len()) {
+                    Ok(len) => records.update(len.to_be_bytes()),
+                    Err(_) => too_long = true,
+                }
+                records.update(record);
+            });
+            if too_long {
+                bail!("a sealed record of object {object_id} is too long to digest");
+            }
+            store.update(object_id.to_be_bytes());
+            store.update(count.to_be_bytes());
+            store.update(records.finalize());
+        }
+        Ok(hex::encode(store.finalize()))
     }
 
     /// The public-state digest of this staged table over `committed`: each
@@ -295,9 +326,13 @@ impl ContractRuntime {
         self.committed.public_object_ids()
     }
 
-    #[cfg(any(test, feature = "diagnostics"))]
     pub(crate) fn public_state_digest(&self) -> Result<String> {
         Ok(self.public_state_snapshot()?.digest)
+    }
+
+    /// A digest of the ciphertext the committed state holds in storage.
+    pub(crate) fn ciphertext_store_digest(&self) -> Result<String> {
+        self.committed.objects.ciphertext_store_digest()
     }
 
     pub(in crate::runtime) fn public_state_snapshot(&self) -> Result<PublicStateSnapshot> {

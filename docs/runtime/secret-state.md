@@ -72,11 +72,13 @@ and the ownership boundaries that keep them auditable.
     `observerCoverage_publicReceipt_hasNoHiddenField` in
     `UOToolchain/ObserverCoverage.lean`).
 
-    Until Issue 26 of
-    [`review/2026-11-external-review`](../../review/2026-11-external-review/README.md),
-    a production call is still accepted only against the hash of a proof
-    bundle that the caller supplies, and that bundle is built from the
-    private evidence.
+13. A production call is accepted on evidence the caller can know, and is
+    answered with a `ProductionReceipt`. Nothing in a receipt derives from
+    the call's private evidence: the module that builds receipts
+    (`runtime/uo-evm/src/deployment.rs`) is handed the call's public
+    receipt, the freshness counters and two state digests, and never a
+    trace. The digest of the ciphertext store covers the sealed records a
+    host holds, and nothing else.
 
 ### What a nonce shows
 
@@ -108,18 +110,20 @@ write/read evidence, direct store cipher calls outside the codec layer, and
 reintroduction of host-visible hidden-state errors that should be modeled
 confidential aborts.
 
-Invariants 9 to 12 have six bits in `runtime_boundary_validation.json`:
+Invariants 9 to 13 have seven bits in `runtime_boundary_validation.json`:
 `deployment_seed_stays_out_of_call_traces`,
 `production_errors_carry_no_runtime_freshness_value`,
 `contract_instance_debug_is_opaque`,
 `runtime_secrets_derive_from_the_master_secret`,
-`seal_nonces_come_from_the_seal_count` and
-`private_evidence_stays_inside_the_runtime`. Each is a check of source text,
+`seal_nonces_come_from_the_seal_count`,
+`private_evidence_stays_inside_the_runtime` and
+`production_calls_issue_chained_receipts`. Each is a check of source text,
 and a probe unit test shows that it rejects the drifts it guards against.
-`cargo test -p uo-evm` runs the tests behind the first three and the last in
-the build a production runtime uses
-(`runtime/uo-evm/tests/production_boundary.rs`); a workspace build turns on
-the `diagnostics` feature and compiles those tests out.
+`cargo test -p uo-evm` runs the tests behind all but the two about secrets
+and nonces in the build a production runtime uses
+(`runtime/uo-evm/tests/production_boundary.rs`, and the production tests
+of `engine.rs`); a workspace build turns on the `diagnostics` feature and
+compiles those tests out.
 
 Invariant 12 is also pinned in the Lean implementation interface
 (`engineDelegatesToRuntimeBridge`), and `tamper_validation.json` has two

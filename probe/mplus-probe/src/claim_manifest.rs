@@ -88,7 +88,7 @@ const CLAIM_ENTRIES: &[ClaimEntry] = &[
     ClaimEntry {
         id: "deployment-acceptance-theorem",
         category: "claim",
-        text: "A production runtime result is accepted only under a current admitted-package identity, runtime proof-bundle hash, deployment policy hash match, return-channel session match, and freshness evidence.",
+        text: "A production runtime accepts a call only under a current admitted-package identity, deployment policy hash match, return-channel session match, freshness evidence and the hash of the receipt it issued last, and answers with the next receipt of the deployment's chain; a replayed, reordered or skipped receipt does not follow.",
         status: STATUS_LEAN_PROVED,
         doc_anchor: "ProductionContractInstance::call_authorized",
         source_files: &["crates/uo-core/src/lib.rs"],

@@ -38,7 +38,9 @@ which a call returns only in a test or diagnostics build (see
 
 Production acceptance uses `ProductionContractInstance::call_authorized`.
 That path refuses calls without a current admitted-package identity, matching
-toolchain manifest digest, runtime confidential proof-bundle hash, runtime
-binary hash, proof-root hash, accepted SGX quote hash, attested
-return-channel session transcript, and freshness/rollback counters matching
-the runtime state at call entry.
+toolchain manifest digest, runtime binary hash, proof-root hash, accepted SGX
+quote hash, attested return-channel session transcript, freshness/rollback
+counters matching the runtime state at call entry, and the hash of the
+receipt the runtime issued last. It answers an accepted call with the next
+`ProductionReceipt` of the deployment's chain; see the Deployment Theorem in
+[`../claim-boundary.md`](../claim-boundary.md).

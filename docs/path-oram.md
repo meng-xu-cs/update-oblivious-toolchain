@@ -295,17 +295,20 @@ spends on the proof objects it exports, the position-map witnesses and the
 execution trace's proof bundles, and the rest, its own work
 (`p50_witness_ns`, `p50_proof_objects_ns`, `p50_runtime_ns`;
 `latency_break_even` compares both). On its own work the tree is faster
-than the full scan for reads from 4,096 entries (16 ms against 17 at 4,096,
-44 against 72 at 16,384) and for an even mix from 16,384, while a write
-alone stays slower (80 ms against 72 at 16,384). Whole calls on the tree are
-slower at every capacity measured (471 ms against 355 for a read at 16,384):
+than the full scan for reads from 8,192 entries (31 ms against 35 at 8,192,
+57 against 71 at 16,384) and for an even mix from 16,384, while a write
+alone stays slower (81 ms against 76 at 16,384). Whole calls on the tree are
+slower at every capacity measured (522 ms against 380 for a read at 16,384):
 to export the position-map witnesses, the runtime decodes every bucket of the
-tree at the start and the end of each call, 390 ms of that read, where the
-full scan's time goes to the proof bundles of its 32,768-event trace (279
-ms). These medians of three trials move with the machine and the run. Across
-the last four bundles the tree's own work for that read at 16,384 measured
-between 42 and 53 ms, and the reads-alone threshold was 4,096 entries on
-this machine and 8,192 on a slower one. A node access evicts the stash
+tree at the start and the end of each call, 423 ms of that read, where the
+full scan's time goes to the proof bundles of its 32,768-event trace (305
+ms). These are medians of three trials without warmup, and they move from
+run to run. At 4,096 entries a read on the tree and one on the full scan are
+within that noise: over five bundles the reads-alone threshold came out at
+4,096 entries three times and at 8,192 twice, and the tree's own work for a
+read at 16,384 between 42 and 57 ms. Issue 27 of
+[`review/2026-11-external-review`](../review/2026-11-external-review/README.md)
+replaces these with warmed-up, larger samples. A node access evicts the stash
 bucket by bucket, placing a block in the
 bucket at a given depth exactly when its leaf and the read leaf agree above
 that depth (the leaf count is a power of two), and moves blocks with in-place

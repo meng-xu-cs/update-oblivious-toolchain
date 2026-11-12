@@ -9,6 +9,12 @@ This module records the production-deployment theorem surface used by F-16.
 The paper theorem remains about the instrumented runtime observer. The
 deployment theorem adds the operational evidence that must be present before a
 runtime result can be accepted in production.
+
+A production call is accepted on evidence that a caller can know before the
+call runs. In place of a per-call proof object, the evidence names the receipt
+the runtime issued last, and the runtime answers with the next receipt of the
+deployment's chain. No proof object and no private evidence leaves a production
+runtime; the Lean checkers run on diagnostics builds of the same source.
 -/
 
 structure DeploymentRuntimePolicy where
@@ -41,7 +47,9 @@ structure DeploymentCallEvidence where
   freshnessEpoch : Nat
   rollbackCounter : Nat
   nextCallCounter : Nat
-  proofBundleHash : Option String
+  /-- The hash of the receipt the call follows: the deployment's receipt for
+  the first call, and then the receipt of the call before. -/
+  previousReceiptHash : String
   translationValidationCertificateHash : String
 deriving Repr, DecidableEq
 
@@ -56,7 +64,31 @@ structure DeploymentRuntimeState where
   freshnessEpoch : Nat
   rollbackCounter : Nat
   nextCallCounter : Nat
+  /-- The hash of the receipt the runtime issued last. -/
+  lastReceiptHash : String
+  /-- The digest of the committed public state. -/
+  publicStateHash : String
+  /-- The digest of the sealed records in storage. -/
+  ciphertextStoreHash : String
   translationValidationCertificateHash : String
+deriving Repr, DecidableEq
+
+/-- What the runtime issues for a deployment and for every call it accepts.
+It names its request and the receipt before it, the state before and after,
+the call's public receipt, and the freshness counters after the call. Hashes
+are opaque strings here: the statements below are about how the fields of
+successive receipts must agree, not about a hash function. -/
+structure DeploymentCallReceipt where
+  requestHash : String
+  previousReceiptHash : String
+  publicStateBeforeHash : String
+  publicStateAfterHash : String
+  ciphertextStoreBeforeHash : String
+  ciphertextStoreAfterHash : String
+  publicReceiptHash : String
+  freshnessEpoch : Nat
+  rollbackCounter : Nat
+  nextCallCounter : Nat
 deriving Repr, DecidableEq
 
 def DeploymentPublicEnvironmentBound
@@ -89,20 +121,21 @@ def DeploymentCallAccepted
   evidence.freshnessEpoch = state.freshnessEpoch ∧
   evidence.rollbackCounter = state.rollbackCounter ∧
   evidence.nextCallCounter = state.nextCallCounter ∧
-  evidence.proofBundleHash.isSome ∧
+  evidence.previousReceiptHash = state.lastReceiptHash ∧
   evidence.translationValidationCertificateHash = state.translationValidationCertificateHash
 
-theorem deployment_call_acceptance_requires_validated_proof_bundle
+/-- An accepted call follows the receipt the runtime issued last. -/
+theorem deployment_call_acceptance_binds_previous_receipt
   {policy : DeploymentRuntimePolicy}
   {profile : DeploymentBuildProfileEvidence}
   {state : DeploymentRuntimeState}
   {evidence : DeploymentCallEvidence} :
   DeploymentCallAccepted policy profile state evidence →
-    evidence.proofBundleHash.isSome := by
+    evidence.previousReceiptHash = state.lastReceiptHash := by
   intro hAccepted
   rcases hAccepted with
-    ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, hProofBundle, _⟩
-  exact hProofBundle
+    ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, hReceipt, _⟩
+  exact hReceipt
 
 theorem deployment_call_acceptance_binds_runtime_binary
   {policy : DeploymentRuntimePolicy}
@@ -228,15 +261,161 @@ theorem deployment_call_acceptance_binds_translation_validation_certificate
     ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, hCertificate⟩
   exact hCertificate
 
-theorem deployment_call_rejects_missing_proof_bundle
+/-- A call that names any receipt but the one the runtime issued last is
+rejected: an older receipt, a receipt that was changed on its way to the
+caller, or none. -/
+theorem deployment_call_rejects_other_receipt
   {policy : DeploymentRuntimePolicy}
   {profile : DeploymentBuildProfileEvidence}
   {state : DeploymentRuntimeState}
   {evidence : DeploymentCallEvidence}
-  (hMissing : evidence.proofBundleHash = none) :
+  (hOther : evidence.previousReceiptHash ≠ state.lastReceiptHash) :
   ¬ DeploymentCallAccepted policy profile state evidence := by
   intro hAccepted
-  have hSome := deployment_call_acceptance_requires_validated_proof_bundle hAccepted
-  simp [hMissing] at hSome
+  exact hOther (deployment_call_acceptance_binds_previous_receipt hAccepted)
+
+/-! ## Receipts
+
+The runtime issues a receipt for each accepted call. `DeploymentReceiptIssued`
+says what the receipt of a call accepted in a state must hold, and
+`DeploymentRuntimeState.afterReceipt` is the state the runtime is in once it
+has issued it. `DeploymentReceiptFollows` is the relation a holder of two
+receipts checks. The Rust `ProductionReceipt::for_call` and
+`ProductionReceipt::follows` implement the two; that they do is tested in
+`runtime/uo-evm/tests/production_boundary.rs`, not proved. -/
+
+/-- The receipt of a call accepted in `state` on evidence whose hash is
+`evidenceHash`. It names the request and the receipt before it, starts from
+the state's commitments, keeps the epoch, and its counters are the state's,
+moved on by one call. A call that aborts leaves the rollback counter where it
+was. -/
+def DeploymentReceiptIssued
+  (state : DeploymentRuntimeState)
+  (evidenceHash : String)
+  (receipt : DeploymentCallReceipt) : Prop :=
+  receipt.requestHash = evidenceHash ∧
+  receipt.previousReceiptHash = state.lastReceiptHash ∧
+  receipt.publicStateBeforeHash = state.publicStateHash ∧
+  receipt.ciphertextStoreBeforeHash = state.ciphertextStoreHash ∧
+  receipt.freshnessEpoch = state.freshnessEpoch ∧
+  receipt.nextCallCounter = state.nextCallCounter + 1 ∧
+  (receipt.rollbackCounter = state.rollbackCounter ∨
+    receipt.rollbackCounter = state.rollbackCounter + 1)
+
+/-- The runtime's state once it has issued `receipt`, whose hash is
+`receiptHash`. -/
+def DeploymentRuntimeState.afterReceipt
+  (state : DeploymentRuntimeState)
+  (receipt : DeploymentCallReceipt)
+  (receiptHash : String) : DeploymentRuntimeState :=
+  { state with
+    lastReceiptHash := receiptHash
+    publicStateHash := receipt.publicStateAfterHash
+    ciphertextStoreHash := receipt.ciphertextStoreAfterHash
+    rollbackCounter := receipt.rollbackCounter
+    nextCallCounter := receipt.nextCallCounter }
+
+/-- `next` comes after `previous`, whose hash is `previousHash`, in a
+deployment's chain of receipts. -/
+def DeploymentReceiptFollows
+  (previous : DeploymentCallReceipt)
+  (previousHash : String)
+  (next : DeploymentCallReceipt) : Prop :=
+  next.previousReceiptHash = previousHash ∧
+  next.publicStateBeforeHash = previous.publicStateAfterHash ∧
+  next.ciphertextStoreBeforeHash = previous.ciphertextStoreAfterHash ∧
+  next.freshnessEpoch = previous.freshnessEpoch ∧
+  next.nextCallCounter = previous.nextCallCounter + 1 ∧
+  (next.rollbackCounter = previous.rollbackCounter ∨
+    next.rollbackCounter = previous.rollbackCounter + 1)
+
+/-- The receipts of two calls accepted one after the other follow one
+another. -/
+theorem deployment_receipts_issued_in_turn_follow
+  {state : DeploymentRuntimeState}
+  {firstEvidenceHash secondEvidenceHash firstHash : String}
+  {first second : DeploymentCallReceipt}
+  (hFirst : DeploymentReceiptIssued state firstEvidenceHash first)
+  (hSecond :
+    DeploymentReceiptIssued (state.afterReceipt first firstHash) secondEvidenceHash second) :
+  DeploymentReceiptFollows first firstHash second := by
+  rcases hFirst with ⟨_, _, _, _, hEpoch, _, _⟩
+  rcases hSecond with ⟨_, hPrevious, hPublic, hStore, hEpoch', hNext, hRollback⟩
+  refine ⟨hPrevious, hPublic, hStore, ?_, hNext, hRollback⟩
+  rw [hEpoch', hEpoch]
+  rfl
+
+/-- The call the runtime accepts next must name the receipt it just issued. -/
+theorem deployment_call_after_receipt_names_it
+  {policy : DeploymentRuntimePolicy}
+  {profile : DeploymentBuildProfileEvidence}
+  {state : DeploymentRuntimeState}
+  {receipt : DeploymentCallReceipt}
+  {receiptHash : String}
+  {evidence : DeploymentCallEvidence}
+  (hAccepted :
+    DeploymentCallAccepted policy profile (state.afterReceipt receipt receiptHash) evidence) :
+  evidence.previousReceiptHash = receiptHash ∧
+    evidence.rollbackCounter = receipt.rollbackCounter ∧
+    evidence.nextCallCounter = receipt.nextCallCounter := by
+  have hReceipt := deployment_call_acceptance_binds_previous_receipt hAccepted
+  have hFreshness := deployment_call_acceptance_binds_freshness hAccepted
+  exact ⟨hReceipt, hFreshness.2.1, hFreshness.2.2⟩
+
+/-- A receipt's call counter is one more than that of the receipt it
+follows. -/
+theorem deployment_receipt_follows_counter
+  {previous next : DeploymentCallReceipt}
+  {previousHash : String}
+  (hFollows : DeploymentReceiptFollows previous previousHash next) :
+  next.nextCallCounter = previous.nextCallCounter + 1 :=
+  hFollows.2.2.2.2.1
+
+/-- A replayed receipt is rejected: no receipt follows itself. -/
+theorem deployment_receipt_not_follows_itself
+  (receipt : DeploymentCallReceipt)
+  (receiptHash : String) :
+  ¬ DeploymentReceiptFollows receipt receiptHash receipt := by
+  intro hFollows
+  have hCounter := deployment_receipt_follows_counter hFollows
+  omega
+
+/-- Reordered receipts are rejected: if one receipt follows another, the
+other does not follow it. -/
+theorem deployment_receipt_follows_asymmetric
+  {first second : DeploymentCallReceipt}
+  {firstHash secondHash : String}
+  (hFollows : DeploymentReceiptFollows first firstHash second) :
+  ¬ DeploymentReceiptFollows second secondHash first := by
+  intro hBack
+  have hForward := deployment_receipt_follows_counter hFollows
+  have hBackward := deployment_receipt_follows_counter hBack
+  omega
+
+/-- A skipped receipt is rejected: a receipt that follows the successor of
+another does not follow that other one. -/
+theorem deployment_receipt_follows_not_skipping
+  {first second third : DeploymentCallReceipt}
+  {firstHash secondHash : String}
+  (hSecond : DeploymentReceiptFollows first firstHash second)
+  (hThird : DeploymentReceiptFollows second secondHash third) :
+  ¬ DeploymentReceiptFollows first firstHash third := by
+  intro hSkip
+  have hOne := deployment_receipt_follows_counter hSecond
+  have hTwo := deployment_receipt_follows_counter hThird
+  have hDirect := deployment_receipt_follows_counter hSkip
+  omega
+
+/-- A receipt follows another only from the state the other ended in, in the
+same epoch. -/
+theorem deployment_receipt_follows_binds_state
+  {previous next : DeploymentCallReceipt}
+  {previousHash : String}
+  (hFollows : DeploymentReceiptFollows previous previousHash next) :
+  next.previousReceiptHash = previousHash ∧
+    next.publicStateBeforeHash = previous.publicStateAfterHash ∧
+    next.ciphertextStoreBeforeHash = previous.ciphertextStoreAfterHash ∧
+    next.freshnessEpoch = previous.freshnessEpoch :=
+  ⟨hFollows.1, hFollows.2.1, hFollows.2.2.1, hFollows.2.2.2.1⟩
 
 end UOToolchain

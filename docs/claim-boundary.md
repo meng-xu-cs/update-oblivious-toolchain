@@ -144,21 +144,47 @@ analogues), and without declared releases the erasure is the identity
 ## Deployment Theorem
 
 The deployment theorem is separate from the paper theorem over the
-instrumented runtime observer. A production runtime result is accepted only
-when the runtime has:
+instrumented runtime observer. A production runtime accepts a call only on
+evidence that shows:
 
 - a current admitted-package identity and matching toolchain manifest digest;
-- a runtime confidential proof-bundle hash for the emitted trace;
 - a deployment policy matching the measured runtime binary hash, proof-root
   hash, and accepted SGX quote hash;
 - a return-channel session id and attestation transcript hash matching the
-  supplied session; and
+  supplied session;
 - freshness evidence matching the runtime epoch, rollback counter, and next
-  call counter at call entry.
+  call counter at call entry; and
+- the hash of the receipt the runtime issued last.
+
+Every item is something a caller can know before the call runs. The runtime
+issues a receipt when it is deployed and one for each call it accepts
+(`ProductionReceipt`). A receipt names the request it answers, the receipt
+before it, the public-state digest and a digest of the sealed records in
+storage before and after, the hash of the call's public receipt, and the
+freshness counters after the call. The receipts of a deployment form a
+chain: a call that names any receipt but the last is rejected, and a holder
+of two receipts can check that one follows the other.
+
+No proof object and no private evidence leaves a production runtime, and
+nothing in a receipt derives from either. What a production result rests on
+is therefore: the attested binary and policy that the evidence names; the
+theorems about the model; and the validation of that binary's source, which
+the Lean checkers perform on diagnostics builds, where the same code returns
+its traces. A production build is not checked call by call.
+
+A receipt is not signed. Its fields are bound by the chain and by the
+runtime's check at the next call; how a caller authenticates the receipt it
+holds last belongs to the attested channel, which this repository models
+only through the session's hashes.
 
 The Rust enforcement point is `ProductionContractInstance::call_authorized`.
-The Lean theorem surface is `DeploymentAcceptance.lean`, which exposes the
-field bindings required by `DeploymentCallAccepted`.
+The Lean theorem surface is `DeploymentAcceptance.lean`:
+`DeploymentCallAccepted` exposes the field bindings of the evidence,
+including the receipt it names, and `DeploymentReceiptFollows` is the chain
+relation, with theorems that a replayed, reordered or skipped receipt does
+not follow. That the Rust receipt checks implement those relations is tested
+in the production build (`runtime/uo-evm/tests/production_boundary.rs`), not
+proved.
 
 ## Backend Scope
 

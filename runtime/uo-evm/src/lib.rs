@@ -17,13 +17,17 @@ mod runtime;
 mod secret;
 
 pub use deployment::{
-    production_build_profile_sha256, production_proof_bundle_sha256,
-    production_public_environment_sha256, production_public_environment_transcript,
-    ProductionCallEvidence, ProductionRuntimePolicy,
+    production_build_profile_sha256, production_call_evidence_sha256,
+    production_deployment_request_sha256, production_public_environment_sha256,
+    production_public_environment_transcript, production_public_receipt_sha256,
+    production_translation_validation_certificate_sha256, ProductionCallEvidence,
+    ProductionReceipt, ProductionRuntimePolicy, PRODUCTION_NO_RECEIPT_SHA256,
 };
 #[cfg(any(test, feature = "diagnostics"))]
 pub use engine::run_artifact_with_seed;
-pub use engine::{run_artifact, CallResult, ContractInstance, ProductionContractInstance};
+pub use engine::{
+    run_artifact, CallResult, ContractInstance, ProductionCallResult, ProductionContractInstance,
+};
 #[cfg(feature = "diagnostics")]
 pub use engine::{CallTelemetry, DiagnosticCallResult};
 #[cfg(feature = "diagnostics")]

@@ -106,9 +106,10 @@ The operational production gate is separate from the observer definition.
 `ProductionContractInstance::call_authorized` requires a deployment policy and
 per-call evidence binding the admitted package, toolchain manifest, runtime
 binary hash, proof-root hash, accepted SGX quote hash, return-channel session
-id, attestation transcript hash, and freshness/rollback counters. The call
-result is accepted only after the emitted trace yields a runtime confidential
-proof-bundle hash matching the supplied evidence.
+id, attestation transcript hash, freshness/rollback counters, and the hash
+of the receipt the runtime issued last. An accepted call is answered with
+the next receipt of the deployment's chain, which carries nothing derived
+from the call's private evidence.
 
 ## Non-Claim
 

@@ -7,7 +7,6 @@
 //! with `cargo test -p uo-evm`.
 #![cfg(not(feature = "diagnostics"))]
 
-use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 use uo_core::{
     CompiledArtifact, ContractMetadata, ProgramMode, PublicEnvironment, ReturnChannelPublicBinding,
@@ -15,8 +14,9 @@ use uo_core::{
 };
 use uo_evm::{
     production_build_profile_sha256, production_public_environment_sha256,
-    production_public_environment_transcript, ContractInstance, ProductionCallEvidence,
-    ProductionContractInstance, ProductionRuntimePolicy, ReturnChannelSession,
+    production_public_environment_transcript, production_translation_validation_certificate_sha256,
+    ContractInstance, ProductionCallEvidence, ProductionContractInstance, ProductionReceipt,
+    ProductionRuntimePolicy, ReturnChannelSession, PRODUCTION_NO_RECEIPT_SHA256,
     RETURN_CHANNEL_SCHEME,
 };
 
@@ -56,23 +56,17 @@ fn session() -> ReturnChannelSession {
     .unwrap()
 }
 
-/// Call evidence built from values a host knows, with a guessed freshness
-/// epoch. The translation certificate is a hash over public values.
+/// Call evidence built from what a caller knows: the artifact, the policy,
+/// the session, the public environment, and the receipt the call follows,
+/// which carries the runtime's epoch and counters.
 fn public_evidence(
     artifact: &CompiledArtifact,
     policy: &ProductionRuntimePolicy,
     session: &ReturnChannelSession,
     environment: &PublicEnvironment,
-    freshness_epoch: u64,
+    previous: &ProductionReceipt,
 ) -> ProductionCallEvidence {
     let identity = artifact.admitted_package.as_ref().unwrap();
-    let certificate = serde_json::json!({
-        "schema": "uo.translation_validation_certificate.v1",
-        "admitted_package_sha256": identity.package_sha256,
-        "toolchain_manifest_sha256": identity.toolchain_manifest_sha256,
-        "proof_relevant_view_sha256": uo_core::proof_relevant_view_sha256(artifact).unwrap(),
-        "proof_root_sha256": policy.proof_root_sha256,
-    });
     ProductionCallEvidence {
         admitted_package_sha256: identity.package_sha256.clone(),
         toolchain_manifest_sha256: identity.toolchain_manifest_sha256.clone(),
@@ -84,14 +78,257 @@ fn public_evidence(
         public_environment_sha256: production_public_environment_sha256(environment).unwrap(),
         session_id: session.binding().session_id.clone(),
         attestation_transcript_hash: session.binding().attestation_transcript_hash.clone(),
-        freshness_epoch,
-        rollback_counter: 0,
-        next_call_counter: 0,
-        proof_bundle_sha256: "00".repeat(32),
-        translation_validation_certificate_sha256: hex::encode(Sha256::digest(
-            serde_json::to_vec(&certificate).unwrap(),
-        )),
+        freshness_epoch: previous.freshness_epoch,
+        rollback_counter: previous.rollback_counter,
+        next_call_counter: previous.next_call_counter,
+        previous_receipt_sha256: previous.sha256().unwrap(),
+        translation_validation_certificate_sha256:
+            production_translation_validation_certificate_sha256(artifact, policy).unwrap(),
     }
+}
+
+fn put(key: u8, value: u64) -> Vec<Value> {
+    vec![Value::Bytes32([key; 32]), Value::uint(value)]
+}
+
+/// A deployment from OS randomness accepts calls from public evidence alone:
+/// the caller needs no seed and no second instance. Each accepted call
+/// returns a receipt that follows the one its evidence named.
+#[test]
+fn a_production_deployment_accepts_calls_from_public_evidence_alone() {
+    let artifact = single_access_map();
+    let policy = policy();
+    let session = session();
+    let environment = PublicEnvironment::default();
+    let mut production =
+        ProductionContractInstance::deploy(artifact.clone(), policy.clone()).unwrap();
+
+    let deployed = production.last_receipt().clone();
+    deployed.binds_deployment(&artifact, &policy).unwrap();
+    assert_eq!(
+        deployed.previous_receipt_sha256,
+        PRODUCTION_NO_RECEIPT_SHA256
+    );
+    assert_eq!(
+        (deployed.rollback_counter, deployed.next_call_counter),
+        (0, 0)
+    );
+
+    let mut head = deployed.clone();
+    let mut chain = vec![deployed];
+    for (key, value) in [(7u8, 5u64), (8, 6), (7, 9)] {
+        let evidence = public_evidence(&artifact, &policy, &session, &environment, &head);
+        let accepted = production
+            .call_authorized("put(bytes32,uint256)", put(key, value), &session, &evidence)
+            .unwrap();
+        assert!(!accepted.call.aborted);
+        accepted.receipt.follows(&head).unwrap();
+        accepted
+            .receipt
+            .binds_call(&evidence, accepted.call.receipt())
+            .unwrap();
+        // The call wrote sealed records and no public state.
+        assert_ne!(
+            accepted.receipt.ciphertext_store_after_sha256,
+            accepted.receipt.ciphertext_store_before_sha256
+        );
+        assert_eq!(
+            accepted.receipt.public_state_after_sha256,
+            accepted.receipt.public_state_before_sha256
+        );
+        assert_eq!(production.last_receipt(), &accepted.receipt);
+        head = accepted.receipt.clone();
+        chain.push(accepted.receipt);
+    }
+    assert_eq!(chain.len(), 4);
+    assert_eq!((head.rollback_counter, head.next_call_counter), (3, 3));
+    for pair in chain.windows(2) {
+        pair[1].follows(&pair[0]).unwrap();
+    }
+
+    // A second deployment of the same artifact starts another chain.
+    let other = ProductionContractInstance::deploy(artifact.clone(), policy.clone()).unwrap();
+    assert_ne!(other.last_receipt(), &chain[0]);
+    assert_ne!(
+        other.last_receipt().freshness_epoch,
+        chain[0].freshness_epoch
+    );
+    assert_ne!(
+        other.last_receipt().ciphertext_store_after_sha256,
+        chain[0].ciphertext_store_after_sha256
+    );
+    assert!(chain[1].follows(other.last_receipt()).is_err());
+}
+
+/// The receipts of a deployment chain. A receipt that is replayed, out of
+/// order or changed in any field is rejected: by the predicates a holder of
+/// the chain applies, and by the runtime when the next call names it.
+#[test]
+fn a_replayed_reordered_or_changed_receipt_is_rejected() {
+    let artifact = single_access_map();
+    let policy = policy();
+    let session = session();
+    let environment = PublicEnvironment::default();
+    let mut production =
+        ProductionContractInstance::deploy(artifact.clone(), policy.clone()).unwrap();
+    let deployed = production.last_receipt().clone();
+    let first_evidence = public_evidence(&artifact, &policy, &session, &environment, &deployed);
+    let first = production
+        .call_authorized("put(bytes32,uint256)", put(7, 5), &session, &first_evidence)
+        .unwrap();
+    let second_evidence =
+        public_evidence(&artifact, &policy, &session, &environment, &first.receipt);
+    let second = production
+        .call_authorized(
+            "put(bytes32,uint256)",
+            put(8, 6),
+            &session,
+            &second_evidence,
+        )
+        .unwrap();
+    let (first_receipt, second_receipt) = (&first.receipt, &second.receipt);
+    first_receipt.follows(&deployed).unwrap();
+    second_receipt.follows(first_receipt).unwrap();
+
+    // Replayed, skipped and reordered receipts do not follow.
+    assert!(first_receipt.follows(first_receipt).is_err());
+    assert!(second_receipt.follows(&deployed).is_err());
+    assert!(first_receipt.follows(second_receipt).is_err());
+    assert!(deployed.follows(first_receipt).is_err());
+    assert!(first_receipt.binds_deployment(&artifact, &policy).is_err());
+
+    // Every field of a receipt is bound. Change each one in the first
+    // call's receipt and see which check rejects the result: that it follows
+    // the deployment's receipt, that it is the receipt of its call, or only
+    // that the next receipt follows it.
+    type Change = Box<dyn Fn(&mut ProductionReceipt)>;
+    let hash = || "5a".repeat(32);
+    // (field, the change, rejected by `follows`, rejected by `binds_call`)
+    let changes: Vec<(&str, Change, bool, bool)> = vec![
+        (
+            "request_sha256",
+            Box::new(move |r| r.request_sha256 = hash()),
+            false,
+            true,
+        ),
+        (
+            "previous_receipt_sha256",
+            Box::new(move |r| r.previous_receipt_sha256 = hash()),
+            true,
+            true,
+        ),
+        (
+            "public_state_before_sha256",
+            Box::new(move |r| r.public_state_before_sha256 = hash()),
+            true,
+            true,
+        ),
+        (
+            "public_state_after_sha256",
+            Box::new(move |r| r.public_state_after_sha256 = hash()),
+            false,
+            true,
+        ),
+        (
+            "ciphertext_store_before_sha256",
+            Box::new(move |r| r.ciphertext_store_before_sha256 = hash()),
+            true,
+            false,
+        ),
+        // Bound by the next receipt, and by the storage itself.
+        (
+            "ciphertext_store_after_sha256",
+            Box::new(move |r| r.ciphertext_store_after_sha256 = hash()),
+            false,
+            false,
+        ),
+        (
+            "public_receipt_sha256",
+            Box::new(move |r| r.public_receipt_sha256 = hash()),
+            false,
+            true,
+        ),
+        (
+            "freshness_epoch",
+            Box::new(|r| r.freshness_epoch ^= 1),
+            true,
+            true,
+        ),
+        (
+            "rollback_counter",
+            Box::new(|r| r.rollback_counter += 2),
+            true,
+            true,
+        ),
+        (
+            "next_call_counter",
+            Box::new(|r| r.next_call_counter += 1),
+            true,
+            true,
+        ),
+    ];
+    let fields: Vec<String> = serde_json::to_value(first_receipt)
+        .unwrap()
+        .as_object()
+        .unwrap()
+        .keys()
+        .cloned()
+        .collect();
+    assert_eq!(changes.len(), fields.len());
+    for (field, change, follows_rejects, binds_rejects) in &changes {
+        assert!(fields.iter().any(|name| name == field), "{field}");
+        let mut changed = first_receipt.clone();
+        change(&mut changed);
+        assert_ne!(&changed, first_receipt, "{field}");
+        // Whatever the field, the next receipt names the unchanged receipt
+        // by hash and does not follow the changed one.
+        assert!(second_receipt.follows(&changed).is_err(), "{field}");
+        assert_eq!(
+            changed.follows(&deployed).is_err(),
+            *follows_rejects,
+            "{field}"
+        );
+        assert_eq!(
+            changed
+                .binds_call(&first_evidence, first.call.receipt())
+                .is_err(),
+            *binds_rejects,
+            "{field}"
+        );
+    }
+    let other_hash = hash();
+
+    // The runtime rejects a call that names any receipt but the last one it
+    // issued: an old one, a changed one, or none.
+    let args = || put(9, 1);
+    let stale = public_evidence(&artifact, &policy, &session, &environment, first_receipt);
+    let err = production
+        .call_authorized("put(bytes32,uint256)", args(), &session, &stale)
+        .unwrap_err();
+    assert!(err.to_string().starts_with("production runtime "), "{err}");
+    let current = public_evidence(&artifact, &policy, &session, &environment, second_receipt);
+    for other in [
+        first_receipt.sha256().unwrap(),
+        deployed.sha256().unwrap(),
+        PRODUCTION_NO_RECEIPT_SHA256.to_owned(),
+        other_hash.clone(),
+    ] {
+        let mut evidence = current.clone();
+        evidence.previous_receipt_sha256 = other;
+        let err = production
+            .call_authorized("put(bytes32,uint256)", args(), &session, &evidence)
+            .unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "production runtime previous_receipt_sha256 mismatch"
+        );
+    }
+    // A rejected call issued no receipt, and the right evidence still works.
+    assert_eq!(production.last_receipt(), second_receipt);
+    let third = production
+        .call_authorized("put(bytes32,uint256)", args(), &session, &current)
+        .unwrap();
+    third.receipt.follows(second_receipt).unwrap();
 }
 
 /// A production deployment draws its freshness epoch from the OS. A call
@@ -106,7 +343,10 @@ fn a_rejected_production_call_returns_no_runtime_value() {
     for guess in [0, 1, u64::MAX] {
         let mut production =
             ProductionContractInstance::deploy(artifact.clone(), policy.clone()).unwrap();
-        let evidence = public_evidence(&artifact, &policy, &session, &environment, guess);
+        // A caller that does not hold the deployment's receipt guesses.
+        let mut guessed = production.last_receipt().clone();
+        guessed.freshness_epoch = guess;
+        let evidence = public_evidence(&artifact, &policy, &session, &environment, &guessed);
         let err = production
             .call_authorized(
                 "put(bytes32,uint256)",
@@ -119,7 +359,11 @@ fn a_rejected_production_call_returns_no_runtime_value() {
             err.to_string(),
             "production runtime freshness_epoch mismatch"
         );
-        assert!(!format!("{production:?}").contains("epoch"));
+        // The instance's `Debug` form shows the receipt it issued last,
+        // which is public, and none of the runtime's state.
+        let debug = format!("{production:?}");
+        assert!(debug.contains("ContractInstance { .. }"), "{debug}");
+        assert!(debug.contains("last_receipt: ProductionReceipt"));
     }
 }
 

@@ -295,7 +295,6 @@
     "crates/uo-core/src/confidential_core.rs"
   ],
   "expected_runtime_confidential_proof_bundle_family_consumer_files": [
-    "runtime/uo-evm/src/deployment.rs",
     "runtime/uo-evm/src/main.rs"
   ],
   "expected_runtime_controller_certificate_constructor_surface_files": [],
@@ -1154,6 +1153,7 @@
   "probe_enables_runtime_diagnostics_feature": true,
   "probe_path": "probe/mplus-probe/src/lib.rs",
   "probe_reads_runtime_telemetry_from_diagnostic_channel": true,
+  "production_calls_issue_chained_receipts": true,
   "production_errors_carry_no_runtime_freshness_value": true,
   "proof_grade_canonical_pair_instantiation_threads_runtime_boundary": true,
   "proof_grade_paper_main_bundles_discharge_minimal_runtime_boundary": true,
@@ -1437,7 +1437,6 @@
   ],
   "runtime_confidential_proof_bundle_family_builder_surface_restricted": true,
   "runtime_confidential_proof_bundle_family_consumer_files": [
-    "runtime/uo-evm/src/deployment.rs",
     "runtime/uo-evm/src/main.rs"
   ],
   "runtime_confidential_proof_bundle_family_consumer_surface_restricted": true,

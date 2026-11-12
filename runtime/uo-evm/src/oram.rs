@@ -411,6 +411,16 @@ impl OramState {
         }))
     }
 
+    /// Hand each sealed record the map holds in storage to `visit`: its
+    /// metadata pages, its buckets and its counter slot, in that order.
+    pub(crate) fn for_each_sealed_record(&self, visit: &mut dyn FnMut(&[u8])) {
+        let storage = &self.storage;
+        for record in storage.directory_pages.iter().chain(storage.buckets.iter()) {
+            visit(record);
+        }
+        visit(&storage.access_counter_slot);
+    }
+
     #[cfg(test)]
     pub(crate) fn access_counter_for_test(&self) -> u64 {
         self.access_counter

@@ -27330,6 +27330,65 @@ fn check_private_evidence_stays_inside_the_runtime(
         && !runtime_dependencies.contains("diagnostics")
 }
 
+/// Whether a production call is accepted on evidence a caller can know and
+/// answered with a receipt of the deployment's chain. The evidence names the
+/// receipt the runtime issued last, in place of the hash of a proof bundle,
+/// and the preflight compares the two. The module that builds receipts never
+/// sees a call's trace or its private evidence: a receipt is built from the
+/// evidence, the receipt before it, the call's public receipt, the counters
+/// and two state digests, and it is checked against the predicates a holder
+/// of the chain applies. The engine builds it from the staged call, commits
+/// only after that, and only then moves the head of the chain.
+fn check_production_calls_issue_chained_receipts(
+    deployment_source: &str,
+    engine_impl_source: &str,
+) -> bool {
+    let receipt_fields: Vec<(String, bool)> = [
+        "request_sha256",
+        "previous_receipt_sha256",
+        "public_state_before_sha256",
+        "public_state_after_sha256",
+        "ciphertext_store_before_sha256",
+        "ciphertext_store_after_sha256",
+        "public_receipt_sha256",
+        "freshness_epoch",
+        "rollback_counter",
+        "next_call_counter",
+    ]
+    .iter()
+    .map(|field| ((*field).to_owned(), true))
+    .collect();
+    !deployment_source.contains("proof_bundle")
+        && !engine_impl_source.contains("proof_bundle")
+        && !deployment_source.contains("ExecutionTrace")
+        && !deployment_source.contains("PrivateEvidence")
+        && deployment_source.contains(
+            "    pub previous_receipt_sha256: String,\n    pub translation_validation_certificate_sha256: String,\n}",
+        )
+        && deployment_source.contains(
+            "    require_equal(\n        \"previous_receipt_sha256\",\n        &evidence.previous_receipt_sha256,\n        last_receipt_sha256,\n    )",
+        )
+        && rust_struct_fields(deployment_source, "ProductionReceipt") == Some(receipt_fields)
+        && deployment_source.contains(
+            "    pub(crate) fn for_call(\n        evidence: &ProductionCallEvidence,\n        previous: &ProductionReceipt,\n        public_receipt: &PublicReceipt,\n        counters_after: RuntimeFreshnessSnapshot,\n        public_state_after_sha256: String,\n        ciphertext_store_after_sha256: String,\n    ) -> Result<Self> {",
+        )
+        && deployment_source.contains(
+            "        receipt.follows(previous)?;\n        receipt.binds_call(evidence, public_receipt)?;\n        Ok(receipt)",
+        )
+        && deployment_source.contains(
+            "        receipt.binds_deployment(artifact, policy)?;\n        Ok(receipt)",
+        )
+        && engine_impl_source.contains(
+            "            self.inner.freshness.snapshot(),\n            &self.last_receipt_sha256,\n        )?;",
+        )
+        && engine_impl_source.contains(
+            "        let receipt = ProductionReceipt::for_call(\n            evidence,\n            &self.last_receipt,\n            &staged.trace.receipt,\n            staged.freshness.snapshot(),\n            staged.state.public_state_digest()?,\n            staged.state.ciphertext_store_digest()?,\n        )?;\n        let receipt_sha256 = receipt.sha256()?;\n        let call = self.inner.commit_staged(staged).0;\n        self.last_receipt = receipt.clone();\n        self.last_receipt_sha256 = receipt_sha256;\n        Ok(ProductionCallResult { call, receipt })",
+        )
+        && engine_impl_source.matches("self.last_receipt = ").count() == 1
+        && engine_impl_source.matches("self.last_receipt_sha256 = ").count() == 1
+        && engine_impl_source.matches("commit_staged(staged)").count() == 2
+}
+
 /// Whether the production path's freshness errors carry no runtime value. An
 /// error reaches the caller, and a caller whose evidence is wrong has not
 /// shown that it knows the runtime's epoch and counters. `deployment.rs` reads
@@ -43179,10 +43238,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         &runtime_evm_src,
         ".runtime_confidential_proof_bundle_family(",
     )?;
-    let expected_runtime_confidential_proof_bundle_family_consumer_files = vec![
-        String::from("runtime/uo-evm/src/deployment.rs"),
-        String::from("runtime/uo-evm/src/main.rs"),
-    ];
+    // Only the CLI's diagnostics formats build the proof bundle family. The
+    // production path does not: it answers a call with a receipt.
+    let expected_runtime_confidential_proof_bundle_family_consumer_files =
+        vec![String::from("runtime/uo-evm/src/main.rs")];
     let runtime_confidential_proof_bundle_family_consumer_surface_restricted =
         runtime_confidential_proof_bundle_family_consumer_files
             == expected_runtime_confidential_proof_bundle_family_consumer_files
@@ -44829,6 +44888,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         &fs::read_to_string(root.join("crates/uo-core/Cargo.toml"))?,
         &runtime_evm_cargo_source,
     );
+    let production_calls_issue_chained_receipts =
+        check_production_calls_issue_chained_receipts(&deployment_source, &engine_impl_source);
     let probe_reads_runtime_telemetry_from_diagnostic_channel = extract_metrics_source
         .contains("fn extract_metrics(result: &DiagnosticCallResult)")
         && extract_metrics_source.contains("let trace = &result.call.trace;")
@@ -46227,6 +46288,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             runtime_secrets_derive_from_the_master_secret,
         "seal_nonces_come_from_the_seal_count": seal_nonces_come_from_the_seal_count,
         "private_evidence_stays_inside_the_runtime": private_evidence_stays_inside_the_runtime,
+        "production_calls_issue_chained_receipts": production_calls_issue_chained_receipts,
         "theorem_certificate_constructor_checks":
             theorem_certificate_constructor_checks,
         "theorem_certificate_constructor_surface_restricted":
@@ -47169,6 +47231,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && runtime_secrets_derive_from_the_master_secret
             && seal_nonces_come_from_the_seal_count
             && private_evidence_stays_inside_the_runtime
+            && production_calls_issue_chained_receipts
             && theorem_certificate_constructor_surface_restricted
             && runtime_public_call_trace_bundle_surface_restricted
             && runtime_public_call_trace_bundle_fields_private
@@ -55826,6 +55889,123 @@ mod tests {
             &by_default,
             &core_manifest,
             ok(&trace, &engine, &main, &by_default, &runtime_manifest),
+        );
+    }
+
+    #[test]
+    fn production_receipt_check_rejects_the_drifts_it_guards() {
+        use super::{check_production_calls_issue_chained_receipts, repo_root};
+        let root = repo_root();
+        let read = |rel: &str| std::fs::read_to_string(root.join(rel)).unwrap();
+        let deployment = read("runtime/uo-evm/src/deployment.rs");
+        let engine = production_source_slice(&read("runtime/uo-evm/src/engine.rs"));
+        let ok = check_production_calls_issue_chained_receipts;
+        let rejects = |what: &str, changed: &str, original: &str, verdict: bool| {
+            assert_ne!(changed, original, "{what}: the drift changed nothing");
+            assert!(!verdict, "{what}: the check accepted the drift");
+        };
+
+        // The sources pass as they are.
+        assert!(ok(&deployment, &engine));
+
+        // Evidence that again carries the hash of a proof bundle.
+        let bundled = deployment.replacen(
+            "    pub previous_receipt_sha256: String,\n",
+            "    pub previous_receipt_sha256: String,\n    pub proof_bundle_sha256: String,\n",
+            1,
+        );
+        rejects(
+            "proof bundle hash",
+            &bundled,
+            &deployment,
+            ok(&bundled, &engine),
+        );
+        // A preflight that does not compare the receipt the call names.
+        let unchecked = deployment.replacen(
+            "        &evidence.previous_receipt_sha256,\n        last_receipt_sha256,\n",
+            "        &evidence.previous_receipt_sha256,\n        &evidence.previous_receipt_sha256,\n",
+            1,
+        );
+        rejects(
+            "unchecked receipt",
+            &unchecked,
+            &deployment,
+            ok(&unchecked, &engine),
+        );
+        // A receipt with a field for a proof object.
+        let widened = deployment.replacen(
+            "    pub public_receipt_sha256: String,\n    pub freshness_epoch: u64,\n    pub rollback_counter: u64,\n    pub next_call_counter: u64,\n}",
+            "    pub public_receipt_sha256: String,\n    pub witness_sha256: String,\n    pub freshness_epoch: u64,\n    pub rollback_counter: u64,\n    pub next_call_counter: u64,\n}",
+            1,
+        );
+        rejects(
+            "wider receipt",
+            &widened,
+            &deployment,
+            ok(&widened, &engine),
+        );
+        // A receipt built from the call's whole trace.
+        let traced = deployment.replacen(
+            "        public_receipt: &PublicReceipt,\n        counters_after: RuntimeFreshnessSnapshot,",
+            "        public_receipt: &uo_core::ExecutionTrace,\n        counters_after: RuntimeFreshnessSnapshot,",
+            1,
+        );
+        rejects(
+            "receipt from the trace",
+            &traced,
+            &deployment,
+            ok(&traced, &engine),
+        );
+        // A receipt that is issued without being checked against the chain.
+        let unverified = deployment.replacen(
+            "        receipt.follows(previous)?;\n        receipt.binds_call(evidence, public_receipt)?;\n",
+            "",
+            1,
+        );
+        rejects(
+            "unverified receipt",
+            &unverified,
+            &deployment,
+            ok(&unverified, &engine),
+        );
+
+        // A call that commits before its receipt exists.
+        let early = engine.replacen(
+            "        let receipt_sha256 = receipt.sha256()?;\n        let call = self.inner.commit_staged(staged).0;\n",
+            "        let call = self.inner.commit_staged(staged).0;\n        let receipt_sha256 = receipt.sha256()?;\n",
+            1,
+        );
+        rejects("early commit", &early, &engine, ok(&deployment, &early));
+        // A call that leaves the head of the chain where it was.
+        let stuck = engine.replacen(
+            "        self.last_receipt_sha256 = receipt_sha256;\n",
+            "",
+            1,
+        );
+        rejects("head not moved", &stuck, &engine, ok(&deployment, &stuck));
+        // A preflight that is not handed the head of the chain.
+        let headless = engine.replacen(
+            "            &self.last_receipt_sha256,\n        )?;",
+            "            &evidence.previous_receipt_sha256,\n        )?;",
+            1,
+        );
+        rejects(
+            "headless preflight",
+            &headless,
+            &engine,
+            ok(&deployment, &headless),
+        );
+        // A receipt built from the committed state, after the commit.
+        let late = engine.replacen(
+            "            staged.state.ciphertext_store_digest()?,\n        )?;",
+            "            self.inner.state.ciphertext_store_digest()?,\n        )?;",
+            1,
+        );
+        rejects(
+            "digest of the old store",
+            &late,
+            &engine,
+            ok(&deployment, &late),
         );
     }
 
