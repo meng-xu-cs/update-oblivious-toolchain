@@ -49,11 +49,21 @@ validation and the capacity sweep.
 | Evaluate at a storage boundary with every cost counted (§9) | Agree. The measurement work moves ahead of the optimizations | 27, 28, 41 |
 | Matched baselines and a backend planner (§9); the novelty boundary (§10) | Agree; mostly work for the paper | 49 |
 
+## Decisions
+
+Issue 22 has the options and the reasoning.
+
+| Decision | Status | Outcome |
+| --- | --- | --- |
+| D1, the unit the storage observer classifies | open | recommended: the 32-byte word |
+| D2, where private evidence may go | decided 2026-11-12 | position maps and leaf schedules do not leave the runtime: a production build exports no private evidence, and only the diagnostics build exports it, to the Lean checkers |
+| D3, the lifetime budget of the stash bound | open | recommended: a cap of 152, at most `2^-60` over `2^48` node accesses of a map |
+
 ## Order of Work
 
 1. **Wave 0, decisions** (Issue 22). The maintainer decides the observer
-   unit, the evidence boundary and the stash budget. Only Issues 26, 35 and
-   40 wait for it.
+   unit, the evidence boundary and the stash budget. Only Issues 35 and 40
+   still wait for it.
 2. **Wave 1, the confidentiality boundary** (Issues 23 to 26). A runtime
    that discloses its master secret undermines every other claim.
 3. **Wave 2, measurement and claim wording** (Issues 27 to 29). Later
@@ -78,11 +88,11 @@ its engineering part is Wave 4, its certified part is research.
 
 | Issue | Title | Wave | Size | Depends on | Status | Commit |
 | --- | --- | --- | --- | --- | --- | --- |
-| 22 | Decide the observer unit, the evidence boundary and the stash budget | 0 | S | maintainer | todo | |
+| 22 | Decide the observer unit, the evidence boundary and the stash budget | 0 | S | maintainer | in progress | |
 | 23 | Stop returning the deployment seed to callers | 1 | S | | todo | |
 | 24 | Give the runtime an independent 256-bit master secret | 1 | M | 23 | todo | |
 | 25 | Split a call's result into a public receipt and private evidence | 1 | M to L | 24 | todo | |
-| 26 | Have the runtime issue the proof binding | 1 | M | 25, D2 | blocked | |
+| 26 | Have the runtime issue the proof binding | 1 | M | 25 | todo | |
 | 27 | Measure occupancy, executed workloads and every cost | 2 | M | | todo | |
 | 28 | Cover the private scheme in the leakage and abort reports | 2 | S | | todo | |
 | 29 | State what the Path ORAM theorem's cryptographic assumptions mean | 2 | S | | todo | |

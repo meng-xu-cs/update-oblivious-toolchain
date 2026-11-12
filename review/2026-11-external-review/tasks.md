@@ -29,40 +29,73 @@ Source: F1, F6, F7 (§3, §7, §8). Size: S. Depends on: the maintainer.
 #### Issue description
 
 Three later issues cannot be designed without a decision that the code does
-not determine.
+not determine. The Decisions table of [`README.md`](./README.md) holds their
+status.
 
-- **D1, the unit the storage observer classifies.** The runtime classifies
-  whole records; the codec makes every byte nonzero; an EVM `SSTORE`
-  classifies a 32-byte storage word. Options: (a) the sealed record, (b) the
-  32-byte word, (c) the byte. Recommended: (b), recorded as a parameter of
-  the semantics profile. Blocks Issue 35.
-- **D2, where private evidence may go.** Position maps, leaf schedules and
-  replay tags must stay inside the confidential boundary. Options: (a) a
-  production build exports none, and only diagnostics builds do; (b) a second
-  attested verifier receives it; (c) it is sealed to an auditor's key.
-  Recommended: (a) until a verifier exists. Blocks Issue 26.
-- **D3, the lifetime budget of the stash bound.** With `R` the stash cap, an
-  access overflows with probability at most `14 · 0.6002^R`. For a total
-  failure probability `2^-λ` over `Q` primitive accesses,
-  `R ≥ (λ + log2 Q + 3.81) / 0.7365`. Today `R = 114`: `2^-80` per access,
-  `2^-50` over `2^30` accesses, `2^-40` over `2^40`. Blocks Issue 40.
+**D1, the unit the storage observer classifies.** Blocks Issue 35. A write is
+`Update` when the unit was nonzero, is nonzero, and changed. A guarantee for a
+small unit implies it for every larger one, and costs more bytes.
 
-  | `Q` | `λ` | `R` |
-  | --- | --- | --- |
-  | `2^30` | 80 | 155 |
-  | `2^40` | 64 | 147 |
-  | `2^40` | 80 | 169 |
+| | Record | 32-byte word | Byte |
+| --- | --- | --- | --- |
+| The host it models | stores and prices whole sealed records | stores and prices 32-byte slots, as an EVM `SSTORE` does | inspects stored bytes one by one |
+| It also covers | | the record | the word and the record |
+| Encoding | none | one marker byte per word | seven bits per byte |
+| `uint256` value (124 bytes, 4 words today) | 62 bytes | 64 bytes, 2 words | 71 bytes, 3 words |
+| Map record (190 bytes, 6 words today) | 95 bytes | 96 bytes, 3 words | 109 bytes, 4 words |
+| Proof | smallest | small, with the unit size a parameter | bit packing, the largest |
+
+The word figures let the marker replace the magic prefix. In each column the
+encoding can make `Update` certain instead of overwhelmingly likely: a tag or
+marker that is nonzero and differs from the one it replaces, or for the byte
+two disjoint alphabets used in turn. Today's nibble encoding makes every byte
+nonzero, but a byte repeats with probability 1/16 and the four bytes of the
+encoded magic prefix never change. So what it delivers is the word level (no
+word is zero, and a word repeats with negligible probability), at twice the
+bytes a marker needs. Recommended: the 32-byte word, recorded as a parameter
+of the semantics profile.
+
+**D2, where private evidence may go.** Blocked Issue 26. Decided on
+2026-11-12: position maps and leaf schedules do not leave the runtime. A
+production build exports no private evidence. The diagnostics build, which
+the production policy rejects, still exports it to the Lean checkers.
+
+**D3, the lifetime budget of the stash bound.** Blocks Issue 40. With `R` the
+stash cap, an access overflows with probability at most `14 · 0.6002^R`. For
+a total of `2^-λ` over `Q` node accesses of one map,
+`R ≥ (λ + log2 Q + 3.81) / 0.7365`. An ERC20Lite `transfer` at 16,384
+entries makes 154 node accesses, so `2^40` of them is about 7 billion
+transfers.
+
+| Cap | Per access | Over `2^40` | Over `2^48` | Extra work per node access |
+| --- | --- | --- | --- | --- |
+| 114 (today) | `2^-80` | `2^-40` | `2^-32` | |
+| 147 | `2^-104` | `2^-64` | `2^-56` | about 13% |
+| 152 | `2^-108` | `2^-68` | `2^-60` | about 15% |
+| 179 | `2^-128` | `2^-88` | `2^-80` | about 26% |
+
+The extra work is at 16,384 entries, estimated from the loop bounds of
+eviction and compaction, which are linear in the stash and are 86% of a node
+access's instructions; it is not measured. A stash page holds 8 blocks and is
+read and written once per operation, so a read moves about 2% more bytes at
+152. A cap of 128 or more gives every local-scheme map a stash as large as
+itself, so the local scheme needs no stash assumption. Recommended: 152,
+stated as at most `2^-60` over `2^48` node accesses of a map, with the
+overflow handling of Issue 40.
 
 #### How to fix
 
-Record D1 in `docs/claim-boundary.md` (Observer) and
-`docs/runtime/tee-observer.md` (Persistent-I/O Model), D2 in
-`docs/runtime/secret-state.md`, and D3 in `docs/path-oram.md` (Assumption
-Provenance).
+Record each decision in the Decisions table of `README.md` when it is made.
+The topic documents describe what the code does, so a decision reaches them
+with the issue that implements it: D1 with Issue 35
+(`docs/claim-boundary.md`, Observer; `docs/runtime/tee-observer.md`,
+Persistent-I/O Model), D2 with Issues 25 and 26
+(`docs/runtime/secret-state.md`), D3 with Issue 40 (`docs/path-oram.md`,
+Assumption Provenance).
 
 #### Acceptance criteria
 
-- The three decisions are in those documents.
+- The three decisions are in the Decisions table.
 - The tracker no longer shows Issues 26, 35 and 40 as blocked.
 
 ---
@@ -117,7 +150,11 @@ Source: F1 items 1, 2 and 7 (§3). Size: M. Depends on: Issue 23.
 
 One `u64` is the freshness epoch and the root of every storage key, nonce
 stream and ORAM coin. Keys have at most 64 bits of entropy. A dropped staged
-call rewinds the nonce stream.
+call rewinds the nonce stream. And the nonces are 96 pseudo-random bits, so
+under one key they collide with probability about `q²/2^97` after `q` seals:
+`2^-33` at `2^32` seals, which a private-scheme map of 16,384 entries reaches
+after about 1.7 million ERC20Lite transfers (2,556 seals each), and `2^-17`
+at `2^40`. In a lifetime bound this term is far larger than the stash's.
 
 #### How to fix
 
@@ -126,15 +163,17 @@ call rewinds the nonce stream.
    a `u64` exists only under `cfg(any(test, feature = "diagnostics"))`, for
    replay.
 2. Derive from it, with a keyed derivation function and one label per use:
-   each object's AEAD key, each object's nonce key, the initial ORAM
-   placement, and each ORAM map's leaf-coin key (in place of
-   `leaf_coin_seed: u64`). No production path uses `seed_from_u64` for key
-   material.
+   each object's AEAD key, the initial ORAM placement, and each ORAM map's
+   leaf-coin key (in place of `leaf_coin_seed: u64`). No production path
+   uses `seed_from_u64` for key material.
 3. Draw the freshness epoch independently. It is public.
-4. Make nonces unable to rewind: derive a record's nonce from the object's
-   nonce key, the slot and a write counter in committed state, or draw it
-   from a source that staging cannot clone. The invariant: of the ciphertexts
-   that leave the runtime, no two under one key share a nonce.
+4. Make nonces unique by construction. A record's nonce is an injective
+   encoding of its location and of a write counter in committed state: not
+   random bits, and not a hash of the two, which would collide like random
+   bits. It then cannot repeat and cannot rewind. The invariant: of the
+   ciphertexts that leave the runtime, no two under one key share a nonce.
+   The counter is a function of the public write schedule, so it reveals
+   nothing more.
 5. Update `crates/uo-core/src/observer_coverage.rs`, the lists in
    `proof/lean/UOToolchain/ObserverCoverage.lean`, and
    `docs/runtime/secret-state.md`. Add the derivation function's assumption
@@ -148,6 +187,8 @@ call rewinds the nonce stream.
   of an error.
 - After a staged call is dropped, the next committed call's nonces differ
   from the dropped call's. Today they are equal.
+- No two records sealed under one key carry the same nonce, by a test that
+  checks the encoding is injective and a Lean statement of the invariant.
 - Seeded diagnostics runs stay deterministic: `fresh_coin_validation`,
   `seeded_witness_validation` and the canonical pair reports regenerate and
   pass, and the tamper suite passes.
@@ -189,7 +230,7 @@ one serializable type that every call returns.
 
 ### Issue 26 — Have the runtime issue the proof binding
 
-Source: F1 item 6 (§3). Size: M. Depends on: Issue 25 and D2.
+Source: F1 item 6 (§3). Size: M. Depends on: Issue 25.
 
 #### Issue description
 
@@ -207,12 +248,16 @@ it takes the deployment seed and the secret arguments. A deployment made with
 2. `call_authorized` returns a `ProductionReceipt`: the hash of the request
    evidence, the hash of the previous receipt, state commitments before and
    after the call (the public-state digest and a digest of the ciphertext
-   store), the hash of the public receipt, a commitment to the private
-   evidence, and the counters after the call.
-3. By D2, the private evidence is dropped, handed to a verifier, or sealed
-   to an auditor.
+   store), the hash of the public receipt, and the counters after the call.
+3. By D2, a production build keeps the private evidence inside the runtime
+   and drops it when the call ends. The receipt carries nothing derived from
+   it. The Lean checkers run on diagnostics builds, as they do now.
 4. `DeploymentCallAccepted` in `DeploymentAcceptance.lean` binds the receipt
    fields. Add a tamper scenario for each.
+5. Say in `docs/claim-boundary.md` (Deployment Theorem) what a production
+   result then rests on: the attested binary, the theorems about the model,
+   and the diagnostics-build validation of that binary's source. No
+   per-call proof object leaves a production runtime.
 
 #### Acceptance criteria
 
@@ -482,24 +527,32 @@ the claim needs depends on the observer unit.
 
 #### How to fix
 
-By D1:
+By D1 (Issue 22 has the comparison):
 
 | Unit | Encoding | Value | Map record |
 | --- | --- | --- | --- |
-| record | the sealed bytes; the magic prefix is nonzero | 62 bytes | 95 bytes |
-| 32-byte word | one nonzero marker byte per word | 2 words | 4 words, or 3 without the magic prefix |
+| record | the sealed bytes with a tag | 62 bytes | 95 bytes |
+| 32-byte word | one marker byte per word, in place of the magic prefix | 64 bytes, 2 words | 96 bytes, 3 words |
 | byte | seven bits per byte | 71 bytes | 109 bytes |
 
 Today a value takes 124 bytes (4 words) and a map record 190 (6 words).
+
+Make `Update` certain, not only overwhelmingly likely: the tag or marker of
+a unit is nonzero and differs from the one it replaces (two values used in
+turn; every UO write path holds the old record). A unit is then never zero
+and never unchanged, whatever its ciphertext bytes are. The marker is the
+parity of the unit's write count, which the public schedule fixes.
+
 Change `RuntimeStoreCodecSemantics.lean` (round trip, fixed public length,
-every unit nonzero), its generator, the ORAM bucket and page codecs, and the
-sizes in the manifests and resource bounds. State nonce freshness, which
-excludes `Same`, as a separate obligation.
+every unit nonzero, every unit different from its predecessor), its
+generator, the ORAM bucket and page codecs, and the sizes in the manifests
+and resource bounds. Keep the unit size a parameter of the Lean statement.
 
 #### Acceptance criteria
 
 - The Lean codec theorems hold for the chosen unit, and decoding rejects a
   record with a zero unit (a tamper scenario).
+- The check of Issue 33 classifies every unit of every UO write as `Update`.
 - `exact_encoding_matches` holds; results regenerate; the byte figures in
   `docs/path-oram.md` are updated.
 
@@ -622,24 +675,43 @@ Source: F6 (§7). Size: M. Depends on: D3.
 The stash bound is stated per access, with no lifetime. That it holds while
 a tree operation keeps up to `3h + 1` nodes out of the tree is assumed.
 
+An overflow also loses data. A block that finds no room in the stash is
+dropped (`TreeStash::compact` and `push_fixed_stash_with_limit` in
+`runtime/uo-evm/src/generated_oram_codecs.rs`), the access reports a failure,
+the call aborts, and the map commits as the call left it, because an aborted
+call keeps its ORAM accesses (`RuntimeObject::commit`,
+`runtime/uo-evm/src/objects.rs`). On the private scheme the lost block is a
+tree node, and its subtree is no longer reachable.
+
 #### How to fix
 
 1. In `docs/path-oram.md`, state the per-access bound, the union bound over
-   `Q` primitive accesses, and the budget of D3. Set
-   `PATH_ORAM_STASH_BOUND_LIMIT` and its Lean counterpart from it.
-2. Add `--only stash-occupancy`: at least `10^7` node accesses of the
+   `Q` node accesses of a map, and the budget of D3. Set
+   `PATH_ORAM_STASH_BOUND_LIMIT` and its Lean counterpart from it, and state
+   that a map no larger than the cap needs no stash assumption.
+2. Make an overflow lose nothing. The access fails with an internal error
+   before its state can commit, so the staged call is dropped and the
+   committed map stays whole. A map whose stash is full then refuses calls
+   and can be rebuilt; it is not corrupted. A dropped call does not remap
+   the keys it read, which `docs/path-oram.md` rules out for ordinary
+   aborts; here it happens only with the overflow's probability, and the
+   bound of Issue 29 already counts that event.
+3. Add `--only stash-occupancy`: at least `10^7` node accesses of the
    private scheme at several capacities, under random, repeated-key and
    insert-and-delete workloads, with a simulator that shares the eviction
    code and skips the cryptography. Record the largest stash and the tail of
    its distribution, during an operation and between operations.
-3. Say exactly what remains assumed.
+4. Say exactly what remains assumed.
 
 #### Acceptance criteria
 
+- A test forces an overflow with a small stash: the call fails, the
+  committed map is unchanged, and every key is still readable.
 - `results/stash_occupancy.json` is committed and indexed in
   `docs/evaluation.md`.
-- The largest stash observed is compared with `114 + 3h + 1`. An occupancy
-  that the bound does not predict blocks the claim.
+- The largest stash observed is compared with the cap plus `3h + 1`. An
+  occupancy that the bound does not predict blocks the claim.
+- The capacity sweep of Issue 27 reports the cost of the new cap.
 
 ---
 

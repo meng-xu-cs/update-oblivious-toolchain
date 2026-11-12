@@ -130,7 +130,11 @@ Confirmed (**run**, **source**), with more than the review found.
    plaintexts that may differ. Staged ciphertexts do not leave the process
    today, so a host sees no reuse. It becomes a key and nonce reuse once
    staged writes reach real storage before the commit decision, or once
-   state is restored from a snapshot.
+   state is restored from a snapshot. The nonces are also 96 pseudo-random
+   bits (`seal_and_wipe_into_slice`,
+   `runtime/uo-store/src/generated_surface.rs`), which collide under one key
+   with probability about `q²/2^97` after `q` seals: `2^-33` at `2^32`
+   seals, `2^-17` at `2^40`.
 8. CI does not run the production call path (**run**). `mplus-probe` depends
    on `uo-evm` with the `diagnostics` feature, so `cargo test --workspace`
    builds `uo-evm` with it. The four tests of `call_authorized` are compiled
@@ -294,7 +298,12 @@ Review §7. Confirmed (**source**).
   a private-scheme write at 16,384 entries makes 77 node accesses (a get of
   19 and a put of 58), so `10^9` of them is about 13 million writes. That the
   bound holds while an operation keeps up to `3h + 1` nodes out of the tree
-  is assumed (`docs/path-oram.md`).
+  is assumed (`docs/path-oram.md`). An overflow is not only an aborted call:
+  the block that finds no room is dropped (`TreeStash::compact`,
+  `generated_oram_codecs.rs:4013`; `push_fixed_stash_with_limit`, `:2102`),
+  and the map commits without it, because an aborted call keeps its ORAM
+  accesses (`objects.rs:1406-1475`). And the stash is not the largest term
+  of a lifetime bound today: the nonce term of F1, item 7, is.
 - Encrypted returns are outside the strongest theorem:
   `PolicyAgreesWithFlow.notEncrypted` (`KernelPaperMain.lean:292`) and
   `policyAgreesWithFlowB` (`KernelAdmission.lean:28-31`). No benchmark sidecar
