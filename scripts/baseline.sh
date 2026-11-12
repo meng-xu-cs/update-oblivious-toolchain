@@ -160,6 +160,9 @@ run_step() {
 
 step_fmt() { cargo fmt --all --check; }
 step_test() { cargo test --workspace; }
+# A workspace build turns on uo-evm's diagnostics feature, which compiles out
+# the tests of the production call path. This runs them.
+step_test_production_runtime() { cargo test -p uo-evm; }
 step_test_all_features() { cargo test --workspace --all-features; }
 step_probe_check() { cargo check -p mplus-probe; }
 step_lean_root() { (cd "$ROOT/proof/lean" && "$LAKE_BIN" build UOToolchain.ProofGradeRoot); }
@@ -176,6 +179,7 @@ run_step "cargo fmt --all --check" step_fmt
 run_step "cargo check -p mplus-probe" step_probe_check
 run_step "lake build UOToolchain.ProofGradeRoot" step_lean_root
 run_step "cargo test --workspace" step_test
+run_step "cargo test -p uo-evm" step_test_production_runtime
 
 if [[ "$MODE" == "full" ]]; then
   run_step "cargo test --workspace --all-features" step_test_all_features

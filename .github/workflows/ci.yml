@@ -38,6 +38,11 @@ jobs:
       - run: cargo check -p mplus-probe
       - run: cargo test --workspace
       - run: cargo test --workspace --all-features
+      # A workspace build turns on uo-evm's diagnostics feature (mplus-probe
+      # depends on it). The production policy rejects that feature, so the
+      # tests of the production call path are compiled out of the two runs
+      # above. This runs them, in the build a production runtime uses.
+      - run: cargo test -p uo-evm
 
   clippy:
     runs-on: ubuntu-latest

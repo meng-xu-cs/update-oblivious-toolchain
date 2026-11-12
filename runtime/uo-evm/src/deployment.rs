@@ -167,28 +167,19 @@ pub(crate) fn validate_production_call_preflight(
         &evidence.attestation_transcript_hash,
         &session.binding().attestation_transcript_hash,
     )?;
-    if evidence.freshness_epoch != freshness.epoch {
-        bail!(
-            "production runtime freshness_epoch mismatch: evidence {}, runtime {}",
-            evidence.freshness_epoch,
-            freshness.epoch
-        );
-    }
-    if evidence.rollback_counter != freshness.rollback_counter {
-        bail!(
-            "production runtime rollback_counter mismatch: evidence {}, runtime {}",
-            evidence.rollback_counter,
-            freshness.rollback_counter
-        );
-    }
-    if evidence.next_call_counter != freshness.next_call_counter {
-        bail!(
-            "production runtime next_call_counter mismatch: evidence {}, runtime {}",
-            evidence.next_call_counter,
-            freshness.next_call_counter
-        );
-    }
-    Ok(())
+    // A mismatch names the field and prints no value: an error reaches the
+    // caller, and the runtime's freshness epoch is its deployment seed.
+    require_equal_counter("freshness_epoch", evidence.freshness_epoch, freshness.epoch)?;
+    require_equal_counter(
+        "rollback_counter",
+        evidence.rollback_counter,
+        freshness.rollback_counter,
+    )?;
+    require_equal_counter(
+        "next_call_counter",
+        evidence.next_call_counter,
+        freshness.next_call_counter,
+    )
 }
 
 pub(crate) fn validate_production_public_environment_trace(
@@ -293,6 +284,13 @@ fn validate_sha256_hex(label: &str, value: &str) -> Result<()> {
 
 fn require_equal(label: &str, actual: &str, expected: &str) -> Result<()> {
     if actual != expected {
+        bail!("production runtime {label} mismatch");
+    }
+    Ok(())
+}
+
+fn require_equal_counter(label: &str, evidence: u64, runtime: u64) -> Result<()> {
+    if evidence != runtime {
         bail!("production runtime {label} mismatch");
     }
     Ok(())

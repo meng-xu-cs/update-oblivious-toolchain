@@ -41,6 +41,10 @@ cd "$ROOT"
   "$LAKE_BIN" build
 )
 cargo test
+# A workspace build turns on uo-evm's diagnostics feature (mplus-probe depends
+# on it), which compiles out the tests of the production call path. Run them in
+# the build a production runtime uses.
+cargo test -p uo-evm
 cargo run -q -p mplus-probe -- "${PROBE_ARGS[@]}"
 # Executable insecure baselines (Issue 16): regenerate overheads + leakage with
 # the insecure-eval-raw feature so every benchmark carries an executable raw

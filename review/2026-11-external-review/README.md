@@ -88,8 +88,8 @@ its engineering part is Wave 4, its certified part is research.
 
 | Issue | Title | Wave | Size | Depends on | Status | Commit |
 | --- | --- | --- | --- | --- | --- | --- |
-| 22 | Decide the observer unit, the evidence boundary and the stash budget | 0 | S | maintainer | done | |
-| 23 | Stop returning the deployment seed to callers | 1 | S | | todo | |
+| 22 | Decide the observer unit, the evidence boundary and the stash budget | 0 | S | maintainer | done | `58bce68` |
+| 23 | Stop returning the deployment seed to callers | 1 | S | | done | |
 | 24 | Give the runtime an independent 256-bit master secret | 1 | M | 23 | todo | |
 | 25 | Split a call's result into a public receipt and private evidence | 1 | M to L | 24 | todo | |
 | 26 | Have the runtime issue the proof binding | 1 | M | 25 | todo | |

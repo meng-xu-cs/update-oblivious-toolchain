@@ -422,6 +422,7 @@ top_level_booleans:
   confidential_proof_family_slot_boundary_validation_uses_boundary_checker: true
   confidential_proof_family_validation_uses_bundle_checker: true
   confidential_statement_trace_bridge_is_exact: true
+  contract_instance_debug_is_opaque: true
   contract_instance_public_clone_removed: true
   contract_runtime_entrypoint_surface_restricted: true
   controller_output_shape_uses_manifest_return_len: true
@@ -432,6 +433,7 @@ top_level_booleans:
   core_value_exposes_boxed_canonical_bytes: true
   core_value_struct_uses_boxed_representation: true
   default_call_result_omits_runtime_telemetry: true
+  deployment_seed_stays_out_of_call_traces: true
   diagnostic_api_gated_behind_feature: true
   diagnostic_call_api_exposes_runtime_telemetry: true
   diagnostic_call_result_nonclone: true
@@ -641,6 +643,7 @@ top_level_booleans:
   physical_write_event_is_shape_only: true
   probe_enables_runtime_diagnostics_feature: true
   probe_reads_runtime_telemetry_from_diagnostic_channel: true
+  production_errors_carry_no_runtime_freshness_value: true
   proof_grade_canonical_pair_instantiation_threads_runtime_boundary: true
   proof_grade_paper_main_bundles_discharge_minimal_runtime_boundary: true
   public_call_summary_api_is_explicit: true

@@ -7,6 +7,7 @@ and the ownership boundaries that keep them auditable.
 
 | Structure | Location | Owner / boundary |
 | --- | --- | --- |
+| Deployment seed, which is also the freshness epoch | `runtime/uo-evm/src/engine.rs`, `runtime/uo-evm/src/freshness.rs` | root of every object key, nonce stream and Path ORAM coin; kept by the runtime, and by `ContractInstance` only as the replay tag of a seeded deployment |
 | `ConfidentialCallInputs` | `runtime/uo-kernel-runtime/src/generated_slot_support.rs` | generated slot-support module; staged only through `RuntimeKernelSlotCall` |
 | `ConfidentialKernelSlotState` | `runtime/uo-kernel-runtime/src/generated_slot_support.rs` | generated fixed-size slot buffer with wipe-on-drop semantics |
 | `PathOramFreshCoinPlan` | `runtime/uo-evm/src/fresh_coins.rs` | runtime-owned opaque fresh-coin handle; diagnostics injection is not default API |
@@ -36,6 +37,18 @@ and the ownership boundaries that keep them auditable.
    an explicitly modeled kernel/state object.
 8. Buffer sizes and budgets that are fixed by manifest metadata must use that
    public shape instead of deriving capacity from live secret values.
+9. The deployment seed reaches no caller. A deployment from OS randomness
+   tags no trace or proof object with it, a production error names the field
+   that differs and prints no runtime value, and a contract instance's
+   `Debug` form shows none of its state. Only a seeded deployment, which
+   exists in test and diagnostics builds, tags its traces with its seed, so
+   that a run can be replayed.
+
+Invariant 9 does not yet make the seed secret. The freshness epoch that
+production call evidence must carry is the seed itself, so whoever prepares
+that evidence knows it, and every key derives from its 64 bits. Issue 24 of
+[`review/2026-11-external-review`](../../review/2026-11-external-review/README.md)
+gives the runtime a master secret that is independent of the epoch.
 
 ## Enforcement
 
@@ -54,6 +67,14 @@ growable runtime witness buffers, ORAM early-exit scans, growable ORAM
 write/read evidence, direct store cipher calls outside the codec layer, and
 reintroduction of host-visible hidden-state errors that should be modeled
 confidential aborts.
+
+Invariant 9 has three bits in `runtime_boundary_validation.json`:
+`deployment_seed_stays_out_of_call_traces`,
+`production_errors_carry_no_runtime_freshness_value` and
+`contract_instance_debug_is_opaque`. `cargo test -p uo-evm` runs the tests
+behind them in the build a production runtime uses
+(`runtime/uo-evm/tests/production_boundary.rs`). A workspace build turns on
+the `diagnostics` feature and compiles those tests out.
 
 The checks are source-backed/static-drift evidence. They deliberately do not
 claim full Rust semantic verification.

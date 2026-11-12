@@ -137,6 +137,10 @@ the committed `results/`.
 - Forgetting one projection alias or report-bit list entry can allow silent
   drift.
 - Running `lake build` from the repo root gives misleading target errors.
+- `cargo test --workspace` builds `uo-evm` with the `diagnostics` feature,
+  because `mplus-probe` depends on it. The production policy rejects that
+  feature, so the tests of the production call path are compiled out. Run
+  `cargo test -p uo-evm` as well.
 
 ## Onboarding
 

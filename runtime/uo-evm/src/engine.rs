@@ -15,14 +15,25 @@ use uo_core::{
     Value,
 };
 
-#[derive(Debug)]
 pub struct ContractInstance {
     artifact: CompiledArtifact,
     state: ContractRuntime,
-    deploy_seed: u64,
+    /// The seed of a seeded (test or diagnostics) deployment. It tags the
+    /// instance's traces so that a run can be replayed. A deployment from OS
+    /// randomness has none: its seed is the root of the runtime's secrets and
+    /// reaches no trace, result or error.
+    replay_seed: Option<u64>,
     freshness: RuntimeFreshnessState,
     environment: PublicEnvironment,
     initialized: bool,
+}
+
+/// The instance holds the runtime's secrets (its freshness epoch is the
+/// deployment seed), so its `Debug` form shows none of its state.
+impl std::fmt::Debug for ContractInstance {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ContractInstance").finish_non_exhaustive()
+    }
 }
 
 #[cfg(feature = "diagnostics")]
@@ -170,15 +181,19 @@ impl ContractInstance {
     pub fn deploy(artifact: CompiledArtifact) -> Result<Self> {
         let freshness = RuntimeFreshnessState::from_os_rng();
         let deploy_seed = freshness.snapshot().epoch;
-        Self::deploy_with_seed_internal(artifact, deploy_seed)
+        Self::deploy_with_seed_internal(artifact, deploy_seed, None)
     }
 
     #[cfg(any(test, feature = "diagnostics"))]
     pub fn deploy_with_seed(artifact: CompiledArtifact, deploy_seed: u64) -> Result<Self> {
-        Self::deploy_with_seed_internal(artifact, deploy_seed)
+        Self::deploy_with_seed_internal(artifact, deploy_seed, Some(deploy_seed))
     }
 
-    fn deploy_with_seed_internal(artifact: CompiledArtifact, deploy_seed: u64) -> Result<Self> {
+    fn deploy_with_seed_internal(
+        artifact: CompiledArtifact,
+        deploy_seed: u64,
+        replay_seed: Option<u64>,
+    ) -> Result<Self> {
         let initialized = !artifact
             .contract
             .manifest
@@ -188,7 +203,7 @@ impl ContractInstance {
         Ok(Self {
             state: deploy_contract_runtime(&artifact.contract.state, deploy_seed)?,
             artifact,
-            deploy_seed,
+            replay_seed,
             freshness: RuntimeFreshnessState::from_epoch(deploy_seed),
             environment: PublicEnvironment::default(),
             initialized,
@@ -350,7 +365,7 @@ impl ContractInstance {
             &mut staged_state,
             &self.artifact,
             &function,
-            self.deploy_seed,
+            self.replay_seed,
             call_freshness,
             args,
             fresh_coins,
@@ -1303,6 +1318,89 @@ bounds:
         assert!(err
             .to_string()
             .contains("production runtime build profile enables diagnostics"));
+    }
+
+    #[test]
+    fn only_a_seeded_deployment_tags_its_traces_with_the_seed() {
+        let artifact = compile_bench(
+            bench_raw!("SingleAccessMap.sol"),
+            include_str!(bench_raw!("SingleAccessMap.pathoram.yaml")),
+            ProgramMode::Uo,
+        );
+        let entrypoint = "put(bytes32,uint256)";
+        let args = || vec![b32(7), Value::uint(5)];
+
+        // A deployment from OS randomness: its seed is its freshness epoch,
+        // and neither its traces nor its `Debug` form carry it.
+        let mut unseeded = ContractInstance::deploy(artifact.clone()).unwrap();
+        let seed = unseeded.freshness.snapshot().epoch.to_string();
+        let result = unseeded.call(entrypoint, args()).unwrap();
+        assert_eq!(result.trace.runtime_seed(), None);
+        let trace_json = serde_json::to_string(&result.trace).unwrap();
+        assert!(trace_json.contains("\"runtime_seed\":null"));
+        assert!(!trace_json.contains(&seed));
+        assert!(!format!("{unseeded:?}").contains(&seed));
+        // The proof objects of an untagged trace still build, without it.
+        let bundle = result.trace.runtime_trusted_kernel_bundle().unwrap();
+        assert!(!serde_json::to_string(&bundle).unwrap().contains(&seed));
+        result.trace.runtime_refinement_witness().unwrap();
+        result
+            .trace
+            .runtime_confidential_proof_bundle_family(&artifact)
+            .unwrap();
+
+        // A seeded deployment tags its traces, so that a run can be replayed.
+        let mut seeded = ContractInstance::deploy_with_seed(artifact, 17).unwrap();
+        let result = seeded.call(entrypoint, args()).unwrap();
+        assert_eq!(result.trace.runtime_seed(), Some(17));
+    }
+
+    #[cfg(not(feature = "diagnostics"))]
+    #[test]
+    fn production_freshness_mismatch_names_the_field_and_prints_no_value() {
+        let artifact = compile_bench(
+            bench_raw!("SingleAccessMap.sol"),
+            include_str!(bench_raw!("SingleAccessMap.pathoram.yaml")),
+            ProgramMode::Uo,
+        );
+        let entrypoint = "add(bytes32,uint256)";
+        let args = vec![b32(7), Value::uint(5)];
+        let policy = production_policy();
+        let session = return_channel_session();
+        let environment = PublicEnvironment::default();
+        let evidence = |freshness_epoch, rollback_counter, next_call_counter| {
+            production_evidence(
+                &artifact,
+                &policy,
+                &session,
+                &environment,
+                freshness_epoch,
+                rollback_counter,
+                next_call_counter,
+                "00".repeat(32),
+            )
+        };
+        // The runtime's values are 91, 0 and 0. Each error names the field
+        // that differs and says nothing more.
+        for (evidence, field) in [
+            (evidence(92, 0, 0), "freshness_epoch"),
+            (evidence(91, 1, 0), "rollback_counter"),
+            (evidence(91, 0, 1), "next_call_counter"),
+        ] {
+            let mut production = ProductionContractInstance::deploy_with_authorized_seed(
+                artifact.clone(),
+                policy.clone(),
+                91,
+            )
+            .unwrap();
+            let err = production
+                .call_authorized(entrypoint, args.clone(), &session, &evidence)
+                .unwrap_err();
+            assert_eq!(
+                err.to_string(),
+                format!("production runtime {field} mismatch")
+            );
+        }
     }
 
     #[test]

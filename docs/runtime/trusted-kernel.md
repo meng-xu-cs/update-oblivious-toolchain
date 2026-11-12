@@ -15,7 +15,8 @@ That bundle packages:
 - the public SGX/controller observer certificate
 - the hidden Path ORAM certificate
 - the optional runtime kernel witness
-- the optional runtime replay seed
+- the optional runtime replay seed, present only for a seeded test or
+  diagnostics deployment
 - the admitted `ConfidentialKernelSlotProgram` for the same entrypoint
 
 The full runtime refinement witness is reconstructed from this bundle and

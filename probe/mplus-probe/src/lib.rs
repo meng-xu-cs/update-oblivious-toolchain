@@ -27038,6 +27038,54 @@ fn collect_lean_source_files(root: &Path, files: &mut Vec<PathBuf>) -> Result<()
     Ok(())
 }
 
+/// Whether the deployment seed stays out of call traces. The engine keeps only
+/// the replay tag of a seeded (test or diagnostics) deployment, a deployment
+/// from OS randomness has none, and the theorem bridge, which builds the
+/// trace, never sees the seed.
+fn check_deployment_seed_stays_out_of_call_traces(
+    engine_impl_source: &str,
+    runtime_module_source: &str,
+    theorem_source: &str,
+) -> bool {
+    engine_impl_source.contains("Self::deploy_with_seed_internal(artifact, deploy_seed, None)")
+        && engine_impl_source
+            .contains("Self::deploy_with_seed_internal(artifact, deploy_seed, Some(deploy_seed))")
+        && engine_impl_source.contains("replay_seed: Option<u64>,")
+        && engine_impl_source.contains("self.replay_seed,")
+        && !engine_impl_source.contains("self.deploy_seed")
+        && runtime_module_source.contains("replay_seed: Option<u64>,")
+        // runtime.rs names the seed only to deploy the contract's state.
+        && runtime_module_source.matches("deploy_seed").count() == 2
+        && !theorem_source.contains("deploy_seed")
+}
+
+/// Whether the production path's freshness errors carry no runtime value. An
+/// error reaches the caller, and the runtime's freshness epoch is its
+/// deployment seed. `deployment.rs` reads each field of the freshness snapshot
+/// once, as an operand of `require_equal_counter`, and that helper reports the
+/// field's name and nothing else.
+fn check_production_errors_carry_no_runtime_freshness_value(deployment_source: &str) -> bool {
+    [
+        "freshness.epoch",
+        "freshness.rollback_counter",
+        "freshness.next_call_counter",
+    ]
+    .iter()
+    .all(|field| deployment_source.matches(field).count() == 1)
+        && deployment_source.contains(
+            "fn require_equal_counter(label: &str, evidence: u64, runtime: u64) -> Result<()> {\n    if evidence != runtime {\n        bail!(\"production runtime {label} mismatch\");\n    }\n    Ok(())\n}",
+        )
+}
+
+/// Whether a contract instance's `Debug` form shows none of its state. The
+/// instance holds the runtime's secrets, and a caller can format it.
+fn check_contract_instance_debug_is_opaque(engine_impl_source: &str) -> bool {
+    !engine_impl_source.contains("#[derive(Debug)]\npub struct ContractInstance {")
+        && engine_impl_source.contains("impl std::fmt::Debug for ContractInstance {")
+        && engine_impl_source
+            .contains("f.debug_struct(\"ContractInstance\").finish_non_exhaustive()")
+}
+
 fn production_source_slice(source: &str) -> String {
     const CFG_TEST_ATTR: &str = "#[cfg(test)]";
 
@@ -38543,6 +38591,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let state_path = root.join("runtime/uo-evm/src/state.rs");
     let controller_path = root.join("runtime/uo-evm/src/controller.rs");
     let theorem_path = root.join("runtime/uo-evm/src/theorem.rs");
+    let deployment_path = root.join("runtime/uo-evm/src/deployment.rs");
     let main_path = root.join("runtime/uo-evm/src/main.rs");
     let probe_path = root.join("probe/mplus-probe/src/lib.rs");
     let probe_main_path = root.join("probe/mplus-probe/src/main.rs");
@@ -38701,6 +38750,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         .with_context(|| format!("reading {}", display_report_path(&controller_path)))?;
     let theorem_source = fs::read_to_string(&theorem_path)
         .with_context(|| format!("reading {}", display_report_path(&theorem_path)))?;
+    let deployment_source = fs::read_to_string(&deployment_path)
+        .with_context(|| format!("reading {}", display_report_path(&deployment_path)))?;
     let main_source = fs::read_to_string(&main_path)
         .with_context(|| format!("reading {}", display_report_path(&main_path)))?;
     let probe_source = fs::read_to_string(&probe_path)
@@ -40089,7 +40140,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         .contains("context: CallTraceContext")
         && theorem_source.contains("artifact: &'a CompiledArtifact")
         && theorem_source.contains("confidential: bool")
-        && theorem_source.contains("deploy_seed: u64")
+        && theorem_source.contains("replay_seed: Option<u64>")
         && theorem_source.contains("manifest_entry: &'a EntrypointManifest")
         && theorem_source.contains("manifest_objects: &'a [StateObjectManifest]")
         && theorem_source.contains("traced_outcome: TracedRuntimeCallOutcome")
@@ -40099,7 +40150,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !theorem_source.contains("runtime_witness_state: TracedRuntimeCallWitnessState")
         && !theorem_source.contains("pub artifact: &'a CompiledArtifact")
         && !theorem_source.contains("pub confidential: bool")
-        && !theorem_source.contains("pub deploy_seed: u64")
+        && !theorem_source.contains("pub replay_seed: Option<u64>")
         && !theorem_source.contains("pub context: CallTraceContext")
         && !theorem_source.contains("pub manifest_entry: &'a EntrypointManifest")
         && !theorem_source.contains("pub manifest_objects: &'a [StateObjectManifest]")
@@ -44452,7 +44503,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !theorem_source.contains("host_proxy_metrics");
     let theorem_finalizer_uses_finish_bundle_as_single_runtime_source = theorem_source
         .contains("trace_bundle.into_runtime_finalization_input(")
-        && theorem_source.contains("Some(deploy_seed),")
+        && theorem_source.contains("replay_seed,")
         && theorem_source.contains("runtime_kernel_finish_bundle,")
         && !theorem_source.contains("RuntimeExecutionTraceFinalizationInput::new(")
         && !theorem_source.contains("controller_certificate,")
@@ -44467,6 +44518,15 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !core_trace_source.contains("runtime_kernel_witness: RuntimeKernelWitness")
         && !core_trace_source
             .contains("runtime_kernel_refinement_witness: RuntimeKernelRefinementWitness");
+    let deployment_seed_stays_out_of_call_traces = check_deployment_seed_stays_out_of_call_traces(
+        &engine_impl_source,
+        &runtime_module_source,
+        &theorem_source,
+    );
+    let production_errors_carry_no_runtime_freshness_value =
+        check_production_errors_carry_no_runtime_freshness_value(&deployment_source);
+    let contract_instance_debug_is_opaque =
+        check_contract_instance_debug_is_opaque(&engine_impl_source);
     let probe_reads_runtime_telemetry_from_diagnostic_channel = extract_metrics_source
         .contains("fn extract_metrics(result: &DiagnosticCallResult)")
         && extract_metrics_source.contains("let trace = &result.call.trace;")
@@ -45856,6 +45916,11 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             theorem_finalize_input_fields_private,
         "theorem_finalizer_uses_finish_bundle_as_single_runtime_source":
             theorem_finalizer_uses_finish_bundle_as_single_runtime_source,
+        "deployment_seed_stays_out_of_call_traces":
+            deployment_seed_stays_out_of_call_traces,
+        "production_errors_carry_no_runtime_freshness_value":
+            production_errors_carry_no_runtime_freshness_value,
+        "contract_instance_debug_is_opaque": contract_instance_debug_is_opaque,
         "theorem_certificate_constructor_checks":
             theorem_certificate_constructor_checks,
         "theorem_certificate_constructor_surface_restricted":
@@ -46792,6 +46857,9 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && theorem_private_surface_restricted
             && theorem_finalize_input_fields_private
             && theorem_finalizer_uses_finish_bundle_as_single_runtime_source
+            && deployment_seed_stays_out_of_call_traces
+            && production_errors_carry_no_runtime_freshness_value
+            && contract_instance_debug_is_opaque
             && theorem_certificate_constructor_surface_restricted
             && runtime_public_call_trace_bundle_surface_restricted
             && runtime_public_call_trace_bundle_fields_private
@@ -55089,6 +55157,73 @@ mod tests {
             injected_witness.path_oram_fresh_coin_values().unwrap(),
             values
         );
+    }
+
+    #[test]
+    fn seed_boundary_checks_reject_the_drifts_they_guard() {
+        use super::{
+            check_contract_instance_debug_is_opaque,
+            check_deployment_seed_stays_out_of_call_traces,
+            check_production_errors_carry_no_runtime_freshness_value, repo_root,
+        };
+        let root = repo_root();
+        let read = |rel: &str| std::fs::read_to_string(root.join(rel)).unwrap();
+        let engine = production_source_slice(&read("runtime/uo-evm/src/engine.rs"));
+        let runtime = read("runtime/uo-evm/src/runtime.rs");
+        let theorem = read("runtime/uo-evm/src/theorem.rs");
+        let deployment = read("runtime/uo-evm/src/deployment.rs");
+
+        // The sources pass as they are.
+        assert!(check_deployment_seed_stays_out_of_call_traces(
+            &engine, &runtime, &theorem
+        ));
+        assert!(check_production_errors_carry_no_runtime_freshness_value(
+            &deployment
+        ));
+        assert!(check_contract_instance_debug_is_opaque(&engine));
+
+        // An unseeded deployment that tags its traces with its seed.
+        let tagged = engine.replace(
+            "Self::deploy_with_seed_internal(artifact, deploy_seed, None)",
+            "Self::deploy_with_seed_internal(artifact, deploy_seed, Some(deploy_seed))",
+        );
+        assert_ne!(tagged, engine);
+        assert!(!check_deployment_seed_stays_out_of_call_traces(
+            &tagged, &runtime, &theorem
+        ));
+        // A theorem bridge that is handed the seed.
+        let handed = theorem.replace("replay_seed: Option<u64>", "deploy_seed: u64");
+        assert_ne!(handed, theorem);
+        assert!(!check_deployment_seed_stays_out_of_call_traces(
+            &engine, &runtime, &handed
+        ));
+
+        // A freshness error that prints the runtime's epoch.
+        let printed = deployment.replace(
+            "    require_equal_counter(\"freshness_epoch\", evidence.freshness_epoch, freshness.epoch)?;",
+            "    if evidence.freshness_epoch != freshness.epoch {\n        bail!(\"freshness_epoch mismatch: runtime {}\", freshness.epoch);\n    }",
+        );
+        assert_ne!(printed, deployment);
+        assert!(!check_production_errors_carry_no_runtime_freshness_value(
+            &printed
+        ));
+        // A comparison helper that prints its operands.
+        let chatty = deployment.replace(
+            "        bail!(\"production runtime {label} mismatch\");\n    }\n    Ok(())\n}\n\nfn sha256_hex",
+            "        bail!(\"production runtime {label} mismatch: {runtime}\");\n    }\n    Ok(())\n}\n\nfn sha256_hex",
+        );
+        assert_ne!(chatty, deployment);
+        assert!(!check_production_errors_carry_no_runtime_freshness_value(
+            &chatty
+        ));
+
+        // An instance whose `Debug` form is derived again.
+        let derived = engine.replace(
+            "pub struct ContractInstance {",
+            "#[derive(Debug)]\npub struct ContractInstance {",
+        );
+        assert_ne!(derived, engine);
+        assert!(!check_contract_instance_debug_is_opaque(&derived));
     }
 
     #[test]
