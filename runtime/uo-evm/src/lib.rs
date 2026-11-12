@@ -31,7 +31,7 @@ pub use engine::{
 #[cfg(feature = "diagnostics")]
 pub use engine::{CallTelemetry, DiagnosticCallResult};
 #[cfg(feature = "diagnostics")]
-pub use instrumentation::{take_instrumentation_timings, InstrumentationTimings};
+pub use instrumentation::{take_instrumentation_totals, InstrumentationTotals};
 #[cfg(feature = "diagnostics")]
 pub use oram::avl_map_replay::{
     path_oram_avl_map_replay, AvlMapReplay, AvlMapReplayOperation, AvlMapReplayRun,

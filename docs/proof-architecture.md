@@ -226,11 +226,14 @@ entry points are:
   rejected
 - `path_oram_avl_map_replay.json`: runtime AVL map operations replayed
   against the Lean model by `checkPathOramAvlMapReplay`
-- `capacity_sweep.json`: a map read's and write's cost on the full scan and
-  both Path ORAM schemes from 1 to 16,384 entries, their read/write mixes,
-  and the capacities from which each scheme is cheaper than the full scan;
-  its release-build latencies split into the time spent on exported proof
-  objects and the runtime's own work
+- `capacity_sweep.json`: what seven kinds of map call cost on the full scan
+  and both Path ORAM schemes from 1 to 16,384 entries and at five occupancy
+  levels, their read/write mixes, computed and executed, and the capacities
+  from which each scheme is cheaper than the full scan; its release-build
+  latencies split into staging, loading, the runtime's own work, witnesses
+  and exported proof objects. This is the sweep's quick profile;
+  `capacity_sweep_full.json` is the full one, which a script outside the
+  validation run writes
 - `reviewer_summary.md`: generated reviewer-facing summary
 - `reproducibility_manifest.json`: output paths, sizes, toolchain pin, and
   SHA-256 digests

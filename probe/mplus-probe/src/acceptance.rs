@@ -46,6 +46,9 @@ fn report_mode(report: &str) -> &'static str {
         | "latency_memory"
         | "storage_growth"
         | "capacity_sweep"
+        // Written by scripts/run_capacity_sweep_full.sh, not the validation
+        // script.
+        | "capacity_sweep_full"
         // Written by scripts/measure_tree_eviction_instructions.sh, not the probe.
         | "tree_eviction_instructions"
         | "abort_rollback"

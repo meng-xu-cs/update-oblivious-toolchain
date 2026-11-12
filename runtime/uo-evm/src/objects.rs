@@ -1226,6 +1226,75 @@ impl RuntimeObject {
         }
     }
 
+    /// Store `entries` in this map, loaded as for a call, with no trace: the
+    /// full scan takes each as a write of the call would, and a Path ORAM
+    /// map makes one committed put for each. A write that overflows the map
+    /// fails the load. The capacity sweep fills its maps this way, since an
+    /// instrumented call per key is too slow; only a test or diagnostics
+    /// build has it.
+    #[cfg(any(test, feature = "diagnostics"))]
+    pub(in crate::runtime) fn bulk_put_for_diagnostics(
+        &mut self,
+        entries: Vec<(Value, Value)>,
+        allocator: &mut AllocatorSession,
+    ) -> Result<()> {
+        match self {
+            Self::UoSmallMap(object) => {
+                object.accessed = true;
+                let value_type = object.spec.value_type.clone();
+                let object_name = object.spec.name.clone();
+                for (key, value) in entries {
+                    let capacity_overflowed = update_small_map_entries_for_put(
+                        &mut object.entries,
+                        key,
+                        value,
+                        true,
+                        &value_type,
+                        &object_name,
+                    )?;
+                    if capacity_overflowed {
+                        bail!("bulk load overflows {object_name}");
+                    }
+                }
+                object.dirty = true;
+                Ok(())
+            }
+            Self::UoOramMap(object) if object.oram.is_tree() => {
+                object.accessed = true;
+                for (key, value) in entries {
+                    let put = PendingOramPut::new(true, key, value);
+                    object.oram.commit_tree_put(
+                        &object.spec,
+                        &put,
+                        false,
+                        allocator,
+                        &mut object.leaf_coin_source,
+                        &mut object.rng,
+                    )?;
+                }
+                object.dirty = true;
+                Ok(())
+            }
+            Self::UoOramMap(object) if is_path_oram_scheme(&object.spec.oram_scheme) => {
+                object.accessed = true;
+                for (key, value) in entries {
+                    let put = PendingOramPut::new(true, key, value);
+                    object.oram.commit_put(
+                        &object.spec,
+                        &put,
+                        false,
+                        allocator,
+                        &mut object.leaf_coin_source,
+                        &mut object.rng,
+                    )?;
+                }
+                object.dirty = true;
+                Ok(())
+            }
+            _ => bail!("{} is not a map that a bulk load fills", self.name()),
+        }
+    }
+
     pub(in crate::runtime) fn commit(
         self,
         old: &Self,

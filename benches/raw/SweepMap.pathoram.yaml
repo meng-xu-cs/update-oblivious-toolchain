@@ -1,0 +1,37 @@
+contract: SweepMap
+entrypoints:
+  put(bytes32,uint256):
+    secret_args: [key, value]
+    confidential: true
+    returns: forbidden
+    status: declassified
+    declassifies: [success]
+  clear(bytes32):
+    secret_args: [key]
+    confidential: true
+    returns: forbidden
+    status: declassified
+    declassifies: [success]
+  putBelow(bytes32,uint256,uint256):
+    secret_args: [key, value, limit]
+    confidential: true
+    returns: forbidden
+    status: declassified
+    declassifies: [success]
+  read(bytes32):
+    secret_args: [key]
+    confidential: true
+    returns: declassified
+    status: public
+    declassifies: [return]
+state:
+  records:
+    kind: map
+    key: bytes32
+    value: uint256
+    capacity: 16
+    backend: oram
+    oram_scheme: path_oram_local_posmap_v1
+    confidential: true
+bounds:
+  loops: {}

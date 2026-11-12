@@ -50,7 +50,19 @@ pub(crate) fn stage_contract_runtime(runtime: &ContractRuntime) -> Result<Contra
     // The committed state must be cold before it is cloned for staging; cloning
     // cold-ifies objects, so this gate runs on the original committed state.
     runtime.ensure_committed_cold_for_call()?;
-    runtime.staged_clone()
+    crate::instrumentation::time_staging(|| runtime.staged_clone())
+}
+
+/// Store `entries` in one map of a deployed runtime with no call. Only a test
+/// or diagnostics build has it: it changes committed state without a trace,
+/// a receipt or a freshness step.
+#[cfg(any(test, feature = "diagnostics"))]
+pub(crate) fn bulk_load_contract_map_for_diagnostics(
+    runtime: &mut ContractRuntime,
+    object_name: &str,
+    entries: Vec<(Value, Value)>,
+) -> Result<()> {
+    runtime.bulk_load_map_for_diagnostics(object_name, entries)
 }
 
 pub(crate) fn run_contract_call(

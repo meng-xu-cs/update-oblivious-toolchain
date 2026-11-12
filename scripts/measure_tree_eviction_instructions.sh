@@ -10,7 +10,9 @@
 # defaults to HEAD. Each revision is exported with `git archive` into a scratch
 # directory, its mplus-probe is built in release, and the capacity sweep runs
 # under callgrind on one map capacity (UO_SWEEP_CAPACITIES, default 4096) with
-# one trial, UO_MEASURE_REPEATS times (default 2). The report gives, per
+# one trial, UO_MEASURE_REPEATS times (default 2). A revision whose sweep has
+# occupancy levels, workloads and Lean checks runs none of them: two stored
+# keys and one call of each kind. The report gives, per
 # revision and run, the calls and inclusive instruction counts (Ir) of the
 # tree's node access (`tree_access`) and of the eviction, stash and copy
 # functions under it, the counts per node access, and the before/after ratios
@@ -70,7 +72,9 @@ measure() {
     printf '[%s] callgrind run %s of %s at capacity %s\n' "$label" "$run" "$REPEATS" "$CAPACITY" >&2
     (
       cd "$src"
-      UO_SWEEP_CAPACITIES="$CAPACITY" UO_SWEEP_TRIALS=1 \
+      UO_SWEEP_CAPACITIES="$CAPACITY" UO_SWEEP_TRIALS=1 UO_SWEEP_WARMUPS=0 \
+        UO_SWEEP_OCCUPANCY_MAX_CAPACITY=0 UO_SWEEP_WORKLOAD_CALLS=0 \
+        UO_SWEEP_LEAN_CAPACITIES=0 \
         valgrind --tool=callgrind --callgrind-out-file="$WORK/$label/run$run.callgrind" \
         "$target/release/mplus-probe" --only capacity-sweep --out-dir "$WORK/$label/run$run-out" \
         >"$WORK/$label/run$run.log" 2>&1

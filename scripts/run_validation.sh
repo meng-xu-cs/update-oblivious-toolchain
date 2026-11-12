@@ -63,11 +63,16 @@ cargo run -q -p mplus-probe --features insecure-eval-raw -- --only leakage-auc "
 UO_CORRECTNESS_TRIALS="${UO_CORRECTNESS_TRIALS:-4}" \
   cargo run -q -p mplus-probe --features insecure-eval-raw -- --only correctness "${PROBE_ARGS[@]}"
 # End-to-end edge cases (Issue 19), strict default build. The capacity sweep
-# drives a bounded map past the proof-grade ORAM position-map bound (overflow
-# rows recorded explicitly); the abort/rollback study drives confidential calls
-# past a require(...) guard and checks public state rolls back on abort and
-# commits otherwise. Override UO_SWEEP_* for deeper capacity sweeps. The sweep
-# reports wall-clock latencies, so it runs from a release build.
+# drives a bounded map past the proof-grade ORAM position-map bound (the
+# rejection is recorded explicitly); the abort/rollback study drives
+# confidential calls past a require(...) guard and checks public state rolls
+# back on abort and commits otherwise. The sweep reports wall-clock latencies,
+# so it runs from a release build. This is its quick profile: every kind of
+# call and every workload, with few trials, on maps filled to their occupancy
+# levels up to 256 entries (about three minutes). Its counts are a function of
+# its seed; its latencies are a smoke test. scripts/run_capacity_sweep_full.sh
+# runs the full profile into capacity_sweep_full.json. Override UO_SWEEP_* for
+# other grids.
 cargo run -q --release -p mplus-probe -- --only capacity-sweep "${PROBE_ARGS[@]}"
 cargo run -q -p mplus-probe -- --only path-oram-avl-map-replay "${PROBE_ARGS[@]}"
 cargo run -q -p mplus-probe -- --only abort-rollback "${PROBE_ARGS[@]}"

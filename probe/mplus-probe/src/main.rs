@@ -31,6 +31,7 @@ enum ReportKind {
     LatencyMemory,
     StorageGrowth,
     CapacitySweep,
+    CapacitySweepFull,
     PathOramAvlMapReplay,
     AbortRollback,
     AdmissionMatrix,
@@ -241,6 +242,15 @@ fn main() -> Result<()> {
                 &cli.out_dir,
                 "capacity_sweep.json",
                 "capacity_sweep",
+                &report,
+            )?;
+        }
+        Some(ReportKind::CapacitySweepFull) => {
+            let report = mplus_probe::run_capacity_sweep_full_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "capacity_sweep_full.json",
+                "capacity_sweep_full",
                 &report,
             )?;
         }

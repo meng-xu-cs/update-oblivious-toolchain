@@ -336,9 +336,15 @@ impl OramState {
         &self,
         spec: &StateObject,
     ) -> Result<RuntimePathOramPositionMapWitness> {
+        // What the decoders open, outside any trace: the tree's every bucket
+        // and metadata page, the local scheme's every position-map page.
         let leaves = if self.is_tree() {
+            crate::instrumentation::count_witness_records(
+                self.parameters.bucket_count + self.parameters.metadata_pages,
+            );
             tree_position_map_witness_leaves(spec, &self.parameters, &self.cipher, &self.storage)?
         } else {
+            crate::instrumentation::count_witness_records(self.parameters.position_map_pages());
             path_position_map_witness_leaves(
                 spec,
                 &self.parameters,

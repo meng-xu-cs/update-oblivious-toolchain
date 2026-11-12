@@ -5,6 +5,8 @@ use crate::deployment::{
 };
 use crate::freshness::RuntimeFreshnessState;
 use crate::return_channel::ReturnChannelSession;
+#[cfg(any(test, feature = "diagnostics"))]
+use crate::runtime::bulk_load_contract_map_for_diagnostics;
 use crate::runtime::{
     deploy_contract_runtime, run_contract_call, stage_contract_runtime, ContractRuntime,
     PathOramFreshCoinPlan,
@@ -372,6 +374,27 @@ impl ContractInstance {
     #[cfg(feature = "diagnostics")]
     pub fn public_state_digest(&self) -> Result<String> {
         self.state.public_state_digest()
+    }
+
+    /// The digest of the ciphertext the committed state holds in storage,
+    /// which a production receipt names. A measurement times it.
+    #[cfg(feature = "diagnostics")]
+    pub fn ciphertext_store_digest(&self) -> Result<String> {
+        self.state.ciphertext_store_digest()
+    }
+
+    /// Store `entries` in the map named `map` with no call: the map takes
+    /// each write as a committed call's write would reach it, and nothing is
+    /// traced, witnessed or proved. The freshness counters do not move. The
+    /// capacity sweep fills its maps this way; a production build has no such
+    /// function.
+    #[cfg(any(test, feature = "diagnostics"))]
+    pub fn bulk_load_map_for_diagnostics(
+        &mut self,
+        map: &str,
+        entries: Vec<(Value, Value)>,
+    ) -> Result<()> {
+        bulk_load_contract_map_for_diagnostics(&mut self.state, map, entries)
     }
 
     fn call_impl(
@@ -1712,6 +1735,15 @@ bounds:
                 .ends_with("#[cfg(feature = \"diagnostics\")]"),
             "fresh-coin injection must stay out of the default production API"
         );
+        let bulk_load = source
+            .find("pub fn bulk_load_map_for_diagnostics")
+            .expect("bulk-load API should exist for diagnostics/tests");
+        assert!(
+            source[..bulk_load]
+                .trim_end()
+                .ends_with("#[cfg(any(test, feature = \"diagnostics\"))]"),
+            "the bulk loader changes committed state with no call, so it must stay out of the default production API"
+        );
         assert!(
             source.contains("state: ContractRuntime"),
             "engine.rs should hold an opaque runtime wrapper rather than the raw committed state"
@@ -1927,6 +1959,149 @@ bounds:
 
         let read = instance.call("read(bytes32)", vec![b32(7)]).unwrap();
         assert_eq!(read.return_value, Some(Value::uint(9)));
+    }
+
+    /// SingleAccessMap's sidecar with its map on another backend and
+    /// capacity.
+    fn single_access_map_metadata(capacity: usize, backend: &str, scheme: Option<&str>) -> String {
+        let base = include_str!(bench_raw!("SingleAccessMap.pathoram.yaml"));
+        let scheme_line = scheme
+            .map(|scheme| format!("    oram_scheme: {scheme}\n"))
+            .unwrap_or_default();
+        let metadata = base
+            .replace("    capacity: 16\n", &format!("    capacity: {capacity}\n"))
+            .replace("    backend: oram\n", &format!("    backend: {backend}\n"))
+            .replace("    oram_scheme: path_oram_local_posmap_v1\n", &scheme_line);
+        assert_ne!(metadata, base, "the sidecar's map lines changed");
+        metadata
+    }
+
+    #[test]
+    fn a_bulk_load_stores_what_calls_would() {
+        const CAPACITY: u8 = 24;
+        let read = |instance: &mut ContractInstance, key: u8| {
+            instance
+                .call("read(bytes32)", vec![b32(key)])
+                .unwrap()
+                .return_value
+        };
+        let read_all = |instance: &mut ContractInstance| -> Vec<Option<Value>> {
+            (1..=CAPACITY + 3).map(|key| read(instance, key)).collect()
+        };
+        for (backend, scheme) in [
+            ("full_scan", None),
+            ("oram", Some("path_oram_local_posmap_v1")),
+            ("oram", Some("path_oram_private_posmap_v1")),
+        ] {
+            let metadata = single_access_map_metadata(usize::from(CAPACITY), backend, scheme);
+            let artifact = compile_bench(
+                bench_raw!("SingleAccessMap.sol"),
+                &metadata,
+                ProgramMode::Uo,
+            );
+            let entries: Vec<(Value, Value)> = (1..=20u8)
+                .map(|key| (b32(key), Value::uint(100 + u64::from(key))))
+                .collect();
+
+            // A load onto a map that already holds one of the keys, against
+            // the same writes made by calls.
+            let mut loaded = ContractInstance::deploy_with_seed(artifact.clone(), 11).unwrap();
+            let mut called = ContractInstance::deploy_with_seed(artifact, 11).unwrap();
+            for instance in [&mut loaded, &mut called] {
+                instance
+                    .call("put(bytes32,uint256)", vec![b32(1), Value::uint(5)])
+                    .unwrap();
+            }
+            loaded
+                .bulk_load_map_for_diagnostics("records", entries.clone())
+                .unwrap();
+            assert_objects_are_cold(&loaded);
+            for (key, value) in entries {
+                let put = called
+                    .call("put(bytes32,uint256)", vec![key, value])
+                    .unwrap();
+                assert!(!put.aborted);
+            }
+            assert_eq!(
+                read_all(&mut loaded),
+                read_all(&mut called),
+                "{backend} {scheme:?}"
+            );
+            assert_eq!(read(&mut loaded, 1), Some(Value::uint(101)));
+            assert_eq!(read(&mut loaded, 21), Some(Value::uint(0)));
+
+            // The loaded map takes calls: four more keys fill it, and the
+            // next new key overflows it.
+            for key in 21..=CAPACITY {
+                let put = loaded
+                    .call("put(bytes32,uint256)", vec![b32(key), Value::uint(7)])
+                    .unwrap();
+                assert!(!put.aborted, "{backend} {scheme:?} key {key}");
+            }
+            let overflow = loaded
+                .call(
+                    "put(bytes32,uint256)",
+                    vec![b32(CAPACITY + 1), Value::uint(7)],
+                )
+                .unwrap();
+            assert!(overflow.aborted, "{backend} {scheme:?}");
+
+            // A load that overflows the map fails and stores nothing.
+            let before = read_all(&mut loaded);
+            let error = loaded
+                .bulk_load_map_for_diagnostics("records", vec![(b32(CAPACITY + 2), Value::uint(1))])
+                .unwrap_err();
+            assert!(!format!("{error:#}").is_empty());
+            assert_objects_are_cold(&loaded);
+            assert_eq!(read_all(&mut loaded), before, "{backend} {scheme:?}");
+
+            // A zero value deletes its key, which makes room for another.
+            loaded
+                .bulk_load_map_for_diagnostics(
+                    "records",
+                    vec![
+                        (b32(3), Value::uint(0)),
+                        (b32(CAPACITY + 2), Value::uint(9)),
+                    ],
+                )
+                .unwrap();
+            assert_eq!(read(&mut loaded, 3), Some(Value::uint(0)));
+            assert_eq!(read(&mut loaded, CAPACITY + 2), Some(Value::uint(9)));
+
+            // No object by that name.
+            assert!(loaded
+                .bulk_load_map_for_diagnostics("absent", Vec::new())
+                .is_err());
+        }
+    }
+
+    #[test]
+    fn an_abort_on_a_large_full_scan_map_stays_within_the_allocator_budget() {
+        // An aborting call opens every slot of an exact map once more than a
+        // committed one, to restore it. When the allocator's event budget
+        // did not count that, the call failed, instead of aborting, on maps
+        // above about 4,600 entries.
+        let base = include_str!(bench_raw!("SweepMap.pathoram.yaml"));
+        let metadata = base
+            .replace("    capacity: 16\n", "    capacity: 5000\n")
+            .replace("    backend: oram\n", "    backend: full_scan\n")
+            .replace("    oram_scheme: path_oram_local_posmap_v1\n", "");
+        assert_ne!(metadata, base, "the sidecar's map lines changed");
+        let artifact = compile_bench(bench_raw!("SweepMap.sol"), &metadata, ProgramMode::Uo);
+        let mut instance = ContractInstance::deploy_with_seed(artifact, 3).unwrap();
+        instance
+            .call("put(bytes32,uint256)", vec![b32(1), Value::uint(9)])
+            .unwrap();
+        let guarded = instance
+            .call(
+                "putBelow(bytes32,uint256,uint256)",
+                vec![b32(1), Value::uint(5), Value::uint(0)],
+            )
+            .unwrap();
+        assert!(guarded.aborted);
+        let read = instance.call("read(bytes32)", vec![b32(1)]).unwrap();
+        assert_eq!(read.return_value, Some(Value::uint(9)));
+        assert_objects_are_cold(&instance);
     }
 
     #[test]

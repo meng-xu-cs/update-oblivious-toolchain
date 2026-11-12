@@ -1,6 +1,6 @@
 {
   "accepted": true,
-  "artifact_json_bytes": 1505873,
+  "artifact_json_bytes": 1521010,
   "checker": "proof/lean/.lake/build/bin/checkProofGradeRuntimeResidualHelperShellBoundary",
   "generated_object_helpers_match_lean_generator_theorem_checked": true,
   "generated_oram_codecs_match_lean_generator_theorem_checked": true,
@@ -10,7 +10,7 @@
   "handwritten_runtime_public_only_theorem_checked": true,
   "lean_checker_input": "source-backed runtime residual helper-shell boundary",
   "lean_checker_kind": "runtime residual helper-shell boundary",
-  "lean_stdout": "validated runtime residual helper-shell boundary for source-backed uo-evm helper shell (218261 helper bytes)",
+  "lean_stdout": "validated runtime residual helper-shell boundary for source-backed uo-evm helper shell (221450 helper bytes)",
   "oram_block_codec_roundtrip_theorem_checked": true,
   "oram_bucket_bytes_match_codec_theorem_checked": true,
   "oram_bucket_bytes_public_formula_theorem_checked": true,
@@ -256,8 +256,8 @@
     "generated_store_codec": 2103,
     "generated_store_helpers": 11516,
     "generated_store_surface": 8153,
-    "objects": 101078,
-    "oram": 89600,
+    "objects": 103865,
+    "oram": 90002,
     "store_codec": 11066,
     "store_lib": 154,
     "store_store": 2898

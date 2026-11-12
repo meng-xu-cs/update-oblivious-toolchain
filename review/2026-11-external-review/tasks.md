@@ -467,6 +467,13 @@ A full-scan map is decrypted once per call, and each access records another
 `N` physical reads against the decrypted copy. The trace is a modeled
 schedule that overstates the reads of a multi-access call.
 
+The sweep of Issue 27 found the opposite case too. A call that aborts, or
+that loads an exact object and does not access it, decrypts every slot a
+second time to restore the object (`decode_entries_from_storage` in
+`RuntimeObject::commit`) and traces one read per slot: at 16,384 entries an
+aborting write takes 106 ms of the runtime's own work where a committed one
+takes 72 ms. Restore from the plaintext the call loaded.
+
 #### How to fix
 
 In `exactEncodeRun`, read each touched object once, in object-id order. In
@@ -588,8 +595,11 @@ and resource bounds. Keep the unit size a parameter of the Lean statement.
 
 ## Wave 4: no work linear in the store
 
-After this wave, and after Wave 3, rerun the sweep of Issue 27 and update the
-break-evens in `docs/path-oram.md`.
+After this wave, and after Wave 3, rerun the sweep of Issue 27
+(`scripts/run_capacity_sweep_full.sh`), compare it with
+[`capacity_sweep_baseline.json`](./capacity_sweep_baseline.json)
+(`scripts/compare_capacity_sweep.py`), and update the break-evens and the
+latencies in `docs/path-oram.md`.
 
 ### Issue 36 — Remove the whole-store witness snapshots from a call
 

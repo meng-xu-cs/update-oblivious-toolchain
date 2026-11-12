@@ -227,17 +227,19 @@ impl RuntimeObjectTable {
         object_ids: &[u32],
         allocator: &mut AllocatorSession,
     ) -> Result<Self> {
-        let mut entries = FixedBoxBuilder::new(object_ids.len());
-        for object_id in object_ids {
-            let object = self
-                .get(*object_id)
-                .ok_or_else(|| anyhow!("missing committed object {}", object_id))?;
-            entries.push(RuntimeObjectEntry {
-                object_id: *object_id,
-                object: object.clone_for_tx(allocator)?,
-            })?;
-        }
-        Ok(Self::new(entries.finish()?))
+        crate::instrumentation::time_load(|| {
+            let mut entries = FixedBoxBuilder::new(object_ids.len());
+            for object_id in object_ids {
+                let object = self
+                    .get(*object_id)
+                    .ok_or_else(|| anyhow!("missing committed object {}", object_id))?;
+                entries.push(RuntimeObjectEntry {
+                    object_id: *object_id,
+                    object: object.clone_for_tx(allocator)?,
+                })?;
+            }
+            Ok(Self::new(entries.finish()?))
+        })
     }
 
     fn into_cold_committed(self) -> Result<Self> {
@@ -312,6 +314,37 @@ impl ContractRuntime {
         Ok(Self {
             committed: self.committed.clone_cold()?,
         })
+    }
+
+    /// Store `entries` in the map named `object_name` with no call: the map
+    /// is loaded and committed as a call's object is, and nothing is traced,
+    /// witnessed or proved. The freshness counters do not move. For
+    /// measurements of filled maps; only a test or diagnostics build has it.
+    #[cfg(any(test, feature = "diagnostics"))]
+    pub(in crate::runtime) fn bulk_load_map_for_diagnostics(
+        &mut self,
+        object_name: &str,
+        entries: Vec<(Value, Value)>,
+    ) -> Result<()> {
+        self.ensure_committed_cold_for_call()?;
+        let object_id = self
+            .committed
+            .objects
+            .iter()
+            .find(|(_, object)| object.name() == object_name)
+            .map(|(object_id, _)| object_id)
+            .ok_or_else(|| anyhow!("bulk load found no object named {object_name}"))?;
+        // The session is dropped without `finish()`, as the public-state
+        // snapshot's is, so its event log is never read.
+        let mut allocator = public_state_snapshot_allocator()?;
+        let mut shadow = self.committed.shadow_load(&[object_id], &mut allocator)?;
+        shadow
+            .object_mut(object_id)?
+            .bulk_put_for_diagnostics(entries, &mut allocator)?;
+        let mut recorder = CallRecorder::begin_with_input_len("bulk load", 0);
+        shadow.commit_against(&self.committed, false, &mut recorder, &mut allocator)?;
+        self.committed = shadow.into_cold_committed_state()?;
+        Ok(())
     }
 
     pub(in crate::runtime) fn ensure_cold(

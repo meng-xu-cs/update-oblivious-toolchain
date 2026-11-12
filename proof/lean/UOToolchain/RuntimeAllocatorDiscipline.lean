@@ -13,9 +13,11 @@ structure Plan where
   maxStackWords : Nat
   scratchBytes : Nat
   /-- The entrypoint's commit operations (the manifest's `max_commit_ops`):
-  on an ORAM map the pages and buckets its accesses write, each opened or
-  sealed at most once more, so four resource events each bound the call's
-  ORAM work. -/
+  the slots, pages and buckets the call writes. The call opens each one when
+  it loads its object or reads its path and seals it when it writes it, and
+  it opens a slot of an exact object once more to restore it when the call
+  aborts or leaves the object unread: three reservations of scratch, each
+  wiped, so six resource events each. -/
   maxCommitOps : Nat := 0
 deriving Repr, DecidableEq
 
@@ -42,7 +44,7 @@ structure State where
 deriving Repr, DecidableEq
 
 def resourceEventCapacity (plan : Plan) : Nat :=
-  (plan.maxKernelOps + plan.maxStackWords) * 128 + 128 + plan.maxCommitOps * 4
+  (plan.maxKernelOps + plan.maxStackWords) * 128 + 128 + plan.maxCommitOps * 6
 
 def emptyUsage : Usage :=
   { liveBytes := 0, peakBytes := 0, wipeCount := 0 }
@@ -131,7 +133,7 @@ theorem initialState_eventLogCapacity (plan : Plan) :
 
 theorem resourceEventCapacity_public_formula (plan : Plan) :
     resourceEventCapacity plan =
-      (plan.maxKernelOps + plan.maxStackWords) * 128 + 128 + plan.maxCommitOps * 4 := by
+      (plan.maxKernelOps + plan.maxStackWords) * 128 + 128 + plan.maxCommitOps * 6 := by
   rfl
 
 theorem recordKernelOp_acceptsOnlyBelowBudget

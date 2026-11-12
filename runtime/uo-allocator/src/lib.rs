@@ -83,9 +83,12 @@ pub struct AllocatorPlan {
     pub scratch_bytes: usize,
     pub max_kernel_ops: usize,
     /// The entrypoint's commit operations (the manifest's `max_commit_ops`):
-    /// on an ORAM map the pages and buckets its accesses write, each of which
-    /// an access also opens or seals at most once more, so the call's ORAM
-    /// work reserves and wipes scratch at most four times per operation.
+    /// the slots, pages and buckets the call writes. The call opens each one
+    /// when it loads its object or reads its path and seals it when it
+    /// writes it, and it opens a slot of an exact object once more to
+    /// restore it when the call aborts or leaves the object unread. That is
+    /// at most three reservations of scratch per operation, each wiped: six
+    /// resource events.
     #[serde(default)]
     pub max_commit_ops: usize,
 }
@@ -268,12 +271,19 @@ impl AllocatorSession {
     }
 }
 
+/// The resource events a call may log for each of its commit operations:
+/// see `AllocatorPlan::max_commit_ops`.
+const RESOURCE_EVENTS_PER_COMMIT_OP: usize = 6;
+
 fn resource_event_capacity(plan: &AllocatorPlan) -> usize {
     plan.max_kernel_ops
         .saturating_add(plan.max_stack_words)
         .saturating_mul(128)
         .saturating_add(128)
-        .saturating_add(plan.max_commit_ops.saturating_mul(4))
+        .saturating_add(
+            plan.max_commit_ops
+                .saturating_mul(RESOURCE_EVENTS_PER_COMMIT_OP),
+        )
 }
 
 fn runtime_kernel_region(region: ScratchRegion) -> RuntimeKernelScratchRegionWitness {
@@ -392,6 +402,36 @@ mod tests {
             max_commit_ops: 9,
             oram_accesses: Default::default(),
         }
+    }
+
+    #[test]
+    fn session_logs_three_reservations_per_commit_operation() {
+        // An aborting call on an exact map of 5,000 slots: each slot opened
+        // at load, opened again to restore it, and sealed at commit.
+        let run = |commit_ops: usize, reservations: usize| {
+            let mut session = AllocatorSession::new(AllocatorPlan {
+                arena_bytes: 0,
+                max_stack_words: 0,
+                scratch_bytes: 64,
+                max_kernel_ops: 0,
+                max_commit_ops: commit_ops,
+            })
+            .unwrap();
+            for _ in 0..reservations {
+                session
+                    .reserve_scratch(ScratchRegion::IoScratch, 64)
+                    .unwrap();
+                session.wipe_region(ScratchRegion::IoScratch);
+            }
+            session.finish()
+        };
+        assert!(run(5000, 3 * 5000).is_ok());
+        // The log has 128 events to spare, which a fourth pass does not fit.
+        assert!(run(5000, 3 * 5000 + 64).is_ok());
+        let error = run(5000, 4 * 5000).unwrap_err();
+        assert!(error
+            .to_string()
+            .contains("allocator resource-event capacity exceeded"));
     }
 
     #[test]

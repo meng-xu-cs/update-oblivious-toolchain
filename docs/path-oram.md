@@ -272,45 +272,109 @@ node access's kind, every size and every tree with its stored heights; the
 replay also checks the pointer level the model leaves out, and the checker
 rejects a replay with one of those facts changed.
 
-The capacity sweep (`--only capacity-sweep`, `results/capacity_sweep.json`)
-measures SingleAccessMap's `read`, one map get, and `put`, one map write, on
-a map of 1 to 16,384 entries on the full scan and on both schemes (the local
-one up to its cap of 128, with its rejection at 256), each on one deployment
-over several keys, and checks that every operation costs the same in every
-trial. On the full scan and the local scheme a read costs what a write does;
-on the tree a write, a get and then a put of `3h + 1` node accesses, costs
-about four times a read: 260 against 980 physical operations at 256 entries,
-654 against 2,556 at 16,384. The full scan moves 380 bytes per entry per
-operation. The tree moves fewer bytes than the full scan from 2,048 entries
-for reads alone, 4,096 for an even mix and 8,192 for writes alone; it makes
-fewer physical operations from 128, 512 and 1,024 entries, and costs less
-modeled gas from 512, 2,048 and 4,096. The local scheme makes fewer
-operations and costs less gas than the full scan from 8 entries but moves
-more bytes at every capacity it admits, and up to its 128 entries it costs
-less than the tree on every metric.
+The capacity sweep (`--only capacity-sweep`, `results/capacity_sweep.json`,
+schema `uo-capacity-sweep-v4`) measures one map of 1 to 16,384 entries on the
+full scan and on both schemes (the local one up to its cap of 128, with its
+rejection at 256). Its contract is SweepMap (`benches/raw/SweepMap.sol`):
+SingleAccessMap's `read`, one map get, and `put`, one map write, with a
+`clear` and a `putBelow`, a write behind a `require` guard. Each map is
+filled to 2 keys and then to 25%, 50%, 90% and 100% of its capacity, with
+keys drawn from a fixed seed, through a bulk loader that only a diagnostics
+build has (`ContractInstance::bulk_load_map_for_diagnostics`): it makes the
+writes of committed calls with no trace, witness or proof object, since an
+instrumented call per key takes 0.6 s at 16,384 entries. At each level the
+sweep measures seven kinds of call in rounds: a read of a stored key and of
+an absent one, an insert, an overwrite, a write of the value a key already
+has, a delete, and a write whose guard fails, which aborts. It then
+executes, for each read fraction, a seeded sequence of reads and of writes
+of every kind, and reports what the sequence cost next to the mix computed
+from one read and one write.
 
-The sweep runs from a release build and splits each call's wall-clock latency
-(the median of three trials) into the time the instrumented runtime spends on
-the proof objects it exports, the position-map witnesses and the execution
-trace's proof bundles, and the rest, its own work (`p50_witness_ns`,
-`p50_proof_objects_ns`, `p50_runtime_ns`; `latency_break_even` compares
-both). These are medians of three trials without warmup, so they move from
-run to run; the ranges below cover the recent bundles, all run on one
-machine, and `results/capacity_sweep.json` holds the last run. On its own
-work the tree is faster than the full scan for reads from 8,192 entries in
-every run (25 to 31 ms against 33 to 36 at 8,192, 42 to 57 against 69 to 72
-at 16,384) and for an even mix from 16,384, while a write alone stays slower
-(78 to 88 ms against 69 to 76 at 16,384). At 4,096 entries a read on the tree
-and one on the full scan are within the noise: the tree was the faster in
-most runs and not in all. Whole calls on the tree are slower at every
-capacity measured (463 to 545 ms against 324 to 380 for a read at 16,384): to
-export the position-map witnesses, the runtime decodes every bucket of the
-tree at the start and the end of each call, 387 to 453 ms of that read, where
-the full scan's time goes to the proof bundles of its 32,768-event trace (252
-to 305 ms).
-Issue 27 of
-[`review/2026-11-external-review`](../review/2026-11-external-review/README.md)
-replaces these with warmed-up, larger samples. A node access evicts the stash
+The counts are a function of the seed. `counts_sha256`, the digest of the
+report without its timings, repeats from run to run, and a probe test runs a
+small sweep twice and compares it. The report checks (`count_checks`) that
+each kind of call costs the same in every trial, at every occupancy level,
+and as every other kind its entrypoint serves: an insert, an overwrite and a
+write that changes nothing are one `put` to the observer, and how full the
+map is does not show. A write that aborts traces what a committed one does,
+on every backend. On the full scan and the local scheme a read costs what a
+write does; on the tree a write, a get and then a put of `3h + 1` node
+accesses, costs about four times a read: 260 against 980 physical operations
+at 256 entries, 654 against 2,556 at 16,384. The full scan moves 380 bytes
+per entry per operation. The tree moves fewer bytes than the full scan from
+2,048 entries for reads alone, 4,096 for an even mix and 8,192 for writes
+alone; it makes fewer physical operations from 128, 512 and 1,024 entries,
+and costs less modeled gas from 512, 2,048 and 4,096. The local scheme makes
+fewer operations and costs less gas than the full scan from 8 entries but
+moves more bytes at every capacity it admits, and up to its 128 entries it
+costs less than the tree on every metric.
+
+Beside the traced counts the report gives the work that no trace records. A
+call on a Path ORAM map reads the map's counter and metadata pages when it
+starts: 24 reads of 43,776 bytes on the tree at 16,384 entries. An
+instrumented call also opens every bucket and metadata page of the tree
+twice, for the position-map witnesses it exports: 65,580 sealed records at
+16,384 entries, where a read traces 654 operations. The report also gives
+the size of what a call exports: at 16,384 entries the trace of a full-scan
+read is 20.7 MB of JSON, 17.5 MB of it private evidence, and that of a tree
+read 3.0 MB.
+
+The latencies are wall-clock times of a release build on one machine. The
+validation script runs a quick profile of the sweep, whose latencies are a
+smoke test: one warmup round and two measured rounds, workloads of five
+calls, and maps above 256 entries left at 2 keys. The figures below come
+from the full profile (`scripts/run_capacity_sweep_full.sh`,
+`results/capacity_sweep_full.json`): 30 measured rounds of every kind of
+call after 5 warmup rounds, at every occupancy level of every map, and a
+workload of 20 calls at each read fraction. Each figure is a median with its
+95% bootstrap interval. A call's time splits into copying the committed
+state for the call, loading the call's objects from the copy, the rest of
+the runtime's own work, the position-map witnesses, and the proof bundles
+of the trace; the report also times the JSON serialization of the trace and
+Lean's check of one call of each kind, and gives the peak resident memory.
+
+On its own work, the call without witnesses and proof bundles, a read on
+the tree is faster than one on the full scan from 4,096 entries (16.7 ms
+[16.2, 17.8] against 18.3 ms [18.1, 18.5]; at 16,384 entries 48.7 ms [45.1,
+52.9] against 72.2 ms [71.7, 74.3]), and a write is slower at every capacity
+(84.4 ms [80.6, 91.9] against 72.5 ms [72.0, 73.8] at 16,384). The executed
+workloads cost what the computed mixes say, to the byte and the physical
+operation in every workload, and 39 units of modeled gas more for each write
+behind the guard, an entrypoint the mixes do not have. Their latencies give
+the same order: an even mix of reads and writes is faster on the tree from
+16,384 entries at every occupancy level (62.6 ms a call [55.1, 69.8] against
+77.3 ms [73.2, 82.3] on full maps), and writes alone are not. Occupancy does
+not move the counts and moves the latencies little: from 4,096 entries on, a
+kind's median spreads by 18% at most over the five levels, and a tree read
+at 16,384 entries takes 48.7 ms with 2 keys stored and 53.1 ms on a full
+map. A write that aborts on the full scan takes 106.3 ms [105.0, 109.8]
+where a committed one takes 72.5 ms: it decodes every slot again to restore
+the map.
+
+Whole calls on the tree are slower at every capacity and for every mix
+(480.8 ms [472.0, 501.6] against 354.8 ms [345.1, 370.9] for a read at
+16,384 entries). The witness snapshots take 392.6 ms of that tree read, and
+the proof bundles of the full scan's 32,768-event trace take 283.9 ms of
+its read. Of the full scan's own 72.2 ms, 32.5 ms load the map, which
+decrypts every slot, and 1.2 ms copy the state; of the tree's 48.7 ms, 10.6
+ms copy the state and 12.5 ms load the map. Serializing the trace takes
+another 22.5 ms for the full-scan read and 2.9 ms for the tree's, and Lean
+checks the witness of the call in 240 ms and 64 ms. A call on the tree
+raises the probe's resident memory from 240 MB to 400 MB at 16,384 entries.
+These are the figures from before the optimizations of the external review:
+`review/2026-11-external-review/capacity_sweep_baseline.json` is this
+report, and Issues 30 to 38 of that review compare their savings with it
+(`scripts/compare_capacity_sweep.py`).
+
+The sweep also found a defect, which is fixed. An aborting call opens every
+slot of an exact map a third time, to restore it, and the allocator's
+budget of resource events counted two: above about 4,600 entries such a
+call failed where it should have aborted. The budget is now six events per
+commit operation (`RESOURCE_EVENTS_PER_COMMIT_OP` in
+`runtime/uo-allocator/src/lib.rs`, `resourceEventCapacity` in
+`UOToolchain/RuntimeAllocatorDiscipline.lean`).
+
+A node access evicts the stash
 bucket by bucket, placing a block in the
 bucket at a given depth exactly when its leaf and the read leaf agree above
 that depth (the leaf count is a power of two), and moves blocks with in-place

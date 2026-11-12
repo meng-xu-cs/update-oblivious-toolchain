@@ -7,6 +7,7 @@ directory holds the response.
 | --- | --- |
 | [`validation.md`](./validation.md) | every factual claim of the review checked against the code, and a position on each recommendation |
 | [`tasks.md`](./tasks.md) | Issues 22 to 53: description, fix and acceptance criteria |
+| [`capacity_sweep_baseline.json`](./capacity_sweep_baseline.json) | the capacity sweep's full profile as Issue 27 measured it, before any optimization: what Issues 30 to 38 compare their savings with |
 | this file | the positions in brief, the order of work, and the tracker |
 
 The review text is not in the repository; `validation.md` restates each
@@ -93,8 +94,8 @@ its engineering part is Wave 4, its certified part is research.
 | 24 | Give the runtime an independent 256-bit master secret | 1 | M | 23 | done | `6b88d18` |
 | 25 | Split a call's result into a public receipt and private evidence | 1 | M to L | 24 | done | `5a5e3b4` |
 | 26 | Have the runtime issue the proof binding | 1 | M | 25 | done | `e232687` |
-| 27 | Measure occupancy, executed workloads and every cost | 2 | M | | todo | |
-| 28 | Cover the private scheme in the leakage and abort reports | 2 | S | | done | |
+| 27 | Measure occupancy, executed workloads and every cost | 2 | M | | done | |
+| 28 | Cover the private scheme in the leakage and abort reports | 2 | S | | done | `348da16` |
 | 29 | State what the Path ORAM theorem's cryptographic assumptions mean | 2 | S | | done | `9631ed0` |
 | 30 | Charge external reads in the modeled cost | 3 | S to M | | todo | |
 | 31 | Do not rewrite statically read-only exact objects | 3 | M | 30 | todo | |

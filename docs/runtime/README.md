@@ -36,6 +36,15 @@ call's whole `ExecutionTrace`, which also holds its `PrivateEvidence` and
 which a call returns only in a test or diagnostics build (see
 [`trusted-kernel.md`](./trusted-kernel.md)).
 
+Committed state changes only through a call, with one exception that a
+production build does not have: `ContractInstance::bulk_load_map_for_diagnostics`
+stores entries in one map with no trace, receipt or freshness step, so that
+the capacity sweep can measure filled maps (see
+[`../path-oram.md`](../path-oram.md)). It loads and commits the map as a call
+does and makes the writes a committed call would; a test compares it with
+those calls on every map backend, and a test of the engine's source keeps it
+behind `cfg(any(test, feature = "diagnostics"))`.
+
 Production acceptance uses `ProductionContractInstance::call_authorized`.
 That path refuses calls without a current admitted-package identity, matching
 toolchain manifest digest, runtime binary hash, proof-root hash, accepted SGX
