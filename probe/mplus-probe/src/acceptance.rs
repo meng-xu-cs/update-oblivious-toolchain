@@ -46,6 +46,8 @@ fn report_mode(report: &str) -> &'static str {
         | "latency_memory"
         | "storage_growth"
         | "capacity_sweep"
+        // Written by scripts/measure_tree_eviction_instructions.sh, not the probe.
+        | "tree_eviction_instructions"
         | "abort_rollback"
         | "admission_matrix"
         | "claim_status"

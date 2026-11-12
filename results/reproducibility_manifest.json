@@ -1,6 +1,6 @@
 {
   "format_version": 3,
-  "file_count": 87,
+  "file_count": 88,
   "lean_toolchain": "leanprover/lean4:v4.30.0-rc2",
   "lean_toolchain_exact_release": true,
   "lean_version": "Lean (version 4.30.0-rc2, x86_64-unknown-linux-gnu, commit 3dc1a088b6d2d8eafe25a7cd7ec7b58d731bd7cc, Release)",
@@ -19,8 +19,8 @@
     },
     {
       "path": "acceptance.json",
-      "bytes": 154330,
-      "sha256": "d5516956b9f99a72578ba81165d77e46c487819e99b548b193b31dfa29f1d9f9"
+      "bytes": 154994,
+      "sha256": "b6a373508cb1c9e2403df98c27096ad19ef1ff97cbe23f89c4d2d890aaebfa13"
     },
     {
       "path": "admission_matrix.json",
@@ -436,6 +436,11 @@
       "path": "trace_equivalence.json",
       "bytes": 3967,
       "sha256": "ce126adf9d8644b5b598c635d455bbc6081a6eb9de2719a975739c5e3786ce86"
+    },
+    {
+      "path": "tree_eviction_instructions.json",
+      "bytes": 4218,
+      "sha256": "b92893abe9236eec98d973b7ce0ac4060769bf3677b138fa7b283aecfb1509b8"
     },
     {
       "path": "trusted_kernel_validation.json",

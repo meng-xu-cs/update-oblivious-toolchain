@@ -142,6 +142,9 @@ are:
 - `reviewer_summary.json` and `reviewer_summary.md`
 - `reproducibility_manifest.json`
 
+[`docs/evaluation.md`](docs/evaluation.md) indexes every result file by the
+evaluation question it answers and the command that produces it.
+
 `results/artifact_readme.md` and `results/reviewer_summary.md` are generated
 probe outputs. Change the probe renderer, not those files directly, when their
 wording needs to change.
@@ -154,5 +157,6 @@ Start with [`docs/README.md`](docs/README.md). The main topic documents are:
 - [`docs/supported-subset.md`](docs/supported-subset.md)
 - [`docs/proof-architecture.md`](docs/proof-architecture.md)
 - [`docs/path-oram.md`](docs/path-oram.md)
+- [`docs/evaluation.md`](docs/evaluation.md)
 - [`docs/runtime/README.md`](docs/runtime/README.md)
 - [`docs/coding-agent-conventions.md`](docs/coding-agent-conventions.md)

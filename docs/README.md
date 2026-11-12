@@ -14,6 +14,7 @@ belongs.
 | Accepted Solidity-like DSL/metadata subset | [`supported-subset.md`](./supported-subset.md) |
 | Lean/proof architecture and validation reports | [`proof-architecture.md`](./proof-architecture.md) |
 | Path ORAM theorem route, provenance, and bibliography | [`path-oram.md`](./path-oram.md), [`path-oram-theorem-sources.bib`](./path-oram-theorem-sources.bib) |
+| Which result file answers which evaluation question | [`evaluation.md`](./evaluation.md) |
 | Runtime boundary, TEE observer, and secret-state ownership | [`runtime/README.md`](./runtime/README.md) |
 | Coding-agent process and validation discipline | [`coding-agent-conventions.md`](./coding-agent-conventions.md) |
 | Lean workspace map | [`proof/README.md`](../proof/README.md) |
@@ -34,7 +35,8 @@ belongs.
   Rust structures live under [`runtime/`](./runtime/).
 - Generated reports: files under `results/` are reproducibility artifacts. Do
   not hand-maintain their prose; update the probe renderer if generated text
-  needs to change.
+  needs to change. [`evaluation.md`](./evaluation.md) indexes them by
+  evaluation question and producing command.
 
 ## Inventory Status
 
@@ -46,6 +48,7 @@ belongs.
 | [`docs/claim-boundary.md`](./claim-boundary.md) | maintained | theorem, observer, TCB, assumptions, and non-claims |
 | [`docs/proof-architecture.md`](./proof-architecture.md) | maintained | proof/checker layers and validation reports |
 | [`docs/path-oram.md`](./path-oram.md) | maintained | Path ORAM theorem route and provenance |
+| [`docs/evaluation.md`](./evaluation.md) | maintained | index of result files by evaluation question |
 | [`docs/runtime/README.md`](./runtime/README.md) | maintained | runtime documentation index |
 | [`docs/runtime/trusted-kernel.md`](./runtime/trusted-kernel.md) | maintained | trusted runtime boundary and validators |
 | [`docs/runtime/tee-observer.md`](./runtime/tee-observer.md) | maintained | SGX/TEE observer and deployment-assumption surface |

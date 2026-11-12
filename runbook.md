@@ -43,6 +43,14 @@ Reproducibility check:
 ./scripts/check_probe_reproducibility.sh --only static-checks
 ```
 
+Instruction counts of a private-scheme tree node access before and after the
+eviction rewrite (needs valgrind, and lean and lake on PATH; not part of
+`run_validation.sh`):
+
+```bash
+./scripts/measure_tree_eviction_instructions.sh
+```
+
 ## Direct Entry Points
 
 Compile a benchmark:

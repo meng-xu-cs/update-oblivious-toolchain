@@ -1,0 +1,139 @@
+{
+  "schema": "uo-tree-eviction-instructions-v1",
+  "metric": "callgrind instruction reads (Ir), inclusive of callees",
+  "workload": {
+    "command": "mplus-probe --only capacity-sweep (release build)",
+    "UO_SWEEP_CAPACITIES": 4096,
+    "UO_SWEEP_TRIALS": 1,
+    "scheme": "path_oram_private_posmap_v1",
+    "note": "SingleAccessMap read and put on every backend of the sweep; the counts below are those of the private scheme's tree functions, and node_accesses is the number of calls to tree_access"
+  },
+  "tools": {
+    "valgrind": "valgrind-3.22.0",
+    "rustc": "rustc 1.82.0 (f6e511eec 2024-10-15)",
+    "arch": "x86_64"
+  },
+  "repeats": 2,
+  "revisions": [
+    {
+      "label": "before",
+      "commit": "9522bd5ec74770b18d57cf5f3bdaa610c7319050",
+      "runs": [
+        {
+          "node_accesses": 211,
+          "functions": {
+            "tree_access": {
+              "calls": 211,
+              "inclusive_ir": 3424302873,
+              "inclusive_ir_per_node_access": 16228923.6
+            },
+            "evict_bucket": {
+              "calls": 2743,
+              "inclusive_ir": 2017962011,
+              "inclusive_ir_per_node_access": 9563801.0
+            },
+            "compact": {
+              "calls": 211,
+              "inclusive_ir": 1168924808,
+              "inclusive_ir_per_node_access": 5539928.0
+            },
+            "assign_tree_node": {
+              "calls": 7059045,
+              "inclusive_ir": 3543640590,
+              "inclusive_ir_per_node_access": 16794505.2
+            }
+          }
+        },
+        {
+          "node_accesses": 211,
+          "functions": {
+            "tree_access": {
+              "calls": 211,
+              "inclusive_ir": 3424302873,
+              "inclusive_ir_per_node_access": 16228923.6
+            },
+            "evict_bucket": {
+              "calls": 2743,
+              "inclusive_ir": 2017962011,
+              "inclusive_ir_per_node_access": 9563801.0
+            },
+            "compact": {
+              "calls": 211,
+              "inclusive_ir": 1168924808,
+              "inclusive_ir_per_node_access": 5539928.0
+            },
+            "assign_tree_node": {
+              "calls": 7059045,
+              "inclusive_ir": 3543640590,
+              "inclusive_ir_per_node_access": 16794505.2
+            }
+          }
+        }
+      ],
+      "runs_agree": true
+    },
+    {
+      "label": "after",
+      "commit": "c89ec4effa3bde148e6dabfbc3e0434725cf844f",
+      "runs": [
+        {
+          "node_accesses": 211,
+          "functions": {
+            "tree_access": {
+              "calls": 211,
+              "inclusive_ir": 1533420638,
+              "inclusive_ir_per_node_access": 7267396.4
+            },
+            "evict_bucket": {
+              "calls": 2743,
+              "inclusive_ir": 834909873,
+              "inclusive_ir_per_node_access": 3956918.8
+            },
+            "compact": {
+              "calls": 211,
+              "inclusive_ir": 489869627,
+              "inclusive_ir_per_node_access": 2321657.0
+            },
+            "assign_tree_node": {
+              "calls": 7059045,
+              "inclusive_ir": 1440086022,
+              "inclusive_ir_per_node_access": 6825052.2
+            }
+          }
+        },
+        {
+          "node_accesses": 211,
+          "functions": {
+            "tree_access": {
+              "calls": 211,
+              "inclusive_ir": 1533420638,
+              "inclusive_ir_per_node_access": 7267396.4
+            },
+            "evict_bucket": {
+              "calls": 2743,
+              "inclusive_ir": 834909873,
+              "inclusive_ir_per_node_access": 3956918.8
+            },
+            "compact": {
+              "calls": 211,
+              "inclusive_ir": 489869627,
+              "inclusive_ir_per_node_access": 2321657.0
+            },
+            "assign_tree_node": {
+              "calls": 7059045,
+              "inclusive_ir": 1440086022,
+              "inclusive_ir_per_node_access": 6825052.2
+            }
+          }
+        }
+      ],
+      "runs_agree": true
+    }
+  ],
+  "before_over_after_per_node_access": {
+    "tree_access": 2.23,
+    "evict_bucket": 2.42,
+    "compact": 2.39,
+    "assign_tree_node": 2.46
+  }
+}

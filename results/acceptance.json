@@ -3537,6 +3537,28 @@
       "expected_false_paths": [],
       "false_count": 0,
       "false_paths": 0,
+      "mode": "evaluation",
+      "report": "tree_eviction_instructions",
+      "required": false,
+      "required_failures": [],
+      "schema": "uo.acceptance.report.v1",
+      "unclassified_false_paths": []
+    },
+    {
+      "accepted": true,
+      "advisory_false_paths": [],
+      "class_counts": {
+        "advisory_nonclaim": 0,
+        "deprecated_report": 0,
+        "expected_computational_difference": 0,
+        "expected_negative": 0,
+        "required_failure": 0,
+        "unclassified": 0
+      },
+      "declared_accepted": null,
+      "expected_false_paths": [],
+      "false_count": 0,
+      "false_paths": 0,
       "mode": "proof_grade",
       "report": "trusted_kernel_validation",
       "required": true,
@@ -3649,6 +3671,7 @@
     "static_checks",
     "tamper_validation",
     "trace_equivalence",
+    "tree_eviction_instructions",
     "trusted_kernel_validation",
     "witness_validation"
   ],

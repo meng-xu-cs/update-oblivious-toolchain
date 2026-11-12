@@ -306,8 +306,12 @@ ms). A node access evicts the stash bucket by bucket, placing a block in the
 bucket at a given depth exactly when its leaf and the read leaf agree above
 that depth (the leaf count is a power of two), and moves blocks with in-place
 masked selects; at 4,096 entries this takes 2.2 times fewer instructions per
-node access than walking each block's path and cloning its key and value,
-with every block placed where it was before.
+node access than walking each block's path and cloning its key and value (2.4
+times fewer in the bucket eviction itself), with every block placed where it
+was before. The counts are callgrind's, from release builds before and after
+the change, and repeat exactly from run to run
+(`results/tree_eviction_instructions.json`, written by
+`scripts/measure_tree_eviction_instructions.sh`).
 
 What remains open on the private scheme: the runtime's pointer-level
 implementation of the AVL map (node ids, leaves, the free list, the stash)
