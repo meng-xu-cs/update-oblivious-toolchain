@@ -75,6 +75,42 @@
     },
     {
       "aborted": true,
+      "backend": "oram_private_posmap",
+      "benchmark": "ConfidentialMixer",
+      "expected_outcome": "abort",
+      "expected_post_state": [
+        "5",
+        "5"
+      ],
+      "outcome_matches_expected": true,
+      "post_state": [
+        "5",
+        "5"
+      ],
+      "runtime_status": "executed",
+      "target_gas_used": 41346,
+      "target_return": null
+    },
+    {
+      "aborted": false,
+      "backend": "oram_private_posmap",
+      "benchmark": "ConfidentialMixer",
+      "expected_outcome": "commit",
+      "expected_post_state": [
+        "3",
+        "3"
+      ],
+      "outcome_matches_expected": true,
+      "post_state": [
+        "3",
+        "3"
+      ],
+      "runtime_status": "executed",
+      "target_gas_used": 41346,
+      "target_return": "2"
+    },
+    {
+      "aborted": true,
       "backend": "uo",
       "benchmark": "ERC20Lite",
       "expected_outcome": "abort",
@@ -152,7 +188,47 @@
       "runtime_status": "executed",
       "target_gas_used": 7427,
       "target_return": "1"
+    },
+    {
+      "aborted": true,
+      "backend": "oram_private_posmap",
+      "benchmark": "ERC20Lite",
+      "expected_outcome": "abort",
+      "expected_post_state": [
+        "10",
+        "0",
+        "4"
+      ],
+      "outcome_matches_expected": true,
+      "post_state": [
+        "10",
+        "0",
+        "4"
+      ],
+      "runtime_status": "executed",
+      "target_gas_used": 82943,
+      "target_return": null
+    },
+    {
+      "aborted": false,
+      "backend": "oram_private_posmap",
+      "benchmark": "ERC20Lite",
+      "expected_outcome": "commit",
+      "expected_post_state": [
+        "7",
+        "3",
+        "1"
+      ],
+      "outcome_matches_expected": true,
+      "post_state": [
+        "7",
+        "3",
+        "1"
+      ],
+      "runtime_status": "executed",
+      "target_gas_used": 82943,
+      "target_return": "1"
     }
   ],
-  "description": "AbortRollback edge-case study: confidential calls that hit a require(...) guard abort and roll back public state, while in-bound calls commit. Exercises Issue 06 transactional atomicity on the exact backend (uo); the proof-grade Path ORAM route fail-closed-rejects a mid-call abort and that rejection is recorded as an explicit edge case."
+  "description": "AbortRollback edge-case study: confidential calls that hit a require(...) guard abort and leave the state they read as it was, while in-bound calls commit. Exercises Issue 06 transactional atomicity on the exact backend (uo) and on both Path ORAM schemes (oram for path_oram_local_posmap_v1, oram_private_posmap for path_oram_private_posmap_v1). Every case executes: on the Path ORAM schemes an aborted call makes the same accesses as a committed one, with its writes masked off."
 }

@@ -289,26 +289,26 @@ operations and costs less gas than the full scan from 8 entries but moves
 more bytes at every capacity it admits, and up to its 128 entries it costs
 less than the tree on every metric.
 
-The sweep runs from a release build and splits each call's wall-clock
-latency (the median of three trials) into the time the instrumented runtime
-spends on the proof objects it exports, the position-map witnesses and the
-execution trace's proof bundles, and the rest, its own work
-(`p50_witness_ns`, `p50_proof_objects_ns`, `p50_runtime_ns`;
-`latency_break_even` compares both). These are medians of three trials
-without warmup, so they move from run to run; the ranges below are those of
-the last five bundles, all run on one machine, and
-`results/capacity_sweep.json` holds the last run. On its own work the tree is
-faster than the full scan for reads from 8,192 entries in every run (25 to
-31 ms against 33 to 36 at 8,192, 42 to 57 against 69 to 72 at 16,384) and
-for an even mix from 16,384, while a write alone stays slower (78 to 88 ms
-against 69 to 76 at 16,384). At 4,096 entries a read on the tree and one on
-the full scan are within the noise: the tree was the faster in four runs of
-the five. Whole calls on the tree are slower at every capacity measured (463
-to 545 ms against 324 to 380 for a read at 16,384): to export the
-position-map witnesses, the runtime decodes every bucket of the tree at the
-start and the end of each call, 387 to 453 ms of that read, where the full
-scan's time goes to the proof bundles of its 32,768-event trace (252 to 305
-ms). Issue 27 of
+The sweep runs from a release build and splits each call's wall-clock latency
+(the median of three trials) into the time the instrumented runtime spends on
+the proof objects it exports, the position-map witnesses and the execution
+trace's proof bundles, and the rest, its own work (`p50_witness_ns`,
+`p50_proof_objects_ns`, `p50_runtime_ns`; `latency_break_even` compares
+both). These are medians of three trials without warmup, so they move from
+run to run; the ranges below cover the recent bundles, all run on one
+machine, and `results/capacity_sweep.json` holds the last run. On its own
+work the tree is faster than the full scan for reads from 8,192 entries in
+every run (25 to 31 ms against 33 to 36 at 8,192, 42 to 57 against 69 to 72
+at 16,384) and for an even mix from 16,384, while a write alone stays slower
+(78 to 88 ms against 69 to 76 at 16,384). At 4,096 entries a read on the tree
+and one on the full scan are within the noise: the tree was the faster in
+most runs and not in all. Whole calls on the tree are slower at every
+capacity measured (463 to 545 ms against 324 to 380 for a read at 16,384): to
+export the position-map witnesses, the runtime decodes every bucket of the
+tree at the start and the end of each call, 387 to 453 ms of that read, where
+the full scan's time goes to the proof bundles of its 32,768-event trace (252
+to 305 ms).
+Issue 27 of
 [`review/2026-11-external-review`](../review/2026-11-external-review/README.md)
 replaces these with warmed-up, larger samples. A node access evicts the stash
 bucket by bucket, placing a block in the

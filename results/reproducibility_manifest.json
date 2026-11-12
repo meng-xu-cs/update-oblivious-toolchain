@@ -14,13 +14,13 @@
   "files": [
     {
       "path": "abort_rollback.json",
-      "bytes": 3613,
-      "sha256": "26de404e6ed49789fe06aedac0f3110aa83b9429d4e7dc1934c897f0122b98b2"
+      "bytes": 5426,
+      "sha256": "1b194648f0c8818ef7fba3e1fd2af33418c6340236c9e68dee72738fe5b905b5"
     },
     {
       "path": "acceptance.json",
-      "bytes": 155166,
-      "sha256": "e53a8e06b9ac94d10324fcf25b5dd522003f3531195734a340681dc097ab0126"
+      "bytes": 155941,
+      "sha256": "40d2cc0b29b59950def196b4e5c9d28447bf28cd95e47dc782dfb9c14f6e4a12"
     },
     {
       "path": "admission_matrix.json",
@@ -39,8 +39,8 @@
     },
     {
       "path": "bridge_validation.json",
-      "bytes": 16182514,
-      "sha256": "30abf80ffb20916791fc4e6fb8b97e62aeaadc2bc9c5a85e6efe0f6a683c1762"
+      "bytes": 16185532,
+      "sha256": "7fbb87baa0678d03538b4c53d3bd9b386e95e45dbda877a020535d629f05e451"
     },
     {
       "path": "canonical_pathoram_pair_validation.json",
@@ -49,8 +49,8 @@
     },
     {
       "path": "capacity_sweep.json",
-      "bytes": 116296,
-      "sha256": "cae66aaf0df794eaf00a8bd1102c3e20ed7ddb1561c0f36524e4fc14ec2d969e"
+      "bytes": 116315,
+      "sha256": "245f9bf5fcbf0519f8506a3981af7436bf06b9913b916e22b0b47b6a433d684b"
     },
     {
       "path": "claim_artifact_manifest.json",
@@ -239,8 +239,8 @@
     },
     {
       "path": "leakage_auc.json",
-      "bytes": 12165,
-      "sha256": "3149b72e9cab5c045a71a8fb973abf234eb358be044595899298a4aabc8e83f4"
+      "bytes": 13595,
+      "sha256": "a5dde91e9b36f5de58572e33b09636b0698875d63a7fa9b2d70c6ca147748ab7"
     },
     {
       "path": "lean_assumption_budget.json",
@@ -249,13 +249,13 @@
     },
     {
       "path": "mutual_information.json",
-      "bytes": 4995,
-      "sha256": "8bf2abbb6f0b719356c936aa5a58f9716ec84455ad4df974f8f491894d44c11e"
+      "bytes": 6199,
+      "sha256": "3fae30ff2d5fca0f435ac4dd6745e04255f317d1837e02a03a0987e01eb42e0c"
     },
     {
       "path": "overheads.json",
-      "bytes": 87880,
-      "sha256": "500c230fe290156e34f4b15b144e3bd1d08ee48e0ab5df1bfa3254a17c9a10c3"
+      "bytes": 95705,
+      "sha256": "099a7cd51dc095f168e8b5226bcae224696ac5ee4cd54f56a3e43c2639d92a82"
     },
     {
       "path": "paper_main_family_boundary_validation.json",
@@ -284,13 +284,13 @@
     },
     {
       "path": "reviewer_summary.json",
-      "bytes": 127141,
-      "sha256": "72ca9e933ef034aafe5b57ad6f50e80f166b43a394e8ff241a31d03c7e3b106c"
+      "bytes": 135229,
+      "sha256": "d3798a72a52106ffcd79b8887f7dbf4e3b8f5ff54e71e1d3f0b990fe4edacb06"
     },
     {
       "path": "reviewer_summary.md",
-      "bytes": 29025,
-      "sha256": "b97ac8f2fe0fed96abc80e6976128f3646b49f43612badef61253e2589c7d68a"
+      "bytes": 29308,
+      "sha256": "c99644ac7925210ad8297c4cf4cb87558a5423bad1475737ef67af641406222d"
     },
     {
       "path": "runtime_boundary_validation.json",
@@ -419,8 +419,8 @@
     },
     {
       "path": "static_checks.json",
-      "bytes": 66511,
-      "sha256": "faca0aaba480995473e0385c9be8f9daa97db8eb50db221d51199416c86ac191"
+      "bytes": 69371,
+      "sha256": "aac3fb91f18f931036538d7db01a9058e3af7528b920c160a2e5d6f008b7a81c"
     },
     {
       "path": "tamper_validation.json",

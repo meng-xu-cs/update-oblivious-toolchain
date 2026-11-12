@@ -1,0 +1,1555 @@
+{
+  "compiler_version": "0.1.0",
+  "admitted_package": {
+    "schema": "uo-admitted-package-v5",
+    "source_language": "uo-solidity-like-dsl-v1",
+    "semantics_profile": "uo-evm-modular256-v1",
+    "source_sha256": "234fe8ee8ec1332afc02b3f7446ef82d93ed2c0d62180b88012be70e98a57262",
+    "metadata_sha256": "f738868809425ca4b626b950bdba140d125360f36ad1ea2882fc418f0dbb0e89",
+    "raw_metadata_sha256": "c2770ace24686c821f2f216998d05505ee43e1b45f0450d8302088868f2f8183",
+    "metadata_canonicalization_sha256": "d4d37982ad376dbc375a0c57e8f2f21cdfad161f1da825dd86294c72fc17f033",
+    "compilation_mode": "uo",
+    "compiler_version": "0.1.0",
+    "toolchain_manifest_sha256": "df0b1bd26916e652d5c84f1f4546da4e2f972c04e9fee7329468a95ffb7aa4aa",
+    "package_sha256": "d4bfb308758e5f97237ac0bf6cfe469145bdff04389c30e51d79fba7c6230c0b"
+  },
+  "contract": {
+    "contract": "ConfidentialMixer",
+    "mode": "Uo",
+    "source_file": "benches/raw/ConfidentialMixer.sol",
+    "state": [
+      {
+        "id": 1,
+        "name": "balances",
+        "kind": "Map",
+        "backend": "Oram",
+        "oram_scheme": "path_oram_private_posmap_v1",
+        "value_type": {
+          "Scalar": {
+            "Uint": 256
+          }
+        },
+        "key_type": {
+          "Scalar": "Bytes32"
+        },
+        "capacity": 256,
+        "confidential": true
+      },
+      {
+        "id": 2,
+        "name": "total",
+        "kind": "Cell",
+        "backend": "FullScan",
+        "oram_scheme": "surrogate_public_schedule_v1",
+        "value_type": {
+          "Scalar": {
+            "Uint": 256
+          }
+        },
+        "key_type": null,
+        "capacity": null,
+        "confidential": true
+      }
+    ],
+    "functions": [
+      {
+        "signature": "deposit(bytes32,uint256)",
+        "params": [
+          [
+            "commitment",
+            {
+              "Scalar": "Bytes32"
+            }
+          ],
+          [
+            "amount",
+            {
+              "Scalar": {
+                "Uint": 256
+              }
+            }
+          ]
+        ],
+        "return_type": null,
+        "body": [
+          {
+            "Declare": {
+              "name": "oldBalance",
+              "ty": {
+                "Scalar": {
+                  "Uint": 256
+                }
+              },
+              "value": {
+                "MapGet": {
+                  "object_id": 1,
+                  "key": {
+                    "Var": "commitment"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "MapPut": {
+              "object_id": 1,
+              "key": {
+                "Var": "commitment"
+              },
+              "value": {
+                "Binary": {
+                  "op": "Add",
+                  "lhs": {
+                    "Var": "oldBalance"
+                  },
+                  "rhs": {
+                    "Var": "amount"
+                  }
+                }
+              },
+              "predicate": {
+                "Literal": {
+                  "Bool": true
+                }
+              }
+            }
+          },
+          {
+            "CellSet": {
+              "object_id": 2,
+              "value": {
+                "Binary": {
+                  "op": "Add",
+                  "lhs": {
+                    "CellGet": {
+                      "object_id": 2
+                    }
+                  },
+                  "rhs": {
+                    "Var": "amount"
+                  }
+                }
+              },
+              "predicate": {
+                "Literal": {
+                  "Bool": true
+                }
+              }
+            }
+          }
+        ],
+        "secret_args": [
+          0,
+          1
+        ],
+        "confidential": true,
+        "confidential_program": {
+          "entrypoint_id": "deposit(bytes32,uint256)",
+          "params": [
+            {
+              "name": "commitment",
+              "ty": {
+                "Scalar": "Bytes32"
+              }
+            },
+            {
+              "name": "amount",
+              "ty": {
+                "Scalar": {
+                  "Uint": 256
+                }
+              }
+            }
+          ],
+          "return_type": null,
+          "secret_args": [
+            0,
+            1
+          ],
+          "body": [
+            {
+              "kind": "declare",
+              "name": "oldBalance",
+              "ty": {
+                "Scalar": {
+                  "Uint": 256
+                }
+              },
+              "value": {
+                "kind": "map_get",
+                "object_id": 1,
+                "key": {
+                  "kind": "var",
+                  "name": "commitment"
+                }
+              }
+            },
+            {
+              "kind": "map_put",
+              "object_id": 1,
+              "key": {
+                "kind": "var",
+                "name": "commitment"
+              },
+              "value": {
+                "kind": "binary",
+                "op": "Add",
+                "lhs": {
+                  "kind": "var",
+                  "name": "oldBalance"
+                },
+                "rhs": {
+                  "kind": "var",
+                  "name": "amount"
+                }
+              },
+              "predicate": {
+                "kind": "literal",
+                "value": {
+                  "Bool": true
+                }
+              }
+            },
+            {
+              "kind": "cell_set",
+              "object_id": 2,
+              "value": {
+                "kind": "binary",
+                "op": "Add",
+                "lhs": {
+                  "kind": "cell_get",
+                  "object_id": 2
+                },
+                "rhs": {
+                  "kind": "var",
+                  "name": "amount"
+                }
+              },
+              "predicate": {
+                "kind": "literal",
+                "value": {
+                  "Bool": true
+                }
+              }
+            }
+          ]
+        },
+        "confidential_slot_program": {
+          "entrypoint_id": "deposit(bytes32,uint256)",
+          "param_count": 2,
+          "return_type": null,
+          "secret_args": [
+            0,
+            1
+          ],
+          "slot_count": 3,
+          "body": [
+            {
+              "kind": "declare",
+              "slot": 2,
+              "value": {
+                "kind": "map_get",
+                "object_id": 1,
+                "key": {
+                  "kind": "slot",
+                  "slot": 0
+                }
+              }
+            },
+            {
+              "kind": "map_put",
+              "object_id": 1,
+              "key": {
+                "kind": "slot",
+                "slot": 0
+              },
+              "value": {
+                "kind": "binary",
+                "op": "Add",
+                "lhs": {
+                  "kind": "slot",
+                  "slot": 2
+                },
+                "rhs": {
+                  "kind": "slot",
+                  "slot": 1
+                }
+              },
+              "predicate": {
+                "kind": "literal",
+                "value": {
+                  "Bool": true
+                }
+              }
+            },
+            {
+              "kind": "cell_set",
+              "object_id": 2,
+              "value": {
+                "kind": "binary",
+                "op": "Add",
+                "lhs": {
+                  "kind": "cell_get",
+                  "object_id": 2
+                },
+                "rhs": {
+                  "kind": "slot",
+                  "slot": 1
+                }
+              },
+              "predicate": {
+                "kind": "literal",
+                "value": {
+                  "Bool": true
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "signature": "withdraw(bytes32,uint256)",
+        "params": [
+          [
+            "commitment",
+            {
+              "Scalar": "Bytes32"
+            }
+          ],
+          [
+            "amount",
+            {
+              "Scalar": {
+                "Uint": 256
+              }
+            }
+          ]
+        ],
+        "return_type": {
+          "Scalar": {
+            "Uint": 256
+          }
+        },
+        "body": [
+          {
+            "Declare": {
+              "name": "oldBalance",
+              "ty": {
+                "Scalar": {
+                  "Uint": 256
+                }
+              },
+              "value": {
+                "MapGet": {
+                  "object_id": 1,
+                  "key": {
+                    "Var": "commitment"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "AbortIf": {
+              "cond": {
+                "Unary": {
+                  "op": "Not",
+                  "expr": {
+                    "Binary": {
+                      "op": "Gte",
+                      "lhs": {
+                        "Var": "oldBalance"
+                      },
+                      "rhs": {
+                        "Var": "amount"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "MapPut": {
+              "object_id": 1,
+              "key": {
+                "Var": "commitment"
+              },
+              "value": {
+                "Binary": {
+                  "op": "Sub",
+                  "lhs": {
+                    "Var": "oldBalance"
+                  },
+                  "rhs": {
+                    "Var": "amount"
+                  }
+                }
+              },
+              "predicate": {
+                "Literal": {
+                  "Bool": true
+                }
+              }
+            }
+          },
+          {
+            "CellSet": {
+              "object_id": 2,
+              "value": {
+                "Binary": {
+                  "op": "Sub",
+                  "lhs": {
+                    "CellGet": {
+                      "object_id": 2
+                    }
+                  },
+                  "rhs": {
+                    "Var": "amount"
+                  }
+                }
+              },
+              "predicate": {
+                "Literal": {
+                  "Bool": true
+                }
+              }
+            }
+          },
+          {
+            "Return": {
+              "value": {
+                "Var": "amount"
+              }
+            }
+          }
+        ],
+        "secret_args": [
+          0,
+          1
+        ],
+        "confidential": true,
+        "confidential_program": {
+          "entrypoint_id": "withdraw(bytes32,uint256)",
+          "params": [
+            {
+              "name": "commitment",
+              "ty": {
+                "Scalar": "Bytes32"
+              }
+            },
+            {
+              "name": "amount",
+              "ty": {
+                "Scalar": {
+                  "Uint": 256
+                }
+              }
+            }
+          ],
+          "return_type": {
+            "Scalar": {
+              "Uint": 256
+            }
+          },
+          "secret_args": [
+            0,
+            1
+          ],
+          "body": [
+            {
+              "kind": "declare",
+              "name": "oldBalance",
+              "ty": {
+                "Scalar": {
+                  "Uint": 256
+                }
+              },
+              "value": {
+                "kind": "map_get",
+                "object_id": 1,
+                "key": {
+                  "kind": "var",
+                  "name": "commitment"
+                }
+              }
+            },
+            {
+              "kind": "abort_if",
+              "cond": {
+                "kind": "unary",
+                "op": "Not",
+                "expr": {
+                  "kind": "binary",
+                  "op": "Gte",
+                  "lhs": {
+                    "kind": "var",
+                    "name": "oldBalance"
+                  },
+                  "rhs": {
+                    "kind": "var",
+                    "name": "amount"
+                  }
+                }
+              }
+            },
+            {
+              "kind": "map_put",
+              "object_id": 1,
+              "key": {
+                "kind": "var",
+                "name": "commitment"
+              },
+              "value": {
+                "kind": "binary",
+                "op": "Sub",
+                "lhs": {
+                  "kind": "var",
+                  "name": "oldBalance"
+                },
+                "rhs": {
+                  "kind": "var",
+                  "name": "amount"
+                }
+              },
+              "predicate": {
+                "kind": "literal",
+                "value": {
+                  "Bool": true
+                }
+              }
+            },
+            {
+              "kind": "cell_set",
+              "object_id": 2,
+              "value": {
+                "kind": "binary",
+                "op": "Sub",
+                "lhs": {
+                  "kind": "cell_get",
+                  "object_id": 2
+                },
+                "rhs": {
+                  "kind": "var",
+                  "name": "amount"
+                }
+              },
+              "predicate": {
+                "kind": "literal",
+                "value": {
+                  "Bool": true
+                }
+              }
+            },
+            {
+              "kind": "return",
+              "value": {
+                "kind": "var",
+                "name": "amount"
+              }
+            }
+          ]
+        },
+        "confidential_slot_program": {
+          "entrypoint_id": "withdraw(bytes32,uint256)",
+          "param_count": 2,
+          "return_type": {
+            "Scalar": {
+              "Uint": 256
+            }
+          },
+          "secret_args": [
+            0,
+            1
+          ],
+          "slot_count": 3,
+          "body": [
+            {
+              "kind": "declare",
+              "slot": 2,
+              "value": {
+                "kind": "map_get",
+                "object_id": 1,
+                "key": {
+                  "kind": "slot",
+                  "slot": 0
+                }
+              }
+            },
+            {
+              "kind": "abort_if",
+              "cond": {
+                "kind": "unary",
+                "op": "Not",
+                "expr": {
+                  "kind": "binary",
+                  "op": "Gte",
+                  "lhs": {
+                    "kind": "slot",
+                    "slot": 2
+                  },
+                  "rhs": {
+                    "kind": "slot",
+                    "slot": 1
+                  }
+                }
+              }
+            },
+            {
+              "kind": "map_put",
+              "object_id": 1,
+              "key": {
+                "kind": "slot",
+                "slot": 0
+              },
+              "value": {
+                "kind": "binary",
+                "op": "Sub",
+                "lhs": {
+                  "kind": "slot",
+                  "slot": 2
+                },
+                "rhs": {
+                  "kind": "slot",
+                  "slot": 1
+                }
+              },
+              "predicate": {
+                "kind": "literal",
+                "value": {
+                  "Bool": true
+                }
+              }
+            },
+            {
+              "kind": "cell_set",
+              "object_id": 2,
+              "value": {
+                "kind": "binary",
+                "op": "Sub",
+                "lhs": {
+                  "kind": "cell_get",
+                  "object_id": 2
+                },
+                "rhs": {
+                  "kind": "slot",
+                  "slot": 1
+                }
+              },
+              "predicate": {
+                "kind": "literal",
+                "value": {
+                  "Bool": true
+                }
+              }
+            },
+            {
+              "kind": "return",
+              "value": {
+                "kind": "slot",
+                "slot": 1
+              }
+            }
+          ]
+        }
+      },
+      {
+        "signature": "balanceOf(bytes32)",
+        "params": [
+          [
+            "commitment",
+            {
+              "Scalar": "Bytes32"
+            }
+          ]
+        ],
+        "return_type": {
+          "Scalar": {
+            "Uint": 256
+          }
+        },
+        "body": [
+          {
+            "Return": {
+              "value": {
+                "MapGet": {
+                  "object_id": 1,
+                  "key": {
+                    "Var": "commitment"
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "secret_args": [],
+        "confidential": true,
+        "confidential_program": {
+          "entrypoint_id": "balanceOf(bytes32)",
+          "params": [
+            {
+              "name": "commitment",
+              "ty": {
+                "Scalar": "Bytes32"
+              }
+            }
+          ],
+          "return_type": {
+            "Scalar": {
+              "Uint": 256
+            }
+          },
+          "secret_args": [],
+          "body": [
+            {
+              "kind": "return",
+              "value": {
+                "kind": "map_get",
+                "object_id": 1,
+                "key": {
+                  "kind": "var",
+                  "name": "commitment"
+                }
+              }
+            }
+          ]
+        },
+        "confidential_slot_program": {
+          "entrypoint_id": "balanceOf(bytes32)",
+          "param_count": 1,
+          "return_type": {
+            "Scalar": {
+              "Uint": 256
+            }
+          },
+          "secret_args": [],
+          "slot_count": 1,
+          "body": [
+            {
+              "kind": "return",
+              "value": {
+                "kind": "map_get",
+                "object_id": 1,
+                "key": {
+                  "kind": "slot",
+                  "slot": 0
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "signature": "totalValue()",
+        "params": [],
+        "return_type": {
+          "Scalar": {
+            "Uint": 256
+          }
+        },
+        "body": [
+          {
+            "Return": {
+              "value": {
+                "CellGet": {
+                  "object_id": 2
+                }
+              }
+            }
+          }
+        ],
+        "secret_args": [],
+        "confidential": true,
+        "confidential_program": {
+          "entrypoint_id": "totalValue()",
+          "params": [],
+          "return_type": {
+            "Scalar": {
+              "Uint": 256
+            }
+          },
+          "secret_args": [],
+          "body": [
+            {
+              "kind": "return",
+              "value": {
+                "kind": "cell_get",
+                "object_id": 2
+              }
+            }
+          ]
+        },
+        "confidential_slot_program": {
+          "entrypoint_id": "totalValue()",
+          "param_count": 0,
+          "return_type": {
+            "Scalar": {
+              "Uint": 256
+            }
+          },
+          "secret_args": [],
+          "slot_count": 0,
+          "body": [
+            {
+              "kind": "return",
+              "value": {
+                "kind": "cell_get",
+                "object_id": 2
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "manifest": {
+      "contract": "ConfidentialMixer",
+      "compilation_mode": "uo",
+      "objects": [
+        {
+          "id": 1,
+          "name": "balances",
+          "kind": "map",
+          "backend": "oram",
+          "capacity": 256,
+          "value_type": "uint256",
+          "key_type": "bytes32",
+          "oram": {
+            "scheme": "path_oram_private_posmap_v1",
+            "block_size": 115,
+            "bucket_size": 599,
+            "bucket_count": 511,
+            "blocks_per_bucket": 5,
+            "tree_height": 8,
+            "stash_bound": 148,
+            "recursion_depth": 1,
+            "metadata_pages": 20,
+            "metadata_pages_per_access": 21,
+            "buckets_per_access": 9,
+            "accesses_per_call": 1
+          }
+        },
+        {
+          "id": 2,
+          "name": "total",
+          "kind": "cell",
+          "backend": "full_scan",
+          "capacity": null,
+          "value_type": "uint256",
+          "key_type": null,
+          "oram": null
+        }
+      ],
+      "entrypoints": {
+        "balanceOf(bytes32)": {
+          "secret_args": [],
+          "param_names": [
+            "commitment"
+          ],
+          "entry_input_len": 32,
+          "public_gas_budget": 11595,
+          "arena_bytes": 4096,
+          "max_stack_words": 64,
+          "max_hash_part_bytes": 0,
+          "return_canonical_len": 32,
+          "returns": "declassified",
+          "status": "public",
+          "declassifies": [
+            "return"
+          ],
+          "public_state_declassifies": [],
+          "confidential_program": {
+            "entrypoint_id": "balanceOf(bytes32)",
+            "params": [
+              {
+                "name": "commitment",
+                "ty": {
+                  "Scalar": "Bytes32"
+                }
+              }
+            ],
+            "return_type": {
+              "Scalar": {
+                "Uint": 256
+              }
+            },
+            "secret_args": [],
+            "body": [
+              {
+                "kind": "return",
+                "value": {
+                  "kind": "map_get",
+                  "object_id": 1,
+                  "key": {
+                    "kind": "var",
+                    "name": "commitment"
+                  }
+                }
+              }
+            ]
+          },
+          "confidential_slot_program": {
+            "entrypoint_id": "balanceOf(bytes32)",
+            "param_count": 1,
+            "return_type": {
+              "Scalar": {
+                "Uint": 256
+              }
+            },
+            "secret_args": [],
+            "slot_count": 1,
+            "body": [
+              {
+                "kind": "return",
+                "value": {
+                  "kind": "map_get",
+                  "object_id": 1,
+                  "key": {
+                    "kind": "slot",
+                    "slot": 0
+                  }
+                }
+              }
+            ]
+          },
+          "kernel_steps": [
+            {
+              "opcode": "Begin",
+              "object_id": null
+            },
+            {
+              "opcode": "MapGet",
+              "object_id": 1
+            },
+            {
+              "opcode": "Commit",
+              "object_id": null
+            },
+            {
+              "opcode": "Wipe",
+              "object_id": null
+            }
+          ],
+          "uocell_reads": 0,
+          "uocell_writes": 0,
+          "uoarray_reads": 0,
+          "uoarray_writes": 0,
+          "uomap_reads": 1,
+          "uomap_writes": 0,
+          "max_commit_ops": 330,
+          "oram_accesses": {
+            "1": 11
+          }
+        },
+        "deposit(bytes32,uint256)": {
+          "secret_args": [
+            0,
+            1
+          ],
+          "param_names": [
+            "commitment",
+            "amount"
+          ],
+          "entry_input_len": 64,
+          "public_gas_budget": 41289,
+          "arena_bytes": 4160,
+          "max_stack_words": 65,
+          "max_hash_part_bytes": 0,
+          "returns": "forbidden",
+          "status": "declassified",
+          "declassifies": [
+            "success"
+          ],
+          "public_state_declassifies": [],
+          "confidential_program": {
+            "entrypoint_id": "deposit(bytes32,uint256)",
+            "params": [
+              {
+                "name": "commitment",
+                "ty": {
+                  "Scalar": "Bytes32"
+                }
+              },
+              {
+                "name": "amount",
+                "ty": {
+                  "Scalar": {
+                    "Uint": 256
+                  }
+                }
+              }
+            ],
+            "return_type": null,
+            "secret_args": [
+              0,
+              1
+            ],
+            "body": [
+              {
+                "kind": "declare",
+                "name": "oldBalance",
+                "ty": {
+                  "Scalar": {
+                    "Uint": 256
+                  }
+                },
+                "value": {
+                  "kind": "map_get",
+                  "object_id": 1,
+                  "key": {
+                    "kind": "var",
+                    "name": "commitment"
+                  }
+                }
+              },
+              {
+                "kind": "map_put",
+                "object_id": 1,
+                "key": {
+                  "kind": "var",
+                  "name": "commitment"
+                },
+                "value": {
+                  "kind": "binary",
+                  "op": "Add",
+                  "lhs": {
+                    "kind": "var",
+                    "name": "oldBalance"
+                  },
+                  "rhs": {
+                    "kind": "var",
+                    "name": "amount"
+                  }
+                },
+                "predicate": {
+                  "kind": "literal",
+                  "value": {
+                    "Bool": true
+                  }
+                }
+              },
+              {
+                "kind": "cell_set",
+                "object_id": 2,
+                "value": {
+                  "kind": "binary",
+                  "op": "Add",
+                  "lhs": {
+                    "kind": "cell_get",
+                    "object_id": 2
+                  },
+                  "rhs": {
+                    "kind": "var",
+                    "name": "amount"
+                  }
+                },
+                "predicate": {
+                  "kind": "literal",
+                  "value": {
+                    "Bool": true
+                  }
+                }
+              }
+            ]
+          },
+          "confidential_slot_program": {
+            "entrypoint_id": "deposit(bytes32,uint256)",
+            "param_count": 2,
+            "return_type": null,
+            "secret_args": [
+              0,
+              1
+            ],
+            "slot_count": 3,
+            "body": [
+              {
+                "kind": "declare",
+                "slot": 2,
+                "value": {
+                  "kind": "map_get",
+                  "object_id": 1,
+                  "key": {
+                    "kind": "slot",
+                    "slot": 0
+                  }
+                }
+              },
+              {
+                "kind": "map_put",
+                "object_id": 1,
+                "key": {
+                  "kind": "slot",
+                  "slot": 0
+                },
+                "value": {
+                  "kind": "binary",
+                  "op": "Add",
+                  "lhs": {
+                    "kind": "slot",
+                    "slot": 2
+                  },
+                  "rhs": {
+                    "kind": "slot",
+                    "slot": 1
+                  }
+                },
+                "predicate": {
+                  "kind": "literal",
+                  "value": {
+                    "Bool": true
+                  }
+                }
+              },
+              {
+                "kind": "cell_set",
+                "object_id": 2,
+                "value": {
+                  "kind": "binary",
+                  "op": "Add",
+                  "lhs": {
+                    "kind": "cell_get",
+                    "object_id": 2
+                  },
+                  "rhs": {
+                    "kind": "slot",
+                    "slot": 1
+                  }
+                },
+                "predicate": {
+                  "kind": "literal",
+                  "value": {
+                    "Bool": true
+                  }
+                }
+              }
+            ]
+          },
+          "kernel_steps": [
+            {
+              "opcode": "Begin",
+              "object_id": null
+            },
+            {
+              "opcode": "MapGet",
+              "object_id": 1
+            },
+            {
+              "opcode": "MapPut",
+              "object_id": 1
+            },
+            {
+              "opcode": "CellGet",
+              "object_id": 2
+            },
+            {
+              "opcode": "CellSet",
+              "object_id": 2
+            },
+            {
+              "opcode": "Commit",
+              "object_id": null
+            },
+            {
+              "opcode": "Wipe",
+              "object_id": null
+            }
+          ],
+          "uocell_reads": 1,
+          "uocell_writes": 1,
+          "uoarray_reads": 0,
+          "uoarray_writes": 0,
+          "uomap_reads": 1,
+          "uomap_writes": 1,
+          "max_commit_ops": 1351,
+          "oram_accesses": {
+            "1": 45
+          }
+        },
+        "totalValue()": {
+          "secret_args": [],
+          "param_names": [],
+          "entry_input_len": 0,
+          "public_gas_budget": 2047,
+          "arena_bytes": 4096,
+          "max_stack_words": 64,
+          "max_hash_part_bytes": 0,
+          "return_canonical_len": 32,
+          "returns": "declassified",
+          "status": "public",
+          "declassifies": [
+            "return"
+          ],
+          "public_state_declassifies": [],
+          "confidential_program": {
+            "entrypoint_id": "totalValue()",
+            "params": [],
+            "return_type": {
+              "Scalar": {
+                "Uint": 256
+              }
+            },
+            "secret_args": [],
+            "body": [
+              {
+                "kind": "return",
+                "value": {
+                  "kind": "cell_get",
+                  "object_id": 2
+                }
+              }
+            ]
+          },
+          "confidential_slot_program": {
+            "entrypoint_id": "totalValue()",
+            "param_count": 0,
+            "return_type": {
+              "Scalar": {
+                "Uint": 256
+              }
+            },
+            "secret_args": [],
+            "slot_count": 0,
+            "body": [
+              {
+                "kind": "return",
+                "value": {
+                  "kind": "cell_get",
+                  "object_id": 2
+                }
+              }
+            ]
+          },
+          "kernel_steps": [
+            {
+              "opcode": "Begin",
+              "object_id": null
+            },
+            {
+              "opcode": "CellGet",
+              "object_id": 2
+            },
+            {
+              "opcode": "Commit",
+              "object_id": null
+            },
+            {
+              "opcode": "Wipe",
+              "object_id": null
+            }
+          ],
+          "uocell_reads": 1,
+          "uocell_writes": 0,
+          "uoarray_reads": 0,
+          "uoarray_writes": 0,
+          "uomap_reads": 0,
+          "uomap_writes": 0,
+          "max_commit_ops": 1,
+          "oram_accesses": {}
+        },
+        "withdraw(bytes32,uint256)": {
+          "secret_args": [
+            0,
+            1
+          ],
+          "param_names": [
+            "commitment",
+            "amount"
+          ],
+          "entry_input_len": 64,
+          "public_gas_budget": 41346,
+          "arena_bytes": 4160,
+          "max_stack_words": 65,
+          "max_hash_part_bytes": 0,
+          "return_canonical_len": 32,
+          "returns": "declassified",
+          "status": "declassified",
+          "declassifies": [
+            "return",
+            "success"
+          ],
+          "public_state_declassifies": [],
+          "confidential_program": {
+            "entrypoint_id": "withdraw(bytes32,uint256)",
+            "params": [
+              {
+                "name": "commitment",
+                "ty": {
+                  "Scalar": "Bytes32"
+                }
+              },
+              {
+                "name": "amount",
+                "ty": {
+                  "Scalar": {
+                    "Uint": 256
+                  }
+                }
+              }
+            ],
+            "return_type": {
+              "Scalar": {
+                "Uint": 256
+              }
+            },
+            "secret_args": [
+              0,
+              1
+            ],
+            "body": [
+              {
+                "kind": "declare",
+                "name": "oldBalance",
+                "ty": {
+                  "Scalar": {
+                    "Uint": 256
+                  }
+                },
+                "value": {
+                  "kind": "map_get",
+                  "object_id": 1,
+                  "key": {
+                    "kind": "var",
+                    "name": "commitment"
+                  }
+                }
+              },
+              {
+                "kind": "abort_if",
+                "cond": {
+                  "kind": "unary",
+                  "op": "Not",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "Gte",
+                    "lhs": {
+                      "kind": "var",
+                      "name": "oldBalance"
+                    },
+                    "rhs": {
+                      "kind": "var",
+                      "name": "amount"
+                    }
+                  }
+                }
+              },
+              {
+                "kind": "map_put",
+                "object_id": 1,
+                "key": {
+                  "kind": "var",
+                  "name": "commitment"
+                },
+                "value": {
+                  "kind": "binary",
+                  "op": "Sub",
+                  "lhs": {
+                    "kind": "var",
+                    "name": "oldBalance"
+                  },
+                  "rhs": {
+                    "kind": "var",
+                    "name": "amount"
+                  }
+                },
+                "predicate": {
+                  "kind": "literal",
+                  "value": {
+                    "Bool": true
+                  }
+                }
+              },
+              {
+                "kind": "cell_set",
+                "object_id": 2,
+                "value": {
+                  "kind": "binary",
+                  "op": "Sub",
+                  "lhs": {
+                    "kind": "cell_get",
+                    "object_id": 2
+                  },
+                  "rhs": {
+                    "kind": "var",
+                    "name": "amount"
+                  }
+                },
+                "predicate": {
+                  "kind": "literal",
+                  "value": {
+                    "Bool": true
+                  }
+                }
+              },
+              {
+                "kind": "return",
+                "value": {
+                  "kind": "var",
+                  "name": "amount"
+                }
+              }
+            ]
+          },
+          "confidential_slot_program": {
+            "entrypoint_id": "withdraw(bytes32,uint256)",
+            "param_count": 2,
+            "return_type": {
+              "Scalar": {
+                "Uint": 256
+              }
+            },
+            "secret_args": [
+              0,
+              1
+            ],
+            "slot_count": 3,
+            "body": [
+              {
+                "kind": "declare",
+                "slot": 2,
+                "value": {
+                  "kind": "map_get",
+                  "object_id": 1,
+                  "key": {
+                    "kind": "slot",
+                    "slot": 0
+                  }
+                }
+              },
+              {
+                "kind": "abort_if",
+                "cond": {
+                  "kind": "unary",
+                  "op": "Not",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "Gte",
+                    "lhs": {
+                      "kind": "slot",
+                      "slot": 2
+                    },
+                    "rhs": {
+                      "kind": "slot",
+                      "slot": 1
+                    }
+                  }
+                }
+              },
+              {
+                "kind": "map_put",
+                "object_id": 1,
+                "key": {
+                  "kind": "slot",
+                  "slot": 0
+                },
+                "value": {
+                  "kind": "binary",
+                  "op": "Sub",
+                  "lhs": {
+                    "kind": "slot",
+                    "slot": 2
+                  },
+                  "rhs": {
+                    "kind": "slot",
+                    "slot": 1
+                  }
+                },
+                "predicate": {
+                  "kind": "literal",
+                  "value": {
+                    "Bool": true
+                  }
+                }
+              },
+              {
+                "kind": "cell_set",
+                "object_id": 2,
+                "value": {
+                  "kind": "binary",
+                  "op": "Sub",
+                  "lhs": {
+                    "kind": "cell_get",
+                    "object_id": 2
+                  },
+                  "rhs": {
+                    "kind": "slot",
+                    "slot": 1
+                  }
+                },
+                "predicate": {
+                  "kind": "literal",
+                  "value": {
+                    "Bool": true
+                  }
+                }
+              },
+              {
+                "kind": "return",
+                "value": {
+                  "kind": "slot",
+                  "slot": 1
+                }
+              }
+            ]
+          },
+          "kernel_steps": [
+            {
+              "opcode": "Begin",
+              "object_id": null
+            },
+            {
+              "opcode": "MapGet",
+              "object_id": 1
+            },
+            {
+              "opcode": "MapPut",
+              "object_id": 1
+            },
+            {
+              "opcode": "CellGet",
+              "object_id": 2
+            },
+            {
+              "opcode": "CellSet",
+              "object_id": 2
+            },
+            {
+              "opcode": "Commit",
+              "object_id": null
+            },
+            {
+              "opcode": "Wipe",
+              "object_id": null
+            }
+          ],
+          "uocell_reads": 1,
+          "uocell_writes": 1,
+          "uoarray_reads": 0,
+          "uoarray_writes": 0,
+          "uomap_reads": 1,
+          "uomap_writes": 1,
+          "max_commit_ops": 1351,
+          "oram_accesses": {
+            "1": 45
+          }
+        }
+      }
+    }
+  },
+  "diagnostics": [],
+  "transformed_source": "function deposit(bytes32,uint256)(bytes32 commitment, uint256 amount) {\n  let oldBalance = map_get(1, commitment)\n  map[1][commitment] = (oldBalance Add amount) @ Some(\"true\")\n  cell[2] = (cell_get(2) Add amount) @ Some(\"true\")\n}\n\nfunction withdraw(bytes32,uint256)(bytes32 commitment, uint256 amount) {\n  let oldBalance = map_get(1, commitment)\n  abort_if Not((oldBalance Gte amount))\n  map[1][commitment] = (oldBalance Sub amount) @ Some(\"true\")\n  cell[2] = (cell_get(2) Sub amount) @ Some(\"true\")\n  return amount\n}\n\nfunction balanceOf(bytes32)(bytes32 commitment) {\n  return map_get(1, commitment)\n}\n\nfunction totalValue()() {\n  return cell_get(2)\n}",
+  "disassembly": [
+    "fn deposit(bytes32,uint256):",
+    "  0000 let oldBalance = map_get(1, commitment)",
+    "  0001 map[1][commitment] = (oldBalance Add amount) @ Some(\"true\")",
+    "  0002 cell[2] = (cell_get(2) Add amount) @ Some(\"true\")",
+    "fn withdraw(bytes32,uint256):",
+    "  0000 let oldBalance = map_get(1, commitment)",
+    "  0001 abort_if Not((oldBalance Gte amount))",
+    "  0002 map[1][commitment] = (oldBalance Sub amount) @ Some(\"true\")",
+    "  0003 cell[2] = (cell_get(2) Sub amount) @ Some(\"true\")",
+    "  0004 return amount",
+    "fn balanceOf(bytes32):",
+    "  0000 return map_get(1, commitment)",
+    "fn totalValue():",
+    "  0000 return cell_get(2)"
+  ]
+}

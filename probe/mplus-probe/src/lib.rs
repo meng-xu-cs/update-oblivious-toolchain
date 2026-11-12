@@ -3771,7 +3771,11 @@ fn compile_suite() -> Result<BTreeMap<&'static str, BenchArtifacts>> {
                 "benches/raw/ConfidentialMixer.fullscan64.yaml",
                 ProgramMode::Uo,
             )?),
-            private_posmap: None,
+            private_posmap: Some(compile_artifact(
+                "benches/raw/ConfidentialMixer.sol",
+                "benches/raw/ConfidentialMixer.private-posmap.yaml",
+                ProgramMode::Uo,
+            )?),
             private_posmap_large: Vec::new(),
         },
     );
@@ -48913,7 +48917,7 @@ fn leakage_controls(reports: &[JsonValue]) -> JsonValue {
         match mode {
             "raw_insecure_eval" | "ct_gas_only" => positive.push(entry),
             "uo" => negative.push(entry),
-            "oram" => computational.push(entry),
+            "oram" | "oram_private_posmap" => computational.push(entry),
             _ => {}
         }
     }
@@ -49051,6 +49055,34 @@ fn run_auc_reports(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<Jso
                     .ok_or_else(|| anyhow!("missing erc20 oram"))?,
             )
             .context("leakage_auc/ERC20Lite/oram"),
+            auc_report,
+        ),
+        experiment_metric_summary(
+            "ConfidentialMixer",
+            "oram_private_posmap",
+            "metric_auc",
+            run_mixer_experiment(
+                suite["ConfidentialMixer"]
+                    .private_posmap
+                    .as_ref()
+                    .ok_or_else(|| anyhow!("missing mixer private posmap"))?,
+            )
+            .context("leakage_auc/ConfidentialMixer/oram_private_posmap"),
+            auc_report,
+        ),
+        // ERC20Lite's map on the private scheme is `balances`, which an
+        // approval does not touch: this row runs transfers.
+        experiment_metric_summary(
+            "ERC20Lite",
+            "oram_private_posmap",
+            "metric_auc",
+            run_erc20_transfer_experiment(
+                suite["ERC20Lite"]
+                    .private_posmap
+                    .as_ref()
+                    .ok_or_else(|| anyhow!("missing erc20 private posmap"))?,
+            )
+            .context("leakage_auc/ERC20Lite/oram_private_posmap"),
             auc_report,
         ),
     ]
@@ -49223,6 +49255,34 @@ fn run_mutual_information_reports(
                     .ok_or_else(|| anyhow!("missing erc20 oram"))?,
             )
             .context("mutual_information/ERC20Lite/oram"),
+            mi_report,
+        ),
+        experiment_metric_summary(
+            "ConfidentialMixer",
+            "oram_private_posmap",
+            "metric_mi_bits",
+            run_mixer_experiment(
+                suite["ConfidentialMixer"]
+                    .private_posmap
+                    .as_ref()
+                    .ok_or_else(|| anyhow!("missing mixer private posmap"))?,
+            )
+            .context("mutual_information/ConfidentialMixer/oram_private_posmap"),
+            mi_report,
+        ),
+        // ERC20Lite's map on the private scheme is `balances`, which an
+        // approval does not touch: this row runs transfers.
+        experiment_metric_summary(
+            "ERC20Lite",
+            "oram_private_posmap",
+            "metric_mi_bits",
+            run_erc20_transfer_experiment(
+                suite["ERC20Lite"]
+                    .private_posmap
+                    .as_ref()
+                    .ok_or_else(|| anyhow!("missing erc20 private posmap"))?,
+            )
+            .context("mutual_information/ERC20Lite/oram_private_posmap"),
             mi_report,
         ),
     ]
@@ -49989,27 +50049,17 @@ fn abort_rollback_case(
             })?;
     }
     let expect_abort = expected_outcome == "abort";
-    let outcome = match instance.call(target.entrypoint, target.args.clone()) {
-        Ok(outcome) => outcome,
-        Err(err) => {
-            // The fail-closed proof-grade route refused to admit this call rather
-            // than emit an unvalidated witness. The Path ORAM route currently does
-            // this for a mid-call abort: every ORAM access must remap the touched
-            // block, so restoring the pre-call hidden state on abort leaves the
-            // emitted leaf schedule inconsistent with the restored position map,
-            // and the refinement-witness check rejects it. Record the rejection
-            // with its exact reason as an explicit edge case (not a silent gap),
-            // mirroring the capacity-overflow rows in the capacity sweep.
-            return Ok(json!({
-                "benchmark": benchmark,
-                "backend": backend,
-                "expected_outcome": expected_outcome,
-                "runtime_status": "rejected_by_proof_grade_route",
-                "recorded_edge_case": true,
-                "rejection_reason": format!("{err:#}"),
-            }));
-        }
-    };
+    // Every backend runs the call. On both Path ORAM schemes an aborted call
+    // makes the same accesses as a committed one, with its writes masked off,
+    // so no route rejects a mid-call abort; an error here fails the report.
+    let outcome = instance
+        .call(target.entrypoint, target.args.clone())
+        .with_context(|| {
+            format!(
+                "abort_rollback target {benchmark}/{backend}: {}",
+                target.entrypoint
+            )
+        })?;
     let aborted = outcome.aborted;
     let post = observers
         .iter()
@@ -50074,6 +50124,13 @@ fn run_abort_rollback(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<
                 .oram
                 .as_ref()
                 .ok_or_else(|| anyhow!("missing ConfidentialMixer oram"))?,
+        ),
+        (
+            "oram_private_posmap",
+            mixer
+                .private_posmap
+                .as_ref()
+                .ok_or_else(|| anyhow!("missing ConfidentialMixer private posmap"))?,
         ),
     ];
     for (backend, artifact) in mixer_targets {
@@ -50149,6 +50206,13 @@ fn run_abort_rollback(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<
                 .as_ref()
                 .ok_or_else(|| anyhow!("missing ERC20Lite oram"))?,
         ),
+        (
+            "oram_private_posmap",
+            erc20
+                .private_posmap
+                .as_ref()
+                .ok_or_else(|| anyhow!("missing ERC20Lite private posmap"))?,
+        ),
     ];
     for (backend, artifact) in erc20_targets {
         // transferFrom above the approved allowance (5 > 4) aborts: alice keeps
@@ -50208,7 +50272,7 @@ fn run_abort_rollback(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<
     };
     let accepted = all_executed_match && demonstrated("abort") && demonstrated("commit");
     Ok(json!({
-        "description": "AbortRollback edge-case study: confidential calls that hit a require(...) guard abort and roll back public state, while in-bound calls commit. Exercises Issue 06 transactional atomicity on the exact backend (uo); the proof-grade Path ORAM route fail-closed-rejects a mid-call abort and that rejection is recorded as an explicit edge case.",
+        "description": "AbortRollback edge-case study: confidential calls that hit a require(...) guard abort and leave the state they read as it was, while in-bound calls commit. Exercises Issue 06 transactional atomicity on the exact backend (uo) and on both Path ORAM schemes (oram for path_oram_local_posmap_v1, oram_private_posmap for path_oram_private_posmap_v1). Every case executes: on the Path ORAM schemes an aborted call makes the same accesses as a committed one, with its writes masked off.",
         "case_studies": case_studies,
         "accepted": accepted,
     }))

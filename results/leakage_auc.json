@@ -11,6 +11,16 @@
         "benchmark": "ERC20Lite",
         "max_auc": 0.5,
         "mode": "oram"
+      },
+      {
+        "benchmark": "ConfidentialMixer",
+        "max_auc": 0.5,
+        "mode": "oram_private_posmap"
+      },
+      {
+        "benchmark": "ERC20Lite",
+        "max_auc": 0.5,
+        "mode": "oram_private_posmap"
       }
     ],
     "computational_controls_silent": true,
@@ -361,6 +371,50 @@
         "zero_writes": 0.5
       },
       "mode": "oram",
+      "rejected": false
+    },
+    {
+      "benchmark": "ConfidentialMixer",
+      "executable": true,
+      "metric_auc": {
+        "backend_reads": 0.5,
+        "backend_writes": 0.5,
+        "boundary_events": 0.5,
+        "bytes_read": 0.5,
+        "bytes_written": 0.5,
+        "clear_writes": 0.5,
+        "controller_phase_count": 0.5,
+        "gas_used": 0.5,
+        "normalized_page_events": 0.5,
+        "same_writes": 0.5,
+        "set_writes": 0.5,
+        "update_only_fraction": 0.5,
+        "update_writes": 0.5,
+        "zero_writes": 0.5
+      },
+      "mode": "oram_private_posmap",
+      "rejected": false
+    },
+    {
+      "benchmark": "ERC20Lite",
+      "executable": true,
+      "metric_auc": {
+        "backend_reads": 0.5,
+        "backend_writes": 0.5,
+        "boundary_events": 0.5,
+        "bytes_read": 0.5,
+        "bytes_written": 0.5,
+        "clear_writes": 0.5,
+        "controller_phase_count": 0.5,
+        "gas_used": 0.5,
+        "normalized_page_events": 0.5,
+        "same_writes": 0.5,
+        "set_writes": 0.5,
+        "update_only_fraction": 0.5,
+        "update_writes": 0.5,
+        "zero_writes": 0.5
+      },
+      "mode": "oram_private_posmap",
       "rejected": false
     },
     {

@@ -1,0 +1,44 @@
+contract: ConfidentialMixer
+# Puts the balances map on the scalable private-position-map route, above the
+# local scheme's cap (capacity 256). deposit and withdraw read and write
+# balances once per call. The probe runs it as the oram_private_posmap variant
+# of ConfidentialMixer in its leakage and abort reports.
+entrypoints:
+  deposit(bytes32,uint256):
+    secret_args: [commitment, amount]
+    confidential: true
+    returns: forbidden
+    status: declassified
+    declassifies: [success]
+  withdraw(bytes32,uint256):
+    secret_args: [commitment, amount]
+    confidential: true
+    returns: declassified
+    status: declassified
+    declassifies: [return, success]
+  balanceOf(bytes32):
+    confidential: true
+    returns: declassified
+    status: public
+    declassifies: [return]
+  totalValue():
+    confidential: true
+    returns: declassified
+    status: public
+    declassifies: [return]
+state:
+  balances:
+    kind: map
+    key: bytes32
+    value: uint256
+    capacity: 256
+    backend: oram
+    oram_scheme: path_oram_private_posmap_v1
+    confidential: true
+  total:
+    kind: cell
+    value: uint256
+    backend: full_scan
+    confidential: true
+bounds:
+  loops: {}

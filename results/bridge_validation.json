@@ -513842,9 +513842,9 @@
     "checker": "proof/lean/.lake/build/bin/checkProofGradeTranslationArtifacts",
     "kernel_admission_all_admitted": true,
     "kernel_admission_checker": "proof/lean/.lake/build/bin/checkKernelAdmission",
-    "kernel_admission_entrypoint_count": 39,
-    "kernel_admission_exact_route_count": 24,
-    "kernel_admission_path_oram_route_count": 15,
+    "kernel_admission_entrypoint_count": 43,
+    "kernel_admission_exact_route_count": 25,
+    "kernel_admission_path_oram_route_count": 18,
     "legacy_axiom_definition_checks": [
       {
         "expected_files": [
@@ -514828,8 +514828,87 @@
             }
           ]
         },
-        "private_posmap_artifact": null,
-        "private_posmap_kernel_admission": null,
+        "private_posmap_artifact": {
+          "accepted": true,
+          "artifact_json_bytes": 16551,
+          "contract": "ConfidentialMixer",
+          "function_count": 4,
+          "lean_stderr": "",
+          "lean_stdout": "validated proof-grade translation artifacts for ConfidentialMixer",
+          "manifest_entrypoint_count": 4,
+          "manifest_object_count": 2,
+          "metadata_contract": "ConfidentialMixer",
+          "mode": "uo",
+          "source_artifact_json_bytes": 16551,
+          "state_object_count": 2
+        },
+        "private_posmap_kernel_admission": {
+          "all_admitted": true,
+          "contract": "ConfidentialMixer",
+          "entrypoint_count": 4,
+          "entrypoints": [
+            {
+              "admitted": true,
+              "entrypoint": "balanceOf(bytes32)",
+              "flow_return": "secret",
+              "flow_status": "public",
+              "policy_agrees_with_flow": true,
+              "program_matches_function": true,
+              "return_policy": "declassified",
+              "returns_only_last": true,
+              "secret_args_match_manifest": true,
+              "status_policy": "public",
+              "trace_route": "path_oram",
+              "well_typed": true,
+              "writes_only_confidential": true
+            },
+            {
+              "admitted": true,
+              "entrypoint": "deposit(bytes32,uint256)",
+              "flow_return": "public",
+              "flow_status": "secret",
+              "policy_agrees_with_flow": true,
+              "program_matches_function": true,
+              "return_policy": "forbidden",
+              "returns_only_last": true,
+              "secret_args_match_manifest": true,
+              "status_policy": "declassified",
+              "trace_route": "path_oram",
+              "well_typed": true,
+              "writes_only_confidential": true
+            },
+            {
+              "admitted": true,
+              "entrypoint": "totalValue()",
+              "flow_return": "secret",
+              "flow_status": "public",
+              "policy_agrees_with_flow": true,
+              "program_matches_function": true,
+              "return_policy": "declassified",
+              "returns_only_last": true,
+              "secret_args_match_manifest": true,
+              "status_policy": "public",
+              "trace_route": "exact",
+              "well_typed": true,
+              "writes_only_confidential": true
+            },
+            {
+              "admitted": true,
+              "entrypoint": "withdraw(bytes32,uint256)",
+              "flow_return": "secret",
+              "flow_status": "secret",
+              "policy_agrees_with_flow": true,
+              "program_matches_function": true,
+              "return_policy": "declassified",
+              "returns_only_last": true,
+              "secret_args_match_manifest": true,
+              "status_policy": "declassified",
+              "trace_route": "path_oram",
+              "well_typed": true,
+              "writes_only_confidential": true
+            }
+          ]
+        },
         "raw_artifact": {
           "accepted": false,
           "artifact_json_bytes": 6530,

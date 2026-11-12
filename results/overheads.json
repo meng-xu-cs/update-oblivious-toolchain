@@ -383,6 +383,15 @@
           "formula_exact": true,
           "gas_used": 3531,
           "manifest_public_gas_budget": 3531
+        },
+        {
+          "backend": "oram_private_posmap",
+          "cost_formula": "modeled_static_budget",
+          "cost_model": "uo-modeled-resource-cost-v1",
+          "entrypoint": "deposit(bytes32,uint256)",
+          "formula_exact": true,
+          "gas_used": 41289,
+          "manifest_public_gas_budget": 41289
         }
       ],
       "ct_gas_only": {
@@ -446,6 +455,20 @@
       },
       "oram_improves_physical_writes": true,
       "oram_improves_physical_writes_baseline": "full_scan_64",
+      "oram_private_posmap": {
+        "bytes_read": 589158.0,
+        "bytes_read_with_call_start": 627234.0,
+        "bytes_written": 589034.0,
+        "call_start_bytes": 38076.0,
+        "call_start_reads": 21,
+        "executable": true,
+        "gas_used": 41289,
+        "physical_reads": 492,
+        "physical_reads_with_call_start": 513,
+        "physical_writes": 491,
+        "rejected": false,
+        "trace_json_bytes": 1755750
+      },
       "raw": {
         "error": "raw confidential backends are rejected in proof-grade builds; this feature build emits the executable raw_insecure_eval control separately",
         "executable": false,
@@ -687,6 +710,57 @@
             }
           ],
           "trace_json_bytes": 101434
+        },
+        {
+          "artifact_json_bytes": 16551,
+          "backend": "oram_private_posmap",
+          "benchmark": "ConfidentialMixer/deposit",
+          "bytes_read": 589158.0,
+          "bytes_read_with_call_start": 627234.0,
+          "bytes_written": 589034.0,
+          "call_start_bytes": 38076.0,
+          "call_start_reads": 21,
+          "capacity": "256",
+          "entrypoint": "deposit(bytes32,uint256)",
+          "entrypoint_resource_bounds": {
+            "max_commit_ops": 1351,
+            "oram_bounds": [
+              {
+                "accesses": 45,
+                "buckets_per_access": 9,
+                "capacity": 256,
+                "commit_ops_for_entrypoint": 1350,
+                "commit_ops_per_access": 30,
+                "metadata_pages": 20,
+                "metadata_pages_per_access": 21,
+                "scheme": "path_oram_private_posmap_v1"
+              }
+            ],
+            "signature": "deposit(bytes32,uint256)"
+          },
+          "executable": true,
+          "gas_used": 41289,
+          "physical_reads": 492,
+          "physical_reads_with_call_start": 513,
+          "physical_writes": 491,
+          "rejected": false,
+          "state_objects": [
+            {
+              "backend": "oram",
+              "capacity": 256,
+              "confidential": true,
+              "kind": "Map",
+              "name": "balances"
+            },
+            {
+              "backend": "full_scan",
+              "capacity": null,
+              "confidential": true,
+              "kind": "Cell",
+              "name": "total"
+            }
+          ],
+          "trace_json_bytes": 1755750
         }
       ]
     },
@@ -719,6 +793,15 @@
           "formula_exact": true,
           "gas_used": 3588,
           "manifest_public_gas_budget": 3588
+        },
+        {
+          "backend": "oram_private_posmap",
+          "cost_formula": "modeled_static_budget",
+          "cost_model": "uo-modeled-resource-cost-v1",
+          "entrypoint": "withdraw(bytes32,uint256)",
+          "formula_exact": true,
+          "gas_used": 41346,
+          "manifest_public_gas_budget": 41346
         }
       ],
       "ct_gas_only": {
@@ -782,6 +865,20 @@
       },
       "oram_improves_physical_writes": true,
       "oram_improves_physical_writes_baseline": "full_scan_64",
+      "oram_private_posmap": {
+        "bytes_read": 589158.0,
+        "bytes_read_with_call_start": 627234.0,
+        "bytes_written": 589034.0,
+        "call_start_bytes": 38076.0,
+        "call_start_reads": 21,
+        "executable": true,
+        "gas_used": 41346,
+        "physical_reads": 492,
+        "physical_reads_with_call_start": 513,
+        "physical_writes": 491,
+        "rejected": false,
+        "trace_json_bytes": 1755702
+      },
       "raw": {
         "error": "raw confidential backends are rejected in proof-grade builds; this feature build emits the executable raw_insecure_eval control separately",
         "executable": false,
@@ -1023,6 +1120,57 @@
             }
           ],
           "trace_json_bytes": 101477
+        },
+        {
+          "artifact_json_bytes": 16551,
+          "backend": "oram_private_posmap",
+          "benchmark": "ConfidentialMixer/withdraw",
+          "bytes_read": 589158.0,
+          "bytes_read_with_call_start": 627234.0,
+          "bytes_written": 589034.0,
+          "call_start_bytes": 38076.0,
+          "call_start_reads": 21,
+          "capacity": "256",
+          "entrypoint": "withdraw(bytes32,uint256)",
+          "entrypoint_resource_bounds": {
+            "max_commit_ops": 1351,
+            "oram_bounds": [
+              {
+                "accesses": 45,
+                "buckets_per_access": 9,
+                "capacity": 256,
+                "commit_ops_for_entrypoint": 1350,
+                "commit_ops_per_access": 30,
+                "metadata_pages": 20,
+                "metadata_pages_per_access": 21,
+                "scheme": "path_oram_private_posmap_v1"
+              }
+            ],
+            "signature": "withdraw(bytes32,uint256)"
+          },
+          "executable": true,
+          "gas_used": 41346,
+          "physical_reads": 492,
+          "physical_reads_with_call_start": 513,
+          "physical_writes": 491,
+          "rejected": false,
+          "state_objects": [
+            {
+              "backend": "oram",
+              "capacity": 256,
+              "confidential": true,
+              "kind": "Map",
+              "name": "balances"
+            },
+            {
+              "backend": "full_scan",
+              "capacity": null,
+              "confidential": true,
+              "kind": "Cell",
+              "name": "total"
+            }
+          ],
+          "trace_json_bytes": 1755702
         }
       ]
     },
@@ -1730,7 +1878,7 @@
     "public_runtime_formula": "logical_reads*3 + logical_writes*5 + physical_writes*17"
   },
   "coverage": {
-    "matrix_row_count": 32,
+    "matrix_row_count": 34,
     "metrics": [
       "gas_used",
       "physical_reads",
@@ -2221,6 +2369,57 @@
       "trace_json_bytes": 101434
     },
     {
+      "artifact_json_bytes": 16551,
+      "backend": "oram_private_posmap",
+      "benchmark": "ConfidentialMixer/deposit",
+      "bytes_read": 589158.0,
+      "bytes_read_with_call_start": 627234.0,
+      "bytes_written": 589034.0,
+      "call_start_bytes": 38076.0,
+      "call_start_reads": 21,
+      "capacity": "256",
+      "entrypoint": "deposit(bytes32,uint256)",
+      "entrypoint_resource_bounds": {
+        "max_commit_ops": 1351,
+        "oram_bounds": [
+          {
+            "accesses": 45,
+            "buckets_per_access": 9,
+            "capacity": 256,
+            "commit_ops_for_entrypoint": 1350,
+            "commit_ops_per_access": 30,
+            "metadata_pages": 20,
+            "metadata_pages_per_access": 21,
+            "scheme": "path_oram_private_posmap_v1"
+          }
+        ],
+        "signature": "deposit(bytes32,uint256)"
+      },
+      "executable": true,
+      "gas_used": 41289,
+      "physical_reads": 492,
+      "physical_reads_with_call_start": 513,
+      "physical_writes": 491,
+      "rejected": false,
+      "state_objects": [
+        {
+          "backend": "oram",
+          "capacity": 256,
+          "confidential": true,
+          "kind": "Map",
+          "name": "balances"
+        },
+        {
+          "backend": "full_scan",
+          "capacity": null,
+          "confidential": true,
+          "kind": "Cell",
+          "name": "total"
+        }
+      ],
+      "trace_json_bytes": 1755750
+    },
+    {
       "artifact_json_bytes": 6530,
       "backend": "raw",
       "benchmark": "ConfidentialMixer/withdraw",
@@ -2445,6 +2644,57 @@
         }
       ],
       "trace_json_bytes": 101477
+    },
+    {
+      "artifact_json_bytes": 16551,
+      "backend": "oram_private_posmap",
+      "benchmark": "ConfidentialMixer/withdraw",
+      "bytes_read": 589158.0,
+      "bytes_read_with_call_start": 627234.0,
+      "bytes_written": 589034.0,
+      "call_start_bytes": 38076.0,
+      "call_start_reads": 21,
+      "capacity": "256",
+      "entrypoint": "withdraw(bytes32,uint256)",
+      "entrypoint_resource_bounds": {
+        "max_commit_ops": 1351,
+        "oram_bounds": [
+          {
+            "accesses": 45,
+            "buckets_per_access": 9,
+            "capacity": 256,
+            "commit_ops_for_entrypoint": 1350,
+            "commit_ops_per_access": 30,
+            "metadata_pages": 20,
+            "metadata_pages_per_access": 21,
+            "scheme": "path_oram_private_posmap_v1"
+          }
+        ],
+        "signature": "withdraw(bytes32,uint256)"
+      },
+      "executable": true,
+      "gas_used": 41346,
+      "physical_reads": 492,
+      "physical_reads_with_call_start": 513,
+      "physical_writes": 491,
+      "rejected": false,
+      "state_objects": [
+        {
+          "backend": "oram",
+          "capacity": 256,
+          "confidential": true,
+          "kind": "Map",
+          "name": "balances"
+        },
+        {
+          "backend": "full_scan",
+          "capacity": null,
+          "confidential": true,
+          "kind": "Cell",
+          "name": "total"
+        }
+      ],
+      "trace_json_bytes": 1755702
     },
     {
       "artifact_json_bytes": 10549,
