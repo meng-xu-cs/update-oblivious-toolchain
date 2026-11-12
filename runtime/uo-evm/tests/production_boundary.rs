@@ -93,11 +93,11 @@ fn public_evidence(
     }
 }
 
-/// A production deployment draws its seed from the OS, and the seed is also
-/// its freshness epoch. A call whose evidence guesses the epoch wrong is
-/// rejected with an error that names the field and carries no value.
+/// A production deployment draws its freshness epoch from the OS. A call
+/// whose evidence guesses the epoch wrong is rejected with an error that
+/// names the field and carries no value of the runtime's.
 #[test]
-fn a_rejected_production_call_does_not_return_the_deployment_seed() {
+fn a_rejected_production_call_returns_no_runtime_value() {
     let artifact = single_access_map();
     let policy = policy();
     let session = session();

@@ -30,13 +30,13 @@
       "paper_main_family_accepted": true,
       "paper_main_family_boundary_accepted": true,
       "paper_main_family_boundary_lean_stdout": "validated proof-grade seeded runtime paper-main family boundary and confinement route for put(bytes32,uint256) with 8 seeds",
-      "paper_main_family_bundle_json_bytes": 99762,
+      "paper_main_family_bundle_json_bytes": 99768,
       "paper_main_family_lean_stdout": "validated proof-grade seeded runtime paper-main family bundle for put(bytes32,uint256) with 8 seeds",
       "paper_main_lean_checker_input": "paper-main family bundle",
       "paper_main_slot_boundary_accepted": true,
       "paper_main_slot_boundary_lean_stdout": "validated proof-grade seeded runtime paper-main slot boundary and confinement route for put(bytes32,uint256) with 8 seeds",
       "paper_main_slot_family_accepted": true,
-      "paper_main_slot_family_bundle_json_bytes": 100087,
+      "paper_main_slot_family_bundle_json_bytes": 100093,
       "paper_main_slot_family_lean_stdout": "validated proof-grade seeded runtime paper-main slot family bundle for put(bytes32,uint256) with 8 seeds",
       "paper_main_slot_lean_checker_input": "paper-main slot family bundle",
       "paper_main_slot_opcode_trace_len": 1,
@@ -52,7 +52,7 @@
       "scenario": "SingleAccessMap/pathoram/put-seeded",
       "seed_count": 8,
       "setup_calls": 0,
-      "witness_family_json_bytes": 99085
+      "witness_family_json_bytes": 99091
     },
     {
       "accepted": true,
@@ -71,13 +71,13 @@
       "paper_main_family_accepted": true,
       "paper_main_family_boundary_accepted": true,
       "paper_main_family_boundary_lean_stdout": "validated proof-grade seeded runtime paper-main family boundary and confinement route for add(bytes32,uint256) with 8 seeds",
-      "paper_main_family_bundle_json_bytes": 157217,
+      "paper_main_family_bundle_json_bytes": 157213,
       "paper_main_family_lean_stdout": "validated proof-grade seeded runtime paper-main family bundle for add(bytes32,uint256) with 8 seeds",
       "paper_main_lean_checker_input": "paper-main family bundle",
       "paper_main_slot_boundary_accepted": true,
       "paper_main_slot_boundary_lean_stdout": "validated proof-grade seeded runtime paper-main slot boundary and confinement route for add(bytes32,uint256) with 8 seeds",
       "paper_main_slot_family_accepted": true,
-      "paper_main_slot_family_bundle_json_bytes": 157718,
+      "paper_main_slot_family_bundle_json_bytes": 157714,
       "paper_main_slot_family_lean_stdout": "validated proof-grade seeded runtime paper-main slot family bundle for add(bytes32,uint256) with 8 seeds",
       "paper_main_slot_lean_checker_input": "paper-main slot family bundle",
       "paper_main_slot_opcode_trace_len": 2,
@@ -93,7 +93,7 @@
       "scenario": "SingleAccessMap/pathoram/add-seeded",
       "seed_count": 8,
       "setup_calls": 0,
-      "witness_family_json_bytes": 156393
+      "witness_family_json_bytes": 156389
     },
     {
       "accepted": true,
@@ -112,13 +112,13 @@
       "paper_main_family_accepted": true,
       "paper_main_family_boundary_accepted": true,
       "paper_main_family_boundary_lean_stdout": "validated proof-grade seeded runtime paper-main family boundary and confinement route for deposit(bytes32,uint256) with 4 seeds",
-      "paper_main_family_bundle_json_bytes": 176791,
+      "paper_main_family_bundle_json_bytes": 176794,
       "paper_main_family_lean_stdout": "validated proof-grade seeded runtime paper-main family bundle for deposit(bytes32,uint256) with 4 seeds",
       "paper_main_lean_checker_input": "paper-main family bundle",
       "paper_main_slot_boundary_accepted": true,
       "paper_main_slot_boundary_lean_stdout": "validated proof-grade seeded runtime paper-main slot boundary and confinement route for deposit(bytes32,uint256) with 4 seeds",
       "paper_main_slot_family_accepted": true,
-      "paper_main_slot_family_bundle_json_bytes": 177502,
+      "paper_main_slot_family_bundle_json_bytes": 177505,
       "paper_main_slot_family_lean_stdout": "validated proof-grade seeded runtime paper-main slot family bundle for deposit(bytes32,uint256) with 4 seeds",
       "paper_main_slot_lean_checker_input": "paper-main slot family bundle",
       "paper_main_slot_opcode_trace_len": 3,
@@ -134,7 +134,7 @@
       "scenario": "ConfidentialMixer/pathoram/deposit-seeded",
       "seed_count": 4,
       "setup_calls": 0,
-      "witness_family_json_bytes": 175955
+      "witness_family_json_bytes": 175958
     },
     {
       "accepted": true,
@@ -153,13 +153,13 @@
       "paper_main_family_accepted": true,
       "paper_main_family_boundary_accepted": true,
       "paper_main_family_boundary_lean_stdout": "validated proof-grade seeded runtime paper-main family boundary and confinement route for transferFrom(address,address,address,uint256) with 4 seeds",
-      "paper_main_family_bundle_json_bytes": 572907,
+      "paper_main_family_bundle_json_bytes": 572883,
       "paper_main_family_lean_stdout": "validated proof-grade seeded runtime paper-main family bundle for transferFrom(address,address,address,uint256) with 4 seeds",
       "paper_main_lean_checker_input": "paper-main family bundle",
       "paper_main_slot_boundary_accepted": true,
       "paper_main_slot_boundary_lean_stdout": "validated proof-grade seeded runtime paper-main slot boundary and confinement route for transferFrom(address,address,address,uint256) with 4 seeds",
       "paper_main_slot_family_accepted": true,
-      "paper_main_slot_family_bundle_json_bytes": 574587,
+      "paper_main_slot_family_bundle_json_bytes": 574563,
       "paper_main_slot_family_lean_stdout": "validated proof-grade seeded runtime paper-main slot family bundle for transferFrom(address,address,address,uint256) with 4 seeds",
       "paper_main_slot_lean_checker_input": "paper-main slot family bundle",
       "paper_main_slot_opcode_trace_len": 9,
@@ -175,7 +175,7 @@
       "scenario": "ERC20Lite/pathoram/transferFrom-seeded",
       "seed_count": 4,
       "setup_calls": 2,
-      "witness_family_json_bytes": 571408
+      "witness_family_json_bytes": 571384
     }
   ]
 }

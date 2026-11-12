@@ -1633,6 +1633,7 @@
     }
   ],
   "runtime_secret_state_inventory_complete": true,
+  "runtime_secrets_derive_from_the_master_secret": true,
   "runtime_state_surface_checks": [
     {
       "expected_files": [
@@ -1771,6 +1772,7 @@
   "runtime_trusted_kernel_bundle_nonclone": true,
   "runtime_trusted_kernel_slot_rechecks_statement_trace": true,
   "runtime_vec_u8_field_lines": [],
+  "seal_nonces_come_from_the_seal_count": true,
   "seeded_runtime_paper_main_family_bundle_api_is_explicit": true,
   "seeded_runtime_paper_main_family_bundle_fields_private": true,
   "seeded_runtime_paper_main_slot_family_bundle_api_is_explicit": true,

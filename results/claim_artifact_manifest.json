@@ -152,6 +152,16 @@
       "ok": true
     },
     {
+      "detail": "doc_anchor \"Runtime key derivation\" for assumption-runtime-key-derivation appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:assumption-runtime-key-derivation",
+      "ok": true
+    },
+    {
+      "detail": "assumption-runtime-key-derivation declares an allowed status (trusted)",
+      "name": "status-allowed:assumption-runtime-key-derivation",
+      "ok": true
+    },
+    {
       "detail": "doc_anchor \"TEE deployment assumptions\" for assumption-tee-deployment appears in docs/claim-boundary.md",
       "name": "anchor-in-doc:assumption-tee-deployment",
       "ok": true
@@ -347,6 +357,11 @@
       "ok": true
     },
     {
+      "detail": "assumption-table row \"Runtime key derivation\" is covered by the manifest",
+      "name": "assumption-covered:Runtime key derivation",
+      "ok": true
+    },
+    {
       "detail": "assumption-table row \"TEE deployment assumptions\" is covered by the manifest",
       "name": "assumption-covered:TEE deployment assumptions",
       "ok": true
@@ -442,7 +457,7 @@
       "ok": true
     },
     {
-      "detail": "6 manifest entries in category assumption",
+      "detail": "7 manifest entries in category assumption",
       "name": "category-present:assumption",
       "ok": true
     },
@@ -769,6 +784,21 @@
     {
       "detail": "artifact runtime/uo-evm/src/controller.rs referenced by assumption-stash-overflow-bounded exists",
       "name": "file-exists:assumption-stash-overflow-bounded:runtime/uo-evm/src/controller.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact runtime/uo-evm/src/secret.rs referenced by assumption-runtime-key-derivation exists",
+      "name": "file-exists:assumption-runtime-key-derivation:runtime/uo-evm/src/secret.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact runtime/uo-evm/src/secret.rs referenced by assumption-runtime-key-derivation exists",
+      "name": "file-exists:assumption-runtime-key-derivation:runtime/uo-evm/src/secret.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact runtime/uo-evm/src/engine.rs referenced by assumption-runtime-key-derivation exists",
+      "name": "file-exists:assumption-runtime-key-derivation:runtime/uo-evm/src/engine.rs",
       "ok": true
     },
     {
@@ -1248,6 +1278,25 @@
     },
     {
       "benchmark_result_files": [
+        "results/runtime_boundary_validation.json"
+      ],
+      "category": "assumption",
+      "doc_anchor": "Runtime key derivation",
+      "id": "assumption-runtime-key-derivation",
+      "lean_modules": [],
+      "runtime_compiler_files": [
+        "runtime/uo-evm/src/secret.rs",
+        "runtime/uo-evm/src/engine.rs"
+      ],
+      "source_files": [
+        "runtime/uo-evm/src/secret.rs"
+      ],
+      "status": "trusted",
+      "text": "Runtime key derivation: each object's storage key, initial placement and Path ORAM leaf coins derive from a 256-bit master secret from the OS by HKDF-SHA256, one label per use, and the ChaCha20 generator; trusted and not modeled in Lean, with the derivation's call sites pinned by the runtime boundary validation.",
+      "validation_command": "cargo run -q -p mplus-probe -- --only runtime-boundary-validation --out-dir results"
+    },
+    {
+      "benchmark_result_files": [
         "results/lean_assumption_budget.json"
       ],
       "category": "assumption",
@@ -1541,7 +1590,7 @@
       "validation_command": "cargo run -q -p mplus-probe -- --only acceptance-check --out-dir results"
     }
   ],
-  "entry_count": 33,
+  "entry_count": 34,
   "schema": "uo.claim_artifact_manifest.v1",
   "source_of_truth": "docs/claim-boundary.md"
 }

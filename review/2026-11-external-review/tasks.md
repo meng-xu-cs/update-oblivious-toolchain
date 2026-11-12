@@ -168,13 +168,20 @@ at `2^40`. In a lifetime bound this term is far larger than the stash's.
    leaf-coin key (in place of `leaf_coin_seed: u64`). No production path
    uses `seed_from_u64` for key material.
 3. Draw the freshness epoch independently. It is public.
-4. Make nonces unique by construction. A record's nonce is an injective
-   encoding of its location and of a write counter in committed state: not
-   random bits, and not a hash of the two, which would collide like random
-   bits. It then cannot repeat and cannot rewind. The invariant: of the
-   ciphertexts that leave the runtime, no two under one key share a nonce.
-   The counter is a function of the public write schedule, so it reveals
-   nothing more.
+4. Make nonces unique by construction. A record's nonce is the count of
+   the seals made under its key before it, as bytes: not random bits, and
+   not a hash of a counter, which would collide like random bits. The count
+   is kept with the key, and every copy of the cipher shares it, so a staged
+   call counts in the committed state's sequence and dropping the call
+   cannot rewind it. The invariant: no two records sealed under one key
+   share a nonce. After deployment every seal is one recorded storage write,
+   so on an error-free run the count is a function of the storage trace and
+   reveals nothing more.
+
+   The first draft of this item kept the counter in committed state. A
+   dropped call would then have used its nonces again, which the second
+   acceptance criterion rules out. What the count shows after a call is
+   dropped on an error is Issue 52.
 5. Update `crates/uo-core/src/observer_coverage.rs`, the lists in
    `proof/lean/UOToolchain/ObserverCoverage.lean`, and
    `docs/runtime/secret-state.md`. Add the derivation function's assumption
@@ -853,3 +860,46 @@ Source: F5 (§6). Size: L. Deferred.
 
 The Lean target is `VersionedSoliditySemanticsBridge`. It helps adoption and
 changes no current claim.
+
+### Issue 51 — Remove the generator that a seal no longer reads
+
+Source: Issue 24. Size: S to M. Depends on: Issue 24.
+
+Every seal still takes a `ChaCha20Rng`, from when it drew the nonce:
+`seal_and_wipe_into_slice`, `seal_and_wipe_boxed`, `filler_boxed` and the
+helpers above them. Nothing reads it now. `seal_and_wipe_into_slice`
+discards it, and `UoObjectStore::preinitialized` still seeds one from a
+constant only to pass it down
+(`runtime/uo-store/src/generated_store_helpers.rs`). Each runtime object
+also keeps its generator after deployment for the same reason.
+
+Remove the parameter from the generated store surface, the store and object
+helpers and the ORAM codecs, with their Lean generators and source pins. An
+object then holds a generator only while it is deployed.
+
+Acceptance: no seal takes a generator, no object keeps one after
+deployment, and the reports regenerate with only their source identities
+changed.
+
+### Issue 52 — Make the seal count of a dropped call a function of its entrypoint
+
+Source: Issue 24. Size: M. Depends on: Issue 24.
+
+A call that stops on an evaluation error is dropped, but the records it
+sealed stay counted. The next record's nonce then shows how many records the
+dropped call had sealed under each key, which is how far it got. A call that
+is dropped after it ran to its end, on a failed production check for
+example, sealed its whole schedule, which is public.
+
+In an admitted program an evaluation error comes from tampered storage, an
+exhausted budget or counter, or a bug. That none of these depends on a
+secret is an observation about the present runtime, not a checked property,
+and evaluation errors are outside the trace claims.
+
+Either advance each key's count, when a staged call is dropped, to what the
+call's static schedule would have reached, so that the gap depends on the
+entrypoint alone; or show that no evaluation error of an admitted program
+depends on a secret.
+
+Acceptance: a test drops a call at two different points and reads the same
+nonces out of the next call's records.

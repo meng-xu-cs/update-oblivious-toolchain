@@ -6,8 +6,8 @@ mod generated_surface;
 pub use generated_surface::StoreCipher;
 
 use generated_codec::{
-    decode_nonzero_into, sealed_encoded_len as generated_sealed_encoded_len, write_nonzero_encoded,
-    SEALED_MAGIC, SEALED_NONCE_BYTES, SEALED_TAG_BYTES,
+    decode_nonzero_into, seal_nonce, sealed_encoded_len as generated_sealed_encoded_len,
+    write_nonzero_encoded, SEALED_MAGIC, SEALED_NONCE_BYTES, SEALED_TAG_BYTES,
 };
 
 #[cfg(test)]
@@ -36,9 +36,124 @@ impl NonZeroCodec {
 
 #[cfg(test)]
 mod tests {
-    use super::{generated_sealed_encoded_len, NonZeroCodec, StoreCipher};
+    use super::{
+        generated_sealed_encoded_len, seal_nonce, NonZeroCodec, StoreCipher, SEALED_MAGIC,
+        SEALED_NONCE_BYTES, SEALED_TAG_BYTES,
+    };
     use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
+    use std::collections::BTreeSet;
+
+    /// Seal `payload` and return the nonce the sealed record carries.
+    fn sealed_nonce(cipher: &StoreCipher, rng_seed: u64, payload: &[u8]) -> Vec<u8> {
+        let mut rng = ChaCha20Rng::seed_from_u64(rng_seed);
+        let mut payload_for_seal = payload.to_vec();
+        let encoded = cipher
+            .seal_and_wipe_boxed(b"object:slot", &mut payload_for_seal, &mut rng)
+            .unwrap();
+        let sealed_len = SEALED_MAGIC.len() + SEALED_NONCE_BYTES + payload.len() + SEALED_TAG_BYTES;
+        let sealed = NonZeroCodec::decode_bytes(sealed_len, &encoded).unwrap();
+        sealed[SEALED_MAGIC.len()..SEALED_MAGIC.len() + SEALED_NONCE_BYTES].to_vec()
+    }
+
+    /// The Lean model `sealNonce` and its example: four zero bytes, then the
+    /// counter, most significant byte first.
+    #[test]
+    fn seal_nonce_is_the_big_endian_counter() {
+        assert_eq!(seal_nonce(258), [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2]);
+        for counter in [0, 1, 255, 256, 258, 1 << 32, u64::MAX - 1, u64::MAX] {
+            let nonce = seal_nonce(counter);
+            assert_eq!(nonce.len(), SEALED_NONCE_BYTES);
+            assert_eq!(nonce[..4], [0u8; 4]);
+            assert_eq!(nonce[4..], counter.to_be_bytes());
+        }
+    }
+
+    #[test]
+    fn seal_nonces_of_different_counters_differ() {
+        let mut counters: Vec<u64> = (0..4096).collect();
+        for bit in 0..64 {
+            counters.push(1u64 << bit);
+            counters.push(u64::MAX ^ (1u64 << bit));
+        }
+        counters.push(u64::MAX);
+        let distinct_counters: BTreeSet<u64> = counters.iter().copied().collect();
+        let distinct_nonces: BTreeSet<[u8; SEALED_NONCE_BYTES]> =
+            distinct_counters.iter().map(|c| seal_nonce(*c)).collect();
+        assert_eq!(distinct_nonces.len(), distinct_counters.len());
+    }
+
+    /// A seal's nonce is the count of the seals under the key so far. The
+    /// payload and the generator passed to the seal do not choose it.
+    #[test]
+    fn each_seal_under_a_key_carries_the_next_counter() {
+        let cipher = StoreCipher::random();
+        assert_eq!(sealed_nonce(&cipher, 11, &[1, 2, 3]), seal_nonce(0));
+        assert_eq!(sealed_nonce(&cipher, 11, &[1, 2, 3]), seal_nonce(1));
+        assert_eq!(sealed_nonce(&cipher, 97, &[]), seal_nonce(2));
+        let mut rng = ChaCha20Rng::seed_from_u64(11);
+        cipher.filler_boxed(b"object:slot", 8, &mut rng).unwrap();
+        assert_eq!(sealed_nonce(&cipher, 11, &[9; 40]), seal_nonce(4));
+    }
+
+    /// A copy of the cipher shares its seal count. A staged call seals with
+    /// copies; dropping it does not give its nonces back.
+    #[test]
+    fn a_dropped_copy_of_the_cipher_does_not_return_its_nonces() {
+        let committed = StoreCipher::random();
+        assert_eq!(sealed_nonce(&committed, 1, &[7]), seal_nonce(0));
+        let staged = committed.clone_for_runtime_state();
+        assert_eq!(staged, committed);
+        let nested = staged.clone_for_runtime_state();
+        assert_eq!(sealed_nonce(&staged, 1, &[8]), seal_nonce(1));
+        assert_eq!(sealed_nonce(&nested, 1, &[8]), seal_nonce(2));
+        drop(nested);
+        drop(staged);
+        assert_eq!(sealed_nonce(&committed, 1, &[8]), seal_nonce(3));
+    }
+
+    /// Two keys count their seals separately.
+    #[test]
+    fn each_key_has_its_own_seal_count() {
+        let lhs = StoreCipher::random();
+        let rhs = StoreCipher::random();
+        assert_ne!(lhs, rhs);
+        assert_eq!(sealed_nonce(&lhs, 1, &[7]), seal_nonce(0));
+        assert_eq!(sealed_nonce(&lhs, 1, &[7]), seal_nonce(1));
+        assert_eq!(sealed_nonce(&rhs, 1, &[7]), seal_nonce(0));
+    }
+
+    /// The last counter is never handed out: once the count cannot grow, a
+    /// seal fails and writes nothing, and it keeps failing.
+    #[test]
+    fn a_seal_fails_once_the_seal_count_is_exhausted() {
+        let cipher = StoreCipher::random();
+        cipher.set_seal_count_for_test(u64::MAX - 1);
+        assert_eq!(sealed_nonce(&cipher, 1, &[7]), seal_nonce(u64::MAX - 1));
+        let mut rng = ChaCha20Rng::seed_from_u64(1);
+        for _ in 0..2 {
+            let mut payload = vec![5u8, 6u8];
+            let mut encoded = vec![0u8; generated_sealed_encoded_len(payload.len())];
+            assert!(!cipher.seal_and_wipe_into_slice(
+                b"object:slot",
+                &mut payload,
+                &mut rng,
+                &mut encoded,
+            ));
+            assert_eq!(payload, vec![0u8; 2]);
+            assert_eq!(encoded, vec![0u8; generated_sealed_encoded_len(2)]);
+            let mut payload = vec![5u8, 6u8];
+            assert!(cipher
+                .seal_and_wipe_boxed(b"object:slot", &mut payload, &mut rng)
+                .is_err());
+            assert!(cipher.filler_boxed(b"object:slot", 2, &mut rng).is_err());
+        }
+        let copy = cipher.clone_for_runtime_state();
+        let mut payload = vec![5u8, 6u8];
+        assert!(copy
+            .seal_and_wipe_boxed(b"object:slot", &mut payload, &mut rng)
+            .is_err());
+    }
 
     #[test]
     fn nonzero_transport_records_are_always_nonzero() {

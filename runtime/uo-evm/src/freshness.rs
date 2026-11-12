@@ -4,11 +4,12 @@ use rand::RngCore;
 use sha2::{Digest, Sha256};
 use uo_core::ReturnChannelPublicBinding;
 
+// The Path ORAM leaf coins derive from the runtime's secrets. The generated
+// ORAM codecs import them from here.
+pub(crate) use crate::secret::{derive_path_oram_leaf, PathOramLeafSeed};
+
 const RUNTIME_FRESHNESS_DOMAIN: &[u8] = b"uo-runtime-freshness-v1";
 const RETURN_NONCE_DOMAIN: &[u8] = b"return-channel-nonce";
-const OBJECT_SEED_DOMAIN: &[u8] = b"runtime-object-seed";
-const PATH_ORAM_LEAF_SEED_DOMAIN: &[u8] = b"path-oram-leaf-seed";
-const PATH_ORAM_LEAF_DOMAIN: &[u8] = b"path-oram-leaf-coin";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct RuntimeCallFreshness {
@@ -124,56 +125,6 @@ impl RuntimeCallFreshness {
     }
 }
 
-pub(crate) fn derive_runtime_object_seed(epoch: u64, object_id: u32, object_name: &str) -> u64 {
-    digest_u64(&[
-        OBJECT_SEED_DOMAIN,
-        &epoch.to_be_bytes(),
-        &object_id.to_be_bytes(),
-        object_name.as_bytes(),
-    ])
-}
-
-pub(crate) fn derive_path_oram_leaf_seed(
-    object_seed: u64,
-    object_id: u32,
-    object_name: &str,
-) -> u64 {
-    digest_u64(&[
-        PATH_ORAM_LEAF_SEED_DOMAIN,
-        &object_seed.to_be_bytes(),
-        &object_id.to_be_bytes(),
-        object_name.as_bytes(),
-    ])
-}
-
-pub(crate) fn derive_path_oram_leaf(
-    leaf_seed: u64,
-    object_id: u32,
-    object_name: &str,
-    access_counter: u64,
-    coin_counter: u64,
-    leaf_count: usize,
-) -> usize {
-    let digest = freshness_digest(&[
-        PATH_ORAM_LEAF_DOMAIN,
-        &leaf_seed.to_be_bytes(),
-        &object_id.to_be_bytes(),
-        object_name.as_bytes(),
-        &access_counter.to_be_bytes(),
-        &coin_counter.to_be_bytes(),
-    ]);
-    let mut value = [0u8; 8];
-    value.copy_from_slice(&digest[..8]);
-    (u64::from_be_bytes(value) as usize) % leaf_count.max(1)
-}
-
-fn digest_u64(parts: &[&[u8]]) -> u64 {
-    let digest = freshness_digest(parts);
-    let mut value = [0u8; 8];
-    value.copy_from_slice(&digest[..8]);
-    u64::from_be_bytes(value)
-}
-
 fn freshness_digest(parts: &[&[u8]]) -> [u8; 32] {
     let mut hasher = Sha256::new();
     hasher.update(RUNTIME_FRESHNESS_DOMAIN);
@@ -254,23 +205,6 @@ mod tests {
         };
         let err = RuntimeFreshnessState::recover(snapshot, 1).unwrap_err();
         assert!(err.to_string().contains("rollback counter mismatch"));
-    }
-
-    #[test]
-    fn path_oram_leaf_derivation_separates_object_and_access_domains() {
-        let seed = derive_path_oram_leaf_seed(23, 7, "records");
-        assert_ne!(
-            derive_path_oram_leaf(seed, 7, "records", 0, 0, 128),
-            derive_path_oram_leaf(seed, 8, "records", 0, 0, 128)
-        );
-        assert_ne!(
-            derive_path_oram_leaf(seed, 7, "records", 0, 0, 128),
-            derive_path_oram_leaf(seed, 7, "records", 1, 0, 128)
-        );
-        assert_ne!(
-            derive_path_oram_leaf(seed, 7, "records", 0, 0, 128),
-            derive_path_oram_leaf(seed, 7, "records", 0, 1, 128)
-        );
     }
 
     #[test]

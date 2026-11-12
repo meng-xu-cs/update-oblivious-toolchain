@@ -10,6 +10,17 @@ pub(super) fn sealed_encoded_len(payload_len: usize) -> usize {
     2 * (SEALED_MAGIC.len() + SEALED_NONCE_BYTES + payload_len + SEALED_TAG_BYTES)
 }
 
+/// The nonce of the `counter`-th seal under a key: four zero bytes, then the
+/// counter's eight bytes, most significant first. Distinct counters give
+/// distinct nonces.
+pub(super) fn seal_nonce(counter: u64) -> [u8; SEALED_NONCE_BYTES] {
+    let mut nonce = [0u8; SEALED_NONCE_BYTES];
+    for (target, byte) in nonce.iter_mut().skip(4).zip(counter.to_be_bytes().iter()) {
+        *target = *byte;
+    }
+    nonce
+}
+
 pub(super) fn write_nonzero_encoded(out: &mut [u8], cursor: &mut usize, bytes: &[u8]) -> bool {
     let Some(encoded_len) = bytes.len().checked_mul(2) else {
         return false;

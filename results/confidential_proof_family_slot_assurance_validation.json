@@ -4854,7 +4854,7 @@
         "secret_arg_count": 2,
         "statement_count": 1
       },
-      "confidential_proof_bundle_family_json_bytes": 159759,
+      "confidential_proof_bundle_family_json_bytes": 159696,
       "confidential_slot_program": {
         "entrypoint_id": "put(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -5337,7 +5337,7 @@
         "secret_arg_count": 2,
         "statement_count": 1
       },
-      "confidential_proof_bundle_family_json_bytes": 159759,
+      "confidential_proof_bundle_family_json_bytes": 159696,
       "confidential_slot_program": {
         "entrypoint_id": "put(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -5820,7 +5820,7 @@
         "secret_arg_count": 2,
         "statement_count": 2
       },
-      "confidential_proof_bundle_family_json_bytes": 248020,
+      "confidential_proof_bundle_family_json_bytes": 247957,
       "confidential_slot_program": {
         "entrypoint_id": "add(bytes32,uint256)",
         "expected_runtime_step_count": 5,
@@ -6510,7 +6510,7 @@
         "secret_arg_count": 2,
         "statement_count": 2
       },
-      "confidential_proof_bundle_family_json_bytes": 248020,
+      "confidential_proof_bundle_family_json_bytes": 247957,
       "confidential_slot_program": {
         "entrypoint_id": "add(bytes32,uint256)",
         "expected_runtime_step_count": 5,
@@ -7200,7 +7200,7 @@
         "secret_arg_count": 2,
         "statement_count": 3
       },
-      "confidential_proof_bundle_family_json_bytes": 531349,
+      "confidential_proof_bundle_family_json_bytes": 531376,
       "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
@@ -8494,7 +8494,7 @@
         "secret_arg_count": 4,
         "statement_count": 9
       },
-      "confidential_proof_bundle_family_json_bytes": 1666574,
+      "confidential_proof_bundle_family_json_bytes": 1666655,
       "confidential_slot_program": {
         "entrypoint_id": "transferFrom(address,address,address,uint256)",
         "expected_runtime_step_count": 9,

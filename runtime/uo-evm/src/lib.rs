@@ -14,6 +14,7 @@ mod instrumentation;
 mod oram;
 mod return_channel;
 mod runtime;
+mod secret;
 
 pub use deployment::{
     production_build_profile_sha256, production_proof_bundle_sha256,
@@ -944,8 +945,8 @@ bounds:
         let after = &witness.oram_position_map_after()[0].leaves[transition.slot_index.value];
         assert!(after.present);
         assert_eq!(after.value, transition.next_leaf.value);
-        // With this deploy seed the fresh leaf differs from the prior one, so
-        // the next access to the key reads a different path.
+        // With this deployment's seed the fresh leaf differs from the prior
+        // one, so the next access to the key reads a different path.
         assert_ne!(transition.next_leaf.value, transition.prior_leaf.value);
         let read = instance.call("read(bytes32)", vec![key]).unwrap();
         assert_eq!(read.return_value, Some(Value::uint(5)));

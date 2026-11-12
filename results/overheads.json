@@ -428,7 +428,7 @@
         "physical_reads_with_call_start": 67,
         "physical_writes": 49,
         "rejected": false,
-        "trace_json_bytes": 101428
+        "trace_json_bytes": 101434
       },
       "oram_64": {
         "bytes_read": 56644.0,
@@ -442,7 +442,7 @@
         "physical_reads_with_call_start": 67,
         "physical_writes": 49,
         "rejected": false,
-        "trace_json_bytes": 101428
+        "trace_json_bytes": 101434
       },
       "oram_improves_physical_writes": true,
       "oram_improves_physical_writes_baseline": "full_scan_64",
@@ -686,7 +686,7 @@
               "name": "total"
             }
           ],
-          "trace_json_bytes": 101428
+          "trace_json_bytes": 101434
         }
       ]
     },
@@ -764,7 +764,7 @@
         "physical_reads_with_call_start": 67,
         "physical_writes": 49,
         "rejected": false,
-        "trace_json_bytes": 101491
+        "trace_json_bytes": 101477
       },
       "oram_64": {
         "bytes_read": 56644.0,
@@ -778,7 +778,7 @@
         "physical_reads_with_call_start": 67,
         "physical_writes": 49,
         "rejected": false,
-        "trace_json_bytes": 101491
+        "trace_json_bytes": 101477
       },
       "oram_improves_physical_writes": true,
       "oram_improves_physical_writes_baseline": "full_scan_64",
@@ -1022,7 +1022,7 @@
               "name": "total"
             }
           ],
-          "trace_json_bytes": 101491
+          "trace_json_bytes": 101477
         }
       ]
     },
@@ -1108,7 +1108,7 @@
         "physical_reads_with_call_start": 225,
         "physical_writes": 176,
         "rejected": false,
-        "trace_json_bytes": 326568
+        "trace_json_bytes": 326586
       },
       "oram_improves_physical_writes": false,
       "oram_improves_physical_writes_baseline": "full_scan",
@@ -1124,7 +1124,7 @@
         "physical_reads_with_call_start": 1113,
         "physical_writes": 1060,
         "rejected": false,
-        "trace_json_bytes": 3611218
+        "trace_json_bytes": 3611226
       },
       "oram_private_posmap_16384": {
         "bytes_read": 2896532.0,
@@ -1138,7 +1138,7 @@
         "physical_reads_with_call_start": 2692,
         "physical_writes": 2636,
         "rejected": false,
-        "trace_json_bytes": 9815958
+        "trace_json_bytes": 9815982
       },
       "oram_private_posmap_4096": {
         "bytes_read": 2182316.0,
@@ -1152,7 +1152,7 @@
         "physical_reads_with_call_start": 2043,
         "physical_writes": 1988,
         "rejected": false,
-        "trace_json_bytes": 6590368
+        "trace_json_bytes": 6590190
       },
       "raw": {
         "error": "raw confidential backends are rejected in proof-grade builds; this feature build emits the executable raw_insecure_eval control separately",
@@ -1368,7 +1368,7 @@
               "name": "balances"
             }
           ],
-          "trace_json_bytes": 326568
+          "trace_json_bytes": 326586
         },
         {
           "artifact_json_bytes": 30573,
@@ -1429,7 +1429,7 @@
               "name": "balances"
             }
           ],
-          "trace_json_bytes": 3611218
+          "trace_json_bytes": 3611226
         },
         {
           "artifact_json_bytes": 30391,
@@ -1490,7 +1490,7 @@
               "name": "balances"
             }
           ],
-          "trace_json_bytes": 6590368
+          "trace_json_bytes": 6590190
         },
         {
           "artifact_json_bytes": 30394,
@@ -1551,7 +1551,7 @@
               "name": "balances"
             }
           ],
-          "trace_json_bytes": 9815958
+          "trace_json_bytes": 9815982
         }
       ]
     },
@@ -2218,7 +2218,7 @@
           "name": "total"
         }
       ],
-      "trace_json_bytes": 101428
+      "trace_json_bytes": 101434
     },
     {
       "artifact_json_bytes": 6530,
@@ -2444,7 +2444,7 @@
           "name": "total"
         }
       ],
-      "trace_json_bytes": 101491
+      "trace_json_bytes": 101477
     },
     {
       "artifact_json_bytes": 10549,
@@ -2644,7 +2644,7 @@
           "name": "balances"
         }
       ],
-      "trace_json_bytes": 326568
+      "trace_json_bytes": 326586
     },
     {
       "artifact_json_bytes": 30573,
@@ -2705,7 +2705,7 @@
           "name": "balances"
         }
       ],
-      "trace_json_bytes": 3611218
+      "trace_json_bytes": 3611226
     },
     {
       "artifact_json_bytes": 30391,
@@ -2766,7 +2766,7 @@
           "name": "balances"
         }
       ],
-      "trace_json_bytes": 6590368
+      "trace_json_bytes": 6590190
     },
     {
       "artifact_json_bytes": 30394,
@@ -2827,7 +2827,7 @@
           "name": "balances"
         }
       ],
-      "trace_json_bytes": 9815958
+      "trace_json_bytes": 9815982
     },
     {
       "artifact_json_bytes": 5475,

@@ -282,6 +282,22 @@ const CLAIM_ENTRIES: &[ClaimEntry] = &[
         validation_command: "scripts/lean_assumption_budget.sh",
     },
     ClaimEntry {
+        id: "assumption-runtime-key-derivation",
+        category: "assumption",
+        text: "Runtime key derivation: each object's storage key, initial placement and Path ORAM leaf coins derive from a 256-bit master secret from the OS by HKDF-SHA256, one label per use, and the ChaCha20 generator; trusted and not modeled in Lean, with the derivation's call sites pinned by the runtime boundary validation.",
+        status: STATUS_TRUSTED,
+        doc_anchor: "Runtime key derivation",
+        source_files: &["runtime/uo-evm/src/secret.rs"],
+        lean_modules: &[],
+        runtime_compiler_files: &[
+            "runtime/uo-evm/src/secret.rs",
+            "runtime/uo-evm/src/engine.rs",
+        ],
+        benchmark_result_files: &["results/runtime_boundary_validation.json"],
+        validation_command:
+            "cargo run -q -p mplus-probe -- --only runtime-boundary-validation --out-dir results",
+    },
+    ClaimEntry {
         id: "assumption-tee-deployment",
         category: "assumption",
         text: "TEE deployment assumptions: enclave memory confidentiality/integrity, attestation authenticity, rollback resistance, freshness, crash recovery, and patch-level trust; explicit Lean bundle SgxDeploymentAssumptions.",

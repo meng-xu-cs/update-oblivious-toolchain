@@ -411,14 +411,14 @@ pub const OBSERVER_FIELD_COVERAGE_OVERRIDES: &[ObserverFieldCoverageOverride] = 
         field: "runtime_seed",
         classification: ObserverCoverageClassification::CryptographicallyHidden,
         lean_anchor: "runtimeFreshnessDiscipline",
-        rationale: "seeded witness families are proof evidence for fresh-coin assumptions, not host-observable data",
+        rationale: "the replay tag of a seeded test or diagnostics deployment, absent from a production deployment; seeded witness families are proof evidence for fresh-coin assumptions, not host-observable data",
     },
     ObserverFieldCoverageOverride {
         schema: "ExecutionTrace",
         field: "runtime_seed",
         classification: ObserverCoverageClassification::CryptographicallyHidden,
         lean_anchor: "runtimeFreshnessDiscipline",
-        rationale: "runtime seed feeds fresh-coin proof families and is covered by the freshness discipline",
+        rationale: "the replay tag of a seeded test or diagnostics deployment, absent from a production deployment, whose keys derive from a master secret that no trace carries; it feeds fresh-coin proof families and is covered by the freshness discipline",
     },
     ObserverFieldCoverageOverride {
         schema: "ExecutionTrace",

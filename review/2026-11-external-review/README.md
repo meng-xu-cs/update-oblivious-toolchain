@@ -6,7 +6,7 @@ directory holds the response.
 | File | Content |
 | --- | --- |
 | [`validation.md`](./validation.md) | every factual claim of the review checked against the code, and a position on each recommendation |
-| [`tasks.md`](./tasks.md) | Issues 22 to 50: description, fix and acceptance criteria |
+| [`tasks.md`](./tasks.md) | Issues 22 to 52: description, fix and acceptance criteria |
 | this file | the positions in brief, the order of work, and the tracker |
 
 The review text is not in the repository; `validation.md` restates each
@@ -78,7 +78,7 @@ Issue 22 has the options and the reasoning.
 7. **Wave 6, evidence at a storage boundary** (Issues 41 and 42).
 
 The research issues (43 to 46) start once the issues they depend on are
-done. The backlog (47 to 50) is not scheduled.
+done. The backlog (47 to 52) is not scheduled.
 
 This differs from the review's sequence in two ways. The measurement work
 comes before the optimizations, not after. And incremental state is split:
@@ -89,8 +89,8 @@ its engineering part is Wave 4, its certified part is research.
 | Issue | Title | Wave | Size | Depends on | Status | Commit |
 | --- | --- | --- | --- | --- | --- | --- |
 | 22 | Decide the observer unit, the evidence boundary and the stash budget | 0 | S | maintainer | done | `58bce68` |
-| 23 | Stop returning the deployment seed to callers | 1 | S | | done | |
-| 24 | Give the runtime an independent 256-bit master secret | 1 | M | 23 | todo | |
+| 23 | Stop returning the deployment seed to callers | 1 | S | | done | `72d3bfb` |
+| 24 | Give the runtime an independent 256-bit master secret | 1 | M | 23 | done | |
 | 25 | Split a call's result into a public receipt and private evidence | 1 | M to L | 24 | todo | |
 | 26 | Have the runtime issue the proof binding | 1 | M | 25 | todo | |
 | 27 | Measure occupancy, executed workloads and every cost | 2 | M | | todo | |
@@ -117,6 +117,8 @@ its engineering part is Wave 4, its certified part is research.
 | 48 | Fuse scans and generalize the reuse analysis | backlog | M | 31, 32 | todo | |
 | 49 | Write the related-work boundary and add matched baselines | backlog | M | 27 | todo | |
 | 50 | Bridge a scoped subset to Solidity 0.8 semantics | backlog | L | | deferred | |
+| 51 | Remove the generator that a seal no longer reads | backlog | S to M | 24 | todo | |
+| 52 | Make the seal count of a dropped call a function of its entrypoint | backlog | M | 24 | todo | |
 
 Sizes are relative, not a schedule: S a day or less, M several days, L one
 to two weeks, R research with no fixed end.

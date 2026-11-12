@@ -10,8 +10,8 @@
     "metadata_canonicalization_sha256": "6c85bcbfe14c861c6b3c3d62aaa1cf2bcb813d64c7058d5319fba3706cd91c44",
     "compilation_mode": "uo",
     "compiler_version": "0.1.0",
-    "toolchain_manifest_sha256": "0e9a055c96a6ad5dc015f29a8189a8713db17c8b69ee21c26fab10ebbcec01ef",
-    "package_sha256": "8b71995fc121b2a4f1ae7310e5af806be6cf51c7e042ca887704b916f460041c"
+    "toolchain_manifest_sha256": "a33cda7db7e5202aea4b9dd30c50a65eb44c9d9e34961687a2238acaa7cf3cb4",
+    "package_sha256": "b11df77d89d2c25a808d9d089feb6e9531f8c31ba07db9372a31430d061f0698"
   },
   "contract": {
     "contract": "FixedSlotClassifier",

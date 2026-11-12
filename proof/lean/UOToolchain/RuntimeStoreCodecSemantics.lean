@@ -981,6 +981,243 @@ theorem uoStoreSlotAad_publicProjection
     uoStoreSlotAad objectA = uoStoreSlotAad objectB := by
   rw [hObject]
 
+/-! ## Seal nonces
+
+A record's nonce is the count of the seals made under its key before it:
+four zero bytes, then the count's eight bytes, most significant first. The
+Rust `seal_nonce` builds the same bytes and `StoreCipher::next_seal_nonce`
+hands out the counts. The theorems below are about this model. That the Rust
+function computes it is tested (`seal_nonce_is_the_big_endian_counter` in
+`runtime/uo-store/src/codec.rs`), not proved. -/
+
+/-- The `width` base-256 digits of `n`, most significant first. Digits above
+the width are dropped. -/
+def natToBytesBE : Nat → Nat → List Nat
+  | 0, _ => []
+  | width + 1, n => natToBytesBE width (n / 256) ++ [n % 256]
+
+/-- The number whose base-256 digits, most significant first, are `bytes`. -/
+def bytesToNatBE (bytes : List Nat) : Nat :=
+  bytes.foldl (fun acc byte => acc * 256 + byte) 0
+
+theorem natToBytesBE_length (width n : Nat) :
+    (natToBytesBE width n).length = width := by
+  induction width generalizing n with
+  | zero => rfl
+  | succ width ih => simp [natToBytesBE, ih]
+
+theorem natToBytesBE_validBytes (width n : Nat) :
+    ∀ byte, byte ∈ natToBytesBE width n → ValidByte byte := by
+  induction width generalizing n with
+  | zero =>
+    intro byte hMem
+    simp [natToBytesBE] at hMem
+  | succ width ih =>
+    intro byte hMem
+    simp only [natToBytesBE, List.mem_append, List.mem_singleton] at hMem
+    rcases hMem with hMem | hMem
+    · exact ih (n / 256) byte hMem
+    · subst hMem
+      unfold ValidByte
+      exact Nat.mod_lt n (by decide)
+
+/-- Reading the digits back gives the number, up to the width. -/
+theorem bytesToNatBE_natToBytesBE (width n : Nat) :
+    bytesToNatBE (natToBytesBE width n) = n % 256 ^ width := by
+  induction width generalizing n with
+  | zero => simp [natToBytesBE, bytesToNatBE, Nat.mod_one]
+  | succ width ih =>
+    have hPrefix := ih (n / 256)
+    unfold bytesToNatBE at hPrefix
+    simp only [natToBytesBE, bytesToNatBE, List.foldl_append, List.foldl_cons,
+      List.foldl_nil]
+    rw [hPrefix, Nat.pow_succ, Nat.mul_comm (256 ^ width) 256, Nat.mod_mul]
+    omega
+
+/-- Two numbers that fit the width and have the same digits are equal. -/
+theorem natToBytesBE_injective
+    {width a b : Nat}
+    (hA : a < 256 ^ width)
+    (hB : b < 256 ^ width)
+    (hEq : natToBytesBE width a = natToBytesBE width b) :
+    a = b := by
+  have hRead := congrArg bytesToNatBE hEq
+  rw [bytesToNatBE_natToBytesBE, bytesToNatBE_natToBytesBE,
+    Nat.mod_eq_of_lt hA, Nat.mod_eq_of_lt hB] at hRead
+  exact hRead
+
+/-- The zero bytes ahead of the count in a nonce. -/
+def sealNoncePrefixBytes : Nat := 4
+
+/-- The bytes of the count in a nonce: a Rust `u64`. -/
+def sealCounterBytes : Nat := 8
+
+/-- One more than the largest count a nonce can carry: `2 ^ 64`. -/
+def sealCounterLimit : Nat := 256 ^ sealCounterBytes
+
+/-- The nonce of the seal numbered `counter` under a key. -/
+def sealNonce (counter : Nat) : List Nat :=
+  List.replicate sealNoncePrefixBytes 0 ++ natToBytesBE sealCounterBytes counter
+
+theorem sealCounterLimit_value :
+    sealCounterLimit = 2 ^ 64 := by
+  decide
+
+theorem sealNonce_length (counter : Nat) :
+    (sealNonce counter).length = sealedNonceBytes := by
+  simp [sealNonce, natToBytesBE_length, sealNoncePrefixBytes, sealCounterBytes,
+    sealedNonceBytes]
+
+theorem sealNonce_validBytes (counter : Nat) :
+    ∀ byte, byte ∈ sealNonce counter → ValidByte byte := by
+  intro byte hMem
+  simp only [sealNonce, List.mem_append, List.mem_replicate] at hMem
+  rcases hMem with hMem | hMem
+  · rw [hMem.2]
+    unfold ValidByte
+    decide
+  · exact natToBytesBE_validBytes sealCounterBytes counter byte hMem
+
+/-- Two counts below the limit with the same nonce are the same count. -/
+theorem sealNonce_injective
+    {a b : Nat}
+    (hA : a < sealCounterLimit)
+    (hB : b < sealCounterLimit)
+    (hEq : sealNonce a = sealNonce b) :
+    a = b :=
+  natToBytesBE_injective hA hB (List.append_cancel_left hEq)
+
+/-- Different counts below the limit have different nonces. -/
+theorem sealNonce_ne_of_counter_ne
+    {a b : Nat}
+    (hA : a < sealCounterLimit)
+    (hB : b < sealCounterLimit)
+    (hNe : a ≠ b) :
+    sealNonce a ≠ sealNonce b :=
+  fun hEq => hNe (sealNonce_injective hA hB hEq)
+
+/-- The count 258 is the bytes `1, 2` after ten zero bytes. -/
+example : sealNonce 258 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2] := by
+  decide
+
+/-- One step of the Rust `StoreCipher::next_seal_nonce`: with `seals` seals
+made so far, the nonce of the next seal and the new count, or `none` once the
+new count would not fit a `u64`. -/
+def nextSealNonce? (seals : Nat) : Option (List Nat × Nat) :=
+  if seals + 1 < sealCounterLimit then
+    some (sealNonce seals, seals + 1)
+  else
+    none
+
+theorem nextSealNonce?_some
+    {seals next : Nat}
+    {nonce : List Nat}
+    (hNext : nextSealNonce? seals = some (nonce, next)) :
+    nonce = sealNonce seals ∧ next = seals + 1 ∧ next < sealCounterLimit := by
+  unfold nextSealNonce? at hNext
+  by_cases hRoom : seals + 1 < sealCounterLimit
+  · simp only [hRoom, if_true, Option.some.injEq, Prod.mk.injEq] at hNext
+    exact ⟨hNext.1.symm, hNext.2.symm, hNext.2 ▸ hRoom⟩
+  · simp [hRoom] at hNext
+
+/-- The count is exhausted, and no nonce is handed out, once it reaches the
+largest `u64`. -/
+theorem nextSealNonce?_none_of_exhausted
+    {seals : Nat}
+    (hFull : sealCounterLimit ≤ seals + 1) :
+    nextSealNonce? seals = none := by
+  unfold nextSealNonce?
+  have hRoom : ¬ seals + 1 < sealCounterLimit := Nat.not_lt.mpr hFull
+  simp [hRoom]
+
+/-- The nonces of up to `count` seals in a row, starting with `seals` seals
+already made. The run stops early if the count is exhausted. -/
+def sealNonceRun : Nat → Nat → List (List Nat)
+  | _, 0 => []
+  | seals, count + 1 =>
+      match nextSealNonce? seals with
+      | some (nonce, next) => nonce :: sealNonceRun next count
+      | none => []
+
+/-- Every nonce of a run is the nonce of a count at or after the run's
+start. -/
+theorem mem_sealNonceRun
+    {seals count : Nat}
+    {nonce : List Nat}
+    (hMem : nonce ∈ sealNonceRun seals count) :
+    ∃ counter,
+      seals ≤ counter ∧ counter + 1 < sealCounterLimit ∧
+        nonce = sealNonce counter := by
+  induction count generalizing seals with
+  | zero => simp [sealNonceRun] at hMem
+  | succ count ih =>
+    unfold sealNonceRun nextSealNonce? at hMem
+    by_cases hRoom : seals + 1 < sealCounterLimit
+    · simp only [hRoom, if_true, List.mem_cons] at hMem
+      rcases hMem with hHead | hTail
+      · exact ⟨seals, Nat.le_refl seals, hRoom, hHead⟩
+      · obtain ⟨counter, hLe, hLt, hEq⟩ := ih hTail
+        exact ⟨counter, Nat.le_of_succ_le hLe, hLt, hEq⟩
+    · simp [hRoom] at hMem
+
+/-- No nonce is handed out twice: the nonces of any run of seals under one
+key are pairwise different. The count is kept with the key and only grows,
+so this covers the seals of a call that is later dropped as well. -/
+theorem sealNonceRun_nodup (seals count : Nat) :
+    (sealNonceRun seals count).Nodup := by
+  induction count generalizing seals with
+  | zero => simp [sealNonceRun]
+  | succ count ih =>
+    unfold sealNonceRun nextSealNonce?
+    by_cases hRoom : seals + 1 < sealCounterLimit
+    · simp only [hRoom, if_true]
+      rw [List.nodup_cons]
+      refine ⟨?_, ih (seals + 1)⟩
+      intro hMem
+      obtain ⟨counter, hLe, hLt, hEq⟩ := mem_sealNonceRun hMem
+      have hSame : seals = counter :=
+        sealNonce_injective (Nat.lt_of_succ_lt hRoom) (Nat.lt_of_succ_lt hLt) hEq
+      omega
+    · simp [hRoom]
+
+/-- Two runs that follow one another under a key share no nonce: the second
+starts from the count the first reached. This is the case of a staged call
+that is dropped and the call that follows it. -/
+theorem sealNonceRun_disjoint_of_le
+    {seals later countA countB : Nat}
+    {nonce : List Nat}
+    (hLater : seals + countA ≤ later)
+    (hA : nonce ∈ sealNonceRun seals countA) :
+    nonce ∉ sealNonceRun later countB := by
+  intro hB
+  obtain ⟨counterB, hLeB, hLtB, hEqB⟩ := mem_sealNonceRun hB
+  have hBound :
+      ∀ (count start : Nat) (candidate : List Nat),
+        candidate ∈ sealNonceRun start count →
+          ∃ counter,
+            counter < start + count ∧ counter + 1 < sealCounterLimit ∧
+              candidate = sealNonce counter := by
+    intro count
+    induction count with
+    | zero =>
+      intro start candidate hMem
+      simp [sealNonceRun] at hMem
+    | succ count ih =>
+      intro start candidate hMem
+      unfold sealNonceRun nextSealNonce? at hMem
+      by_cases hRoom : start + 1 < sealCounterLimit
+      · simp only [hRoom, if_true, List.mem_cons] at hMem
+        rcases hMem with hHead | hTail
+        · exact ⟨start, by omega, hRoom, hHead⟩
+        · obtain ⟨counter, hLt, hFit, hEq⟩ := ih (start + 1) candidate hTail
+          exact ⟨counter, by omega, hFit, hEq⟩
+      · simp [hRoom] at hMem
+  obtain ⟨counterA, hLtA, hFitA, hEqA⟩ := hBound countA seals nonce hA
+  have hSame : counterA = counterB :=
+    sealNonce_injective (Nat.lt_of_succ_lt hFitA) (Nat.lt_of_succ_lt hLtB)
+      (hEqA.symm.trans hEqB)
+  omega
+
 end RuntimeStoreCodecSemantics
 
 end UOToolchain

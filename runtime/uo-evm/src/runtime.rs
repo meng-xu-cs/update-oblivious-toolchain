@@ -16,6 +16,7 @@ mod theorem;
 use crate::controller::CallRecorder;
 use crate::freshness::RuntimeCallFreshness;
 use crate::return_channel::ReturnChannelSession;
+use crate::secret::RuntimeMasterSecret;
 use anyhow::Result;
 pub use fresh_coins::PathOramFreshCoinPlan;
 pub(crate) use state::ContractRuntime;
@@ -28,9 +29,9 @@ use uo_core::{RuntimeCallOutcome, Value};
 
 pub(crate) fn deploy_contract_runtime(
     contract_state: &[StateObject],
-    deploy_seed: u64,
+    master: &RuntimeMasterSecret,
 ) -> Result<ContractRuntime> {
-    state::ContractRuntime::deploy(contract_state, deploy_seed)
+    state::ContractRuntime::deploy(contract_state, master)
 }
 
 #[cfg(test)]

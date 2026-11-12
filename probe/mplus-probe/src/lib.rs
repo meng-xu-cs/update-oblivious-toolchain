@@ -27038,32 +27038,126 @@ fn collect_lean_source_files(root: &Path, files: &mut Vec<PathBuf>) -> Result<()
     Ok(())
 }
 
-/// Whether the deployment seed stays out of call traces. The engine keeps only
-/// the replay tag of a seeded (test or diagnostics) deployment, a deployment
-/// from OS randomness has none, and the theorem bridge, which builds the
-/// trace, never sees the seed.
+/// Whether a deployment's seed stays out of call traces. Only a seeded (test
+/// or diagnostics) deployment has one, and the engine keeps it as the replay
+/// tag of the instance's traces. A deployment from OS randomness has none,
+/// and neither the runtime module, which deploys the state from the master
+/// secret, nor the theorem bridge, which builds the trace, sees a seed.
 fn check_deployment_seed_stays_out_of_call_traces(
     engine_impl_source: &str,
     runtime_module_source: &str,
     theorem_source: &str,
 ) -> bool {
-    engine_impl_source.contains("Self::deploy_with_seed_internal(artifact, deploy_seed, None)")
+    engine_impl_source.contains("Self::deploy_internal(artifact, &master, freshness, None)")
         && engine_impl_source
-            .contains("Self::deploy_with_seed_internal(artifact, deploy_seed, Some(deploy_seed))")
+            .contains("Self::deploy_internal(artifact, &master, freshness, Some(deploy_seed))")
         && engine_impl_source.contains("replay_seed: Option<u64>,")
         && engine_impl_source.contains("self.replay_seed,")
         && !engine_impl_source.contains("self.deploy_seed")
         && runtime_module_source.contains("replay_seed: Option<u64>,")
-        // runtime.rs names the seed only to deploy the contract's state.
-        && runtime_module_source.matches("deploy_seed").count() == 2
+        && !runtime_module_source.contains("deploy_seed")
         && !theorem_source.contains("deploy_seed")
 }
 
+/// Whether a deployment's secrets derive from a master secret that production
+/// draws from the operating system, with the freshness epoch, which is
+/// public, drawn independently of it. A master secret that is a function of a
+/// seed exists only in test and diagnostics builds, and no production source
+/// seeds a generator from 64 bits.
+fn check_runtime_secrets_derive_from_the_master_secret(
+    engine_impl_source: &str,
+    state_source: &str,
+    objects_production_source: &str,
+    secret_production_source: &str,
+) -> bool {
+    engine_impl_source.contains(
+        "    pub fn deploy(artifact: CompiledArtifact) -> Result<Self> {\n        let master = RuntimeMasterSecret::from_os_rng();\n        let freshness = RuntimeFreshnessState::from_os_rng();\n        Self::deploy_internal(artifact, &master, freshness, None)\n    }",
+    ) && engine_impl_source.contains(
+        "    #[cfg(any(test, feature = \"diagnostics\"))]\n    pub fn deploy_with_seed(artifact: CompiledArtifact, deploy_seed: u64) -> Result<Self> {\n        let master = RuntimeMasterSecret::from_diagnostic_seed(deploy_seed);",
+    ) && engine_impl_source
+        .matches("RuntimeMasterSecret::from_diagnostic_seed(")
+        .count()
+        == 1
+        && engine_impl_source.matches("RuntimeMasterSecret::").count() == 2
+        && !engine_impl_source.contains("seed_from_u64")
+        && state_source.contains("let secret = master.object_secret(spec.id, &spec.name)?;")
+        && state_source.contains("object: RuntimeObject::instantiate(spec, &secret)?,")
+        && objects_production_source.contains("let mut rng = secret.rng()?;")
+        && objects_production_source
+            .contains("let leaf_coin_seed = secret.path_oram_leaf_seed()?;")
+        && !objects_production_source.contains("seed_from_u64")
+        && secret_production_source.contains("const SECRET_BYTES: usize = 32;")
+        && secret_production_source.contains(
+            "    pub(crate) fn from_os_rng() -> Self {\n        let mut secret = [0u8; SECRET_BYTES];\n        OsRng.fill_bytes(&mut secret);\n        Self(secret)\n    }",
+        )
+        && secret_production_source.contains(
+            "    #[cfg(any(test, feature = \"diagnostics\"))]\n    pub(crate) fn from_diagnostic_seed(seed: u64) -> Self {\n        Self(diagnostic_secret(DIAGNOSTIC_MASTER_SECRET_LABEL, seed))",
+        )
+        && secret_production_source.contains(
+            "#[cfg(any(test, feature = \"diagnostics\"))]\nfn diagnostic_secret(label: &[u8], seed: u64) -> [u8; SECRET_BYTES] {",
+        )
+        && secret_production_source.matches("diagnostic_secret(").count() == 2
+        && secret_production_source.contains("Hkdf::<Sha256>::from_prk(key)")
+        // No secret type is cloned, compared or serialized by a derive.
+        && !secret_production_source.contains("#[derive(")
+        && !secret_production_source.contains("seed_from_u64")
+}
+
+/// Whether a sealed record's nonce is the count of the seals under its key.
+/// The count is shared by every copy of the cipher and only grows, so a
+/// nonce cannot repeat under a key, whether or not a call is committed. A
+/// seal fails once the count is exhausted, and no nonce is drawn at random.
+fn check_seal_nonces_come_from_the_seal_count(
+    generated_store_surface_production_source: &str,
+    generated_store_codec_source: &str,
+) -> bool {
+    generated_store_surface_production_source
+        .contains("pub struct StoreCipher {\n    key: [u8; 32],\n    seals: Arc<AtomicU64>,\n}")
+        && generated_store_surface_production_source.contains(
+            "        Self {\n            key,\n            seals: Arc::new(AtomicU64::new(0)),\n        }",
+        )
+        && generated_store_surface_production_source.contains(
+            "        Self {\n            key: self.key,\n            seals: Arc::clone(&self.seals),\n        }",
+        )
+        // The count is written where a cipher is made and where a seal reads
+        // it, and nowhere else.
+        && generated_store_surface_production_source
+            .matches("AtomicU64::new(")
+            .count()
+            == 1
+        && generated_store_surface_production_source
+            .matches("self.seals")
+            .count()
+            == 1
+        && generated_store_surface_production_source.matches(".seals").count() == 2
+        && generated_store_surface_production_source.contains(
+            "            .seals\n            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |seals| {\n                seals.checked_add(1)\n            })\n            .ok()?;\n        Some(seal_nonce(counter))",
+        )
+        && generated_store_surface_production_source.contains(
+            "    let Some(nonce_bytes) = cipher.next_seal_nonce() else {\n        return false;\n    };",
+        )
+        && generated_store_surface_production_source
+            .matches("next_seal_nonce(")
+            .count()
+            == 2
+        && generated_store_surface_production_source.contains("Nonce::from_slice(&nonce_bytes),")
+        && !generated_store_surface_production_source.contains("fill_bytes(&mut nonce")
+        && generated_store_surface_production_source
+            .matches("fill_bytes(")
+            .count()
+            == 1
+        && !generated_store_surface_production_source.contains("#[derive(")
+        && generated_store_codec_source.contains(
+            "pub(super) fn seal_nonce(counter: u64) -> [u8; SEALED_NONCE_BYTES] {\n    let mut nonce = [0u8; SEALED_NONCE_BYTES];\n    for (target, byte) in nonce.iter_mut().skip(4).zip(counter.to_be_bytes().iter()) {\n        *target = *byte;\n    }\n    nonce\n}",
+        )
+}
+
 /// Whether the production path's freshness errors carry no runtime value. An
-/// error reaches the caller, and the runtime's freshness epoch is its
-/// deployment seed. `deployment.rs` reads each field of the freshness snapshot
-/// once, as an operand of `require_equal_counter`, and that helper reports the
-/// field's name and nothing else.
+/// error reaches the caller, and a caller whose evidence is wrong has not
+/// shown that it knows the runtime's epoch and counters. `deployment.rs` reads
+/// each field of the freshness snapshot once, as an operand of
+/// `require_equal_counter`, and that helper reports the field's name and
+/// nothing else.
 fn check_production_errors_carry_no_runtime_freshness_value(deployment_source: &str) -> bool {
     [
         "freshness.epoch",
@@ -29167,7 +29261,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && generated_oram_codecs_source.contains("impl Drop for OramState {")
         && generated_oram_codecs_source.contains("impl Drop for PathOramLeafCoinSource {")
         && generated_oram_codecs_source.contains("Self::Random { seed, next_index } => {")
-        && generated_oram_codecs_source.contains("pub(crate) fn from_domain_seed(seed: u64) -> Self {")
+        && generated_oram_codecs_source
+            .contains("pub(crate) fn from_domain_seed(seed: &super::PathOramLeafSeed) -> Self {")
         && generated_oram_codecs_source.contains("let leaf = derive_path_oram_leaf(")
         && generated_oram_codecs_source.contains("impl Drop for PathOramLeafCoinSource {")
         && generated_oram_codecs_source.contains("impl PathOramLeafCoinSource {")
@@ -29979,12 +30074,14 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && generated_store_surface_source.contains("use uo_core::FixedBoxBuilder;")
         && generated_store_surface_source.contains("use zeroize::Zeroize;")
         && generated_store_surface_source.contains("use super::{")
-        && generated_store_surface_source.contains("#[derive(PartialEq, Eq)]")
+        && generated_store_surface_source.contains("impl PartialEq for StoreCipher {")
+        && generated_store_surface_source.contains("impl Eq for StoreCipher {}")
         && !generated_store_surface_source.contains("#[derive(Clone, PartialEq, Eq)]")
         && generated_store_surface_source.contains("pub struct StoreCipher {")
         && generated_store_surface_source.contains("key: [u8; 32],")
+        && generated_store_surface_source.contains("seals: Arc<AtomicU64>,")
         && generated_store_surface_source.contains(
-            "decode_nonzero_into, generated_sealed_encoded_len, write_nonzero_encoded,",
+            "decode_nonzero_into, generated_sealed_encoded_len, seal_nonce, write_nonzero_encoded,",
         )
         && generated_store_surface_source.contains("struct WipeOnDrop<'a> {")
         && generated_store_surface_source.contains("impl Drop for WipeOnDrop<'_> {")
@@ -38592,6 +38689,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let controller_path = root.join("runtime/uo-evm/src/controller.rs");
     let theorem_path = root.join("runtime/uo-evm/src/theorem.rs");
     let deployment_path = root.join("runtime/uo-evm/src/deployment.rs");
+    let secret_path = root.join("runtime/uo-evm/src/secret.rs");
     let main_path = root.join("runtime/uo-evm/src/main.rs");
     let probe_path = root.join("probe/mplus-probe/src/lib.rs");
     let probe_main_path = root.join("probe/mplus-probe/src/main.rs");
@@ -38752,6 +38850,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         .with_context(|| format!("reading {}", display_report_path(&theorem_path)))?;
     let deployment_source = fs::read_to_string(&deployment_path)
         .with_context(|| format!("reading {}", display_report_path(&deployment_path)))?;
+    let secret_production_source = production_source_slice(
+        &fs::read_to_string(&secret_path)
+            .with_context(|| format!("reading {}", display_report_path(&secret_path)))?,
+    );
     let main_source = fs::read_to_string(&main_path)
         .with_context(|| format!("reading {}", display_report_path(&main_path)))?;
     let probe_source = fs::read_to_string(&probe_path)
@@ -39495,14 +39597,14 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             .contains("std::mem::take(&mut self.raw_args).into_vec().into_iter()");
     let path_oram_leaf_coin_source_uses_fixed_tape = !oram_source.contains("VecDeque")
         && oram_source.contains("#[derive(Debug)]\npub(crate) enum PathOramLeafCoinSource {")
-        && oram_source.contains("Random {\n        seed: u64,\n        next_index: u64,\n    },")
-        && oram_source.contains("impl Default for PathOramLeafCoinSource {")
+        && oram_source.contains("Random {\n        seed: PathOramLeafSeed,\n        next_index: u64,\n    },")
+        && !oram_source.contains("impl Default for PathOramLeafCoinSource {")
         && oram_source.contains("Injected {\n        coins: Box<[usize]>,\n        next_index: usize,\n    },")
-        && objects_source.contains("let leaf_coin_seed = derive_path_oram_leaf_seed(object_seed, spec.id, &spec.name);")
+        && objects_source.contains("let leaf_coin_seed = secret.path_oram_leaf_seed()?;")
         && objects_source
-            .contains("leaf_coin_source: PathOramLeafCoinSource::from_domain_seed(leaf_coin_seed),")
+            .contains("leaf_coin_source: PathOramLeafCoinSource::from_domain_seed(&leaf_coin_seed),")
         && objects_source
-            .contains("PathOramLeafCoinSource::from_domain_seed(object.leaf_coin_seed),")
+            .contains("PathOramLeafCoinSource::from_domain_seed(&object.leaf_coin_seed),")
         && !objects_source.contains("leaf_coin_source: self.leaf_coin_source.clone(),")
         && !oram_source.contains("#[derive(Clone, Debug, Default)]\npub(crate) enum PathOramLeafCoinSource {")
         && !oram_source.contains("fn sample_leaf(rng: &mut ChaCha20Rng, leaf_count: usize) -> usize {")
@@ -39510,10 +39612,12 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !oram_source.contains("impl PathOramLeafCoinSource {")
         && generated_oram_codecs_source.contains("impl Drop for PathOramLeafCoinSource {")
         && generated_oram_codecs_source.contains("Self::Random { seed, next_index } => {")
-        && generated_oram_codecs_source.contains("*seed = 0;")
+        && generated_oram_codecs_source.contains("seed.wipe();")
         && generated_oram_codecs_source.contains("*next_index = 0;")
         && generated_oram_codecs_source.contains("impl PathOramLeafCoinSource {")
-        && generated_oram_codecs_source.contains("pub(crate) fn from_domain_seed(seed: u64) -> Self {")
+        && generated_oram_codecs_source
+            .contains("pub(crate) fn from_domain_seed(seed: &super::PathOramLeafSeed) -> Self {")
+        && generated_oram_codecs_source.contains("seed: seed.duplicate(),")
         && generated_oram_codecs_source.contains("object_id: u32,")
         && generated_oram_codecs_source.contains("access_counter: u64,")
         && generated_oram_codecs_source.contains("let leaf = derive_path_oram_leaf(")
@@ -43816,12 +43920,14 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && generated_store_surface_source.contains("use uo_core::FixedBoxBuilder;")
         && generated_store_surface_source.contains("use zeroize::Zeroize;")
         && generated_store_surface_source.contains("use super::{")
-        && generated_store_surface_source.contains("#[derive(PartialEq, Eq)]")
+        && generated_store_surface_source.contains("impl PartialEq for StoreCipher {")
+        && generated_store_surface_source.contains("impl Eq for StoreCipher {}")
         && !generated_store_surface_source.contains("#[derive(Clone, PartialEq, Eq)]")
         && generated_store_surface_source.contains("pub struct StoreCipher {")
         && generated_store_surface_source.contains("key: [u8; 32],")
+        && generated_store_surface_source.contains("seals: Arc<AtomicU64>,")
         && generated_store_surface_source.contains(
-            "decode_nonzero_into, generated_sealed_encoded_len, write_nonzero_encoded,",
+            "decode_nonzero_into, generated_sealed_encoded_len, seal_nonce, write_nonzero_encoded,",
         )
         && generated_store_surface_source.contains("struct WipeOnDrop<'a> {")
         && generated_store_surface_source.contains("impl Drop for WipeOnDrop<'_> {")
@@ -44527,6 +44633,17 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         check_production_errors_carry_no_runtime_freshness_value(&deployment_source);
     let contract_instance_debug_is_opaque =
         check_contract_instance_debug_is_opaque(&engine_impl_source);
+    let runtime_secrets_derive_from_the_master_secret =
+        check_runtime_secrets_derive_from_the_master_secret(
+            &engine_impl_source,
+            &state_source,
+            &objects_production_source,
+            &secret_production_source,
+        );
+    let seal_nonces_come_from_the_seal_count = check_seal_nonces_come_from_the_seal_count(
+        &production_source_slice(&generated_store_surface_source),
+        &generated_store_codec_source,
+    );
     let probe_reads_runtime_telemetry_from_diagnostic_channel = extract_metrics_source
         .contains("fn extract_metrics(result: &DiagnosticCallResult)")
         && extract_metrics_source.contains("let trace = &result.call.trace;")
@@ -45921,6 +46038,9 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "production_errors_carry_no_runtime_freshness_value":
             production_errors_carry_no_runtime_freshness_value,
         "contract_instance_debug_is_opaque": contract_instance_debug_is_opaque,
+        "runtime_secrets_derive_from_the_master_secret":
+            runtime_secrets_derive_from_the_master_secret,
+        "seal_nonces_come_from_the_seal_count": seal_nonces_come_from_the_seal_count,
         "theorem_certificate_constructor_checks":
             theorem_certificate_constructor_checks,
         "theorem_certificate_constructor_surface_restricted":
@@ -46860,6 +46980,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && deployment_seed_stays_out_of_call_traces
             && production_errors_carry_no_runtime_freshness_value
             && contract_instance_debug_is_opaque
+            && runtime_secrets_derive_from_the_master_secret
+            && seal_nonces_come_from_the_seal_count
             && theorem_certificate_constructor_surface_restricted
             && runtime_public_call_trace_bundle_surface_restricted
             && runtime_public_call_trace_bundle_fields_private
@@ -55182,14 +55304,23 @@ mod tests {
         ));
         assert!(check_contract_instance_debug_is_opaque(&engine));
 
-        // An unseeded deployment that tags its traces with its seed.
+        // An unseeded deployment that tags its traces with a seed.
         let tagged = engine.replace(
-            "Self::deploy_with_seed_internal(artifact, deploy_seed, None)",
-            "Self::deploy_with_seed_internal(artifact, deploy_seed, Some(deploy_seed))",
+            "Self::deploy_internal(artifact, &master, freshness, None)",
+            "Self::deploy_internal(artifact, &master, freshness, Some(0))",
         );
         assert_ne!(tagged, engine);
         assert!(!check_deployment_seed_stays_out_of_call_traces(
             &tagged, &runtime, &theorem
+        ));
+        // A runtime module that is handed the seed again.
+        let seeded = runtime.replace(
+            "master: &RuntimeMasterSecret,",
+            "master: &RuntimeMasterSecret,\n    deploy_seed: u64,",
+        );
+        assert_ne!(seeded, runtime);
+        assert!(!check_deployment_seed_stays_out_of_call_traces(
+            &engine, &seeded, &theorem
         ));
         // A theorem bridge that is handed the seed.
         let handed = theorem.replace("replay_seed: Option<u64>", "deploy_seed: u64");
@@ -55224,6 +55355,114 @@ mod tests {
         );
         assert_ne!(derived, engine);
         assert!(!check_contract_instance_debug_is_opaque(&derived));
+    }
+
+    #[test]
+    fn secret_and_nonce_checks_reject_the_drifts_they_guard() {
+        use super::{
+            check_runtime_secrets_derive_from_the_master_secret,
+            check_seal_nonces_come_from_the_seal_count, repo_root,
+        };
+        let root = repo_root();
+        let read = |rel: &str| std::fs::read_to_string(root.join(rel)).unwrap();
+        let engine = production_source_slice(&read("runtime/uo-evm/src/engine.rs"));
+        let state = read("runtime/uo-evm/src/state.rs");
+        let objects = production_source_slice(&read("runtime/uo-evm/src/objects.rs"));
+        let secret = production_source_slice(&read("runtime/uo-evm/src/secret.rs"));
+        let surface = production_source_slice(&read("runtime/uo-store/src/generated_surface.rs"));
+        let codec = read("runtime/uo-store/src/generated_codec.rs");
+        let secrets_ok = |engine: &str, state: &str, objects: &str, secret: &str| {
+            check_runtime_secrets_derive_from_the_master_secret(engine, state, objects, secret)
+        };
+
+        // The sources pass as they are.
+        assert!(secrets_ok(&engine, &state, &objects, &secret));
+        assert!(check_seal_nonces_come_from_the_seal_count(&surface, &codec));
+
+        // A production deployment whose master secret follows from its epoch.
+        let rooted = engine.replace(
+            "        let master = RuntimeMasterSecret::from_os_rng();\n        let freshness = RuntimeFreshnessState::from_os_rng();",
+            "        let freshness = RuntimeFreshnessState::from_os_rng();\n        let master = RuntimeMasterSecret::from_diagnostic_seed(freshness.snapshot().epoch);",
+        );
+        assert_ne!(rooted, engine);
+        assert!(!secrets_ok(&rooted, &state, &objects, &secret));
+        // A seeded master secret that a production build can reach.
+        let ungated = secret.replace(
+            "    #[cfg(any(test, feature = \"diagnostics\"))]\n    pub(crate) fn from_diagnostic_seed(seed: u64) -> Self {\n        Self(diagnostic_secret(DIAGNOSTIC_MASTER_SECRET_LABEL, seed))",
+            "    pub(crate) fn from_diagnostic_seed(seed: u64) -> Self {\n        Self(diagnostic_secret(DIAGNOSTIC_MASTER_SECRET_LABEL, seed))",
+        );
+        assert_ne!(ungated, secret);
+        assert!(!secrets_ok(&engine, &state, &objects, &ungated));
+        // A master secret of fewer than 256 bits.
+        let short = secret.replace(
+            "const SECRET_BYTES: usize = 32;",
+            "const SECRET_BYTES: usize = 8;",
+        );
+        assert_ne!(short, secret);
+        assert!(!secrets_ok(&engine, &state, &objects, &short));
+        // A master secret that can be cloned.
+        let cloned = secret.replace(
+            "pub(crate) struct RuntimeMasterSecret(",
+            "#[derive(Clone)]\npub(crate) struct RuntimeMasterSecret(",
+        );
+        assert_ne!(cloned, secret);
+        assert!(!secrets_ok(&engine, &state, &objects, &cloned));
+        // An object whose generator is seeded from 64 bits.
+        let narrow = objects.replace(
+            "let mut rng = secret.rng()?;",
+            "let mut rng = ChaCha20Rng::seed_from_u64(0);",
+        );
+        assert_ne!(narrow, objects);
+        assert!(!secrets_ok(&engine, &state, &narrow, &secret));
+        // Objects that all share the master secret's own derivation.
+        let shared = state.replace(
+            "let secret = master.object_secret(spec.id, &spec.name)?;",
+            "let secret = master.object_secret(0, \"\")?;",
+        );
+        assert_ne!(shared, state);
+        assert!(!secrets_ok(&engine, &shared, &objects, &secret));
+
+        // A nonce drawn at random.
+        let random = surface.replace(
+            "    let Some(nonce_bytes) = cipher.next_seal_nonce() else {\n        return false;\n    };",
+            "    let mut nonce_bytes = [0u8; SEALED_NONCE_BYTES];\n    rng.fill_bytes(&mut nonce_bytes);",
+        );
+        assert_ne!(random, surface);
+        assert!(!check_seal_nonces_come_from_the_seal_count(&random, &codec));
+        // A copy of the cipher that counts its seals from zero again.
+        let rewound = surface.replace(
+            "seals: Arc::clone(&self.seals),",
+            "seals: Arc::new(AtomicU64::new(0)),",
+        );
+        assert_ne!(rewound, surface);
+        assert!(!check_seal_nonces_come_from_the_seal_count(
+            &rewound, &codec
+        ));
+        // A count that wraps instead of stopping.
+        let wrapping = surface.replace("seals.checked_add(1)", "Some(seals.wrapping_add(1))");
+        assert_ne!(wrapping, surface);
+        assert!(!check_seal_nonces_come_from_the_seal_count(
+            &wrapping, &codec
+        ));
+        // A cipher whose count can be set back.
+        let resettable = surface.replace(
+            "    pub fn seal_and_wipe_boxed(\n        &self,",
+            "    pub fn reset(&self) {\n        self.seals.store(0, Ordering::SeqCst);\n    }\n\n    pub fn seal_and_wipe_boxed(\n        &self,",
+        );
+        assert_ne!(resettable, surface);
+        assert!(!check_seal_nonces_come_from_the_seal_count(
+            &resettable,
+            &codec
+        ));
+        // A nonce that drops the top half of the count.
+        let truncated = codec.replace(
+            "nonce.iter_mut().skip(4).zip(counter.to_be_bytes().iter())",
+            "nonce.iter_mut().skip(8).zip(counter.to_be_bytes().iter().skip(4))",
+        );
+        assert_ne!(truncated, codec);
+        assert!(!check_seal_nonces_come_from_the_seal_count(
+            &surface, &truncated
+        ));
     }
 
     #[test]

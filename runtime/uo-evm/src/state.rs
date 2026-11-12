@@ -1,7 +1,7 @@
 use crate::controller::{CallRecorder, PublicCallSummary};
-use crate::freshness::derive_runtime_object_seed;
 use crate::runtime::fresh_coins::{PathOramFreshCoinEntry, PathOramFreshCoinPlan};
 use crate::runtime::objects::RuntimeObject;
+use crate::secret::RuntimeMasterSecret;
 use anyhow::{anyhow, bail, Result};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -266,10 +266,10 @@ impl RuntimeObjectTable {
 impl ContractRuntime {
     pub(in crate::runtime) fn deploy(
         contract_state: &[StateObject],
-        deploy_seed: u64,
+        master: &RuntimeMasterSecret,
     ) -> Result<Self> {
         Ok(Self {
-            committed: CommittedRuntimeState::deploy(contract_state, deploy_seed)?,
+            committed: CommittedRuntimeState::deploy(contract_state, master)?,
         })
     }
 
@@ -483,13 +483,13 @@ impl ContractRuntime {
 }
 
 impl CommittedRuntimeState {
-    fn deploy(contract_state: &[StateObject], deploy_seed: u64) -> Result<Self> {
+    fn deploy(contract_state: &[StateObject], master: &RuntimeMasterSecret) -> Result<Self> {
         let mut objects = FixedBoxBuilder::new(contract_state.len());
         for spec in contract_state {
-            let object_seed = derive_runtime_object_seed(deploy_seed, spec.id, &spec.name);
+            let secret = master.object_secret(spec.id, &spec.name)?;
             objects.push(RuntimeObjectEntry {
                 object_id: spec.id,
-                object: RuntimeObject::instantiate_with_seed(spec, object_seed)?,
+                object: RuntimeObject::instantiate(spec, &secret)?,
             })?;
         }
         let mut objects = objects.finish()?;

@@ -4706,7 +4706,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "confidential_core_shell_boundary_lowering_bundle_json_bytes": 19037,
+      "confidential_core_shell_boundary_lowering_bundle_json_bytes": 19030,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "SingleAccessMap",
@@ -5177,7 +5177,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "confidential_core_shell_boundary_lowering_bundle_json_bytes": 19037,
+      "confidential_core_shell_boundary_lowering_bundle_json_bytes": 19030,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "SingleAccessMap",
@@ -5648,7 +5648,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "confidential_core_shell_boundary_lowering_bundle_json_bytes": 29237,
+      "confidential_core_shell_boundary_lowering_bundle_json_bytes": 29230,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "SingleAccessMap",
@@ -6325,7 +6325,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "confidential_core_shell_boundary_lowering_bundle_json_bytes": 29237,
+      "confidential_core_shell_boundary_lowering_bundle_json_bytes": 29230,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "SingleAccessMap",
@@ -7002,7 +7002,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "confidential_core_shell_boundary_lowering_bundle_json_bytes": 62114,
+      "confidential_core_shell_boundary_lowering_bundle_json_bytes": 62117,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "ConfidentialMixer",
@@ -8280,7 +8280,7 @@
     {
       "accepted": true,
       "boundary_events": 14,
-      "confidential_core_shell_boundary_lowering_bundle_json_bytes": 191766,
+      "confidential_core_shell_boundary_lowering_bundle_json_bytes": 191775,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "ERC20Lite",

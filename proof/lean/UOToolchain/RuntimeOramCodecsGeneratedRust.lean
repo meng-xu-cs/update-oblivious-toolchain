@@ -578,7 +578,7 @@ def generatedRustLines0 : List String :=
   , "    fn drop(&mut self) {"
   , "        match self {"
   , "            Self::Random { seed, next_index } => {"
-  , "                *seed = 0;"
+  , "                seed.wipe();"
   , "                *next_index = 0;"
   , "            }"
   , "            Self::Injected { coins, next_index } => {"
@@ -592,13 +592,14 @@ def generatedRustLines0 : List String :=
   , "}"
   , ""
   , "impl PathOramLeafCoinSource {"
+  , "    #[cfg(test)]"
   , "    pub(crate) fn random() -> Self {"
-  , "        Self::from_domain_seed(0)"
+  , "        Self::from_domain_seed(&super::PathOramLeafSeed::from_diagnostic_seed(0))"
   , "    }"
   , ""
-  , "    pub(crate) fn from_domain_seed(seed: u64) -> Self {"
+  , "    pub(crate) fn from_domain_seed(seed: &super::PathOramLeafSeed) -> Self {"
   , "        Self::Random {"
-  , "            seed,"
+  , "            seed: seed.duplicate(),"
   , "            next_index: 0,"
   , "        }"
   , "    }"
@@ -628,13 +629,13 @@ def generatedRustLines0 : List String :=
   , "        match self {"
   , "            Self::Random { seed, next_index } => {"
   , "                let leaf = derive_path_oram_leaf("
-  , "                    *seed,"
+  , "                    seed,"
   , "                    object_id,"
   , "                    object_name,"
   , "                    access_counter,"
   , "                    *next_index,"
   , "                    leaf_count,"
-  , "                );"
+  , "                )?;"
   , "                *next_index = next_index.checked_add(1).ok_or_else(|| {"
   , "                    anyhow!(\"path ORAM fresh-leaf counter overflow for {object_name}\")"
   , "                })?;"
@@ -1505,12 +1506,12 @@ def generatedRustLines0 : List String :=
   , "/// The value of the accessed slot's block, which the path read has put in the"
   , "/// stash, or which was there already. A present slot has exactly one block,"
   , "/// on its prior leaf and with its key; otherwise the access fails."
-  , "pub(super) fn select_stash_value_for_slot("
   ]
 
 /-- Lines 1501 to 3000 of the generated Rust. -/
 def generatedRustLines1 : List String :=
-  [ "    stash: &FixedStash,"
+  [ "pub(super) fn select_stash_value_for_slot("
+  , "    stash: &FixedStash,"
   , "    slot: &MaskedUsizeOption,"
   , "    prior_leaf: &MaskedUsizeOption,"
   , "    key: &Value,"
@@ -3009,12 +3010,12 @@ def generatedRustLines1 : List String :=
   , "    ) -> Result<bool>,"
   , "{"
   , "    let mut writes = oram_write_log_with_capacity(oram_write_log_capacity(&state.parameters)?)?;"
-  , "    let mut working_entries = std::mem::take(&mut state.entries);"
   ]
 
 /-- Lines 3001 to 4500 of the generated Rust. -/
 def generatedRustLines2 : List String :=
-  [ "    let mut working_position_map = std::mem::take(&mut state.position_map);"
+  [ "    let mut working_entries = std::mem::take(&mut state.entries);"
+  , "    let mut working_position_map = std::mem::take(&mut state.position_map);"
   , "    let mut working_stash = std::mem::replace(&mut state.stash, FixedStash::placeholder());"
   , "    let required_stash_capacity = working_stash_capacity(&state.parameters)?;"
   , "    if working_stash.capacity() < required_stash_capacity {"
@@ -4513,12 +4514,12 @@ def generatedRustLines2 : List String :=
   , "            .slots"
   , "            .get_mut(level)"
   , "            .ok_or_else(|| anyhow!(\"tree cache slot {} missing\", level))?;"
-  , "        node.value = Value::confidential_select(hit, value.clone(), node.value.clone())?;"
   ]
 
-/-- Lines 4501 to 5874 of the generated Rust. -/
+/-- Lines 4501 to 5875 of the generated Rust. -/
 def generatedRustLines3 : List String :=
-  [ "    }"
+  [ "        node.value = Value::confidential_select(hit, value.clone(), node.value.clone())?;"
+  , "    }"
   , ""
   , "    // A delete removes the found node, or, when it has two children, moves"
   , "    // the successor's entry into it and removes the successor."

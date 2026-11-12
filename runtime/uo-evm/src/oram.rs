@@ -1,3 +1,4 @@
+use crate::freshness::PathOramLeafSeed;
 use anyhow::{anyhow, bail, Result};
 use rand_chacha::ChaCha20Rng;
 use serde_json::json;
@@ -296,22 +297,13 @@ pub(crate) struct OramState {
 #[derive(Debug)]
 pub(crate) enum PathOramLeafCoinSource {
     Random {
-        seed: u64,
+        seed: PathOramLeafSeed,
         next_index: u64,
     },
     Injected {
         coins: Box<[usize]>,
         next_index: usize,
     },
-}
-
-impl Default for PathOramLeafCoinSource {
-    fn default() -> Self {
-        Self::Random {
-            seed: 0,
-            next_index: 0,
-        }
-    }
 }
 
 impl OramState {
@@ -422,6 +414,20 @@ impl OramState {
     #[cfg(test)]
     pub(crate) fn access_counter_for_test(&self) -> u64 {
         self.access_counter
+    }
+
+    /// The map's cipher and every sealed record it holds in storage.
+    #[cfg(test)]
+    pub(crate) fn sealed_storage_for_test(&self) -> (&StoreCipher, Vec<&[u8]>) {
+        let storage = &self.storage;
+        let records = storage
+            .directory_pages
+            .iter()
+            .chain(storage.buckets.iter())
+            .map(|record| &record[..])
+            .chain(std::iter::once(&storage.access_counter_slot[..]))
+            .collect();
+        (&self.cipher, records)
     }
 
     #[cfg(test)]

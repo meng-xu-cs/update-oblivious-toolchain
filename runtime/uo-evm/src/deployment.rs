@@ -167,8 +167,9 @@ pub(crate) fn validate_production_call_preflight(
         &evidence.attestation_transcript_hash,
         &session.binding().attestation_transcript_hash,
     )?;
-    // A mismatch names the field and prints no value: an error reaches the
-    // caller, and the runtime's freshness epoch is its deployment seed.
+    // A mismatch names the field and prints no value. An error reaches the
+    // caller, and a caller whose evidence is wrong has not shown that it
+    // knows the runtime's epoch and counters.
     require_equal_counter("freshness_epoch", evidence.freshness_epoch, freshness.epoch)?;
     require_equal_counter(
         "rollback_counter",

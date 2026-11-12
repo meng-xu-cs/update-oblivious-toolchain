@@ -295,17 +295,18 @@ spends on the proof objects it exports, the position-map witnesses and the
 execution trace's proof bundles, and the rest, its own work
 (`p50_witness_ns`, `p50_proof_objects_ns`, `p50_runtime_ns`;
 `latency_break_even` compares both). On its own work the tree is faster
-than the full scan for reads from 4,096 entries (14 ms against 18 at 4,096,
-42 against 69 at 16,384) and for an even mix from 16,384, while a write
-alone stays slower (80 ms against 71 at 16,384). Whole calls on the tree are
-slower at every capacity measured (469 ms against 332 for a read at 16,384):
+than the full scan for reads from 4,096 entries (14 ms against 16 at 4,096,
+53 against 69 at 16,384) and for an even mix from 16,384, while a write
+alone stays slower (78 ms against 74 at 16,384). Whole calls on the tree are
+slower at every capacity measured (545 ms against 332 for a read at 16,384):
 to export the position-map witnesses, the runtime decodes every bucket of the
-tree at the start and the end of each call, 391 ms of that read, where the
+tree at the start and the end of each call, 453 ms of that read, where the
 full scan's time goes to the proof bundles of its 32,768-event trace (263
-ms). These medians of three trials move with the machine and the run: the
-bundle before this one, from a slower machine, put the reads-alone threshold
-at 8,192 entries. A node access evicts the stash bucket by bucket, placing a
-block in the
+ms). These medians of three trials move with the machine and the run: an
+earlier bundle, from a slower machine, put the reads-alone threshold at 8,192
+entries, and the one before this put that read at 16,384 at 42 ms of the
+tree's own work and 469 ms in all. A node access evicts the stash bucket by
+bucket, placing a block in the
 bucket at a given depth exactly when its leaf and the read leaf agree above
 that depth (the leaf count is a power of two), and moves blocks with in-place
 masked selects; at 4,096 entries this takes 2.2 times fewer instructions per
@@ -403,7 +404,7 @@ time. Multi-access calls on either scheme get the theorem from tape families
 | Assumption | Provenance |
 | --- | --- |
 | `stashOverflowBounded` | JACM Path ORAM stash theorem specialized to deployed `Z = 5` / `stash_bound = min(max(capacity, 1), 114)` parameters: a stash overflows after an access with probability at most `14 · 0.6002^114 < 2^-80`, and a map of capacity at most 114 cannot overflow |
-| `bucketEncryptionINDCPA` | concrete sealed bucket/path records implemented with `ChaCha20Poly1305` and paired with RFC 8439 plus AEAD composition analysis |
+| `bucketEncryptionINDCPA` | concrete sealed bucket/path records implemented with `ChaCha20Poly1305` and paired with RFC 8439 plus AEAD composition analysis. A record's key derives from the runtime's master secret and its nonce is the count of the seals under the key, so no key seals twice with one nonce (see [`claim-boundary.md`](./claim-boundary.md)) |
 | `metadataEncryptionINDCPA` | same sealed-record crypto route for encrypted position-map metadata pages |
 
 Fresh leaf remapping is checked by the canonical fresh-coin runtime-family

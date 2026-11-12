@@ -1,11 +1,12 @@
 use crate::controller::CallRecorder;
-use crate::freshness::derive_path_oram_leaf_seed;
+use crate::freshness::PathOramLeafSeed;
 use crate::oram::{
     select_pending_put_value, MapEntry, OramState, OramTranscript, PathOramLeafCoinSource,
     PendingOramPut,
 };
+use crate::secret::ObjectSecret;
 use anyhow::{anyhow, bail, Result};
-use rand::{RngCore, SeedableRng};
+use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use serde_json::json;
 use std::collections::BTreeMap;
@@ -353,7 +354,7 @@ pub(crate) struct OramMapObject {
     oram: OramState,
     accessed: bool,
     dirty: bool,
-    leaf_coin_seed: u64,
+    leaf_coin_seed: PathOramLeafSeed,
     leaf_coin_source: PathOramLeafCoinSource,
     rng: ChaCha20Rng,
     // Path ORAM schemes: the call's writes, which reach the ORAM at commit,
@@ -376,8 +377,8 @@ impl OramMapObject {
             oram: self.oram.clone_committed_cold(&self.spec)?,
             accessed: false,
             dirty: false,
-            leaf_coin_seed: self.leaf_coin_seed,
-            leaf_coin_source: PathOramLeafCoinSource::from_domain_seed(self.leaf_coin_seed),
+            leaf_coin_seed: self.leaf_coin_seed.duplicate(),
+            leaf_coin_source: PathOramLeafCoinSource::from_domain_seed(&self.leaf_coin_seed),
             rng: self.rng.clone(),
             pending_view: None,
             pending_puts: Vec::new(),
@@ -407,7 +408,7 @@ impl OramMapObject {
         self.accessed = false;
         self.dirty = false;
         self.clear_pending();
-        self.leaf_coin_source = PathOramLeafCoinSource::from_domain_seed(self.leaf_coin_seed);
+        self.leaf_coin_source = PathOramLeafCoinSource::from_domain_seed(&self.leaf_coin_seed);
         Ok(())
     }
 }
@@ -464,13 +465,18 @@ impl RuntimeObject {
         Ok(key_type.canonical_len())
     }
 
-    fn instantiate_from_rng(spec: &StateObject, master_rng: &mut ChaCha20Rng) -> Result<Self> {
+    /// A fresh object. Its storage key and its initial placement come from a
+    /// generator seeded with 256 bits of the object's secret, and its Path
+    /// ORAM leaf coins from a seed derived from the same secret.
+    pub(in crate::runtime) fn instantiate(
+        spec: &StateObject,
+        secret: &ObjectSecret,
+    ) -> Result<Self> {
         #[cfg(not(feature = "insecure-eval-raw"))]
         if spec.confidential && matches!(spec.backend, BackendKind::Raw) {
             bail!("confidential object {} uses raw backend", spec.name);
         }
-        let object_seed = master_rng.next_u64();
-        let mut rng = ChaCha20Rng::seed_from_u64(object_seed);
+        let mut rng = secret.rng()?;
         match (&spec.kind, &spec.backend) {
             (ContainerKind::Cell, BackendKind::Raw) => {
                 let logical = cold_zero_value(&spec.value_type);
@@ -573,14 +579,14 @@ impl RuntimeObject {
                 }))
             }
             (ContainerKind::Map, BackendKind::Oram) => {
-                let leaf_coin_seed = derive_path_oram_leaf_seed(object_seed, spec.id, &spec.name);
+                let leaf_coin_seed = secret.path_oram_leaf_seed()?;
                 Ok(Self::UoOramMap(OramMapObject {
                     spec: spec.clone(),
                     oram: OramState::instantiate(spec, &mut rng)?,
                     accessed: false,
                     dirty: false,
+                    leaf_coin_source: PathOramLeafCoinSource::from_domain_seed(&leaf_coin_seed),
                     leaf_coin_seed,
-                    leaf_coin_source: PathOramLeafCoinSource::from_domain_seed(leaf_coin_seed),
                     rng,
                     pending_view: None,
                     pending_puts: Vec::new(),
@@ -592,9 +598,10 @@ impl RuntimeObject {
         }
     }
 
+    /// An object whose secret a test can reproduce from a seed.
+    #[cfg(test)]
     pub fn instantiate_with_seed(spec: &StateObject, seed: u64) -> Result<Self> {
-        let mut master_rng = ChaCha20Rng::seed_from_u64(seed);
-        Self::instantiate_from_rng(spec, &mut master_rng)
+        Self::instantiate(spec, &ObjectSecret::from_diagnostic_seed(seed))
     }
 
     pub(in crate::runtime) fn clone_for_tx(
@@ -613,8 +620,8 @@ impl RuntimeObject {
                 oram: object.oram.clone_for_tx(&object.spec, allocator)?,
                 accessed: false,
                 dirty: false,
-                leaf_coin_seed: object.leaf_coin_seed,
-                leaf_coin_source: PathOramLeafCoinSource::from_domain_seed(object.leaf_coin_seed),
+                leaf_coin_seed: object.leaf_coin_seed.duplicate(),
+                leaf_coin_source: PathOramLeafCoinSource::from_domain_seed(&object.leaf_coin_seed),
                 rng: object.rng.clone(),
                 pending_view: None,
                 pending_puts: Vec::with_capacity(object.oram.parameters().accesses_per_call),
@@ -680,6 +687,23 @@ impl RuntimeObject {
                 Ok(())
             }
             _ => bail!("{} is not a confidential UO object", self.name()),
+        }
+    }
+
+    /// The object's cipher and its sealed records in storage, so that a test
+    /// can compare the keys of two objects and read the records' nonces. A
+    /// raw object seals nothing.
+    #[cfg(test)]
+    pub(crate) fn sealed_storage_for_test(&self) -> Option<(&StoreCipher, Vec<&[u8]>)> {
+        fn records(slots: &[Box<[u8]>]) -> Vec<&[u8]> {
+            slots.iter().map(|slot| &slot[..]).collect()
+        }
+        match self {
+            Self::UoCell(object) => Some((&object.cipher, vec![&object.physical[..]])),
+            Self::UoArray(object) => Some((&object.cipher, records(&object.physical_slots))),
+            Self::UoSmallMap(object) => Some((&object.cipher, records(&object.physical_slots))),
+            Self::UoOramMap(object) => Some(object.oram.sealed_storage_for_test()),
+            Self::RawCell(_) | Self::RawArray(_) | Self::RawMap(_) => None,
         }
     }
 
@@ -1470,7 +1494,7 @@ impl RuntimeObject {
                 next.accessed = false;
                 next.dirty = false;
                 next.leaf_coin_source =
-                    PathOramLeafCoinSource::from_domain_seed(next.leaf_coin_seed);
+                    PathOramLeafCoinSource::from_domain_seed(&next.leaf_coin_seed);
                 Ok(Self::UoOramMap(next))
             }
             _ => bail!("mismatched object kinds during commit"),
@@ -1499,7 +1523,7 @@ impl RuntimeObject {
                 object.dirty = false;
                 object.clear_pending();
                 object.leaf_coin_source =
-                    PathOramLeafCoinSource::from_domain_seed(object.leaf_coin_seed);
+                    PathOramLeafCoinSource::from_domain_seed(&object.leaf_coin_seed);
             }
         }
     }

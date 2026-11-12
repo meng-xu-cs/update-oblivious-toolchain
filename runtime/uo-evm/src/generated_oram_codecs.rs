@@ -570,7 +570,7 @@ impl Drop for PathOramLeafCoinSource {
     fn drop(&mut self) {
         match self {
             Self::Random { seed, next_index } => {
-                *seed = 0;
+                seed.wipe();
                 *next_index = 0;
             }
             Self::Injected { coins, next_index } => {
@@ -584,13 +584,14 @@ impl Drop for PathOramLeafCoinSource {
 }
 
 impl PathOramLeafCoinSource {
+    #[cfg(test)]
     pub(crate) fn random() -> Self {
-        Self::from_domain_seed(0)
+        Self::from_domain_seed(&super::PathOramLeafSeed::from_diagnostic_seed(0))
     }
 
-    pub(crate) fn from_domain_seed(seed: u64) -> Self {
+    pub(crate) fn from_domain_seed(seed: &super::PathOramLeafSeed) -> Self {
         Self::Random {
-            seed,
+            seed: seed.duplicate(),
             next_index: 0,
         }
     }
@@ -620,13 +621,13 @@ impl PathOramLeafCoinSource {
         match self {
             Self::Random { seed, next_index } => {
                 let leaf = derive_path_oram_leaf(
-                    *seed,
+                    seed,
                     object_id,
                     object_name,
                     access_counter,
                     *next_index,
                     leaf_count,
-                );
+                )?;
                 *next_index = next_index.checked_add(1).ok_or_else(|| {
                     anyhow!("path ORAM fresh-leaf counter overflow for {object_name}")
                 })?;

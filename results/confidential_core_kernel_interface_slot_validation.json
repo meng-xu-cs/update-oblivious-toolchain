@@ -4756,7 +4756,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "confidential_core_kernel_interface_slot_bundle_json_bytes": 19124,
+      "confidential_core_kernel_interface_slot_bundle_json_bytes": 19117,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "SingleAccessMap",
@@ -5230,7 +5230,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "confidential_core_kernel_interface_slot_bundle_json_bytes": 19124,
+      "confidential_core_kernel_interface_slot_bundle_json_bytes": 19117,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "SingleAccessMap",
@@ -5704,7 +5704,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "confidential_core_kernel_interface_slot_bundle_json_bytes": 29188,
+      "confidential_core_kernel_interface_slot_bundle_json_bytes": 29181,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "SingleAccessMap",
@@ -6385,7 +6385,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "confidential_core_kernel_interface_slot_bundle_json_bytes": 29188,
+      "confidential_core_kernel_interface_slot_bundle_json_bytes": 29181,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "SingleAccessMap",
@@ -7066,7 +7066,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "confidential_core_kernel_interface_slot_bundle_json_bytes": 61993,
+      "confidential_core_kernel_interface_slot_bundle_json_bytes": 61996,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "ConfidentialMixer",
@@ -8351,7 +8351,7 @@
     {
       "accepted": true,
       "boundary_events": 14,
-      "confidential_core_kernel_interface_slot_bundle_json_bytes": 190674,
+      "confidential_core_kernel_interface_slot_bundle_json_bytes": 190683,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "ERC20Lite",

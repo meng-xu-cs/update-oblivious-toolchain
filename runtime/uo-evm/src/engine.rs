@@ -9,6 +9,7 @@ use crate::runtime::{
     deploy_contract_runtime, run_contract_call, stage_contract_runtime, ContractRuntime,
     PathOramFreshCoinPlan,
 };
+use crate::secret::RuntimeMasterSecret;
 use anyhow::{anyhow, bail, Result};
 use uo_core::{
     CompiledArtifact, EncryptedReturnPayload, ExecutionTrace, PublicEnvironment, ReturnPolicy,
@@ -20,16 +21,15 @@ pub struct ContractInstance {
     state: ContractRuntime,
     /// The seed of a seeded (test or diagnostics) deployment. It tags the
     /// instance's traces so that a run can be replayed. A deployment from OS
-    /// randomness has none: its seed is the root of the runtime's secrets and
-    /// reaches no trace, result or error.
+    /// randomness has none.
     replay_seed: Option<u64>,
     freshness: RuntimeFreshnessState,
     environment: PublicEnvironment,
     initialized: bool,
 }
 
-/// The instance holds the runtime's secrets (its freshness epoch is the
-/// deployment seed), so its `Debug` form shows none of its state.
+/// The instance holds the runtime's secrets (its objects' storage keys and
+/// leaf-coin seeds), so its `Debug` form shows none of its state.
 impl std::fmt::Debug for ContractInstance {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ContractInstance").finish_non_exhaustive()
@@ -178,20 +178,29 @@ impl ProductionContractInstance {
 }
 
 impl ContractInstance {
+    /// Deploy from OS randomness. The master secret and the freshness epoch
+    /// are drawn independently: the epoch is public, since production call
+    /// evidence carries it, and nothing public derives from the secret.
     pub fn deploy(artifact: CompiledArtifact) -> Result<Self> {
+        let master = RuntimeMasterSecret::from_os_rng();
         let freshness = RuntimeFreshnessState::from_os_rng();
-        let deploy_seed = freshness.snapshot().epoch;
-        Self::deploy_with_seed_internal(artifact, deploy_seed, None)
+        Self::deploy_internal(artifact, &master, freshness, None)
     }
 
+    /// Deploy from a seed, so that a test or a diagnostics run can replay
+    /// the deployment. The seed is the epoch, the root of the secrets and
+    /// the tag of the instance's traces; it protects nothing.
     #[cfg(any(test, feature = "diagnostics"))]
     pub fn deploy_with_seed(artifact: CompiledArtifact, deploy_seed: u64) -> Result<Self> {
-        Self::deploy_with_seed_internal(artifact, deploy_seed, Some(deploy_seed))
+        let master = RuntimeMasterSecret::from_diagnostic_seed(deploy_seed);
+        let freshness = RuntimeFreshnessState::from_epoch(deploy_seed);
+        Self::deploy_internal(artifact, &master, freshness, Some(deploy_seed))
     }
 
-    fn deploy_with_seed_internal(
+    fn deploy_internal(
         artifact: CompiledArtifact,
-        deploy_seed: u64,
+        master: &RuntimeMasterSecret,
+        freshness: RuntimeFreshnessState,
         replay_seed: Option<u64>,
     ) -> Result<Self> {
         let initialized = !artifact
@@ -201,10 +210,10 @@ impl ContractInstance {
             .values()
             .any(|entry| entry.initializer);
         Ok(Self {
-            state: deploy_contract_runtime(&artifact.contract.state, deploy_seed)?,
+            state: deploy_contract_runtime(&artifact.contract.state, master)?,
             artifact,
             replay_seed,
-            freshness: RuntimeFreshnessState::from_epoch(deploy_seed),
+            freshness,
             environment: PublicEnvironment::default(),
             initialized,
         })
@@ -428,9 +437,11 @@ mod tests {
     };
     use crate::runtime::ensure_contract_runtime_cold;
     use crate::runtime::objects::RuntimeObject;
+    use crate::runtime::ContractRuntime;
     use chacha20poly1305::aead::AeadInPlace;
     use chacha20poly1305::{ChaCha20Poly1305, KeyInit, Nonce, Tag};
     use sha2::{Digest, Sha256};
+    use std::collections::{BTreeMap, BTreeSet};
     use std::fs;
     use std::path::PathBuf;
     #[cfg(not(feature = "diagnostics"))]
@@ -1330,19 +1341,21 @@ bounds:
         let entrypoint = "put(bytes32,uint256)";
         let args = || vec![b32(7), Value::uint(5)];
 
-        // A deployment from OS randomness: its seed is its freshness epoch,
-        // and neither its traces nor its `Debug` form carry it.
+        // A deployment from OS randomness has no seed: its traces carry no
+        // seed tag, and neither they nor its `Debug` form carry the epoch
+        // it drew.
         let mut unseeded = ContractInstance::deploy(artifact.clone()).unwrap();
-        let seed = unseeded.freshness.snapshot().epoch.to_string();
+        assert_eq!(unseeded.replay_seed, None);
+        let epoch = unseeded.freshness.snapshot().epoch.to_string();
         let result = unseeded.call(entrypoint, args()).unwrap();
         assert_eq!(result.trace.runtime_seed(), None);
         let trace_json = serde_json::to_string(&result.trace).unwrap();
         assert!(trace_json.contains("\"runtime_seed\":null"));
-        assert!(!trace_json.contains(&seed));
-        assert!(!format!("{unseeded:?}").contains(&seed));
+        assert!(!trace_json.contains(&epoch));
+        assert!(!format!("{unseeded:?}").contains(&epoch));
         // The proof objects of an untagged trace still build, without it.
         let bundle = result.trace.runtime_trusted_kernel_bundle().unwrap();
-        assert!(!serde_json::to_string(&bundle).unwrap().contains(&seed));
+        assert!(!serde_json::to_string(&bundle).unwrap().contains(&epoch));
         result.trace.runtime_refinement_witness().unwrap();
         result
             .trace
@@ -1353,6 +1366,174 @@ bounds:
         let mut seeded = ContractInstance::deploy_with_seed(artifact, 17).unwrap();
         let result = seeded.call(entrypoint, args()).unwrap();
         assert_eq!(result.trace.runtime_seed(), Some(17));
+    }
+
+    /// Contracts that between them hold every kind of sealed object: a cell,
+    /// a full-scan map, and Path ORAM maps of both schemes. Each comes with a
+    /// call that writes it.
+    fn sealing_contracts() -> Vec<(uo_core::CompiledArtifact, &'static str, Vec<Value>)> {
+        vec![
+            (
+                compile_bench(
+                    bench_raw!("ConfidentialMixer.sol"),
+                    include_str!(bench_raw!("ConfidentialMixer.pathoram.yaml")),
+                    ProgramMode::Uo,
+                ),
+                "deposit(bytes32,uint256)",
+                vec![b32(7), Value::uint(5)],
+            ),
+            (
+                compile_bench(
+                    bench_raw!("ERC20Lite.sol"),
+                    include_str!(bench_raw!("ERC20Lite.private-posmap.yaml")),
+                    ProgramMode::Uo,
+                ),
+                "mint(address,uint256)",
+                vec![Value::Address([0x11; 20]), Value::uint(5)],
+            ),
+            (
+                compile_bench(
+                    bench_raw!("RegistryCRUD.sol"),
+                    include_str!(bench_raw!("RegistryCRUD.uo.yaml")),
+                    ProgramMode::Uo,
+                ),
+                "upsert(bytes32,uint256)",
+                vec![b32(7), Value::uint(5)],
+            ),
+            (
+                compile_bench(
+                    bench_raw!("FixedSlotClassifier.sol"),
+                    include_str!(bench_raw!("FixedSlotClassifier.uo.yaml")),
+                    ProgramMode::Uo,
+                ),
+                "classify(uint256)",
+                vec![Value::uint(1)],
+            ),
+        ]
+    }
+
+    /// The ciphers of a state's sealed objects, by object id.
+    fn sealed_ciphers(state: &ContractRuntime) -> Vec<(u32, &uo_store::StoreCipher)> {
+        state
+            .object_entries_for_test()
+            .filter_map(|(id, object)| Some((id, object.sealed_storage_for_test()?.0)))
+            .collect()
+    }
+
+    /// The counter that a sealed record's nonce carries. A record is its
+    /// bytes in two nonzero nibbles each: two bytes of magic, the twelve of
+    /// the nonce, then the ciphertext and the tag.
+    fn sealed_record_counter(record: &[u8]) -> u64 {
+        let byte = |index: usize| ((record[2 * index] - 1) << 4) | (record[2 * index + 1] - 1);
+        assert_eq!([byte(0), byte(1)], [0xA5, 0x5A], "not a sealed record");
+        assert_eq!([byte(2), byte(3), byte(4), byte(5)], [0u8; 4]);
+        u64::from_be_bytes(std::array::from_fn(|index| byte(6 + index)))
+    }
+
+    /// The nonce counters of the records in a state's storage, by object id.
+    fn sealed_counters(state: &ContractRuntime) -> BTreeMap<u32, Vec<u64>> {
+        state
+            .object_entries_for_test()
+            .filter_map(|(id, object)| {
+                let (_, records) = object.sealed_storage_for_test()?;
+                Some((id, records.into_iter().map(sealed_record_counter).collect()))
+            })
+            .collect()
+    }
+
+    #[test]
+    fn deployments_from_os_randomness_share_no_epoch_and_no_key() {
+        for (artifact, _, _) in sealing_contracts() {
+            let lhs = ContractInstance::deploy(artifact.clone()).unwrap();
+            let rhs = ContractInstance::deploy(artifact.clone()).unwrap();
+            assert_ne!(
+                lhs.freshness.snapshot().epoch,
+                rhs.freshness.snapshot().epoch
+            );
+            // Every object of either deployment has a key of its own.
+            let ciphers: Vec<&uo_store::StoreCipher> = sealed_ciphers(&lhs.state)
+                .into_iter()
+                .chain(sealed_ciphers(&rhs.state))
+                .map(|(_, cipher)| cipher)
+                .collect();
+            assert!(ciphers.len() >= 2);
+            for (index, cipher) in ciphers.iter().enumerate() {
+                for other in &ciphers[index + 1..] {
+                    assert_ne!(cipher, other);
+                }
+            }
+
+            // A seeded deployment is replayed by its seed and by nothing else.
+            let seeded = ContractInstance::deploy_with_seed(artifact.clone(), 7).unwrap();
+            let replayed = ContractInstance::deploy_with_seed(artifact.clone(), 7).unwrap();
+            let reseeded = ContractInstance::deploy_with_seed(artifact, 8).unwrap();
+            assert_eq!(
+                sealed_ciphers(&seeded.state),
+                sealed_ciphers(&replayed.state)
+            );
+            for ((_, cipher), (_, other)) in sealed_ciphers(&seeded.state)
+                .into_iter()
+                .zip(sealed_ciphers(&reseeded.state))
+            {
+                assert_ne!(cipher, other);
+            }
+        }
+    }
+
+    /// A call that is staged and then dropped has sealed records under the
+    /// committed keys. The records are gone, but their nonces stay used: the
+    /// next call seals with later ones. Before the seal count was kept with
+    /// the key, the next call drew the dropped call's nonces again.
+    #[test]
+    fn a_dropped_staged_call_does_not_give_its_nonces_back() {
+        for (artifact, entrypoint, args) in sealing_contracts() {
+            let mut instance = ContractInstance::deploy_with_seed(artifact, 7).unwrap();
+            instance.call(entrypoint, args.clone()).unwrap();
+            let before = sealed_counters(&instance.state);
+            assert!(!before.is_empty());
+
+            let staged = instance
+                .stage_call(entrypoint, args.clone(), None, None, None)
+                .unwrap();
+            let dropped = sealed_counters(&staged.state);
+            drop(staged);
+            assert_eq!(sealed_counters(&instance.state), before);
+
+            instance.call(entrypoint, args).unwrap();
+            let after = sealed_counters(&instance.state);
+            assert_eq!(
+                after.keys().collect::<Vec<_>>(),
+                before.keys().collect::<Vec<_>>()
+            );
+
+            let mut resealed_objects = 0;
+            for (object, counters) in &after {
+                // No two records of an object carry the same nonce.
+                let distinct: BTreeSet<u64> = counters.iter().copied().collect();
+                assert_eq!(distinct.len(), counters.len());
+
+                let old: BTreeSet<u64> = before[object].iter().copied().collect();
+                let fresh = |counters: &[u64]| -> BTreeSet<u64> {
+                    counters
+                        .iter()
+                        .copied()
+                        .filter(|counter| !old.contains(counter))
+                        .collect()
+                };
+                let dropped_fresh = fresh(&dropped[object]);
+                let committed_fresh = fresh(counters);
+                // The two calls made the same writes, with different nonces.
+                assert_eq!(dropped_fresh.len(), committed_fresh.len());
+                assert!(dropped_fresh.is_disjoint(&committed_fresh));
+                if let (Some(last_dropped), Some(first_committed)) =
+                    (dropped_fresh.iter().max(), committed_fresh.iter().min())
+                {
+                    assert!(last_dropped < first_committed);
+                    resealed_objects += 1;
+                }
+            }
+            assert!(resealed_objects >= 1);
+        }
     }
 
     #[cfg(not(feature = "diagnostics"))]
