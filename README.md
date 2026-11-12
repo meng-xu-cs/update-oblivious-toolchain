@@ -116,11 +116,17 @@ Direct compiler/checker/runtime examples:
 ```bash
 cargo run -q -p uo-solc -- --source benches/raw/FixedSlotClassifier.sol --metadata benches/raw/FixedSlotClassifier.uo.yaml --mode uo --out /tmp/fixedslot.json
 cargo run -q -p uo-check -- --artifact /tmp/fixedslot.json --source benches/raw/FixedSlotClassifier.sol --metadata benches/raw/FixedSlotClassifier.uo.yaml
-cargo run -q -p uo-evm -- --artifact /tmp/fixedslot.json --entrypoint 'peek()' --format trace
-cargo run -q -p uo-evm -- --artifact /tmp/fixedslot.json --entrypoint 'peek()' --format kernel-witness
-cargo run -q -p uo-evm -- --artifact /tmp/fixedslot.json --entrypoint 'peek()' --format trusted-kernel
-cargo run -q -p uo-evm -- --artifact /tmp/fixedslot.json --entrypoint 'peek()' --format refinement-witness
+cargo run -q -p uo-evm -- --artifact /tmp/fixedslot.json --entrypoint 'peek()'
+cargo run -q -p uo-evm --features diagnostics -- --artifact /tmp/fixedslot.json --entrypoint 'peek()' --format trace
+cargo run -q -p uo-evm --features diagnostics -- --artifact /tmp/fixedslot.json --entrypoint 'peek()' --format kernel-witness
+cargo run -q -p uo-evm --features diagnostics -- --artifact /tmp/fixedslot.json --entrypoint 'peek()' --format trusted-kernel
+cargo run -q -p uo-evm --features diagnostics -- --artifact /tmp/fixedslot.json --entrypoint 'peek()' --format refinement-witness
 ```
+
+The first `uo-evm` command prints the call's public receipt, which is all a
+default build prints. The whole trace and the proof objects hold the call's
+private evidence, so those formats exist only in a build with the
+`diagnostics` feature.
 
 Useful probe entry points:
 

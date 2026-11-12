@@ -454,6 +454,36 @@ def RuntimeImplementationInterface.engineDelegatesToRuntimeBridge
       , "ExecutionTrace {"
       , "impl Clone for ContractInstance"
       , "state: self.state.clone()"
+      ] ∧
+    -- A call's result carries the receipt in every build and the whole
+    -- trace only in a test or diagnostics build; no engine function returns
+    -- a trace.
+    sourceContainsAll iface.engineProductionSource
+      [ "#[cfg(not(any(test, feature = \"diagnostics\")))]\n    pub receipt: PublicReceipt,"
+      , "#[cfg(any(test, feature = \"diagnostics\"))]\n    pub trace: ExecutionTrace,"
+      , "#[cfg(not(any(test, feature = \"diagnostics\")))]\n            receipt: trace.into_receipt(),"
+      ] ∧
+    sourceLacksAll iface.engineProductionSource
+      [ "-> Result<ExecutionTrace>"
+      , "-> ExecutionTrace"
+      , "pub aborted: bool,\n    pub trace: ExecutionTrace,"
+      ] ∧
+    -- The receipt has the observer's fields and no other, the evidence and
+    -- the trace are written out only by a test or diagnostics build, the
+    -- evidence is wiped on drop, and nothing hands it out.
+    sourceContainsAll iface.traceProductionSource
+      [ "pub struct PublicReceipt {\n    #[serde(default)]\n    pub opcode_trace: Box<[String]>,\n    #[serde(default)]\n    pub logical_accesses: Box<[LogicalEvent]>,\n    #[serde(default)]\n    pub logical_writes: Box<[LogicalEvent]>,\n    #[serde(default)]\n    pub physical_reads: Box<[PhysicalReadEvent]>,\n    #[serde(default)]\n    pub physical_writes: Box<[PhysicalWriteEvent]>,\n    #[serde(default)]\n    pub gas_used: u64,\n    #[serde(default)]\n    pub theorem_trace: TheoremTrace,\n    #[serde(default, skip_serializing_if = \"Option::is_none\")]\n    pub public_state_transition: Option<RuntimePublicStateTransition>,\n}"
+      , "#[derive(PartialEq, Default)]\n#[cfg_attr(\n    any(test, feature = \"diagnostics\"),\n    derive(Debug, Serialize, Deserialize)\n)]\npub struct PrivateEvidence {"
+      , "#[derive(Debug, PartialEq, Default)]\n#[cfg_attr(any(test, feature = \"diagnostics\"), derive(Serialize, Deserialize))]\npub struct ExecutionTrace {\n    #[cfg_attr(any(test, feature = \"diagnostics\"), serde(flatten))]\n    pub receipt: PublicReceipt,\n    #[cfg_attr(any(test, feature = \"diagnostics\"), serde(flatten))]\n    pub(crate) evidence: PrivateEvidence,\n}"
+      , "impl Drop for PrivateEvidence {\n    fn drop(&mut self) {\n        self.wipe();\n    }\n}"
+      , "pub fn into_receipt(self) -> PublicReceipt {\n        self.receipt\n    }"
+      ] ∧
+    sourceLacksAll iface.traceProductionSource
+      [ "pub evidence: PrivateEvidence"
+      , "pub fn evidence("
+      , "-> PrivateEvidence"
+      , "&PrivateEvidence"
+      , "pub runtime_oram_"
       ]
 
 def RuntimeImplementationInterface.checkEngineDelegatesToRuntimeBridge
@@ -475,6 +505,36 @@ def RuntimeImplementationInterface.checkEngineDelegatesToRuntimeBridge
       , "ExecutionTrace {"
       , "impl Clone for ContractInstance"
       , "state: self.state.clone()"
+      ] &&
+    -- A call's result carries the receipt in every build and the whole
+    -- trace only in a test or diagnostics build; no engine function returns
+    -- a trace.
+    checkSourceContainsAll iface.engineProductionSource
+      [ "#[cfg(not(any(test, feature = \"diagnostics\")))]\n    pub receipt: PublicReceipt,"
+      , "#[cfg(any(test, feature = \"diagnostics\"))]\n    pub trace: ExecutionTrace,"
+      , "#[cfg(not(any(test, feature = \"diagnostics\")))]\n            receipt: trace.into_receipt(),"
+      ] &&
+    checkSourceLacksAll iface.engineProductionSource
+      [ "-> Result<ExecutionTrace>"
+      , "-> ExecutionTrace"
+      , "pub aborted: bool,\n    pub trace: ExecutionTrace,"
+      ] &&
+    -- The receipt has the observer's fields and no other, the evidence and
+    -- the trace are written out only by a test or diagnostics build, the
+    -- evidence is wiped on drop, and nothing hands it out.
+    checkSourceContainsAll iface.traceProductionSource
+      [ "pub struct PublicReceipt {\n    #[serde(default)]\n    pub opcode_trace: Box<[String]>,\n    #[serde(default)]\n    pub logical_accesses: Box<[LogicalEvent]>,\n    #[serde(default)]\n    pub logical_writes: Box<[LogicalEvent]>,\n    #[serde(default)]\n    pub physical_reads: Box<[PhysicalReadEvent]>,\n    #[serde(default)]\n    pub physical_writes: Box<[PhysicalWriteEvent]>,\n    #[serde(default)]\n    pub gas_used: u64,\n    #[serde(default)]\n    pub theorem_trace: TheoremTrace,\n    #[serde(default, skip_serializing_if = \"Option::is_none\")]\n    pub public_state_transition: Option<RuntimePublicStateTransition>,\n}"
+      , "#[derive(PartialEq, Default)]\n#[cfg_attr(\n    any(test, feature = \"diagnostics\"),\n    derive(Debug, Serialize, Deserialize)\n)]\npub struct PrivateEvidence {"
+      , "#[derive(Debug, PartialEq, Default)]\n#[cfg_attr(any(test, feature = \"diagnostics\"), derive(Serialize, Deserialize))]\npub struct ExecutionTrace {\n    #[cfg_attr(any(test, feature = \"diagnostics\"), serde(flatten))]\n    pub receipt: PublicReceipt,\n    #[cfg_attr(any(test, feature = \"diagnostics\"), serde(flatten))]\n    pub(crate) evidence: PrivateEvidence,\n}"
+      , "impl Drop for PrivateEvidence {\n    fn drop(&mut self) {\n        self.wipe();\n    }\n}"
+      , "pub fn into_receipt(self) -> PublicReceipt {\n        self.receipt\n    }"
+      ] &&
+    checkSourceLacksAll iface.traceProductionSource
+      [ "pub evidence: PrivateEvidence"
+      , "pub fn evidence("
+      , "-> PrivateEvidence"
+      , "&PrivateEvidence"
+      , "pub runtime_oram_"
       ]
 
 @[simp] theorem runtimeImplementationInterface_checkEngineDelegatesToRuntimeBridge_eq_true_iff
@@ -482,7 +542,7 @@ def RuntimeImplementationInterface.checkEngineDelegatesToRuntimeBridge
   iface.checkEngineDelegatesToRuntimeBridge = true ↔ iface.engineDelegatesToRuntimeBridge := by
   unfold RuntimeImplementationInterface.checkEngineDelegatesToRuntimeBridge
     RuntimeImplementationInterface.engineDelegatesToRuntimeBridge
-  simp
+  simp [and_assoc]
 
 def RuntimeImplementationInterface.shellRejectsConfidentialExpressionEvaluation
   (iface : RuntimeImplementationInterface) : Prop :=

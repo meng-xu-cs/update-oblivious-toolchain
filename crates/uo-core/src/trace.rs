@@ -6639,8 +6639,12 @@ impl RuntimePublicStateTransition {
     }
 }
 
+/// What the observer of a call sees: the statements the call ran, its
+/// logical and physical storage events, its modeled gas, the theorems' view
+/// of it and its public-state transition. A production runtime returns this
+/// and nothing else of a call's trace.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Default)]
-pub struct ExecutionTrace {
+pub struct PublicReceipt {
     #[serde(default)]
     pub opcode_trace: Box<[String]>,
     #[serde(default)]
@@ -6657,34 +6661,107 @@ pub struct ExecutionTrace {
     pub theorem_trace: TheoremTrace,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub public_state_transition: Option<RuntimePublicStateTransition>,
-    #[serde(default)]
-    runtime_seed: Option<u64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    runtime_kernel_witness: Option<RuntimeKernelWitness>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    runtime_kernel_refinement_witness: Option<RuntimeKernelRefinementWitness>,
-    #[serde(default)]
-    runtime_kernel_finish_bundle: Option<RuntimeKernelFinishBundle>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    runtime_kernel_machine_finish_witness: Option<RuntimeKernelMachineFinishWitness>,
-    #[serde(default)]
-    runtime_trusted_kernel_bundle: Option<RuntimeTrustedKernelBundle>,
-    #[serde(default)]
-    runtime_controller_certificate: Option<RuntimeControllerCertificate>,
-    #[serde(default)]
-    runtime_oram_objects: Box<[RuntimeOramObjectWitness]>,
-    #[serde(default)]
-    runtime_oram_leaf_schedule: Box<[RuntimeOramLeafWitness]>,
-    #[serde(default)]
-    runtime_oram_access_counters_before: Box<[RuntimeOramAccessCounterWitness]>,
-    #[serde(default)]
-    runtime_oram_access_counters_after: Box<[RuntimeOramAccessCounterWitness]>,
-    #[serde(default)]
-    runtime_oram_position_map_before: Box<[RuntimePathOramPositionMapWitness]>,
-    #[serde(default)]
-    runtime_oram_position_map_after: Box<[RuntimePathOramPositionMapWitness]>,
-    #[serde(default)]
-    runtime_oram_leaf_state_transitions: Box<[RuntimePathOramTransitionWitness]>,
+}
+
+/// What a call's proof objects are built from and its observer must not see:
+/// the replay tag of a seeded deployment, the kernel witnesses, and the Path
+/// ORAM leaf schedule, access counters, position maps and leaf transitions.
+/// It stays inside the runtime. Only a test or a diagnostics build can
+/// serialize it or print it, for the Lean checkers.
+#[derive(PartialEq, Default)]
+#[cfg_attr(
+    any(test, feature = "diagnostics"),
+    derive(Debug, Serialize, Deserialize)
+)]
+pub struct PrivateEvidence {
+    #[cfg_attr(any(test, feature = "diagnostics"), serde(default))]
+    pub(crate) runtime_seed: Option<u64>,
+    #[cfg_attr(
+        any(test, feature = "diagnostics"),
+        serde(default, skip_serializing_if = "Option::is_none")
+    )]
+    pub(crate) runtime_kernel_witness: Option<RuntimeKernelWitness>,
+    #[cfg_attr(
+        any(test, feature = "diagnostics"),
+        serde(default, skip_serializing_if = "Option::is_none")
+    )]
+    pub(crate) runtime_kernel_refinement_witness: Option<RuntimeKernelRefinementWitness>,
+    #[cfg_attr(any(test, feature = "diagnostics"), serde(default))]
+    pub(crate) runtime_kernel_finish_bundle: Option<RuntimeKernelFinishBundle>,
+    #[cfg_attr(
+        any(test, feature = "diagnostics"),
+        serde(default, skip_serializing_if = "Option::is_none")
+    )]
+    pub(crate) runtime_kernel_machine_finish_witness: Option<RuntimeKernelMachineFinishWitness>,
+    #[cfg_attr(any(test, feature = "diagnostics"), serde(default))]
+    pub(crate) runtime_trusted_kernel_bundle: Option<RuntimeTrustedKernelBundle>,
+    #[cfg_attr(any(test, feature = "diagnostics"), serde(default))]
+    pub(crate) runtime_controller_certificate: Option<RuntimeControllerCertificate>,
+    #[cfg_attr(any(test, feature = "diagnostics"), serde(default))]
+    pub(crate) runtime_oram_objects: Box<[RuntimeOramObjectWitness]>,
+    #[cfg_attr(any(test, feature = "diagnostics"), serde(default))]
+    pub(crate) runtime_oram_leaf_schedule: Box<[RuntimeOramLeafWitness]>,
+    #[cfg_attr(any(test, feature = "diagnostics"), serde(default))]
+    pub(crate) runtime_oram_access_counters_before: Box<[RuntimeOramAccessCounterWitness]>,
+    #[cfg_attr(any(test, feature = "diagnostics"), serde(default))]
+    pub(crate) runtime_oram_access_counters_after: Box<[RuntimeOramAccessCounterWitness]>,
+    #[cfg_attr(any(test, feature = "diagnostics"), serde(default))]
+    pub(crate) runtime_oram_position_map_before: Box<[RuntimePathOramPositionMapWitness]>,
+    #[cfg_attr(any(test, feature = "diagnostics"), serde(default))]
+    pub(crate) runtime_oram_position_map_after: Box<[RuntimePathOramPositionMapWitness]>,
+    #[cfg_attr(any(test, feature = "diagnostics"), serde(default))]
+    pub(crate) runtime_oram_leaf_state_transitions: Box<[RuntimePathOramTransitionWitness]>,
+}
+
+#[cfg(not(any(test, feature = "diagnostics")))]
+impl std::fmt::Debug for PrivateEvidence {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PrivateEvidence").finish_non_exhaustive()
+    }
+}
+
+impl PrivateEvidence {
+    /// Zero the access counters and the position maps.
+    fn wipe(&mut self) {
+        wipe_runtime_oram_access_counters(&mut self.runtime_oram_access_counters_before);
+        wipe_runtime_oram_access_counters(&mut self.runtime_oram_access_counters_after);
+        wipe_runtime_oram_position_maps(&mut self.runtime_oram_position_map_before);
+        wipe_runtime_oram_position_maps(&mut self.runtime_oram_position_map_after);
+    }
+}
+
+impl Drop for PrivateEvidence {
+    fn drop(&mut self) {
+        self.wipe();
+    }
+}
+
+/// A call's whole trace: its receipt and its private evidence. The proof
+/// objects are built from both. In JSON it is one object with the fields of
+/// the receipt and then those of the evidence, which is the form the Lean
+/// importers read; only a test or a diagnostics build can write it.
+#[derive(Debug, PartialEq, Default)]
+#[cfg_attr(any(test, feature = "diagnostics"), derive(Serialize, Deserialize))]
+pub struct ExecutionTrace {
+    #[cfg_attr(any(test, feature = "diagnostics"), serde(flatten))]
+    pub receipt: PublicReceipt,
+    #[cfg_attr(any(test, feature = "diagnostics"), serde(flatten))]
+    pub(crate) evidence: PrivateEvidence,
+}
+
+/// A trace reads as its receipt.
+impl std::ops::Deref for ExecutionTrace {
+    type Target = PublicReceipt;
+
+    fn deref(&self) -> &PublicReceipt {
+        &self.receipt
+    }
+}
+
+impl std::ops::DerefMut for ExecutionTrace {
+    fn deref_mut(&mut self) -> &mut PublicReceipt {
+        &mut self.receipt
+    }
 }
 
 #[derive(Debug, Error)]
@@ -7304,18 +7381,25 @@ impl RuntimeExecutionTraceFinalizationInput {
 }
 
 impl ExecutionTrace {
+    /// The call's receipt alone. The private evidence is dropped, and its
+    /// access counters and position maps are wiped.
+    pub fn into_receipt(self) -> PublicReceipt {
+        self.receipt
+    }
+
     pub fn runtime_seed(&self) -> Option<u64> {
-        self.runtime_seed
+        self.evidence.runtime_seed
     }
 
     pub(crate) fn stored_runtime_kernel_finish_bundle(&self) -> Option<&RuntimeKernelFinishBundle> {
-        self.runtime_kernel_finish_bundle.as_ref()
+        self.evidence.runtime_kernel_finish_bundle.as_ref()
     }
 
     pub fn exact_runtime_kernel_machine_finish_witness(
         &self,
     ) -> Result<RuntimeKernelMachineFinishWitness, RuntimeKernelFinishBundleAccessError> {
         let runtime_kernel_machine_finish_witness = self
+            .evidence
             .runtime_kernel_machine_finish_witness
             .as_ref()
             .cloned()
@@ -7325,7 +7409,9 @@ impl ExecutionTrace {
         runtime_kernel_machine_finish_witness.validate().map_err(
             RuntimeKernelFinishBundleAccessError::InvalidRuntimeKernelMachineFinishWitness,
         )?;
-        if let Some(runtime_kernel_finish_bundle) = self.runtime_kernel_finish_bundle.as_ref() {
+        if let Some(runtime_kernel_finish_bundle) =
+            self.evidence.runtime_kernel_finish_bundle.as_ref()
+        {
             if runtime_kernel_machine_finish_witness.projected_finish_bundle()
                 != runtime_kernel_finish_bundle.duplicate()
             {
@@ -7341,12 +7427,13 @@ impl ExecutionTrace {
         &self,
     ) -> Result<RuntimeKernelFinishBundle, RuntimeKernelFinishBundleAccessError> {
         let runtime_kernel_finish_bundle = self
+            .evidence
             .runtime_kernel_finish_bundle
             .as_ref()
             .map(RuntimeKernelFinishBundle::duplicate)
             .ok_or(RuntimeKernelFinishBundleAccessError::MissingRuntimeKernelFinishBundle)?;
         RuntimeExecutionTraceParts::validate_runtime_kernel_machine_finish_witness_against_finish_bundle(
-            self.runtime_kernel_machine_finish_witness.as_ref(),
+            self.evidence.runtime_kernel_machine_finish_witness.as_ref(),
             Some(&runtime_kernel_finish_bundle),
         )
         .map_err(|err| match err {
@@ -7361,8 +7448,8 @@ impl ExecutionTrace {
             }
         })?;
         RuntimeExecutionTraceParts::validate_runtime_kernel_witness_pair_against_finish_bundle(
-            self.runtime_kernel_witness.clone(),
-            self.runtime_kernel_refinement_witness.clone(),
+            self.evidence.runtime_kernel_witness.clone(),
+            self.evidence.runtime_kernel_refinement_witness.clone(),
             Some(&runtime_kernel_finish_bundle),
         )
         .map_err(|err| match err {
@@ -7400,7 +7487,8 @@ impl ExecutionTrace {
     }
 
     pub fn runtime_public_oram_access_counters_before(&self) -> BTreeMap<u32, u64> {
-        self.runtime_oram_access_counters_before
+        self.evidence
+            .runtime_oram_access_counters_before
             .iter()
             .map(|counter| (counter.object_id, counter.access_counter))
             .collect()
@@ -7431,28 +7519,32 @@ impl ExecutionTrace {
             runtime_oram_leaf_state_transitions,
         } = parts;
         Self {
-            opcode_trace,
-            logical_accesses,
-            logical_writes,
-            physical_reads,
-            physical_writes,
-            gas_used,
-            theorem_trace,
-            public_state_transition,
-            runtime_seed,
-            runtime_kernel_witness,
-            runtime_kernel_refinement_witness,
-            runtime_kernel_finish_bundle,
-            runtime_kernel_machine_finish_witness,
-            runtime_trusted_kernel_bundle: None,
-            runtime_controller_certificate,
-            runtime_oram_objects,
-            runtime_oram_leaf_schedule,
-            runtime_oram_access_counters_before,
-            runtime_oram_access_counters_after,
-            runtime_oram_position_map_before,
-            runtime_oram_position_map_after,
-            runtime_oram_leaf_state_transitions,
+            receipt: PublicReceipt {
+                opcode_trace,
+                logical_accesses,
+                logical_writes,
+                physical_reads,
+                physical_writes,
+                gas_used,
+                theorem_trace,
+                public_state_transition,
+            },
+            evidence: PrivateEvidence {
+                runtime_seed,
+                runtime_kernel_witness,
+                runtime_kernel_refinement_witness,
+                runtime_kernel_finish_bundle,
+                runtime_kernel_machine_finish_witness,
+                runtime_trusted_kernel_bundle: None,
+                runtime_controller_certificate,
+                runtime_oram_objects,
+                runtime_oram_leaf_schedule,
+                runtime_oram_access_counters_before,
+                runtime_oram_access_counters_after,
+                runtime_oram_position_map_before,
+                runtime_oram_position_map_after,
+                runtime_oram_leaf_state_transitions,
+            },
         }
     }
 
@@ -7556,7 +7648,7 @@ impl ExecutionTrace {
         push_primitive_event(
             &mut events,
             RuntimePrimitiveEventKind::RuntimeSeed,
-            &self.runtime_seed,
+            &self.evidence.runtime_seed,
         )?;
         for (index, opcode) in self.opcode_trace.iter().enumerate() {
             push_primitive_event(
@@ -7621,34 +7713,34 @@ impl ExecutionTrace {
         push_primitive_event(
             &mut events,
             RuntimePrimitiveEventKind::RuntimeKernelWitness,
-            &self.runtime_kernel_witness,
+            &self.evidence.runtime_kernel_witness,
         )?;
         push_primitive_event(
             &mut events,
             RuntimePrimitiveEventKind::RuntimeKernelRefinementWitness,
-            &self.runtime_kernel_refinement_witness,
+            &self.evidence.runtime_kernel_refinement_witness,
         )?;
         push_primitive_event(
             &mut events,
             RuntimePrimitiveEventKind::RuntimeKernelFinishBundle,
-            &self.runtime_kernel_finish_bundle,
+            &self.evidence.runtime_kernel_finish_bundle,
         )?;
         push_primitive_event(
             &mut events,
             RuntimePrimitiveEventKind::RuntimeKernelMachineFinishWitness,
-            &self.runtime_kernel_machine_finish_witness,
+            &self.evidence.runtime_kernel_machine_finish_witness,
         )?;
         push_primitive_event(
             &mut events,
             RuntimePrimitiveEventKind::RuntimeTrustedKernelBundle,
-            &self.runtime_trusted_kernel_bundle,
+            &self.evidence.runtime_trusted_kernel_bundle,
         )?;
         push_primitive_event(
             &mut events,
             RuntimePrimitiveEventKind::RuntimeControllerCertificate,
-            &self.runtime_controller_certificate,
+            &self.evidence.runtime_controller_certificate,
         )?;
-        for (index, witness) in self.runtime_oram_objects.iter().enumerate() {
+        for (index, witness) in self.evidence.runtime_oram_objects.iter().enumerate() {
             push_primitive_event(
                 &mut events,
                 RuntimePrimitiveEventKind::RuntimeOramObject,
@@ -7658,7 +7750,7 @@ impl ExecutionTrace {
                 },
             )?;
         }
-        for (index, witness) in self.runtime_oram_leaf_schedule.iter().enumerate() {
+        for (index, witness) in self.evidence.runtime_oram_leaf_schedule.iter().enumerate() {
             push_primitive_event(
                 &mut events,
                 RuntimePrimitiveEventKind::RuntimeOramLeafSchedule,
@@ -7668,7 +7760,12 @@ impl ExecutionTrace {
                 },
             )?;
         }
-        for (index, witness) in self.runtime_oram_access_counters_before.iter().enumerate() {
+        for (index, witness) in self
+            .evidence
+            .runtime_oram_access_counters_before
+            .iter()
+            .enumerate()
+        {
             push_primitive_event(
                 &mut events,
                 RuntimePrimitiveEventKind::RuntimeOramAccessCounterBefore,
@@ -7678,7 +7775,12 @@ impl ExecutionTrace {
                 },
             )?;
         }
-        for (index, witness) in self.runtime_oram_access_counters_after.iter().enumerate() {
+        for (index, witness) in self
+            .evidence
+            .runtime_oram_access_counters_after
+            .iter()
+            .enumerate()
+        {
             push_primitive_event(
                 &mut events,
                 RuntimePrimitiveEventKind::RuntimeOramAccessCounterAfter,
@@ -7688,7 +7790,12 @@ impl ExecutionTrace {
                 },
             )?;
         }
-        for (index, witness) in self.runtime_oram_position_map_before.iter().enumerate() {
+        for (index, witness) in self
+            .evidence
+            .runtime_oram_position_map_before
+            .iter()
+            .enumerate()
+        {
             push_primitive_event(
                 &mut events,
                 RuntimePrimitiveEventKind::RuntimeOramPositionMapBefore,
@@ -7698,7 +7805,12 @@ impl ExecutionTrace {
                 },
             )?;
         }
-        for (index, witness) in self.runtime_oram_position_map_after.iter().enumerate() {
+        for (index, witness) in self
+            .evidence
+            .runtime_oram_position_map_after
+            .iter()
+            .enumerate()
+        {
             push_primitive_event(
                 &mut events,
                 RuntimePrimitiveEventKind::RuntimeOramPositionMapAfter,
@@ -7708,7 +7820,12 @@ impl ExecutionTrace {
                 },
             )?;
         }
-        for (index, witness) in self.runtime_oram_leaf_state_transitions.iter().enumerate() {
+        for (index, witness) in self
+            .evidence
+            .runtime_oram_leaf_state_transitions
+            .iter()
+            .enumerate()
+        {
             push_primitive_event(
                 &mut events,
                 RuntimePrimitiveEventKind::RuntimeOramLeafStateTransition,
@@ -7725,19 +7842,21 @@ impl ExecutionTrace {
         RuntimeProofObjectPayload {
             public_state_transition: &self.public_state_transition,
             theorem_trace: &self.theorem_trace,
-            runtime_kernel_witness: &self.runtime_kernel_witness,
-            runtime_kernel_refinement_witness: &self.runtime_kernel_refinement_witness,
-            runtime_kernel_finish_bundle: &self.runtime_kernel_finish_bundle,
-            runtime_kernel_machine_finish_witness: &self.runtime_kernel_machine_finish_witness,
-            runtime_trusted_kernel_bundle: &self.runtime_trusted_kernel_bundle,
-            runtime_controller_certificate: &self.runtime_controller_certificate,
-            runtime_oram_objects: &self.runtime_oram_objects,
-            runtime_oram_leaf_schedule: &self.runtime_oram_leaf_schedule,
-            runtime_oram_access_counters_before: &self.runtime_oram_access_counters_before,
-            runtime_oram_access_counters_after: &self.runtime_oram_access_counters_after,
-            runtime_oram_position_map_before: &self.runtime_oram_position_map_before,
-            runtime_oram_position_map_after: &self.runtime_oram_position_map_after,
-            runtime_oram_leaf_state_transitions: &self.runtime_oram_leaf_state_transitions,
+            runtime_kernel_witness: &self.evidence.runtime_kernel_witness,
+            runtime_kernel_refinement_witness: &self.evidence.runtime_kernel_refinement_witness,
+            runtime_kernel_finish_bundle: &self.evidence.runtime_kernel_finish_bundle,
+            runtime_kernel_machine_finish_witness: &self
+                .evidence
+                .runtime_kernel_machine_finish_witness,
+            runtime_trusted_kernel_bundle: &self.evidence.runtime_trusted_kernel_bundle,
+            runtime_controller_certificate: &self.evidence.runtime_controller_certificate,
+            runtime_oram_objects: &self.evidence.runtime_oram_objects,
+            runtime_oram_leaf_schedule: &self.evidence.runtime_oram_leaf_schedule,
+            runtime_oram_access_counters_before: &self.evidence.runtime_oram_access_counters_before,
+            runtime_oram_access_counters_after: &self.evidence.runtime_oram_access_counters_after,
+            runtime_oram_position_map_before: &self.evidence.runtime_oram_position_map_before,
+            runtime_oram_position_map_after: &self.evidence.runtime_oram_position_map_after,
+            runtime_oram_leaf_state_transitions: &self.evidence.runtime_oram_leaf_state_transitions,
         }
     }
 
@@ -7778,7 +7897,8 @@ impl ExecutionTrace {
                 .normalized_micro_trace
                 .clone()
                 .ok_or(RefinementWitnessError::MissingNormalizedMicroTrace)?,
-            self.runtime_controller_certificate
+            self.evidence
+                .runtime_controller_certificate
                 .clone()
                 .ok_or(RefinementWitnessError::MissingControllerCertificate)?,
         )
@@ -7789,11 +7909,11 @@ impl ExecutionTrace {
     ) -> Result<RuntimePathOramHiddenCertificate, RefinementWitnessError> {
         RuntimePathOramHiddenCertificate::new(
             self.refinement_trace(),
-            self.runtime_oram_objects.clone(),
-            self.runtime_oram_leaf_schedule.clone(),
-            self.runtime_oram_position_map_before.clone(),
-            self.runtime_oram_position_map_after.clone(),
-            self.runtime_oram_leaf_state_transitions.clone(),
+            self.evidence.runtime_oram_objects.clone(),
+            self.evidence.runtime_oram_leaf_schedule.clone(),
+            self.evidence.runtime_oram_position_map_before.clone(),
+            self.evidence.runtime_oram_position_map_after.clone(),
+            self.evidence.runtime_oram_leaf_state_transitions.clone(),
         )
     }
 
@@ -7802,7 +7922,7 @@ impl ExecutionTrace {
     ) -> Result<RuntimeTrustedKernelBundle, RefinementWitnessError> {
         let kernel_witness = self.checked_runtime_kernel_witness()?;
         RuntimeTrustedKernelBundle::new_with_kernel_witness(
-            self.runtime_seed,
+            self.evidence.runtime_seed,
             self.reconstructed_runtime_controller_observer_certificate()?,
             kernel_witness,
             self.reconstructed_runtime_path_oram_hidden_certificate()?,
@@ -7813,7 +7933,7 @@ impl ExecutionTrace {
         &self,
     ) -> Result<RuntimeControllerObserverCertificate, RefinementWitnessError> {
         let reconstructed = self.reconstructed_runtime_controller_observer_certificate()?;
-        if let Some(bundle) = &self.runtime_trusted_kernel_bundle {
+        if let Some(bundle) = &self.evidence.runtime_trusted_kernel_bundle {
             bundle.controller_observer.validate()?;
             if bundle.controller_observer != reconstructed {
                 return Err(RefinementWitnessError::ControllerObserverTraceMismatch);
@@ -7827,7 +7947,7 @@ impl ExecutionTrace {
         &self,
     ) -> Result<RuntimePathOramHiddenCertificate, RefinementWitnessError> {
         let reconstructed = self.reconstructed_runtime_path_oram_hidden_certificate()?;
-        if let Some(bundle) = &self.runtime_trusted_kernel_bundle {
+        if let Some(bundle) = &self.evidence.runtime_trusted_kernel_bundle {
             bundle.hidden_certificate.validate()?;
             if bundle.hidden_certificate != reconstructed {
                 return Err(RefinementWitnessError::HiddenCertificateTraceMismatch);
@@ -7858,7 +7978,7 @@ impl ExecutionTrace {
             return Err(RefinementWitnessError::TrustedKernelBundleTraceMismatch);
         }
         bundle.validate()?;
-        self.runtime_trusted_kernel_bundle = Some(bundle);
+        self.evidence.runtime_trusted_kernel_bundle = Some(bundle);
         Ok(())
     }
 
@@ -7879,7 +7999,7 @@ impl ExecutionTrace {
         ),
         RefinementWitnessError,
     > {
-        if let Some(runtime_kernel_finish_bundle) = &self.runtime_kernel_finish_bundle {
+        if let Some(runtime_kernel_finish_bundle) = &self.evidence.runtime_kernel_finish_bundle {
             let (kernel_witness, runtime_kernel_refinement_witness) = runtime_kernel_finish_bundle
                 .to_witness_pair()
                 .map_err(|err| match err {
@@ -7890,13 +8010,13 @@ impl ExecutionTrace {
                         RefinementWitnessError::RuntimeKernelRefinement(err)
                     }
                 })?;
-            if let Some(trace_kernel_witness) = &self.runtime_kernel_witness {
+            if let Some(trace_kernel_witness) = &self.evidence.runtime_kernel_witness {
                 if trace_kernel_witness != &kernel_witness {
                     return Err(RefinementWitnessError::KernelWitnessFinishBundleMismatch);
                 }
             }
             if let Some(trace_runtime_kernel_refinement_witness) =
-                &self.runtime_kernel_refinement_witness
+                &self.evidence.runtime_kernel_refinement_witness
             {
                 if trace_runtime_kernel_refinement_witness != &runtime_kernel_refinement_witness {
                     return Err(
@@ -7910,15 +8030,15 @@ impl ExecutionTrace {
             ));
         }
         Ok((
-            self.runtime_kernel_witness.clone(),
-            self.runtime_kernel_refinement_witness.clone(),
+            self.evidence.runtime_kernel_witness.clone(),
+            self.evidence.runtime_kernel_refinement_witness.clone(),
         ))
     }
 
     fn checked_exported_runtime_kernel_witness(
         &self,
     ) -> Result<Option<RuntimeKernelWitness>, KernelWitnessError> {
-        if let Some(runtime_kernel_finish_bundle) = &self.runtime_kernel_finish_bundle {
+        if let Some(runtime_kernel_finish_bundle) = &self.evidence.runtime_kernel_finish_bundle {
             let kernel_witness =
                 runtime_kernel_finish_bundle
                     .to_kernel_witness()
@@ -7928,20 +8048,20 @@ impl ExecutionTrace {
                             KernelWitnessError::FinishBundleMismatch
                         }
                     })?;
-            if let Some(trace_kernel_witness) = &self.runtime_kernel_witness {
+            if let Some(trace_kernel_witness) = &self.evidence.runtime_kernel_witness {
                 if trace_kernel_witness != &kernel_witness {
                     return Err(KernelWitnessError::FinishBundleMismatch);
                 }
             }
             return Ok(Some(kernel_witness));
         }
-        Ok(self.runtime_kernel_witness.clone())
+        Ok(self.evidence.runtime_kernel_witness.clone())
     }
 
     fn checked_exported_runtime_kernel_refinement_witness(
         &self,
     ) -> Result<Option<RuntimeKernelRefinementWitness>, RuntimeKernelRefinementWitnessError> {
-        if let Some(runtime_kernel_finish_bundle) = &self.runtime_kernel_finish_bundle {
+        if let Some(runtime_kernel_finish_bundle) = &self.evidence.runtime_kernel_finish_bundle {
             let runtime_kernel_refinement_witness = runtime_kernel_finish_bundle
                 .to_runtime_kernel_refinement_witness()
                 .map_err(|err| match err {
@@ -7951,7 +8071,7 @@ impl ExecutionTrace {
                     }
                 })?;
             if let Some(trace_runtime_kernel_refinement_witness) =
-                &self.runtime_kernel_refinement_witness
+                &self.evidence.runtime_kernel_refinement_witness
             {
                 if trace_runtime_kernel_refinement_witness != &runtime_kernel_refinement_witness {
                     return Err(RuntimeKernelRefinementWitnessError::FinishBundleMismatch);
@@ -7959,7 +8079,7 @@ impl ExecutionTrace {
             }
             return Ok(Some(runtime_kernel_refinement_witness));
         }
-        Ok(self.runtime_kernel_refinement_witness.clone())
+        Ok(self.evidence.runtime_kernel_refinement_witness.clone())
     }
 
     fn checked_runtime_kernel_witness(
@@ -7970,7 +8090,7 @@ impl ExecutionTrace {
     }
 
     fn checked_runtime_kernel_witness_mismatch_error(&self) -> RefinementWitnessError {
-        if self.runtime_kernel_finish_bundle.is_some() {
+        if self.evidence.runtime_kernel_finish_bundle.is_some() {
             RefinementWitnessError::KernelWitnessFinishBundleMismatch
         } else {
             RefinementWitnessError::KernelWitnessTraceMismatch
@@ -7980,7 +8100,7 @@ impl ExecutionTrace {
     pub fn runtime_trusted_kernel_bundle(
         &self,
     ) -> Result<RuntimeTrustedKernelBundle, RefinementWitnessError> {
-        if let Some(bundle) = &self.runtime_trusted_kernel_bundle {
+        if let Some(bundle) = &self.evidence.runtime_trusted_kernel_bundle {
             let mut bundle = bundle.duplicate();
             let checked_kernel_witness = self.checked_runtime_kernel_witness()?;
             if let Some(trace_kernel_witness) = &checked_kernel_witness {
@@ -8253,17 +8373,18 @@ mod tests {
         CanonicalFreshCoinRuntimePathOramWitnessFamily, CanonicalFreshCoinTheoremInputError,
         CanonicalFreshCoinWitnessFamilyError, ExecutionTrace, ExitEvent, KernelWitnessError,
         LogicalEvent, NormalizedMicroTrace, NormalizedPageEvent, OutputShape, PageEventKind,
-        PhysicalReadEvent, PhysicalWriteEvent, PublicOutcomeTrace, RefinementWitnessError,
-        RuntimeControllerCertificate, RuntimeExecutionTraceParts, RuntimeKernelBoundaryTracker,
-        RuntimeKernelBoundaryTrackerError, RuntimeKernelExecutionTracker,
-        RuntimeKernelFinishBundle, RuntimeKernelFinishBundleAccessError,
-        RuntimeKernelFinishBundleError, RuntimeKernelFinishSnapshot,
-        RuntimeKernelFinishSnapshotError, RuntimeKernelRefinementEventWitness,
-        RuntimeKernelRefinementTracker, RuntimeKernelRefinementTrackerError,
-        RuntimeKernelRefinementWitness, RuntimeKernelRefinementWitnessError,
-        RuntimeKernelStepWitness, RuntimeKernelTelemetrySnapshot, RuntimeKernelWitness,
-        RuntimeMaskedUsizeOptionWitness, RuntimeOramAccessWitness, RuntimeOramLeafScaffoldWitness,
-        RuntimeOramLeafWitness, RuntimeOramObjectWitness, RuntimePaperMainSlotFamilyBundleError,
+        PhysicalReadEvent, PhysicalWriteEvent, PrivateEvidence, PublicOutcomeTrace, PublicReceipt,
+        RefinementWitnessError, RuntimeControllerCertificate, RuntimeExecutionTraceParts,
+        RuntimeKernelBoundaryTracker, RuntimeKernelBoundaryTrackerError,
+        RuntimeKernelExecutionTracker, RuntimeKernelFinishBundle,
+        RuntimeKernelFinishBundleAccessError, RuntimeKernelFinishBundleError,
+        RuntimeKernelFinishSnapshot, RuntimeKernelFinishSnapshotError,
+        RuntimeKernelRefinementEventWitness, RuntimeKernelRefinementTracker,
+        RuntimeKernelRefinementTrackerError, RuntimeKernelRefinementWitness,
+        RuntimeKernelRefinementWitnessError, RuntimeKernelStepWitness,
+        RuntimeKernelTelemetrySnapshot, RuntimeKernelWitness, RuntimeMaskedUsizeOptionWitness,
+        RuntimeOramAccessWitness, RuntimeOramLeafScaffoldWitness, RuntimeOramLeafWitness,
+        RuntimeOramObjectWitness, RuntimePaperMainSlotFamilyBundleError,
         RuntimePathOramPositionMapWitness, RuntimePathOramTransitionKind,
         RuntimePathOramTransitionWitness, RuntimePrimitiveEventKind, RuntimeRefinementWitness,
         SeededRuntimePaperMainFamilyBundle, SeededRuntimePaperMainFamilyBundleError,
@@ -8323,6 +8444,111 @@ mod tests {
         assert_eq!(classify_write(&[0, 0], &[1, 2]), WriteClass::Set);
         assert_eq!(classify_write(&[1, 2], &[0, 0]), WriteClass::Clear);
         assert_eq!(classify_write(&[1, 2], &[2, 3]), WriteClass::Update);
+    }
+
+    /// The keys of a JSON object's own fields, in the order they are written.
+    fn top_level_json_keys(json: &str) -> Vec<String> {
+        let mut keys = Vec::new();
+        let mut depth = 0usize;
+        let mut chars = json.char_indices().peekable();
+        while let Some((start, ch)) = chars.next() {
+            match ch {
+                '{' | '[' => depth += 1,
+                '}' | ']' => depth -= 1,
+                '"' => {
+                    let mut end = start + 1;
+                    while let Some((index, inner)) = chars.next() {
+                        if inner == '\\' {
+                            chars.next();
+                        } else if inner == '"' {
+                            end = index;
+                            break;
+                        }
+                    }
+                    if depth == 1 && matches!(chars.peek(), Some((_, ':'))) {
+                        keys.push(json[start + 1..end].to_owned());
+                    }
+                }
+                _ => {}
+            }
+        }
+        keys
+    }
+
+    /// A trace's JSON is one object: the receipt's fields, then the
+    /// evidence's, under the names the Lean importers read. A receipt's JSON
+    /// holds the receipt's fields only.
+    #[test]
+    fn a_trace_serializes_as_its_receipt_fields_then_its_evidence_fields() {
+        use crate::observer_coverage::{PRIVATE_EVIDENCE_FIELDS, PUBLIC_RECEIPT_FIELDS};
+
+        let trace = sample_runtime_execution_trace_with_seed(7);
+        // An absent optional field of these four is not written.
+        let unwritten = [
+            "public_state_transition",
+            "runtime_kernel_witness",
+            "runtime_kernel_refinement_witness",
+            "runtime_kernel_machine_finish_witness",
+        ];
+        let written = |fields: &[&str]| -> Vec<String> {
+            fields
+                .iter()
+                .filter(|field| !unwritten.contains(field))
+                .map(|field| (*field).to_owned())
+                .collect()
+        };
+
+        let trace_json = serde_json::to_string(&trace).unwrap();
+        let mut expected = written(PUBLIC_RECEIPT_FIELDS);
+        expected.extend(written(PRIVATE_EVIDENCE_FIELDS));
+        assert_eq!(top_level_json_keys(&trace_json), expected);
+        let reread: ExecutionTrace = serde_json::from_str(&trace_json).unwrap();
+        assert_eq!(reread, trace);
+
+        let receipt_json = serde_json::to_string(&trace.receipt).unwrap();
+        assert_eq!(
+            top_level_json_keys(&receipt_json),
+            written(PUBLIC_RECEIPT_FIELDS)
+        );
+        assert!(trace_json.starts_with(&receipt_json[..receipt_json.len() - 1]));
+        for field in PRIVATE_EVIDENCE_FIELDS {
+            assert!(!receipt_json.contains(&format!("\"{field}\"")), "{field}");
+        }
+        // Reading a trace's JSON as a receipt drops the evidence.
+        let receipt: PublicReceipt = serde_json::from_str(&trace_json).unwrap();
+        assert_eq!(receipt, trace.receipt);
+        assert_eq!(trace.into_receipt(), receipt);
+    }
+
+    /// Dropping the private evidence wipes its access counters and position
+    /// maps: the destructor runs the wipe this test calls.
+    #[test]
+    fn private_evidence_wipes_counters_and_position_maps() {
+        let mut evidence = sample_runtime_execution_trace_with_seed(7).evidence;
+        evidence.runtime_oram_access_counters_before =
+            vec![super::RuntimeOramAccessCounterWitness {
+                object_id: 1,
+                object_name: "records".into(),
+                access_counter: 9,
+            }]
+            .into_boxed_slice();
+        let before = evidence.runtime_oram_position_map_before.clone();
+        assert!(before
+            .iter()
+            .any(|map| map.leaves.iter().any(|leaf| leaf.present)));
+        evidence.wipe();
+        assert_eq!(
+            evidence.runtime_oram_access_counters_before[0].access_counter,
+            0
+        );
+        assert_ne!(evidence.runtime_oram_position_map_before, before);
+        assert!(evidence
+            .runtime_oram_position_map_before
+            .iter()
+            .all(|map| map
+                .leaves
+                .iter()
+                .all(|leaf| !leaf.present && leaf.value == 0)));
     }
 
     #[test]
@@ -8808,8 +9034,8 @@ mod tests {
             .unwrap(),
         );
 
-        assert_eq!(trace.runtime_kernel_witness, None);
-        assert_eq!(trace.runtime_kernel_refinement_witness, None);
+        assert_eq!(trace.evidence.runtime_kernel_witness, None);
+        assert_eq!(trace.evidence.runtime_kernel_refinement_witness, None);
         assert_eq!(
             trace.exact_runtime_kernel_witness().unwrap(),
             sample_runtime_kernel_witness()
@@ -9206,56 +9432,60 @@ mod tests {
         let normalized_micro_trace = controller_shape.normalized_micro_trace();
         let path = sample_path_bucket_indices();
         ExecutionTrace {
-            opcode_trace: vec!["declare".into(), "return".into()].into_boxed_slice(),
-            logical_accesses: sample_oram_logical_accesses().into_boxed_slice(),
-            logical_writes: vec![].into_boxed_slice(),
-            physical_reads: path
-                .iter()
-                .map(|index| PhysicalReadEvent {
-                    object: "records".into(),
-                    location: format!("records@bucket{index}"),
-                    len: 64,
-                })
-                .collect::<Vec<_>>()
-                .into_boxed_slice(),
-            physical_writes: path
-                .iter()
-                .rev()
-                .map(|index| {
-                    PhysicalWriteEvent::from_shape(
-                        "records",
-                        format!("records@bucket{index}"),
-                        2,
-                        WriteClass::Update,
-                    )
-                })
-                .collect::<Vec<_>>()
-                .into_boxed_slice(),
-            gas_used: 99,
-            theorem_trace: TheoremTrace {
-                public_outcome: Some(public_outcome.clone()),
-                boundary_schedule: controller_certificate.boundary_schedule(&public_outcome),
-                controller_shape: Some(controller_shape.clone()),
-                normalized_micro_trace: Some(normalized_micro_trace.clone()),
+            receipt: PublicReceipt {
+                opcode_trace: vec!["declare".into(), "return".into()].into_boxed_slice(),
+                logical_accesses: sample_oram_logical_accesses().into_boxed_slice(),
+                logical_writes: vec![].into_boxed_slice(),
+                physical_reads: path
+                    .iter()
+                    .map(|index| PhysicalReadEvent {
+                        object: "records".into(),
+                        location: format!("records@bucket{index}"),
+                        len: 64,
+                    })
+                    .collect::<Vec<_>>()
+                    .into_boxed_slice(),
+                physical_writes: path
+                    .iter()
+                    .rev()
+                    .map(|index| {
+                        PhysicalWriteEvent::from_shape(
+                            "records",
+                            format!("records@bucket{index}"),
+                            2,
+                            WriteClass::Update,
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .into_boxed_slice(),
+                gas_used: 99,
+                theorem_trace: TheoremTrace {
+                    public_outcome: Some(public_outcome.clone()),
+                    boundary_schedule: controller_certificate.boundary_schedule(&public_outcome),
+                    controller_shape: Some(controller_shape.clone()),
+                    normalized_micro_trace: Some(normalized_micro_trace.clone()),
+                },
+                public_state_transition: None,
             },
-            public_state_transition: None,
-            runtime_seed: Some(seed),
-            runtime_kernel_witness: None,
-            runtime_kernel_refinement_witness: None,
-            runtime_kernel_machine_finish_witness: None,
-            runtime_kernel_finish_bundle: None,
-            runtime_trusted_kernel_bundle: None,
-            runtime_controller_certificate: Some(controller_certificate),
-            runtime_oram_objects: vec![sample_oram_object()].into_boxed_slice(),
-            runtime_oram_leaf_schedule: sample_oram_leaf_schedule().into_boxed_slice(),
-            runtime_oram_access_counters_before: Vec::new().into_boxed_slice(),
-            runtime_oram_access_counters_after: Vec::new().into_boxed_slice(),
-            runtime_oram_position_map_before: sample_path_oram_position_map_before()
-                .into_boxed_slice(),
-            runtime_oram_position_map_after: sample_path_oram_position_map_after()
-                .into_boxed_slice(),
-            runtime_oram_leaf_state_transitions: sample_path_oram_leaf_state_transitions()
-                .into_boxed_slice(),
+            evidence: PrivateEvidence {
+                runtime_seed: Some(seed),
+                runtime_kernel_witness: None,
+                runtime_kernel_refinement_witness: None,
+                runtime_kernel_finish_bundle: None,
+                runtime_kernel_machine_finish_witness: None,
+                runtime_trusted_kernel_bundle: None,
+                runtime_controller_certificate: Some(controller_certificate),
+                runtime_oram_objects: vec![sample_oram_object()].into_boxed_slice(),
+                runtime_oram_leaf_schedule: sample_oram_leaf_schedule().into_boxed_slice(),
+                runtime_oram_access_counters_before: Vec::new().into_boxed_slice(),
+                runtime_oram_access_counters_after: Vec::new().into_boxed_slice(),
+                runtime_oram_position_map_before: sample_path_oram_position_map_before()
+                    .into_boxed_slice(),
+                runtime_oram_position_map_after: sample_path_oram_position_map_after()
+                    .into_boxed_slice(),
+                runtime_oram_leaf_state_transitions: sample_path_oram_leaf_state_transitions()
+                    .into_boxed_slice(),
+            },
         }
     }
 
@@ -9631,64 +9861,74 @@ mod tests {
         let controller_shape = controller_certificate.controller_shape();
         let normalized_micro_trace = controller_shape.normalized_micro_trace();
         let trace = ExecutionTrace {
-            opcode_trace: vec!["declare".into(), "return".into()].into_boxed_slice(),
-            logical_accesses: sample_read_miss_logical_accesses().into_boxed_slice(),
-            logical_writes: vec![].into_boxed_slice(),
-            physical_reads: vec![PhysicalReadEvent {
-                object: "tiny_records".into(),
-                location: "tiny_records@bucket0".into(),
-                len: 64,
-            }]
-            .into_boxed_slice(),
-            physical_writes: vec![PhysicalWriteEvent::from_shape(
-                "tiny_records",
-                "tiny_records@bucket0",
-                1,
-                WriteClass::Update,
-            )]
-            .into_boxed_slice(),
-            gas_used: 7,
-            theorem_trace: TheoremTrace {
-                public_outcome: Some(public_outcome.clone()),
-                boundary_schedule: controller_certificate.boundary_schedule(&public_outcome),
-                controller_shape: Some(controller_shape.clone()),
-                normalized_micro_trace: Some(normalized_micro_trace),
+            receipt: PublicReceipt {
+                opcode_trace: vec!["declare".into(), "return".into()].into_boxed_slice(),
+                logical_accesses: sample_read_miss_logical_accesses().into_boxed_slice(),
+                logical_writes: vec![].into_boxed_slice(),
+                physical_reads: vec![PhysicalReadEvent {
+                    object: "tiny_records".into(),
+                    location: "tiny_records@bucket0".into(),
+                    len: 64,
+                }]
+                .into_boxed_slice(),
+                physical_writes: vec![PhysicalWriteEvent::from_shape(
+                    "tiny_records",
+                    "tiny_records@bucket0",
+                    1,
+                    WriteClass::Update,
+                )]
+                .into_boxed_slice(),
+                gas_used: 7,
+                theorem_trace: TheoremTrace {
+                    public_outcome: Some(public_outcome.clone()),
+                    boundary_schedule: controller_certificate.boundary_schedule(&public_outcome),
+                    controller_shape: Some(controller_shape.clone()),
+                    normalized_micro_trace: Some(normalized_micro_trace),
+                },
+                ..PublicReceipt::default()
             },
-            runtime_controller_certificate: Some(controller_certificate),
-            runtime_oram_objects: vec![sample_read_miss_oram_object()].into_boxed_slice(),
-            runtime_oram_leaf_schedule: vec![RuntimeOramLeafWitness {
-                object_id: 9,
-                object_name: "tiny_records".into(),
-                bucket_count: 1,
-                leaf: 0,
-            }]
-            .into_boxed_slice(),
-            runtime_oram_access_counters_before: Vec::new().into_boxed_slice(),
-            runtime_oram_access_counters_after: Vec::new().into_boxed_slice(),
-            runtime_oram_position_map_before: vec![RuntimePathOramPositionMapWitness {
-                object_id: 9,
-                object_name: "tiny_records".into(),
-                leaves: vec![RuntimeMaskedUsizeOptionWitness::none(); 4].into_boxed_slice(),
-            }]
-            .into_boxed_slice(),
-            runtime_oram_position_map_after: vec![RuntimePathOramPositionMapWitness {
-                object_id: 9,
-                object_name: "tiny_records".into(),
-                leaves: vec![RuntimeMaskedUsizeOptionWitness::none(); 4].into_boxed_slice(),
-            }]
-            .into_boxed_slice(),
-            runtime_oram_leaf_state_transitions: vec![RuntimePathOramTransitionWitness {
-                object_id: 9,
-                object_name: "tiny_records".into(),
-                bucket_count: 1,
-                kind: RuntimePathOramTransitionKind::ReadMiss,
-                fresh_leaf: 0,
-                slot_index: RuntimeMaskedUsizeOptionWitness::none(),
-                prior_leaf: RuntimeMaskedUsizeOptionWitness::none(),
-                next_leaf: RuntimeMaskedUsizeOptionWitness::none(),
-            }]
-            .into_boxed_slice(),
-            ..ExecutionTrace::default()
+            evidence: PrivateEvidence {
+                runtime_seed: None,
+                runtime_kernel_witness: None,
+                runtime_kernel_refinement_witness: None,
+                runtime_kernel_finish_bundle: None,
+                runtime_kernel_machine_finish_witness: None,
+                runtime_trusted_kernel_bundle: None,
+                runtime_controller_certificate: Some(controller_certificate),
+                runtime_oram_objects: vec![sample_read_miss_oram_object()].into_boxed_slice(),
+                runtime_oram_leaf_schedule: vec![RuntimeOramLeafWitness {
+                    object_id: 9,
+                    object_name: "tiny_records".into(),
+                    bucket_count: 1,
+                    leaf: 0,
+                }]
+                .into_boxed_slice(),
+                runtime_oram_access_counters_before: Vec::new().into_boxed_slice(),
+                runtime_oram_access_counters_after: Vec::new().into_boxed_slice(),
+                runtime_oram_position_map_before: vec![RuntimePathOramPositionMapWitness {
+                    object_id: 9,
+                    object_name: "tiny_records".into(),
+                    leaves: vec![RuntimeMaskedUsizeOptionWitness::none(); 4].into_boxed_slice(),
+                }]
+                .into_boxed_slice(),
+                runtime_oram_position_map_after: vec![RuntimePathOramPositionMapWitness {
+                    object_id: 9,
+                    object_name: "tiny_records".into(),
+                    leaves: vec![RuntimeMaskedUsizeOptionWitness::none(); 4].into_boxed_slice(),
+                }]
+                .into_boxed_slice(),
+                runtime_oram_leaf_state_transitions: vec![RuntimePathOramTransitionWitness {
+                    object_id: 9,
+                    object_name: "tiny_records".into(),
+                    bucket_count: 1,
+                    kind: RuntimePathOramTransitionKind::ReadMiss,
+                    fresh_leaf: 0,
+                    slot_index: RuntimeMaskedUsizeOptionWitness::none(),
+                    prior_leaf: RuntimeMaskedUsizeOptionWitness::none(),
+                    next_leaf: RuntimeMaskedUsizeOptionWitness::none(),
+                }]
+                .into_boxed_slice(),
+            },
         };
         trace.runtime_refinement_witness().unwrap()
     }
@@ -9836,7 +10076,8 @@ mod tests {
     #[test]
     fn runtime_refinement_witness_rejects_runtime_phase_witness_without_kernel() {
         let mut trace = sample_runtime_execution_trace_with_seed(0);
-        trace.runtime_kernel_refinement_witness = Some(sample_runtime_kernel_refinement_witness());
+        trace.evidence.runtime_kernel_refinement_witness =
+            Some(sample_runtime_kernel_refinement_witness());
         assert_eq!(
             trace.runtime_refinement_witness().unwrap_err(),
             RefinementWitnessError::RuntimeKernelRefinement(
@@ -9848,7 +10089,7 @@ mod tests {
     #[test]
     fn runtime_refinement_witness_uses_stored_finish_bundle_when_kernel_witnesses_missing() {
         let mut trace = sample_runtime_execution_trace_with_seed(0);
-        trace.runtime_kernel_finish_bundle = Some(sample_runtime_kernel_finish_bundle());
+        trace.evidence.runtime_kernel_finish_bundle = Some(sample_runtime_kernel_finish_bundle());
 
         let witness = trace.runtime_refinement_witness().unwrap();
         assert_eq!(
@@ -9864,7 +10105,7 @@ mod tests {
     #[test]
     fn exact_runtime_kernel_finish_bundle_uses_stored_finish_bundle_when_present() {
         let mut trace = sample_runtime_execution_trace_with_seed(0);
-        trace.runtime_kernel_finish_bundle = Some(sample_runtime_kernel_finish_bundle());
+        trace.evidence.runtime_kernel_finish_bundle = Some(sample_runtime_kernel_finish_bundle());
 
         assert_eq!(
             trace.exact_runtime_kernel_finish_bundle().unwrap(),
@@ -9875,7 +10116,7 @@ mod tests {
     #[test]
     fn exact_runtime_kernel_finish_bundle_rejects_missing_finish_bundle() {
         let mut trace = sample_runtime_execution_trace_with_seed(0);
-        trace.runtime_kernel_finish_bundle = None;
+        trace.evidence.runtime_kernel_finish_bundle = None;
 
         assert_eq!(
             trace.exact_runtime_kernel_finish_bundle().unwrap_err(),
@@ -9886,7 +10127,7 @@ mod tests {
     #[test]
     fn exact_runtime_kernel_finish_bundle_rejects_stored_kernel_witness_drift() {
         let mut trace = sample_runtime_execution_trace_with_seed(0);
-        trace.runtime_kernel_finish_bundle = Some(sample_runtime_kernel_finish_bundle());
+        trace.evidence.runtime_kernel_finish_bundle = Some(sample_runtime_kernel_finish_bundle());
         let mut drifted_kernel_witness = sample_runtime_kernel_witness();
         let drifted_steps = vec![
             RuntimeKernelStepWitness::new(UoOpcode::Begin, None).unwrap(),
@@ -9899,7 +10140,7 @@ mod tests {
         drifted_kernel_witness.public_object_ids = vec![9].into_boxed_slice();
         drifted_kernel_witness.expected_public_object_ids = Some(vec![9].into_boxed_slice());
         drifted_kernel_witness.kernel_steps = drifted_steps.into_boxed_slice();
-        trace.runtime_kernel_witness = Some(drifted_kernel_witness);
+        trace.evidence.runtime_kernel_witness = Some(drifted_kernel_witness);
 
         assert_eq!(
             trace.exact_runtime_kernel_finish_bundle().unwrap_err(),
@@ -9910,11 +10151,11 @@ mod tests {
     #[test]
     fn exact_runtime_kernel_finish_bundle_rejects_stored_phase_drift() {
         let mut trace = sample_runtime_execution_trace_with_seed(0);
-        trace.runtime_kernel_finish_bundle = Some(sample_runtime_kernel_finish_bundle());
+        trace.evidence.runtime_kernel_finish_bundle = Some(sample_runtime_kernel_finish_bundle());
         let mut refinement_events = sample_runtime_kernel_refinement_witness().events().to_vec();
         refinement_events[3] =
             RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::CellSet, Some(7));
-        trace.runtime_kernel_refinement_witness = Some(
+        trace.evidence.runtime_kernel_refinement_witness = Some(
             RuntimeKernelRefinementWitness::from_events(refinement_events.into_boxed_slice())
                 .expect("drifted refinement witness should remain phase-valid"),
         );
@@ -9928,8 +10169,8 @@ mod tests {
     #[test]
     fn exact_runtime_kernel_witness_uses_stored_finish_bundle_when_kernel_witness_missing() {
         let mut trace = sample_runtime_execution_trace_with_seed(0);
-        trace.runtime_kernel_witness = None;
-        trace.runtime_kernel_finish_bundle = Some(sample_runtime_kernel_finish_bundle());
+        trace.evidence.runtime_kernel_witness = None;
+        trace.evidence.runtime_kernel_finish_bundle = Some(sample_runtime_kernel_finish_bundle());
 
         assert_eq!(
             trace.exact_runtime_kernel_witness().unwrap(),
@@ -9940,7 +10181,7 @@ mod tests {
     #[test]
     fn exact_runtime_kernel_witness_rejects_stored_kernel_witness_drift_from_finish_bundle() {
         let mut trace = sample_runtime_execution_trace_with_seed(0);
-        trace.runtime_kernel_finish_bundle = Some(sample_runtime_kernel_finish_bundle());
+        trace.evidence.runtime_kernel_finish_bundle = Some(sample_runtime_kernel_finish_bundle());
         let mut drifted_kernel_witness = sample_runtime_kernel_witness();
         let drifted_steps = vec![
             RuntimeKernelStepWitness::new(UoOpcode::Begin, None).unwrap(),
@@ -9953,7 +10194,7 @@ mod tests {
         drifted_kernel_witness.public_object_ids = vec![9].into_boxed_slice();
         drifted_kernel_witness.expected_public_object_ids = Some(vec![9].into_boxed_slice());
         drifted_kernel_witness.kernel_steps = drifted_steps.into_boxed_slice();
-        trace.runtime_kernel_witness = Some(drifted_kernel_witness);
+        trace.evidence.runtime_kernel_witness = Some(drifted_kernel_witness);
 
         assert_eq!(
             trace.exact_runtime_kernel_witness().unwrap_err(),
@@ -9964,8 +10205,8 @@ mod tests {
     #[test]
     fn exact_runtime_kernel_refinement_witness_uses_stored_finish_bundle_when_phase_missing() {
         let mut trace = sample_runtime_execution_trace_with_seed(0);
-        trace.runtime_kernel_refinement_witness = None;
-        trace.runtime_kernel_finish_bundle = Some(sample_runtime_kernel_finish_bundle());
+        trace.evidence.runtime_kernel_refinement_witness = None;
+        trace.evidence.runtime_kernel_finish_bundle = Some(sample_runtime_kernel_finish_bundle());
 
         assert_eq!(
             trace.exact_runtime_kernel_refinement_witness().unwrap(),
@@ -9976,11 +10217,11 @@ mod tests {
     #[test]
     fn exact_runtime_kernel_refinement_witness_rejects_stored_phase_drift_from_finish_bundle() {
         let mut trace = sample_runtime_execution_trace_with_seed(0);
-        trace.runtime_kernel_finish_bundle = Some(sample_runtime_kernel_finish_bundle());
+        trace.evidence.runtime_kernel_finish_bundle = Some(sample_runtime_kernel_finish_bundle());
         let mut refinement_events = sample_runtime_kernel_refinement_witness().events().to_vec();
         refinement_events[3] =
             RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::CellSet, Some(7));
-        trace.runtime_kernel_refinement_witness = Some(
+        trace.evidence.runtime_kernel_refinement_witness = Some(
             RuntimeKernelRefinementWitness::from_events(refinement_events.into_boxed_slice())
                 .expect("drifted refinement witness should remain phase-valid"),
         );
@@ -9994,7 +10235,7 @@ mod tests {
     #[test]
     fn runtime_refinement_witness_rejects_stored_kernel_witness_drift_from_finish_bundle() {
         let mut trace = sample_runtime_execution_trace_with_seed(0);
-        trace.runtime_kernel_finish_bundle = Some(sample_runtime_kernel_finish_bundle());
+        trace.evidence.runtime_kernel_finish_bundle = Some(sample_runtime_kernel_finish_bundle());
         let mut drifted_kernel_witness = sample_runtime_kernel_witness();
         let drifted_steps = vec![
             RuntimeKernelStepWitness::new(UoOpcode::Begin, None).unwrap(),
@@ -10007,7 +10248,7 @@ mod tests {
         drifted_kernel_witness.public_object_ids = vec![9].into_boxed_slice();
         drifted_kernel_witness.expected_public_object_ids = Some(vec![9].into_boxed_slice());
         drifted_kernel_witness.kernel_steps = drifted_steps.into_boxed_slice();
-        trace.runtime_kernel_witness = Some(drifted_kernel_witness);
+        trace.evidence.runtime_kernel_witness = Some(drifted_kernel_witness);
 
         assert_eq!(
             trace.runtime_refinement_witness().unwrap_err(),
@@ -10018,11 +10259,11 @@ mod tests {
     #[test]
     fn runtime_refinement_witness_rejects_stored_runtime_phase_drift_from_finish_bundle() {
         let mut trace = sample_runtime_execution_trace_with_seed(0);
-        trace.runtime_kernel_finish_bundle = Some(sample_runtime_kernel_finish_bundle());
+        trace.evidence.runtime_kernel_finish_bundle = Some(sample_runtime_kernel_finish_bundle());
         let mut refinement_events = sample_runtime_kernel_refinement_witness().events().to_vec();
         refinement_events[3] =
             RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::CellSet, Some(7));
-        trace.runtime_kernel_refinement_witness = Some(
+        trace.evidence.runtime_kernel_refinement_witness = Some(
             RuntimeKernelRefinementWitness::from_events(refinement_events.into_boxed_slice())
                 .expect("drifted refinement witness should remain phase-valid"),
         );
@@ -10036,14 +10277,14 @@ mod tests {
     #[test]
     fn runtime_refinement_witness_rejects_runtime_phase_projection_drift() {
         let mut trace = sample_runtime_execution_trace_with_seed(0);
-        trace.runtime_kernel_witness = Some(sample_runtime_kernel_witness());
+        trace.evidence.runtime_kernel_witness = Some(sample_runtime_kernel_witness());
         let mut refinement_events = sample_runtime_kernel_refinement_witness().events().to_vec();
         refinement_events[3] =
             RuntimeKernelRefinementEventWitness::kernel_step(UoOpcode::CellSet, Some(7));
         let refinement_witness =
             RuntimeKernelRefinementWitness::from_events(refinement_events.into_boxed_slice())
                 .expect("projection drift witness should remain phase-valid");
-        trace.runtime_kernel_refinement_witness = Some(refinement_witness);
+        trace.evidence.runtime_kernel_refinement_witness = Some(refinement_witness);
         assert_eq!(
             trace.runtime_refinement_witness().unwrap_err(),
             RefinementWitnessError::RuntimeKernelRefinement(
@@ -10184,7 +10425,7 @@ mod tests {
         let controller_observer = trace.runtime_controller_observer_certificate().unwrap();
         let hidden_certificate = trace.runtime_path_oram_hidden_certificate().unwrap();
         let direct = RuntimeRefinementWitness::from_certificates(
-            trace.runtime_seed,
+            trace.evidence.runtime_seed,
             controller_observer,
             hidden_certificate,
         )
@@ -10218,7 +10459,7 @@ mod tests {
             .runtime_trusted_kernel_bundle()
             .unwrap();
         let expected_witness = expected_bundle.to_witness().unwrap();
-        trace.runtime_trusted_kernel_bundle = Some(
+        trace.evidence.runtime_trusted_kernel_bundle = Some(
             sample_runtime_execution_trace_with_seed(0)
                 .runtime_trusted_kernel_bundle()
                 .unwrap(),
@@ -10238,8 +10479,8 @@ mod tests {
     #[test]
     fn runtime_trusted_kernel_bundle_uses_stored_finish_bundle_when_kernel_witness_missing() {
         let mut trace = sample_runtime_execution_trace_with_seed(0);
-        trace.runtime_kernel_witness = None;
-        trace.runtime_kernel_finish_bundle = Some(sample_runtime_kernel_finish_bundle());
+        trace.evidence.runtime_kernel_witness = None;
+        trace.evidence.runtime_kernel_finish_bundle = Some(sample_runtime_kernel_finish_bundle());
 
         let bundle = trace.runtime_trusted_kernel_bundle().unwrap();
         assert_eq!(
@@ -10251,8 +10492,8 @@ mod tests {
     #[test]
     fn runtime_trusted_kernel_bundle_rejects_stored_kernel_drift_from_finish_bundle() {
         let mut trace = sample_runtime_execution_trace_with_seed(0);
-        trace.runtime_kernel_witness = None;
-        trace.runtime_kernel_finish_bundle = Some(sample_runtime_kernel_finish_bundle());
+        trace.evidence.runtime_kernel_witness = None;
+        trace.evidence.runtime_kernel_finish_bundle = Some(sample_runtime_kernel_finish_bundle());
         let mut bundle = trace.runtime_trusted_kernel_bundle().unwrap();
         let mut drifted_kernel_witness = sample_runtime_kernel_witness();
         let drifted_steps = vec![
@@ -10267,7 +10508,7 @@ mod tests {
         drifted_kernel_witness.expected_public_object_ids = Some(vec![9].into_boxed_slice());
         drifted_kernel_witness.kernel_steps = drifted_steps.into_boxed_slice();
         bundle.kernel_witness = Some(drifted_kernel_witness);
-        trace.runtime_trusted_kernel_bundle = Some(bundle);
+        trace.evidence.runtime_trusted_kernel_bundle = Some(bundle);
 
         assert_eq!(
             trace.runtime_trusted_kernel_bundle().unwrap_err(),
@@ -10279,9 +10520,9 @@ mod tests {
     fn runtime_trusted_kernel_bundle_rejects_stored_controller_observer_drift_from_trace() {
         let mut trace = sample_runtime_execution_trace_with_seed(0);
         let bundle = trace.runtime_trusted_kernel_bundle().unwrap();
-        trace.runtime_trusted_kernel_bundle = Some(bundle);
+        trace.evidence.runtime_trusted_kernel_bundle = Some(bundle);
         trace.theorem_trace = TheoremTrace::default();
-        trace.runtime_controller_certificate = None;
+        trace.evidence.runtime_controller_certificate = None;
         assert_eq!(
             trace.runtime_trusted_kernel_bundle().unwrap_err(),
             RefinementWitnessError::MissingPublicOutcome
@@ -10292,8 +10533,8 @@ mod tests {
     fn runtime_trusted_kernel_bundle_rejects_stored_hidden_certificate_drift_from_trace() {
         let mut trace = sample_runtime_execution_trace_with_seed(0);
         let bundle = trace.runtime_trusted_kernel_bundle().unwrap();
-        trace.runtime_trusted_kernel_bundle = Some(bundle);
-        trace.runtime_oram_position_map_after = Vec::new().into_boxed_slice();
+        trace.evidence.runtime_trusted_kernel_bundle = Some(bundle);
+        trace.evidence.runtime_oram_position_map_after = Vec::new().into_boxed_slice();
         assert_eq!(
             trace.runtime_trusted_kernel_bundle().unwrap_err(),
             RefinementWitnessError::OramLeafStateMismatch
@@ -10306,7 +10547,7 @@ mod tests {
         let mut bundle = trace.runtime_trusted_kernel_bundle().unwrap();
         bundle.hidden_certificate.oram_position_map_after[0].leaves[0] =
             RuntimeMaskedUsizeOptionWitness::some(2);
-        trace.runtime_trusted_kernel_bundle = Some(bundle);
+        trace.evidence.runtime_trusted_kernel_bundle = Some(bundle);
         assert_eq!(
             trace.runtime_trusted_kernel_bundle().unwrap_err(),
             RefinementWitnessError::TrustedKernelBundleTraceMismatch
@@ -10410,23 +10651,40 @@ mod tests {
         };
         let controller_shape = controller_certificate.controller_shape();
         let trace = ExecutionTrace {
-            gas_used: 1,
-            theorem_trace: TheoremTrace {
-                public_outcome: Some(public_outcome.clone()),
-                boundary_schedule: controller_certificate.boundary_schedule(&public_outcome),
-                controller_shape: Some(controller_shape),
-                normalized_micro_trace: Some(NormalizedMicroTrace {
-                    page_trace: vec![NormalizedPageEvent {
-                        page_kind: "metadata".into(),
-                        kind: PageEventKind::EvictOut,
-                    }]
-                    .into_boxed_slice(),
-                    exit_pattern: vec![ExitEvent::Terminate].into_boxed_slice(),
-                    shared_resource_pattern: Box::default(),
-                }),
+            receipt: PublicReceipt {
+                gas_used: 1,
+                theorem_trace: TheoremTrace {
+                    public_outcome: Some(public_outcome.clone()),
+                    boundary_schedule: controller_certificate.boundary_schedule(&public_outcome),
+                    controller_shape: Some(controller_shape),
+                    normalized_micro_trace: Some(NormalizedMicroTrace {
+                        page_trace: vec![NormalizedPageEvent {
+                            page_kind: "metadata".into(),
+                            kind: PageEventKind::EvictOut,
+                        }]
+                        .into_boxed_slice(),
+                        exit_pattern: vec![ExitEvent::Terminate].into_boxed_slice(),
+                        shared_resource_pattern: Box::default(),
+                    }),
+                },
+                ..PublicReceipt::default()
             },
-            runtime_controller_certificate: Some(controller_certificate),
-            ..ExecutionTrace::default()
+            evidence: PrivateEvidence {
+                runtime_seed: None,
+                runtime_kernel_witness: None,
+                runtime_kernel_refinement_witness: None,
+                runtime_kernel_finish_bundle: None,
+                runtime_kernel_machine_finish_witness: None,
+                runtime_trusted_kernel_bundle: None,
+                runtime_controller_certificate: Some(controller_certificate),
+                runtime_oram_objects: Box::default(),
+                runtime_oram_leaf_schedule: Box::default(),
+                runtime_oram_access_counters_before: Box::default(),
+                runtime_oram_access_counters_after: Box::default(),
+                runtime_oram_position_map_before: Box::default(),
+                runtime_oram_position_map_after: Box::default(),
+                runtime_oram_leaf_state_transitions: Box::default(),
+            },
         };
         assert_eq!(
             trace.runtime_refinement_witness().unwrap_err(),
@@ -10442,21 +10700,37 @@ mod tests {
         drifted_certificate.observed_oram_accesses[0].recursion_depth = 0;
         let controller_shape = controller_certificate.controller_shape();
         let trace = ExecutionTrace {
-            gas_used: 7,
-            logical_accesses: sample_oram_logical_accesses().into_boxed_slice(),
-            theorem_trace: TheoremTrace {
-                public_outcome: Some(public_outcome.clone()),
-                boundary_schedule: controller_certificate.boundary_schedule(&public_outcome),
-                controller_shape: Some(controller_shape),
-                normalized_micro_trace: Some(
-                    controller_certificate
-                        .controller_shape()
-                        .normalized_micro_trace(),
-                ),
+            receipt: PublicReceipt {
+                gas_used: 7,
+                logical_accesses: sample_oram_logical_accesses().into_boxed_slice(),
+                theorem_trace: TheoremTrace {
+                    public_outcome: Some(public_outcome.clone()),
+                    boundary_schedule: controller_certificate.boundary_schedule(&public_outcome),
+                    controller_shape: Some(controller_shape),
+                    normalized_micro_trace: Some(
+                        controller_certificate
+                            .controller_shape()
+                            .normalized_micro_trace(),
+                    ),
+                },
+                ..PublicReceipt::default()
             },
-            runtime_controller_certificate: Some(drifted_certificate),
-            runtime_oram_objects: vec![sample_oram_object()].into_boxed_slice(),
-            ..ExecutionTrace::default()
+            evidence: PrivateEvidence {
+                runtime_seed: None,
+                runtime_kernel_witness: None,
+                runtime_kernel_refinement_witness: None,
+                runtime_kernel_finish_bundle: None,
+                runtime_kernel_machine_finish_witness: None,
+                runtime_trusted_kernel_bundle: None,
+                runtime_controller_certificate: Some(drifted_certificate),
+                runtime_oram_objects: vec![sample_oram_object()].into_boxed_slice(),
+                runtime_oram_leaf_schedule: Box::default(),
+                runtime_oram_access_counters_before: Box::default(),
+                runtime_oram_access_counters_after: Box::default(),
+                runtime_oram_position_map_before: Box::default(),
+                runtime_oram_position_map_after: Box::default(),
+                runtime_oram_leaf_state_transitions: Box::default(),
+            },
         };
         assert_eq!(
             trace.runtime_refinement_witness().unwrap_err(),
@@ -10472,17 +10746,33 @@ mod tests {
         let mut logical_accesses = sample_oram_logical_accesses();
         logical_accesses.remove(1);
         let trace = ExecutionTrace {
-            gas_used: 7,
-            logical_accesses: logical_accesses.into_boxed_slice(),
-            theorem_trace: TheoremTrace {
-                public_outcome: Some(public_outcome.clone()),
-                boundary_schedule: controller_certificate.boundary_schedule(&public_outcome),
-                controller_shape: Some(controller_shape.clone()),
-                normalized_micro_trace: Some(controller_shape.normalized_micro_trace()),
+            receipt: PublicReceipt {
+                gas_used: 7,
+                logical_accesses: logical_accesses.into_boxed_slice(),
+                theorem_trace: TheoremTrace {
+                    public_outcome: Some(public_outcome.clone()),
+                    boundary_schedule: controller_certificate.boundary_schedule(&public_outcome),
+                    controller_shape: Some(controller_shape.clone()),
+                    normalized_micro_trace: Some(controller_shape.normalized_micro_trace()),
+                },
+                ..PublicReceipt::default()
             },
-            runtime_controller_certificate: Some(controller_certificate),
-            runtime_oram_objects: vec![sample_oram_object()].into_boxed_slice(),
-            ..ExecutionTrace::default()
+            evidence: PrivateEvidence {
+                runtime_seed: None,
+                runtime_kernel_witness: None,
+                runtime_kernel_refinement_witness: None,
+                runtime_kernel_finish_bundle: None,
+                runtime_kernel_machine_finish_witness: None,
+                runtime_trusted_kernel_bundle: None,
+                runtime_controller_certificate: Some(controller_certificate),
+                runtime_oram_objects: vec![sample_oram_object()].into_boxed_slice(),
+                runtime_oram_leaf_schedule: Box::default(),
+                runtime_oram_access_counters_before: Box::default(),
+                runtime_oram_access_counters_after: Box::default(),
+                runtime_oram_position_map_before: Box::default(),
+                runtime_oram_position_map_after: Box::default(),
+                runtime_oram_leaf_state_transitions: Box::default(),
+            },
         };
         assert_eq!(
             trace.runtime_refinement_witness().unwrap_err(),
@@ -10504,55 +10794,59 @@ mod tests {
         let mut drifted_after = sample_path_oram_position_map_after();
         drifted_after[0].leaves[0] = RuntimeMaskedUsizeOptionWitness::some(2);
         let trace = ExecutionTrace {
-            opcode_trace: vec!["declare".into(), "return".into()].into_boxed_slice(),
-            logical_accesses: sample_oram_logical_accesses().into_boxed_slice(),
-            logical_writes: vec![].into_boxed_slice(),
-            physical_reads: path
-                .iter()
-                .map(|index| PhysicalReadEvent {
-                    object: "records".into(),
-                    location: format!("records@bucket{index}"),
-                    len: 64,
-                })
-                .collect::<Vec<_>>()
-                .into_boxed_slice(),
-            physical_writes: path
-                .iter()
-                .rev()
-                .map(|index| {
-                    PhysicalWriteEvent::from_shape(
-                        "records",
-                        format!("records@bucket{index}"),
-                        2,
-                        WriteClass::Update,
-                    )
-                })
-                .collect::<Vec<_>>()
-                .into_boxed_slice(),
-            gas_used: 99,
-            theorem_trace: TheoremTrace {
-                public_outcome: Some(public_outcome.clone()),
-                boundary_schedule: controller_certificate.boundary_schedule(&public_outcome),
-                controller_shape: Some(controller_shape.clone()),
-                normalized_micro_trace: Some(normalized_micro_trace.clone()),
+            receipt: PublicReceipt {
+                opcode_trace: vec!["declare".into(), "return".into()].into_boxed_slice(),
+                logical_accesses: sample_oram_logical_accesses().into_boxed_slice(),
+                logical_writes: vec![].into_boxed_slice(),
+                physical_reads: path
+                    .iter()
+                    .map(|index| PhysicalReadEvent {
+                        object: "records".into(),
+                        location: format!("records@bucket{index}"),
+                        len: 64,
+                    })
+                    .collect::<Vec<_>>()
+                    .into_boxed_slice(),
+                physical_writes: path
+                    .iter()
+                    .rev()
+                    .map(|index| {
+                        PhysicalWriteEvent::from_shape(
+                            "records",
+                            format!("records@bucket{index}"),
+                            2,
+                            WriteClass::Update,
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .into_boxed_slice(),
+                gas_used: 99,
+                theorem_trace: TheoremTrace {
+                    public_outcome: Some(public_outcome.clone()),
+                    boundary_schedule: controller_certificate.boundary_schedule(&public_outcome),
+                    controller_shape: Some(controller_shape.clone()),
+                    normalized_micro_trace: Some(normalized_micro_trace.clone()),
+                },
+                public_state_transition: None,
             },
-            public_state_transition: None,
-            runtime_seed: None,
-            runtime_kernel_witness: None,
-            runtime_kernel_refinement_witness: None,
-            runtime_kernel_machine_finish_witness: None,
-            runtime_kernel_finish_bundle: None,
-            runtime_trusted_kernel_bundle: None,
-            runtime_controller_certificate: Some(controller_certificate),
-            runtime_oram_objects: vec![sample_oram_object()].into_boxed_slice(),
-            runtime_oram_leaf_schedule: sample_oram_leaf_schedule().into_boxed_slice(),
-            runtime_oram_access_counters_before: Vec::new().into_boxed_slice(),
-            runtime_oram_access_counters_after: Vec::new().into_boxed_slice(),
-            runtime_oram_position_map_before: sample_path_oram_position_map_before()
-                .into_boxed_slice(),
-            runtime_oram_position_map_after: drifted_after.into_boxed_slice(),
-            runtime_oram_leaf_state_transitions: sample_path_oram_leaf_state_transitions()
-                .into_boxed_slice(),
+            evidence: PrivateEvidence {
+                runtime_seed: None,
+                runtime_kernel_witness: None,
+                runtime_kernel_refinement_witness: None,
+                runtime_kernel_finish_bundle: None,
+                runtime_kernel_machine_finish_witness: None,
+                runtime_trusted_kernel_bundle: None,
+                runtime_controller_certificate: Some(controller_certificate),
+                runtime_oram_objects: vec![sample_oram_object()].into_boxed_slice(),
+                runtime_oram_leaf_schedule: sample_oram_leaf_schedule().into_boxed_slice(),
+                runtime_oram_access_counters_before: Vec::new().into_boxed_slice(),
+                runtime_oram_access_counters_after: Vec::new().into_boxed_slice(),
+                runtime_oram_position_map_before: sample_path_oram_position_map_before()
+                    .into_boxed_slice(),
+                runtime_oram_position_map_after: drifted_after.into_boxed_slice(),
+                runtime_oram_leaf_state_transitions: sample_path_oram_leaf_state_transitions()
+                    .into_boxed_slice(),
+            },
         };
         assert_eq!(
             trace.runtime_refinement_witness().unwrap_err(),
@@ -10570,55 +10864,59 @@ mod tests {
         let mut drifted_after = sample_path_oram_position_map_after();
         drifted_after[0].leaves[0] = RuntimeMaskedUsizeOptionWitness::some(2);
         let trace = ExecutionTrace {
-            opcode_trace: vec!["declare".into(), "return".into()].into_boxed_slice(),
-            logical_accesses: sample_oram_logical_accesses().into_boxed_slice(),
-            logical_writes: vec![].into_boxed_slice(),
-            physical_reads: path
-                .iter()
-                .map(|index| PhysicalReadEvent {
-                    object: "records".into(),
-                    location: format!("records@bucket{index}"),
-                    len: 64,
-                })
-                .collect::<Vec<_>>()
-                .into_boxed_slice(),
-            physical_writes: path
-                .iter()
-                .rev()
-                .map(|index| {
-                    PhysicalWriteEvent::from_shape(
-                        "records",
-                        format!("records@bucket{index}"),
-                        2,
-                        WriteClass::Update,
-                    )
-                })
-                .collect::<Vec<_>>()
-                .into_boxed_slice(),
-            gas_used: 99,
-            theorem_trace: TheoremTrace {
-                public_outcome: Some(public_outcome.clone()),
-                boundary_schedule: controller_certificate.boundary_schedule(&public_outcome),
-                controller_shape: Some(controller_shape.clone()),
-                normalized_micro_trace: Some(normalized_micro_trace.clone()),
+            receipt: PublicReceipt {
+                opcode_trace: vec!["declare".into(), "return".into()].into_boxed_slice(),
+                logical_accesses: sample_oram_logical_accesses().into_boxed_slice(),
+                logical_writes: vec![].into_boxed_slice(),
+                physical_reads: path
+                    .iter()
+                    .map(|index| PhysicalReadEvent {
+                        object: "records".into(),
+                        location: format!("records@bucket{index}"),
+                        len: 64,
+                    })
+                    .collect::<Vec<_>>()
+                    .into_boxed_slice(),
+                physical_writes: path
+                    .iter()
+                    .rev()
+                    .map(|index| {
+                        PhysicalWriteEvent::from_shape(
+                            "records",
+                            format!("records@bucket{index}"),
+                            2,
+                            WriteClass::Update,
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .into_boxed_slice(),
+                gas_used: 99,
+                theorem_trace: TheoremTrace {
+                    public_outcome: Some(public_outcome.clone()),
+                    boundary_schedule: controller_certificate.boundary_schedule(&public_outcome),
+                    controller_shape: Some(controller_shape.clone()),
+                    normalized_micro_trace: Some(normalized_micro_trace.clone()),
+                },
+                public_state_transition: None,
             },
-            public_state_transition: None,
-            runtime_seed: None,
-            runtime_kernel_witness: None,
-            runtime_kernel_refinement_witness: None,
-            runtime_kernel_machine_finish_witness: None,
-            runtime_kernel_finish_bundle: None,
-            runtime_trusted_kernel_bundle: None,
-            runtime_controller_certificate: Some(controller_certificate),
-            runtime_oram_objects: vec![sample_oram_object()].into_boxed_slice(),
-            runtime_oram_leaf_schedule: sample_oram_leaf_schedule().into_boxed_slice(),
-            runtime_oram_access_counters_before: Vec::new().into_boxed_slice(),
-            runtime_oram_access_counters_after: Vec::new().into_boxed_slice(),
-            runtime_oram_position_map_before: sample_path_oram_position_map_before()
-                .into_boxed_slice(),
-            runtime_oram_position_map_after: drifted_after.into_boxed_slice(),
-            runtime_oram_leaf_state_transitions: sample_path_oram_leaf_state_transitions()
-                .into_boxed_slice(),
+            evidence: PrivateEvidence {
+                runtime_seed: None,
+                runtime_kernel_witness: None,
+                runtime_kernel_refinement_witness: None,
+                runtime_kernel_finish_bundle: None,
+                runtime_kernel_machine_finish_witness: None,
+                runtime_trusted_kernel_bundle: None,
+                runtime_controller_certificate: Some(controller_certificate),
+                runtime_oram_objects: vec![sample_oram_object()].into_boxed_slice(),
+                runtime_oram_leaf_schedule: sample_oram_leaf_schedule().into_boxed_slice(),
+                runtime_oram_access_counters_before: Vec::new().into_boxed_slice(),
+                runtime_oram_access_counters_after: Vec::new().into_boxed_slice(),
+                runtime_oram_position_map_before: sample_path_oram_position_map_before()
+                    .into_boxed_slice(),
+                runtime_oram_position_map_after: drifted_after.into_boxed_slice(),
+                runtime_oram_leaf_state_transitions: sample_path_oram_leaf_state_transitions()
+                    .into_boxed_slice(),
+            },
         };
         assert_eq!(
             trace.runtime_path_oram_hidden_certificate().unwrap_err(),
@@ -10825,8 +11123,9 @@ mod tests {
     #[test]
     fn runtime_paper_main_slot_family_bundle_uses_manifest_slot_program() {
         let mut trace = sample_runtime_execution_trace_with_seed(19);
-        trace.runtime_kernel_witness = Some(sample_runtime_kernel_witness());
-        trace.runtime_kernel_refinement_witness = Some(sample_runtime_kernel_refinement_witness());
+        trace.evidence.runtime_kernel_witness = Some(sample_runtime_kernel_witness());
+        trace.evidence.runtime_kernel_refinement_witness =
+            Some(sample_runtime_kernel_refinement_witness());
         let artifact = sample_runtime_paper_main_artifact();
         let bundle = trace
             .runtime_paper_main_slot_family_bundle(&artifact)
@@ -10851,8 +11150,9 @@ mod tests {
     #[test]
     fn runtime_paper_main_slot_family_bundle_rejects_missing_manifest_slot_program() {
         let mut trace = sample_runtime_execution_trace_with_seed(19);
-        trace.runtime_kernel_witness = Some(sample_runtime_kernel_witness());
-        trace.runtime_kernel_refinement_witness = Some(sample_runtime_kernel_refinement_witness());
+        trace.evidence.runtime_kernel_witness = Some(sample_runtime_kernel_witness());
+        trace.evidence.runtime_kernel_refinement_witness =
+            Some(sample_runtime_kernel_refinement_witness());
         let mut artifact = sample_runtime_paper_main_artifact();
         artifact
             .contract

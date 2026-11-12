@@ -5,7 +5,9 @@ edition.workspace = true
 license.workspace = true
 
 [features]
-diagnostics = []
+# A diagnostics build returns a call's private evidence with its receipt and
+# can write it out for the Lean checkers. The production policy rejects it.
+diagnostics = ["uo-core/diagnostics"]
 insecure-eval-raw = []
 
 [dependencies]
@@ -29,4 +31,6 @@ zeroize.workspace = true
 
 [dev-dependencies]
 serde_yaml.workspace = true
+# The unit tests read a call's whole trace and write it out.
+uo-core = { path = "../../crates/uo-core", features = ["diagnostics"] }
 uo-solc = { path = "../../compiler/uo-solc" }

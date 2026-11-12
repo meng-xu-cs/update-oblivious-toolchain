@@ -641,6 +641,7 @@
       "path_oram_restore_reuses_in_place_buffers": true,
       "physical_write_event_builders_are_shape_only": true,
       "physical_write_event_is_shape_only": true,
+      "private_evidence_stays_inside_the_runtime": true,
       "probe_enables_runtime_diagnostics_feature": true,
       "probe_reads_runtime_telemetry_from_diagnostic_channel": true,
       "production_errors_carry_no_runtime_freshness_value": true,

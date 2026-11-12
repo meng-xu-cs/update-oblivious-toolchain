@@ -31,6 +31,11 @@ runtime proof-object hash. A fully verified extractor would still reduce the
 TCB, but omitted or mutated proof payloads are no longer outside the checked
 hash surface.
 
+A call returns its `PublicReceipt`. The proof objects are built from the
+call's whole `ExecutionTrace`, which also holds its `PrivateEvidence` and
+which a call returns only in a test or diagnostics build (see
+[`trusted-kernel.md`](./trusted-kernel.md)).
+
 Production acceptance uses `ProductionContractInstance::call_authorized`.
 That path refuses calls without a current admitted-package identity, matching
 toolchain manifest digest, runtime confidential proof-bundle hash, runtime

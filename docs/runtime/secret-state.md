@@ -15,6 +15,7 @@ and the ownership boundaries that keep them auditable.
 | `PathOramFreshCoinPlan` | `runtime/uo-evm/src/fresh_coins.rs` | runtime-owned opaque fresh-coin handle; diagnostics injection is not default API |
 | `Value` aggregate payloads | `crates/uo-core/src/types.rs` | shared value layer; boxed fixed-size aggregate buffers |
 | `RuntimeCallOutcome` and traced-call wrappers | `crates/uo-core/src/trace.rs` | theorem-handoff wrappers, non-`Clone`, consumed by finalization helpers |
+| `PrivateEvidence`, and the `ExecutionTrace` that holds it | `crates/uo-core/src/trace.rs` | a call's replay tag, kernel witnesses and Path ORAM leaf schedule, counters, position maps and leaf transitions; fields private to `uo-core`, wiped on drop, serializable only in a test or diagnostics build; a call returns it only in such a build |
 | `CommittedRuntimeWitnessSnapshot` | `crates/uo-core/src/trace.rs` | hidden witness snapshot wrapper built from `state.rs` |
 | `RuntimeShadowState` / `ConfidentialRuntimeShadowState` / `PublicRuntimeShadowState` | `runtime/uo-evm/src/state.rs` | runtime-only reopened state; public shell receives only public wrapper |
 | `RuntimeObject` graph | `runtime/uo-evm/src/objects.rs` | runtime-owned object state and commit/restore paths |
@@ -49,10 +50,9 @@ and the ownership boundaries that keep them auditable.
    diagnostics builds, is a function of its seed, and it tags its traces
    with the seed so that a run can be replayed.
 
-   A trace still carries what a call did with those coins: the position
-   maps and the leaf schedule of its Path ORAM accesses. Issue 25 of
-   [`review/2026-11-external-review`](../../review/2026-11-external-review/README.md)
-   takes them out of what a production call returns.
+   What a call did with those coins, the position maps and the leaf
+   schedule of its Path ORAM accesses, is in the call's private evidence
+   (invariant 12).
 10. The freshness epoch is public and is drawn from the OS independently of
     the master secret. Production call evidence carries it, so whoever
     prepares that evidence knows it, and it says nothing about a key.
@@ -61,6 +61,22 @@ and the ownership boundaries that keep them auditable.
     of a cipher shares the count, the count only grows, and a seal fails once
     it is exhausted. A call that is staged and then dropped therefore keeps
     the nonces it used: the next call seals with later ones.
+
+12. A call returns its public receipt. Its private evidence stays inside
+    the runtime and is dropped, and wiped, when the call ends. Only a test
+    or diagnostics build returns the whole trace, writes it out or prints a
+    proof object, and the production policy rejects such a build. No field
+    of the trace that is classified `CryptographicallyHidden` is a field of
+    the receipt (`a_hidden_trace_field_is_private_evidence` in
+    `crates/uo-core/src/observer_coverage.rs`, and
+    `observerCoverage_publicReceipt_hasNoHiddenField` in
+    `UOToolchain/ObserverCoverage.lean`).
+
+    Until Issue 26 of
+    [`review/2026-11-external-review`](../../review/2026-11-external-review/README.md),
+    a production call is still accepted only against the hash of a proof
+    bundle that the caller supplies, and that bundle is built from the
+    private evidence.
 
 ### What a nonce shows
 
@@ -92,17 +108,26 @@ write/read evidence, direct store cipher calls outside the codec layer, and
 reintroduction of host-visible hidden-state errors that should be modeled
 confidential aborts.
 
-Invariants 9 to 11 have five bits in `runtime_boundary_validation.json`:
+Invariants 9 to 12 have six bits in `runtime_boundary_validation.json`:
 `deployment_seed_stays_out_of_call_traces`,
 `production_errors_carry_no_runtime_freshness_value`,
 `contract_instance_debug_is_opaque`,
-`runtime_secrets_derive_from_the_master_secret` and
-`seal_nonces_come_from_the_seal_count`. Each is a check of source text, and a
-probe unit test shows that it rejects the drifts it guards against.
-`cargo test -p uo-evm` runs the tests behind the first three in the build a
-production runtime uses (`runtime/uo-evm/tests/production_boundary.rs`); a
-workspace build turns on the `diagnostics` feature and compiles those tests
-out.
+`runtime_secrets_derive_from_the_master_secret`,
+`seal_nonces_come_from_the_seal_count` and
+`private_evidence_stays_inside_the_runtime`. Each is a check of source text,
+and a probe unit test shows that it rejects the drifts it guards against.
+`cargo test -p uo-evm` runs the tests behind the first three and the last in
+the build a production runtime uses
+(`runtime/uo-evm/tests/production_boundary.rs`); a workspace build turns on
+the `diagnostics` feature and compiles those tests out.
+
+Invariant 12 is also pinned in the Lean implementation interface
+(`engineDelegatesToRuntimeBridge`), and `tamper_validation.json` has two
+scenarios for it that the Lean checker must reject: a position map moved
+from the evidence into the receipt
+(`runtime_implementation_interface/receipt_position_map_drift`), and a call
+result that carries the trace in every build
+(`runtime_implementation_interface/call_result_trace_drift`).
 
 Invariant 11 also has a Lean statement and tests. `sealNonceRun_nodup` and
 `sealNonceRun_disjoint_of_le` in `UOToolchain/RuntimeStoreCodecSemantics.lean`

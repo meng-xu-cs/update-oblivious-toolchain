@@ -14356,6 +14356,75 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "mutation": "inject a handwritten `ExecutionTrace {` construction marker into theorem.rs so the strengthened interface must reject theorem-side trace materialization bypassing the shared bridge",
         }),
     )?);
+    // A position map moved from the private evidence into the receipt.
+    let mut tampered_runtime_implementation_receipt_position_map =
+        runtime_implementation_interface.clone();
+    tampered_runtime_implementation_receipt_position_map.trace_source =
+        tampered_runtime_implementation_receipt_position_map
+            .trace_source
+            .replacen(
+                "    #[cfg_attr(any(test, feature = \"diagnostics\"), serde(default))]\n    pub(crate) runtime_oram_position_map_before: Box<[RuntimePathOramPositionMapWitness]>,\n",
+                "",
+                1,
+            )
+            .replacen(
+                "    pub public_state_transition: Option<RuntimePublicStateTransition>,\n}",
+                "    pub public_state_transition: Option<RuntimePublicStateTransition>,\n    #[serde(default)]\n    pub runtime_oram_position_map_before: Box<[RuntimePathOramPositionMapWitness]>,\n}",
+                1,
+            );
+    if tampered_runtime_implementation_receipt_position_map.trace_source
+        == runtime_implementation_interface.trace_source
+    {
+        bail!("receipt position-map tamper did not change the trace source");
+    }
+    scenarios.push(validate_tampered_json_case(
+        "runtime_implementation_interface/receipt_position_map_drift",
+        &tampered_runtime_implementation_receipt_position_map,
+        |interface_path| {
+            Ok(Command::new(&runtime_implementation_interface_checker)
+                .arg(interface_path)
+                .output()?)
+        },
+        json!({
+            "scenario": "runtime_implementation_interface/receipt_position_map_drift",
+            "artifact_kind": "proofgrade_runtime_implementation_interface",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "move `runtime_oram_position_map_before` from `PrivateEvidence` into `PublicReceipt` in trace.rs, so a production call would return a position map; the interface pins the receipt's fields and must reject it",
+        }),
+    )?);
+    // A call result that carries the whole trace in every build.
+    let mut tampered_runtime_implementation_call_result_trace =
+        runtime_implementation_interface.clone();
+    tampered_runtime_implementation_call_result_trace.engine_source =
+        tampered_runtime_implementation_call_result_trace
+            .engine_source
+            .replacen(
+                "    #[cfg(any(test, feature = \"diagnostics\"))]\n    pub trace: ExecutionTrace,",
+                "    pub trace: ExecutionTrace,",
+                1,
+            );
+    if tampered_runtime_implementation_call_result_trace.engine_source
+        == runtime_implementation_interface.engine_source
+    {
+        bail!("call-result trace tamper did not change the engine source");
+    }
+    scenarios.push(validate_tampered_json_case(
+        "runtime_implementation_interface/call_result_trace_drift",
+        &tampered_runtime_implementation_call_result_trace,
+        |interface_path| {
+            Ok(Command::new(&runtime_implementation_interface_checker)
+                .arg(interface_path)
+                .output()?)
+        },
+        json!({
+            "scenario": "runtime_implementation_interface/call_result_trace_drift",
+            "artifact_kind": "proofgrade_runtime_implementation_interface",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "drop the test-or-diagnostics gate from `CallResult.trace` in engine.rs, so a production call would return its private evidence; the interface pins the gated field and must reject it",
+        }),
+    )?);
     let tampered_runtime_public_bridge_theorem_manual_trace =
         ImportedRuntimeImplementationPublicBridgeBoundary {
             implementation_interface: tampered_runtime_implementation_theorem_manual_trace.clone(),
@@ -27150,6 +27219,115 @@ fn check_seal_nonces_come_from_the_seal_count(
         && generated_store_codec_source.contains(
             "pub(super) fn seal_nonce(counter: u64) -> [u8; SEALED_NONCE_BYTES] {\n    let mut nonce = [0u8; SEALED_NONCE_BYTES];\n    for (target, byte) in nonce.iter_mut().skip(4).zip(counter.to_be_bytes().iter()) {\n        *target = *byte;\n    }\n    nonce\n}",
         )
+}
+
+/// The fields of a struct in a Rust source, each with whether it is `pub`
+/// (visible outside its crate). `None` if the struct is not found.
+fn rust_struct_fields(source: &str, struct_name: &str) -> Option<Vec<(String, bool)>> {
+    let start = source.find(&format!("pub struct {struct_name} {{\n"))?;
+    let body = &source[start..];
+    let body = &body[..body.find("\n}\n")?];
+    let mut fields = Vec::new();
+    for line in body.lines().skip(1) {
+        let line = line.trim();
+        let Some((name, _type)) = line.split_once(':') else {
+            continue;
+        };
+        let (name, public) = match name.strip_prefix("pub(crate) ") {
+            Some(name) => (name, false),
+            None => match name.strip_prefix("pub ") {
+                Some(name) => (name, true),
+                None => (name, false),
+            },
+        };
+        if !name.is_empty()
+            && name
+                .chars()
+                .all(|ch| ch == '_' || ch.is_ascii_alphanumeric())
+        {
+            fields.push((name.to_owned(), public));
+        }
+    }
+    Some(fields)
+}
+
+/// Whether a call's private evidence stays inside the runtime in a
+/// production build. The receipt has the observer's fields and no other, and
+/// every field of the evidence is private to `uo-core`. The evidence and the
+/// trace that holds it can be written out only by a test or diagnostics
+/// build, nothing hands the evidence out, and it is wiped on drop. A call's
+/// result carries the receipt in every build and the trace only in a test or
+/// diagnostics build, no engine function returns a trace, and the CLI prints
+/// the trace or a proof object only in a diagnostics build.
+fn check_private_evidence_stays_inside_the_runtime(
+    core_trace_source: &str,
+    engine_impl_source: &str,
+    main_source: &str,
+    core_manifest: &str,
+    runtime_manifest: &str,
+) -> bool {
+    let fields = |name: &str| rust_struct_fields(core_trace_source, name).unwrap_or_default();
+    let named = |names: &[&str], public: bool| -> Vec<(String, bool)> {
+        names
+            .iter()
+            .map(|name| ((*name).to_owned(), public))
+            .collect()
+    };
+    let runtime_dependencies = runtime_manifest
+        .split_once("[dependencies]")
+        .and_then(|(_, rest)| rest.split_once("[dev-dependencies]"))
+        .map(|(dependencies, _)| dependencies)
+        .unwrap_or_default();
+    fields("PublicReceipt") == named(uo_core::PUBLIC_RECEIPT_FIELDS, true)
+        && fields("PrivateEvidence") == named(uo_core::PRIVATE_EVIDENCE_FIELDS, false)
+        && fields("ExecutionTrace")
+            == [("receipt".to_owned(), true), ("evidence".to_owned(), false)]
+        && uo_core::PUBLIC_RECEIPT_FIELDS
+            .iter()
+            .all(|field| !uo_core::PRIVATE_EVIDENCE_FIELDS.contains(field))
+        && core_trace_source.contains(
+            "#[derive(PartialEq, Default)]\n#[cfg_attr(\n    any(test, feature = \"diagnostics\"),\n    derive(Debug, Serialize, Deserialize)\n)]\npub struct PrivateEvidence {",
+        )
+        && core_trace_source.contains(
+            "#[derive(Debug, PartialEq, Default)]\n#[cfg_attr(any(test, feature = \"diagnostics\"), derive(Serialize, Deserialize))]\npub struct ExecutionTrace {",
+        )
+        && core_trace_source.contains(
+            "impl Drop for PrivateEvidence {\n    fn drop(&mut self) {\n        self.wipe();\n    }\n}",
+        )
+        && core_trace_source.contains(
+            "    pub fn into_receipt(self) -> PublicReceipt {\n        self.receipt\n    }",
+        )
+        && !core_trace_source.contains("pub fn evidence(")
+        && !core_trace_source.contains("-> PrivateEvidence")
+        && !core_trace_source.contains("&PrivateEvidence")
+        && engine_impl_source.contains(
+            "pub struct CallResult {\n    pub return_value: Option<Value>,\n    pub encrypted_return: Option<EncryptedReturnPayload>,\n    pub aborted: bool,\n    /// What the observer of the call sees.\n    #[cfg(not(any(test, feature = \"diagnostics\")))]\n    pub receipt: PublicReceipt,\n    /// The call's receipt and its private evidence.\n    #[cfg(any(test, feature = \"diagnostics\"))]\n    pub trace: ExecutionTrace,\n}",
+        )
+        && engine_impl_source.contains(
+            "            #[cfg(not(any(test, feature = \"diagnostics\")))]\n            receipt: trace.into_receipt(),\n            #[cfg(any(test, feature = \"diagnostics\"))]\n            trace,",
+        )
+        && !engine_impl_source.contains("-> Result<ExecutionTrace>")
+        && !engine_impl_source.contains("-> ExecutionTrace")
+        // The receipt is the CLI's one ungated format and one ungated arm.
+        && main_source.contains("enum OutputFormat {\n    Receipt,\n    #[cfg(feature = \"diagnostics\")]\n    Trace,")
+        && main_source.contains(
+            "        OutputFormat::Receipt => {\n            println!(\"{}\", serde_json::to_string_pretty(result.receipt())?);\n        }",
+        )
+        && main_source.matches("\n        OutputFormat::").count()
+            == main_source
+                .matches("\n        #[cfg(feature = \"diagnostics\")]\n        OutputFormat::")
+                .count()
+                + 1
+        && main_source.matches("\n    #[cfg(feature = \"diagnostics\")]\n    ").count()
+            == main_source.matches("\n        #[cfg(feature = \"diagnostics\")]\n        OutputFormat::").count() + 3
+        // Only the diagnostics feature, or a test build, turns on the
+        // evidence's serialization.
+        && core_manifest.contains("\ndiagnostics = []\n")
+        && !core_manifest.contains("default =")
+        && runtime_manifest.contains("\ndiagnostics = [\"uo-core/diagnostics\"]\n")
+        && !runtime_manifest.contains("default =")
+        && runtime_dependencies.contains("\nuo-core = { path = \"../../crates/uo-core\" }\n")
+        && !runtime_dependencies.contains("diagnostics")
 }
 
 /// Whether the production path's freshness errors carry no runtime value. An
@@ -42229,7 +42407,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let execution_trace_runtime_refinement_witness_prefers_stored_finish_bundle =
         core_trace_source.contains("fn checked_runtime_kernel_witness_pair(")
             && core_trace_source.contains(
-                "if let Some(runtime_kernel_finish_bundle) = &self.runtime_kernel_finish_bundle",
+                "if let Some(runtime_kernel_finish_bundle) = &self.evidence.runtime_kernel_finish_bundle",
             )
             && core_trace_source.contains(
                 "let (kernel_witness, runtime_kernel_refinement_witness) = runtime_kernel_finish_bundle",
@@ -42252,7 +42430,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let execution_trace_runtime_trusted_kernel_bundle_rejects_finish_bundle_drift =
         core_trace_source.contains(
             "fn checked_runtime_kernel_witness_mismatch_error(&self) -> RefinementWitnessError",
-        ) && core_trace_source.contains("self.runtime_kernel_finish_bundle.is_some()")
+        ) && core_trace_source.contains("self.evidence.runtime_kernel_finish_bundle.is_some()")
             && core_trace_source
                 .contains("return Err(self.checked_runtime_kernel_witness_mismatch_error());");
     let imported_runtime_kernel_finish_bundle_projects_to_runtime_refinement_boundary =
@@ -44560,7 +44738,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let execution_trace_struct_literal_surface_restricted =
         execution_trace_struct_literal_files.is_empty();
     let runtime_diagnostics_feature_declared = runtime_evm_cargo_source.contains("[features]")
-        && runtime_evm_cargo_source.contains("diagnostics = []");
+        && runtime_evm_cargo_source.contains("diagnostics = [\"uo-core/diagnostics\"]");
     let probe_enables_runtime_diagnostics_feature = probe_cargo_source
         .contains("uo-evm = { path = \"../../runtime/uo-evm\", features = [\"diagnostics\"] }");
     let default_call_result_omits_runtime_telemetry = engine_source
@@ -44643,6 +44821,13 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let seal_nonces_come_from_the_seal_count = check_seal_nonces_come_from_the_seal_count(
         &production_source_slice(&generated_store_surface_source),
         &generated_store_codec_source,
+    );
+    let private_evidence_stays_inside_the_runtime = check_private_evidence_stays_inside_the_runtime(
+        &core_trace_source,
+        &engine_impl_source,
+        &main_source,
+        &fs::read_to_string(root.join("crates/uo-core/Cargo.toml"))?,
+        &runtime_evm_cargo_source,
     );
     let probe_reads_runtime_telemetry_from_diagnostic_channel = extract_metrics_source
         .contains("fn extract_metrics(result: &DiagnosticCallResult)")
@@ -46041,6 +46226,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "runtime_secrets_derive_from_the_master_secret":
             runtime_secrets_derive_from_the_master_secret,
         "seal_nonces_come_from_the_seal_count": seal_nonces_come_from_the_seal_count,
+        "private_evidence_stays_inside_the_runtime": private_evidence_stays_inside_the_runtime,
         "theorem_certificate_constructor_checks":
             theorem_certificate_constructor_checks,
         "theorem_certificate_constructor_surface_restricted":
@@ -46982,6 +47168,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && contract_instance_debug_is_opaque
             && runtime_secrets_derive_from_the_master_secret
             && seal_nonces_come_from_the_seal_count
+            && private_evidence_stays_inside_the_runtime
             && theorem_certificate_constructor_surface_restricted
             && runtime_public_call_trace_bundle_surface_restricted
             && runtime_public_call_trace_bundle_fields_private
@@ -54291,7 +54478,8 @@ The same report also checks that the
 proof-grade trusted-kernel path itself stays on the stronger slot-wrapped
 artifact: `crates/uo-core/src/trusted_kernel.rs` must source the admitted
 `confidential_slot_program` from the checked manifest, `uo-evm --format
-trusted-kernel` must emit `runtime_trusted_kernel_slot_bundle`, the probe's
+trusted-kernel` (in a diagnostics build, the only build with that format)
+must emit `runtime_trusted_kernel_slot_bundle`, the probe's
 trusted-kernel validator must validate that same slot-wrapped artifact, and
 `CheckProofGradeRuntimeTrustedKernel.lean` must load the corresponding slot
 bundle checker path rather than the older bare trusted-kernel bundle loader.
@@ -55463,6 +55651,182 @@ mod tests {
         assert!(!check_seal_nonces_come_from_the_seal_count(
             &surface, &truncated
         ));
+    }
+
+    #[test]
+    fn private_evidence_check_rejects_the_drifts_it_guards() {
+        use super::{check_private_evidence_stays_inside_the_runtime, repo_root};
+        let root = repo_root();
+        let read = |rel: &str| std::fs::read_to_string(root.join(rel)).unwrap();
+        let trace = read("crates/uo-core/src/trace.rs");
+        let engine = production_source_slice(&read("runtime/uo-evm/src/engine.rs"));
+        let main = read("runtime/uo-evm/src/main.rs");
+        let core_manifest = read("crates/uo-core/Cargo.toml");
+        let runtime_manifest = read("runtime/uo-evm/Cargo.toml");
+        let ok = |trace: &str, engine: &str, main: &str, core: &str, runtime: &str| {
+            check_private_evidence_stays_inside_the_runtime(trace, engine, main, core, runtime)
+        };
+        let rejects = |what: &str, changed: &str, original: &str, verdict: bool| {
+            assert_ne!(changed, original, "{what}: the drift changed nothing");
+            assert!(!verdict, "{what}: the check accepted the drift");
+        };
+
+        // The sources pass as they are.
+        assert!(ok(
+            &trace,
+            &engine,
+            &main,
+            &core_manifest,
+            &runtime_manifest
+        ));
+
+        // A position map moved from the evidence into the receipt.
+        let moved = trace
+            .replacen(
+                "    #[cfg_attr(any(test, feature = \"diagnostics\"), serde(default))]\n    pub(crate) runtime_oram_position_map_before: Box<[RuntimePathOramPositionMapWitness]>,\n",
+                "",
+                1,
+            )
+            .replacen(
+                "    pub public_state_transition: Option<RuntimePublicStateTransition>,\n}",
+                "    pub public_state_transition: Option<RuntimePublicStateTransition>,\n    #[serde(default)]\n    pub runtime_oram_position_map_before: Box<[RuntimePathOramPositionMapWitness]>,\n}",
+                1,
+            );
+        rejects(
+            "moved position map",
+            &moved,
+            &trace,
+            ok(&moved, &engine, &main, &core_manifest, &runtime_manifest),
+        );
+        // A position map copied into the receipt and kept in the evidence.
+        let copied = trace.replacen(
+            "    pub public_state_transition: Option<RuntimePublicStateTransition>,\n}",
+            "    pub public_state_transition: Option<RuntimePublicStateTransition>,\n    #[serde(default)]\n    pub runtime_oram_position_map_after: Box<[RuntimePathOramPositionMapWitness]>,\n}",
+            1,
+        );
+        rejects(
+            "copied position map",
+            &copied,
+            &trace,
+            ok(&copied, &engine, &main, &core_manifest, &runtime_manifest),
+        );
+        // An evidence field that another crate can read.
+        let exposed = trace.replacen(
+            "    pub(crate) runtime_oram_leaf_schedule:",
+            "    pub runtime_oram_leaf_schedule:",
+            1,
+        );
+        rejects(
+            "public evidence field",
+            &exposed,
+            &trace,
+            ok(&exposed, &engine, &main, &core_manifest, &runtime_manifest),
+        );
+        // Evidence that every build can serialize.
+        let serializable = trace.replacen(
+            "#[derive(PartialEq, Default)]\n#[cfg_attr(\n    any(test, feature = \"diagnostics\"),\n    derive(Debug, Serialize, Deserialize)\n)]\npub struct PrivateEvidence {",
+            "#[derive(Debug, Serialize, Deserialize, PartialEq, Default)]\npub struct PrivateEvidence {",
+            1,
+        );
+        rejects(
+            "ungated serialization",
+            &serializable,
+            &trace,
+            ok(
+                &serializable,
+                &engine,
+                &main,
+                &core_manifest,
+                &runtime_manifest,
+            ),
+        );
+        // An accessor that hands the evidence out.
+        let handed = trace.replacen(
+            "    pub fn into_receipt(self) -> PublicReceipt {",
+            "    pub fn evidence(&self) -> &PrivateEvidence {\n        &self.evidence\n    }\n\n    pub fn into_receipt(self) -> PublicReceipt {",
+            1,
+        );
+        rejects(
+            "evidence accessor",
+            &handed,
+            &trace,
+            ok(&handed, &engine, &main, &core_manifest, &runtime_manifest),
+        );
+        // Evidence that is not wiped when it is dropped.
+        let unwiped = trace.replacen(
+            "impl Drop for PrivateEvidence {\n    fn drop(&mut self) {\n        self.wipe();\n    }\n}",
+            "impl Drop for PrivateEvidence {\n    fn drop(&mut self) {}\n}",
+            1,
+        );
+        rejects(
+            "no wipe on drop",
+            &unwiped,
+            &trace,
+            ok(&unwiped, &engine, &main, &core_manifest, &runtime_manifest),
+        );
+
+        // A call result that carries the trace in every build.
+        let ungated = engine.replacen(
+            "    #[cfg(any(test, feature = \"diagnostics\"))]\n    pub trace: ExecutionTrace,",
+            "    pub trace: ExecutionTrace,",
+            1,
+        );
+        rejects(
+            "ungated trace field",
+            &ungated,
+            &engine,
+            ok(&trace, &ungated, &main, &core_manifest, &runtime_manifest),
+        );
+        // An engine function that returns a trace.
+        let returned = engine.replacen(
+            "pub fn run_artifact(artifact: &CompiledArtifact, entrypoint: &str) -> Result<CallResult> {",
+            "pub fn run_artifact(artifact: &CompiledArtifact, entrypoint: &str) -> Result<ExecutionTrace> {",
+            1,
+        );
+        rejects(
+            "returned trace",
+            &returned,
+            &engine,
+            ok(&trace, &returned, &main, &core_manifest, &runtime_manifest),
+        );
+
+        // A CLI that prints a proof object in every build.
+        let printed = main.replacen(
+            "        #[cfg(feature = \"diagnostics\")]\n        OutputFormat::TrustedKernel => {",
+            "        OutputFormat::TrustedKernel => {",
+            1,
+        );
+        rejects(
+            "ungated CLI format",
+            &printed,
+            &main,
+            ok(&trace, &engine, &printed, &core_manifest, &runtime_manifest),
+        );
+
+        // A runtime that always builds `uo-core` with the evidence's
+        // serialization, and a `uo-core` that has it on by default.
+        let always = runtime_manifest.replacen(
+            "\nuo-core = { path = \"../../crates/uo-core\" }\n",
+            "\nuo-core = { path = \"../../crates/uo-core\", features = [\"diagnostics\"] }\n",
+            1,
+        );
+        rejects(
+            "feature always on",
+            &always,
+            &runtime_manifest,
+            ok(&trace, &engine, &main, &core_manifest, &always),
+        );
+        let by_default = core_manifest.replacen(
+            "\ndiagnostics = []\n",
+            "\ndefault = [\"diagnostics\"]\ndiagnostics = []\n",
+            1,
+        );
+        rejects(
+            "feature on by default",
+            &by_default,
+            &core_manifest,
+            ok(&trace, &engine, &main, &by_default, &runtime_manifest),
+        );
     }
 
     #[test]

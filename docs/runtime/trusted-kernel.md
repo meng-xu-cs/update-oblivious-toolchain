@@ -5,8 +5,27 @@ runtime boundary.
 
 ## Boundary Object
 
-The base runtime boundary is the `RuntimeTrustedKernelBundle` exported from
-`ExecutionTrace` in `crates/uo-core/src/trace.rs`.
+A call's trace is two types in `crates/uo-core/src/trace.rs`:
+
+- `PublicReceipt` is what the observer of the call sees: the statements it
+  ran, its logical and physical storage events, its modeled gas, the
+  theorems' view of it (`TheoremTrace`) and its public-state transition. A
+  production runtime returns this and nothing else of the trace.
+- `PrivateEvidence` is what the proof objects are built from and the
+  observer must not see: the replay tag of a seeded deployment, the kernel
+  witnesses and bundles, and the Path ORAM leaf schedule, access counters,
+  position maps and leaf transitions. Its fields are private to `uo-core`,
+  it is wiped when dropped, and only a test or a diagnostics build can
+  serialize it.
+
+`ExecutionTrace` holds both. Its JSON form is one object, the receipt's
+fields and then the evidence's, which is the form the Lean importers read. A
+call returns it only in a test or diagnostics build (`CallResult.trace`); in
+any other build the call returns `CallResult.receipt`, and the evidence is
+dropped inside the runtime when the call ends.
+
+The base runtime boundary is the `RuntimeTrustedKernelBundle` built from an
+`ExecutionTrace`, so it exists only where the trace does.
 
 The proof-grade checker validates the stronger
 `RuntimeTrustedKernelSlotBundle` from `crates/uo-core/src/trusted_kernel.rs`.

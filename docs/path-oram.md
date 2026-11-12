@@ -295,18 +295,18 @@ spends on the proof objects it exports, the position-map witnesses and the
 execution trace's proof bundles, and the rest, its own work
 (`p50_witness_ns`, `p50_proof_objects_ns`, `p50_runtime_ns`;
 `latency_break_even` compares both). On its own work the tree is faster
-than the full scan for reads from 4,096 entries (14 ms against 16 at 4,096,
-53 against 69 at 16,384) and for an even mix from 16,384, while a write
-alone stays slower (78 ms against 74 at 16,384). Whole calls on the tree are
-slower at every capacity measured (545 ms against 332 for a read at 16,384):
+than the full scan for reads from 4,096 entries (16 ms against 17 at 4,096,
+44 against 72 at 16,384) and for an even mix from 16,384, while a write
+alone stays slower (80 ms against 72 at 16,384). Whole calls on the tree are
+slower at every capacity measured (471 ms against 355 for a read at 16,384):
 to export the position-map witnesses, the runtime decodes every bucket of the
-tree at the start and the end of each call, 453 ms of that read, where the
-full scan's time goes to the proof bundles of its 32,768-event trace (263
-ms). These medians of three trials move with the machine and the run: an
-earlier bundle, from a slower machine, put the reads-alone threshold at 8,192
-entries, and the one before this put that read at 16,384 at 42 ms of the
-tree's own work and 469 ms in all. A node access evicts the stash bucket by
-bucket, placing a block in the
+tree at the start and the end of each call, 390 ms of that read, where the
+full scan's time goes to the proof bundles of its 32,768-event trace (279
+ms). These medians of three trials move with the machine and the run. Across
+the last four bundles the tree's own work for that read at 16,384 measured
+between 42 and 53 ms, and the reads-alone threshold was 4,096 entries on
+this machine and 8,192 on a slower one. A node access evicts the stash
+bucket by bucket, placing a block in the
 bucket at a given depth exactly when its leaf and the read leaf agree above
 that depth (the leaf count is a power of two), and moves blocks with in-place
 masked selects; at 4,096 entries this takes 2.2 times fewer instructions per

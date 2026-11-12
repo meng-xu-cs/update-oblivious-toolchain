@@ -213,7 +213,8 @@ The same report also checks that the
 proof-grade trusted-kernel path itself stays on the stronger slot-wrapped
 artifact: `crates/uo-core/src/trusted_kernel.rs` must source the admitted
 `confidential_slot_program` from the checked manifest, `uo-evm --format
-trusted-kernel` must emit `runtime_trusted_kernel_slot_bundle`, the probe's
+trusted-kernel` (in a diagnostics build, the only build with that format)
+must emit `runtime_trusted_kernel_slot_bundle`, the probe's
 trusted-kernel validator must validate that same slot-wrapped artifact, and
 `CheckProofGradeRuntimeTrustedKernel.lean` must load the corresponding slot
 bundle checker path rather than the older bare trusted-kernel bundle loader.

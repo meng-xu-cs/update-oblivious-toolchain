@@ -202,7 +202,12 @@ pub const RUNTIME_PUBLIC_STATE_TRANSITION_FIELDS: &[&str] = &[
     "aborted",
 ];
 
-pub const EXECUTION_TRACE_FIELDS: &[&str] = &[
+/// The fields of `ExecutionTrace`: a call's receipt and its private evidence.
+/// In JSON the two are flattened into one object.
+pub const EXECUTION_TRACE_FIELDS: &[&str] = &["receipt", "evidence"];
+
+/// The fields of `PublicReceipt`: what the observer of a call sees.
+pub const PUBLIC_RECEIPT_FIELDS: &[&str] = &[
     "opcode_trace",
     "logical_accesses",
     "logical_writes",
@@ -211,6 +216,10 @@ pub const EXECUTION_TRACE_FIELDS: &[&str] = &[
     "gas_used",
     "theorem_trace",
     "public_state_transition",
+];
+
+/// The fields of `PrivateEvidence`: what stays inside the runtime.
+pub const PRIVATE_EVIDENCE_FIELDS: &[&str] = &[
     "runtime_seed",
     "runtime_kernel_witness",
     "runtime_kernel_refinement_witness",
@@ -355,11 +364,18 @@ pub const OBSERVER_SCHEMA_COVERAGE: &[ObserverSchemaCoverage] = &[
         rationale: "public-state commit and rollback hashes are mirrored by the abort rollback theorem surface",
     },
     ObserverSchemaCoverage {
-        schema: "ExecutionTrace",
-        fields: EXECUTION_TRACE_FIELDS,
+        schema: "PublicReceipt",
+        fields: PUBLIC_RECEIPT_FIELDS,
         default_classification: ObserverCoverageClassification::IncludedInLean,
         lean_anchor: "ExecutionTrace / RuntimeRefinementWitness / primitive_event_transcript",
-        rationale: "execution trace fields are projected into Lean observer, refinement witness, or primitive transcript evidence",
+        rationale: "receipt fields are what the observer of a call sees, and are projected into the Lean observer, the refinement witness or the primitive transcript",
+    },
+    ObserverSchemaCoverage {
+        schema: "PrivateEvidence",
+        fields: PRIVATE_EVIDENCE_FIELDS,
+        default_classification: ObserverCoverageClassification::IncludedInLean,
+        lean_anchor: "ExecutionTrace / RuntimeRefinementWitness / primitive_event_transcript",
+        rationale: "evidence fields stay inside the runtime; a diagnostics build projects them into the Lean refinement witness, hidden certificate or primitive transcript",
     },
 ];
 
@@ -414,41 +430,74 @@ pub const OBSERVER_FIELD_COVERAGE_OVERRIDES: &[ObserverFieldCoverageOverride] = 
         rationale: "the replay tag of a seeded test or diagnostics deployment, absent from a production deployment; seeded witness families are proof evidence for fresh-coin assumptions, not host-observable data",
     },
     ObserverFieldCoverageOverride {
-        schema: "ExecutionTrace",
+        schema: "PrivateEvidence",
         field: "runtime_seed",
         classification: ObserverCoverageClassification::CryptographicallyHidden,
         lean_anchor: "runtimeFreshnessDiscipline",
         rationale: "the replay tag of a seeded test or diagnostics deployment, absent from a production deployment, whose keys derive from a master secret that no trace carries; it feeds fresh-coin proof families and is covered by the freshness discipline",
     },
     ObserverFieldCoverageOverride {
-        schema: "ExecutionTrace",
+        schema: "PrivateEvidence",
         field: "runtime_oram_access_counters_before",
         classification: ObserverCoverageClassification::CryptographicallyHidden,
         lean_anchor: "PathOramLocalPosmapV1StandardTheorem",
         rationale: "ORAM counters are hidden witness state covered by the ORAM refinement and freshness assumptions",
     },
     ObserverFieldCoverageOverride {
-        schema: "ExecutionTrace",
+        schema: "PrivateEvidence",
         field: "runtime_oram_access_counters_after",
         classification: ObserverCoverageClassification::CryptographicallyHidden,
         lean_anchor: "PathOramLocalPosmapV1StandardTheorem",
         rationale: "ORAM counters are hidden witness state covered by the ORAM refinement and freshness assumptions",
     },
     ObserverFieldCoverageOverride {
-        schema: "ExecutionTrace",
+        schema: "PrivateEvidence",
         field: "runtime_oram_position_map_before",
         classification: ObserverCoverageClassification::CryptographicallyHidden,
         lean_anchor: "PathOramLocalPosmapV1StandardTheorem",
         rationale: "position map contents are hidden ORAM witness state and not part of the public observer",
     },
     ObserverFieldCoverageOverride {
-        schema: "ExecutionTrace",
+        schema: "PrivateEvidence",
         field: "runtime_oram_position_map_after",
         classification: ObserverCoverageClassification::CryptographicallyHidden,
         lean_anchor: "PathOramLocalPosmapV1StandardTheorem",
         rationale: "position map contents are hidden ORAM witness state and not part of the public observer",
     },
+    ObserverFieldCoverageOverride {
+        schema: "PrivateEvidence",
+        field: "runtime_oram_leaf_state_transitions",
+        classification: ObserverCoverageClassification::CryptographicallyHidden,
+        lean_anchor: "PathOramLocalPosmapV1StandardTheorem",
+        rationale: "a leaf transition names the slot an access touched and the leaf it moved to, which are hidden ORAM witness state",
+    },
 ];
+
+/// The schemas whose values a `PublicReceipt` holds, itself included.
+pub const PUBLIC_RECEIPT_SCHEMAS: &[&str] = &[
+    "PublicReceipt",
+    "TheoremTrace",
+    "PublicOutcomeTrace",
+    "OutputShape",
+    "EncryptedReturnPayload",
+    "ReturnChannelPublicBinding",
+    "RuntimePublicStateTransition",
+];
+
+/// The fields that a `PublicReceipt` holds and that are classified
+/// `CryptographicallyHidden`: the bytes of an encrypted return, which the
+/// caller is meant to receive and only the client can open. Every other
+/// field so classified belongs to the private evidence or to a proof object
+/// built from it.
+pub fn public_receipt_hidden_fields() -> Vec<ObserverFieldCoverage> {
+    observer_field_coverage_table()
+        .into_iter()
+        .filter(|entry| {
+            PUBLIC_RECEIPT_SCHEMAS.contains(&entry.schema)
+                && entry.classification == ObserverCoverageClassification::CryptographicallyHidden
+        })
+        .collect()
+}
 
 pub fn observer_schema_coverage(schema: &str) -> Option<&'static ObserverSchemaCoverage> {
     OBSERVER_SCHEMA_COVERAGE
@@ -585,10 +634,11 @@ mod tests {
             let Some((field_name, _ty)) = trimmed.split_once(':') else {
                 continue;
             };
+            let field_name = field_name.trim();
             let field_name = field_name
-                .trim()
-                .strip_prefix("pub ")
-                .unwrap_or(field_name.trim());
+                .strip_prefix("pub(crate) ")
+                .or_else(|| field_name.strip_prefix("pub "))
+                .unwrap_or(field_name);
             if field_name
                 .chars()
                 .all(|ch| ch == '_' || ch.is_ascii_alphanumeric())
@@ -704,6 +754,8 @@ mod tests {
             RUNTIME_PUBLIC_STATE_TRANSITION_FIELDS,
         );
         assert_source_fields(trace_source, "ExecutionTrace", EXECUTION_TRACE_FIELDS);
+        assert_source_fields(trace_source, "PublicReceipt", PUBLIC_RECEIPT_FIELDS);
+        assert_source_fields(trace_source, "PrivateEvidence", PRIVATE_EVIDENCE_FIELDS);
 
         let return_channel_source = include_str!("../../../runtime/uo-evm/src/return_channel.rs");
         assert_source_fields(
@@ -711,6 +763,58 @@ mod tests {
             "ReturnChannelAad",
             RETURN_CHANNEL_AAD_FIELDS,
         );
+    }
+
+    /// A field of a call's trace that the observer must not see is a field
+    /// of the private evidence, never of the receipt.
+    #[test]
+    fn a_hidden_trace_field_is_private_evidence() {
+        let table = observer_field_coverage_table();
+        let hidden = |schema: &str| -> Vec<&str> {
+            table
+                .iter()
+                .filter(|entry| {
+                    entry.schema == schema
+                        && entry.classification
+                            == ObserverCoverageClassification::CryptographicallyHidden
+                })
+                .map(|entry| entry.field)
+                .collect()
+        };
+        assert_eq!(hidden("PublicReceipt"), Vec::<&str>::new());
+        assert_eq!(
+            hidden("PrivateEvidence"),
+            [
+                "runtime_seed",
+                "runtime_oram_access_counters_before",
+                "runtime_oram_access_counters_after",
+                "runtime_oram_position_map_before",
+                "runtime_oram_position_map_after",
+                "runtime_oram_leaf_state_transitions",
+            ]
+        );
+        // The two types share no field, so the flattened JSON of a trace
+        // names each field once.
+        for field in PUBLIC_RECEIPT_FIELDS {
+            assert!(!PRIVATE_EVIDENCE_FIELDS.contains(field));
+        }
+        // What a receipt holds besides its own fields hides only the bytes
+        // of an encrypted return.
+        let reachable: Vec<String> = public_receipt_hidden_fields()
+            .iter()
+            .map(|entry| format!("{}.{}", entry.schema, entry.field))
+            .collect();
+        assert_eq!(
+            reachable,
+            [
+                "EncryptedReturnPayload.nonce",
+                "EncryptedReturnPayload.ciphertext",
+                "EncryptedReturnPayload.tag",
+            ]
+        );
+        for schema in PUBLIC_RECEIPT_SCHEMAS {
+            assert!(observer_schema_coverage(schema).is_some(), "{schema}");
+        }
     }
 
     #[test]

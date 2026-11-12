@@ -8,6 +8,7 @@
 #![cfg(not(feature = "diagnostics"))]
 
 use sha2::{Digest, Sha256};
+use std::collections::BTreeSet;
 use uo_core::{
     CompiledArtifact, ContractMetadata, ProgramMode, PublicEnvironment, ReturnChannelPublicBinding,
     Value,
@@ -122,40 +123,74 @@ fn a_rejected_production_call_returns_no_runtime_value() {
     }
 }
 
-/// The trace of a deployment from OS randomness carries no seed.
+/// Every key of a JSON value, at any depth.
+fn collect_keys(value: &serde_json::Value, keys: &mut BTreeSet<String>) {
+    match value {
+        serde_json::Value::Object(fields) => {
+            for (key, field) in fields {
+                keys.insert(key.clone());
+                collect_keys(field, keys);
+            }
+        }
+        serde_json::Value::Array(items) => {
+            for item in items {
+                collect_keys(item, keys);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// A call returns its receipt and none of its private evidence. In this
+/// build the result has no field for the call's whole trace, so this test
+/// reads what the result does have.
 #[test]
-fn the_trace_of_an_unseeded_deployment_carries_no_seed() {
+fn a_call_returns_its_receipt_and_no_private_evidence() {
     let artifact = single_access_map();
-    let mut instance = ContractInstance::deploy(artifact.clone()).unwrap();
+    let mut instance = ContractInstance::deploy(artifact).unwrap();
     let result = instance
         .call(
             "put(bytes32,uint256)",
             vec![Value::Bytes32([7u8; 32]), Value::uint(5)],
         )
         .unwrap();
-    assert_eq!(result.trace.runtime_seed(), None);
-    let trace = serde_json::to_value(&result.trace).unwrap();
-    assert!(trace["runtime_seed"].is_null());
-    let bundle =
-        serde_json::to_value(result.trace.runtime_trusted_kernel_bundle().unwrap()).unwrap();
-    assert!(bundle["runtime_seed"].is_null());
-    let family = serde_json::to_string(
-        &result
-            .trace
-            .runtime_confidential_proof_bundle_family(&artifact)
-            .unwrap(),
-    )
-    .unwrap();
-    // A seed tag in the proof bundles is absent, or is the index 0 of a
-    // singleton family. It is never a deployment seed.
-    let tag = "\"runtime_seed\":";
-    assert!(family.contains(tag));
-    for (at, _) in family.match_indices(tag) {
-        let value = &family[at + tag.len()..];
+
+    // The receipt is what the observer sees: the call's storage events and
+    // the theorems' view of it.
+    assert_eq!(result.receipt(), &result.receipt);
+    assert!(!result.receipt.physical_reads.is_empty());
+    assert!(!result.receipt.physical_writes.is_empty());
+    assert!(result.receipt.theorem_trace.public_outcome.is_some());
+
+    let receipt = serde_json::to_value(&result.receipt).unwrap();
+    for key in receipt.as_object().unwrap().keys() {
         assert!(
-            value.starts_with("null") || value.starts_with("0,") || value.starts_with("0}"),
-            "unexpected seed tag {}",
-            &value[..value.len().min(24)]
+            uo_core::PUBLIC_RECEIPT_FIELDS.contains(&key.as_str()),
+            "{key}"
         );
+    }
+    // No field of the private evidence, and no part of a hidden certificate
+    // or a kernel witness, appears in it at any depth.
+    let mut keys = BTreeSet::new();
+    collect_keys(&receipt, &mut keys);
+    for field in uo_core::PRIVATE_EVIDENCE_FIELDS {
+        assert!(!keys.contains(*field), "{field}");
+    }
+    for field in [
+        "oram_leaf_schedule",
+        "oram_position_map_before",
+        "oram_position_map_after",
+        "oram_leaf_state_transitions",
+        "hidden_certificate",
+        "kernel_witness",
+        "access_counter",
+        "leaves",
+    ] {
+        assert!(!keys.contains(field), "{field}");
+    }
+    // Nor does the result's `Debug` form show any of it.
+    let debug = format!("{result:?}");
+    for field in uo_core::PRIVATE_EVIDENCE_FIELDS {
+        assert!(!debug.contains(field), "{field}");
     }
 }

@@ -55,11 +55,12 @@ def observerCoverageCryptographicallyHiddenKeys : List String :=
   , "EncryptedReturnPayload.ciphertext"
   , "EncryptedReturnPayload.tag"
   , "RuntimeTrustedKernelBundle.runtime_seed"
-  , "ExecutionTrace.runtime_seed"
-  , "ExecutionTrace.runtime_oram_access_counters_before"
-  , "ExecutionTrace.runtime_oram_access_counters_after"
-  , "ExecutionTrace.runtime_oram_position_map_before"
-  , "ExecutionTrace.runtime_oram_position_map_after"
+  , "PrivateEvidence.runtime_seed"
+  , "PrivateEvidence.runtime_oram_access_counters_before"
+  , "PrivateEvidence.runtime_oram_access_counters_after"
+  , "PrivateEvidence.runtime_oram_position_map_before"
+  , "PrivateEvidence.runtime_oram_position_map_after"
+  , "PrivateEvidence.runtime_oram_leaf_state_transitions"
   ]
 
 def observerCoveragePublicInputKeys : List String :=
@@ -211,28 +212,28 @@ def observerCoverageKeys : List String :=
   , "RuntimePublicStateTransition.committed_public_state_hash"
   , "RuntimePublicStateTransition.public_delta_hash"
   , "RuntimePublicStateTransition.aborted"
-  , "ExecutionTrace.opcode_trace"
-  , "ExecutionTrace.logical_accesses"
-  , "ExecutionTrace.logical_writes"
-  , "ExecutionTrace.physical_reads"
-  , "ExecutionTrace.physical_writes"
-  , "ExecutionTrace.gas_used"
-  , "ExecutionTrace.theorem_trace"
-  , "ExecutionTrace.public_state_transition"
-  , "ExecutionTrace.runtime_seed"
-  , "ExecutionTrace.runtime_kernel_witness"
-  , "ExecutionTrace.runtime_kernel_refinement_witness"
-  , "ExecutionTrace.runtime_kernel_finish_bundle"
-  , "ExecutionTrace.runtime_kernel_machine_finish_witness"
-  , "ExecutionTrace.runtime_trusted_kernel_bundle"
-  , "ExecutionTrace.runtime_controller_certificate"
-  , "ExecutionTrace.runtime_oram_objects"
-  , "ExecutionTrace.runtime_oram_leaf_schedule"
-  , "ExecutionTrace.runtime_oram_access_counters_before"
-  , "ExecutionTrace.runtime_oram_access_counters_after"
-  , "ExecutionTrace.runtime_oram_position_map_before"
-  , "ExecutionTrace.runtime_oram_position_map_after"
-  , "ExecutionTrace.runtime_oram_leaf_state_transitions"
+  , "PublicReceipt.opcode_trace"
+  , "PublicReceipt.logical_accesses"
+  , "PublicReceipt.logical_writes"
+  , "PublicReceipt.physical_reads"
+  , "PublicReceipt.physical_writes"
+  , "PublicReceipt.gas_used"
+  , "PublicReceipt.theorem_trace"
+  , "PublicReceipt.public_state_transition"
+  , "PrivateEvidence.runtime_seed"
+  , "PrivateEvidence.runtime_kernel_witness"
+  , "PrivateEvidence.runtime_kernel_refinement_witness"
+  , "PrivateEvidence.runtime_kernel_finish_bundle"
+  , "PrivateEvidence.runtime_kernel_machine_finish_witness"
+  , "PrivateEvidence.runtime_trusted_kernel_bundle"
+  , "PrivateEvidence.runtime_controller_certificate"
+  , "PrivateEvidence.runtime_oram_objects"
+  , "PrivateEvidence.runtime_oram_leaf_schedule"
+  , "PrivateEvidence.runtime_oram_access_counters_before"
+  , "PrivateEvidence.runtime_oram_access_counters_after"
+  , "PrivateEvidence.runtime_oram_position_map_before"
+  , "PrivateEvidence.runtime_oram_position_map_after"
+  , "PrivateEvidence.runtime_oram_leaf_state_transitions"
   ]
 
 def observerFieldCoverage : List ObserverFieldCoverage :=
@@ -274,13 +275,77 @@ theorem observerCoverage_cryptographicallyHiddenKeysPinned :
       , "EncryptedReturnPayload.ciphertext"
       , "EncryptedReturnPayload.tag"
       , "RuntimeTrustedKernelBundle.runtime_seed"
-      , "ExecutionTrace.runtime_seed"
-      , "ExecutionTrace.runtime_oram_access_counters_before"
-      , "ExecutionTrace.runtime_oram_access_counters_after"
-      , "ExecutionTrace.runtime_oram_position_map_before"
-      , "ExecutionTrace.runtime_oram_position_map_after"
+      , "PrivateEvidence.runtime_seed"
+      , "PrivateEvidence.runtime_oram_access_counters_before"
+      , "PrivateEvidence.runtime_oram_access_counters_after"
+      , "PrivateEvidence.runtime_oram_position_map_before"
+      , "PrivateEvidence.runtime_oram_position_map_after"
+      , "PrivateEvidence.runtime_oram_leaf_state_transitions"
       ] := by
   rfl
+
+/-- The keys of a call's public receipt: what a production runtime returns of
+a call's trace. -/
+def observerCoveragePublicReceiptKeys : List String :=
+  [ "PublicReceipt.opcode_trace"
+  , "PublicReceipt.logical_accesses"
+  , "PublicReceipt.logical_writes"
+  , "PublicReceipt.physical_reads"
+  , "PublicReceipt.physical_writes"
+  , "PublicReceipt.gas_used"
+  , "PublicReceipt.theorem_trace"
+  , "PublicReceipt.public_state_transition"
+  ]
+
+/-- The keys of a call's private evidence, which stays inside the runtime. -/
+def observerCoveragePrivateEvidenceKeys : List String :=
+  [ "PrivateEvidence.runtime_seed"
+  , "PrivateEvidence.runtime_kernel_witness"
+  , "PrivateEvidence.runtime_kernel_refinement_witness"
+  , "PrivateEvidence.runtime_kernel_finish_bundle"
+  , "PrivateEvidence.runtime_kernel_machine_finish_witness"
+  , "PrivateEvidence.runtime_trusted_kernel_bundle"
+  , "PrivateEvidence.runtime_controller_certificate"
+  , "PrivateEvidence.runtime_oram_objects"
+  , "PrivateEvidence.runtime_oram_leaf_schedule"
+  , "PrivateEvidence.runtime_oram_access_counters_before"
+  , "PrivateEvidence.runtime_oram_access_counters_after"
+  , "PrivateEvidence.runtime_oram_position_map_before"
+  , "PrivateEvidence.runtime_oram_position_map_after"
+  , "PrivateEvidence.runtime_oram_leaf_state_transitions"
+  ]
+
+/-- Whether every key of the first list is in the second. -/
+def allContained (keys : List String) (within : List String) : Bool :=
+  keys.all (fun key => containsString key within)
+
+/-- The receipt's and the evidence's keys are covered keys. -/
+theorem observerCoverage_receiptAndEvidenceKeysCovered :
+    allContained observerCoveragePublicReceiptKeys observerCoverageKeys = true ∧
+      allContained observerCoveragePrivateEvidenceKeys observerCoverageKeys = true := by
+  decide
+
+/-- No field of the public receipt is classified as cryptographically hidden:
+a field of a call's trace that the observer must not see is a field of the
+private evidence. -/
+theorem observerCoverage_publicReceipt_hasNoHiddenField :
+    observerCoveragePublicReceiptKeys.all
+        (fun key => !containsString key observerCoverageCryptographicallyHiddenKeys) =
+      true := by
+  decide
+
+/-- Besides the bytes of an encrypted return and the replay tag inside a
+trusted-kernel bundle, every cryptographically hidden key is a key of the
+private evidence. -/
+theorem observerCoverage_hiddenTraceKeys_arePrivateEvidence :
+    (observerCoverageCryptographicallyHiddenKeys.filter
+        (fun key => !containsString key observerCoveragePrivateEvidenceKeys)) =
+      [ "EncryptedReturnPayload.nonce"
+      , "EncryptedReturnPayload.ciphertext"
+      , "EncryptedReturnPayload.tag"
+      , "RuntimeTrustedKernelBundle.runtime_seed"
+      ] := by
+  decide
 
 theorem observerCoverage_publicInputKeysPinned :
     observerCoveragePublicInputKeys =

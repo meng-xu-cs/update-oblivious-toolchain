@@ -65,20 +65,22 @@ Check an artifact:
 cargo run -q -p uo-check -- --artifact /tmp/fixedslot.json --source benches/raw/FixedSlotClassifier.sol --metadata benches/raw/FixedSlotClassifier.uo.yaml
 ```
 
-Run the runtime:
+Run the runtime. A default build prints the call's public receipt:
 
 ```bash
-cargo run -q -p uo-evm -- --artifact /tmp/fixedslot.json --entrypoint 'peek()' --format trace
+cargo run -q -p uo-evm -- --artifact /tmp/fixedslot.json --entrypoint 'peek()'
 ```
 
-Inspect proof-facing runtime outputs:
+Inspect the whole trace and the proof-facing runtime outputs. They hold the
+call's private evidence, so they need a build with the `diagnostics` feature:
 
 ```bash
-cargo run -q -p uo-evm -- --artifact /tmp/fixedslot.json --entrypoint 'peek()' --format kernel-witness
-cargo run -q -p uo-evm -- --artifact /tmp/fixedslot.json --entrypoint 'peek()' --format kernel-refinement-witness
-cargo run -q -p uo-evm -- --artifact /tmp/fixedslot.json --entrypoint 'peek()' --format trusted-kernel
-cargo run -q -p uo-evm -- --artifact /tmp/fixedslot.json --entrypoint 'peek()' --format shell-boundary
-cargo run -q -p uo-evm -- --artifact /tmp/fixedslot.json --entrypoint 'peek()' --format refinement-witness
+cargo run -q -p uo-evm --features diagnostics -- --artifact /tmp/fixedslot.json --entrypoint 'peek()' --format trace
+cargo run -q -p uo-evm --features diagnostics -- --artifact /tmp/fixedslot.json --entrypoint 'peek()' --format kernel-witness
+cargo run -q -p uo-evm --features diagnostics -- --artifact /tmp/fixedslot.json --entrypoint 'peek()' --format kernel-refinement-witness
+cargo run -q -p uo-evm --features diagnostics -- --artifact /tmp/fixedslot.json --entrypoint 'peek()' --format trusted-kernel
+cargo run -q -p uo-evm --features diagnostics -- --artifact /tmp/fixedslot.json --entrypoint 'peek()' --format shell-boundary
+cargo run -q -p uo-evm --features diagnostics -- --artifact /tmp/fixedslot.json --entrypoint 'peek()' --format refinement-witness
 ```
 
 ## Artifact Modes

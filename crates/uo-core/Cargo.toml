@@ -4,6 +4,12 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 
+[features]
+# Lets a call's private evidence, and so its whole trace, be serialized and
+# printed. The Lean checkers read those forms. A production runtime is built
+# without it.
+diagnostics = []
+
 [dependencies]
 anyhow.workspace = true
 hex.workspace = true

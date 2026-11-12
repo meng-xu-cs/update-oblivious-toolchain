@@ -77,9 +77,10 @@ pub use metadata::{
 };
 pub use observer_coverage::{
     observer_field_coverage, observer_field_coverage_table, observer_schema_coverage,
-    validate_observer_coverage_table, ObserverCoverageClassification, ObserverFieldCoverage,
-    ObserverFieldCoverageOverride, ObserverSchemaCoverage, OBSERVER_FIELD_COVERAGE_OVERRIDES,
-    OBSERVER_SCHEMA_COVERAGE,
+    public_receipt_hidden_fields, validate_observer_coverage_table, ObserverCoverageClassification,
+    ObserverFieldCoverage, ObserverFieldCoverageOverride, ObserverSchemaCoverage,
+    OBSERVER_FIELD_COVERAGE_OVERRIDES, OBSERVER_SCHEMA_COVERAGE, PRIVATE_EVIDENCE_FIELDS,
+    PUBLIC_RECEIPT_FIELDS, PUBLIC_RECEIPT_SCHEMAS,
 };
 pub use runtime_boundary_schema::{
     runtime_boundary_obligation_ids, runtime_boundary_schema_is_mechanized_for_claim,
@@ -104,8 +105,8 @@ pub use trace::{
     ControllerPageBudget, ControllerPhase, EncryptedReturnPayload, ExecutionTrace, ExitEvent,
     FinalizedRuntimeCallTraceParts, KernelWitnessError, LogicalEvent, NormalizedMicroTrace,
     NormalizedPageEvent, OutputShape, PageEventKind, PhysicalReadEvent, PhysicalWriteEvent,
-    PublicCallSummary, PublicOutcomeTrace, RefinementPhysicalWrite, RefinementTrace,
-    RefinementWitnessError, ReturnChannelPublicBinding, RuntimeCallOutcome,
+    PrivateEvidence, PublicCallSummary, PublicOutcomeTrace, PublicReceipt, RefinementPhysicalWrite,
+    RefinementTrace, RefinementWitnessError, ReturnChannelPublicBinding, RuntimeCallOutcome,
     RuntimeControllerCertificate, RuntimeControllerObserverCertificate,
     RuntimeExecutionTraceFinalizationError, RuntimeExecutionTraceFinalizationInput,
     RuntimeKernelBoundaryTracker, RuntimeKernelBoundaryTrackerError, RuntimeKernelExecutionTracker,

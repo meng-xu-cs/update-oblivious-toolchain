@@ -12,8 +12,8 @@ use crate::runtime::{
 use crate::secret::RuntimeMasterSecret;
 use anyhow::{anyhow, bail, Result};
 use uo_core::{
-    CompiledArtifact, EncryptedReturnPayload, ExecutionTrace, PublicEnvironment, ReturnPolicy,
-    Value,
+    CompiledArtifact, EncryptedReturnPayload, ExecutionTrace, PublicEnvironment, PublicReceipt,
+    ReturnPolicy, Value,
 };
 
 pub struct ContractInstance {
@@ -42,20 +42,65 @@ pub struct CallTelemetry {
     pub zero_writes: usize,
 }
 
+/// What a call returns to its caller. Of the call's trace, a production
+/// build returns the receipt alone: the private evidence stays inside the
+/// runtime and is dropped when the call ends. A test or diagnostics build
+/// returns the whole trace, from which the proof objects are built.
 #[derive(Debug)]
 pub struct CallResult {
     pub return_value: Option<Value>,
     pub encrypted_return: Option<EncryptedReturnPayload>,
     pub aborted: bool,
+    /// What the observer of the call sees.
+    #[cfg(not(any(test, feature = "diagnostics")))]
+    pub receipt: PublicReceipt,
+    /// The call's receipt and its private evidence.
+    #[cfg(any(test, feature = "diagnostics"))]
     pub trace: ExecutionTrace,
+}
+
+impl CallResult {
+    /// What the observer of the call sees, in every build.
+    pub fn receipt(&self) -> &PublicReceipt {
+        #[cfg(not(any(test, feature = "diagnostics")))]
+        {
+            &self.receipt
+        }
+        #[cfg(any(test, feature = "diagnostics"))]
+        {
+            &self.trace.receipt
+        }
+    }
+
+    fn from_staged(
+        return_value: Option<Value>,
+        encrypted_return: Option<EncryptedReturnPayload>,
+        aborted: bool,
+        trace: ExecutionTrace,
+    ) -> Self {
+        Self {
+            return_value,
+            encrypted_return,
+            aborted,
+            #[cfg(not(any(test, feature = "diagnostics")))]
+            receipt: trace.into_receipt(),
+            #[cfg(any(test, feature = "diagnostics"))]
+            trace,
+        }
+    }
 }
 
 /// A call executed on a staged copy of committed state and freshness. It is
 /// applied to `self` only by `commit_staged`, after all host-visible
-/// validation succeeds; otherwise it is dropped and `self` is unchanged.
+/// validation succeeds; otherwise it is dropped and `self` is unchanged. It
+/// holds the call's whole trace, which the production checks read; the
+/// private evidence leaves it only in a test or diagnostics build.
 #[derive(Debug)]
 struct StagedCall {
-    result: CallResult,
+    return_value: Option<Value>,
+    encrypted_return: Option<EncryptedReturnPayload>,
+    aborted: bool,
+    trace: ExecutionTrace,
     zero_writes: usize,
     state: ContractRuntime,
     freshness: RuntimeFreshnessState,
@@ -169,10 +214,10 @@ impl ProductionContractInstance {
             self.inner
                 .stage_call(entrypoint, args, None, execution_session, Some(environment))?;
         validate_production_public_environment_trace(
-            &staged.result.trace,
+            &staged.trace,
             &expected_public_environment_projection,
         )?;
-        validate_production_proof_bundle(&self.inner.artifact, &staged.result.trace, evidence)?;
+        validate_production_proof_bundle(&self.inner.artifact, &staged.trace, evidence)?;
         Ok(self.inner.commit_staged(staged).0)
     }
 }
@@ -300,7 +345,15 @@ impl ContractInstance {
         self.state = staged.state;
         self.freshness = staged.freshness;
         self.initialized = staged.initialized;
-        (staged.result, staged.zero_writes)
+        (
+            CallResult::from_staged(
+                staged.return_value,
+                staged.encrypted_return,
+                staged.aborted,
+                staged.trace,
+            ),
+            staged.zero_writes,
+        )
     }
 
     /// Execute a call on a staged copy of committed state and freshness without
@@ -383,12 +436,10 @@ impl ContractInstance {
         staged_freshness.finish_call(aborted)?;
         let initialized = self.initialized || (initializer && !aborted);
         Ok(StagedCall {
-            result: CallResult {
-                return_value,
-                encrypted_return,
-                aborted,
-                trace,
-            },
+            return_value,
+            encrypted_return,
+            aborted,
+            trace,
             zero_writes,
             state: staged_state,
             freshness: staged_freshness,
@@ -397,19 +448,22 @@ impl ContractInstance {
     }
 }
 
-pub fn run_artifact(artifact: &CompiledArtifact, entrypoint: &str) -> Result<ExecutionTrace> {
+/// Deploy an artifact from OS randomness and call an entrypoint that takes
+/// no arguments.
+pub fn run_artifact(artifact: &CompiledArtifact, entrypoint: &str) -> Result<CallResult> {
     let mut instance = ContractInstance::deploy(artifact.clone())?;
-    Ok(instance.call(entrypoint, Vec::new())?.trace)
+    instance.call(entrypoint, Vec::new())
 }
 
+/// As `run_artifact`, on a deployment that the seed replays.
 #[cfg(any(test, feature = "diagnostics"))]
 pub fn run_artifact_with_seed(
     artifact: &CompiledArtifact,
     entrypoint: &str,
     deploy_seed: u64,
-) -> Result<ExecutionTrace> {
+) -> Result<CallResult> {
     let mut instance = ContractInstance::deploy_with_seed(artifact.clone(), deploy_seed)?;
-    Ok(instance.call(entrypoint, Vec::new())?.trace)
+    instance.call(entrypoint, Vec::new())
 }
 
 #[cfg(test)]

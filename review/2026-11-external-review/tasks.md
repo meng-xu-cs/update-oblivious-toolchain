@@ -217,20 +217,25 @@ one serializable type that every call returns.
    public-state transition, trace hashes) and `PrivateEvidence` (the replay
    tag, ORAM objects, leaf schedule, access counters, position maps, leaf
    transitions, and any kernel-witness field that holds hidden state).
-2. Take the split from `observer_coverage.rs`: a field classified
-   `CryptographicallyHidden` appears only in `PrivateEvidence`. A unit test
-   enforces it.
-3. `PrivateEvidence` implements `Serialize` only in a diagnostics build.
-   `CallResult` carries the receipt and, in a diagnostics build, the
-   evidence.
+2. Take the split from `observer_coverage.rs`: a field of the trace
+   classified `CryptographicallyHidden` appears only in `PrivateEvidence`. A
+   unit test enforces it. The receipt still holds the bytes of an encrypted
+   return, which carry that class and which the caller is meant to receive;
+   the test names them as the only such fields a receipt holds.
+3. `PrivateEvidence` implements `Serialize` only in a test or diagnostics
+   build. `CallResult` carries the receipt and, in such a build, the whole
+   trace.
 4. The probe and the CLI's proof-object formats build their bundles from
-   both. The Lean JSON importers keep their formats.
+   the whole trace, `ExecutionTrace`, which holds both. Its JSON is the
+   receipt's fields and then the evidence's, so the Lean JSON importers keep
+   their formats. The CLI prints the receipt in a default build and has the
+   trace and proof-object formats only in a diagnostics build.
 
 #### Acceptance criteria
 
-- In a default build, no type that can reach a caller has a
-  `CryptographicallyHidden` field. A probe static check covers it, with a
-  tamper scenario that moves a position map into the receipt.
+- In a default build, no type that can reach a caller has a field of the
+  trace classified `CryptographicallyHidden`. A probe static check covers
+  it, with a tamper scenario that moves a position map into the receipt.
 - Every Lean-backed validator accepts the diagnostics-build bundles; results
   regenerate.
 - `docs/runtime/secret-state.md` and `docs/runtime/trusted-kernel.md`
