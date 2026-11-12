@@ -17,7 +17,8 @@ claim.
 - Work an issue as `tasks.md` describes it, to the definition of done of
   [`review/runbook.md`](../runbook.md).
 - Title the commit `Issue NN: …`. In the same commit, set the issue's row
-  below to `done` and record the commit.
+  below to `done`. A commit cannot name itself, so the next commit that
+  touches the tracker fills in its hash.
 - Statuses: `todo`, `blocked` (on a decision of Issue 22), `in progress`,
   `done`, `deferred`.
 - A finished issue's durable facts go to the topic document that owns them.
@@ -55,15 +56,14 @@ Issue 22 has the options and the reasoning.
 
 | Decision | Status | Outcome |
 | --- | --- | --- |
-| D1, the unit the storage observer classifies | open | recommended: the 32-byte word |
+| D1, the unit the storage observer classifies | decided 2026-11-12 | the 32-byte word, as an EVM `SSTORE` classifies it; the unit size stays a parameter of the codec's Lean statement |
 | D2, where private evidence may go | decided 2026-11-12 | position maps and leaf schedules do not leave the runtime: a production build exports no private evidence, and only the diagnostics build exports it, to the Lean checkers |
-| D3, the lifetime budget of the stash bound | open | recommended: a cap of 152, at most `2^-60` over `2^48` node accesses of a map |
+| D3, the lifetime budget of the stash bound | decided 2026-11-12 | a cap of 152: at most `2^-60` over `2^48` node accesses of a map |
 
 ## Order of Work
 
-1. **Wave 0, decisions** (Issue 22). The maintainer decides the observer
-   unit, the evidence boundary and the stash budget. Only Issues 35 and 40
-   still wait for it.
+1. **Wave 0, decisions** (Issue 22). Done: the maintainer decided the
+   observer unit, the evidence boundary and the stash budget.
 2. **Wave 1, the confidentiality boundary** (Issues 23 to 26). A runtime
    that discloses its master secret undermines every other claim.
 3. **Wave 2, measurement and claim wording** (Issues 27 to 29). Later
@@ -88,7 +88,7 @@ its engineering part is Wave 4, its certified part is research.
 
 | Issue | Title | Wave | Size | Depends on | Status | Commit |
 | --- | --- | --- | --- | --- | --- | --- |
-| 22 | Decide the observer unit, the evidence boundary and the stash budget | 0 | S | maintainer | in progress | |
+| 22 | Decide the observer unit, the evidence boundary and the stash budget | 0 | S | maintainer | done | |
 | 23 | Stop returning the deployment seed to callers | 1 | S | | todo | |
 | 24 | Give the runtime an independent 256-bit master secret | 1 | M | 23 | todo | |
 | 25 | Split a call's result into a public receipt and private evidence | 1 | M to L | 24 | todo | |
@@ -101,12 +101,12 @@ its engineering part is Wave 4, its certified part is research.
 | 32 | Load each exact object once per call | 3 | M | 30 | todo | |
 | 33 | Check each UO write's class against its bytes | 3 | S | | todo | |
 | 34 | Make the confidential kernel's 256-bit arithmetic branch-free | 3 | M | | todo | |
-| 35 | Match the record codec to the observer unit | 3 | M | D1 | blocked | |
+| 35 | Match the record codec to the observer unit | 3 | M | | todo | |
 | 36 | Remove the whole-store witness snapshots from a call | 4 | M | 25 | todo | |
 | 37 | Stage a call without copying the store | 4 | M | | todo | |
 | 38 | Compress scan schedules in traces and proof objects | 4 | M to L | 31, 32 | todo | |
 | 39 | Admit encrypted returns in the kernel theorems | 5 | M | | todo | |
-| 40 | Give the stash bound a lifetime budget and test deferred write-back | 5 | M | D3 | blocked | |
+| 40 | Give the stash bound a lifetime budget and test deferred write-back | 5 | M | | todo | |
 | 41 | Put storage behind an adapter that keeps its own I/O log | 6 | M to L | 24, 31, 32 | todo | |
 | 42 | Widen the runtime-versus-model tests of the tree and the tape substitution | 6 | M | | todo | |
 | 43 | Prove a store operation's post-state and its write class together | research | R | 33, 35 | todo | |

@@ -32,9 +32,10 @@ Three later issues cannot be designed without a decision that the code does
 not determine. The Decisions table of [`README.md`](./README.md) holds their
 status.
 
-**D1, the unit the storage observer classifies.** Blocks Issue 35. A write is
-`Update` when the unit was nonzero, is nonzero, and changed. A guarantee for a
-small unit implies it for every larger one, and costs more bytes.
+**D1, the unit the storage observer classifies.** Blocked Issue 35. Decided
+on 2026-11-12: the 32-byte word. A write is `Update` when the unit was
+nonzero, is nonzero, and changed. A guarantee for a small unit implies it for
+every larger one, and costs more bytes.
 
 | | Record | 32-byte word | Byte |
 | --- | --- | --- | --- |
@@ -52,20 +53,20 @@ two disjoint alphabets used in turn. Today's nibble encoding makes every byte
 nonzero, but a byte repeats with probability 1/16 and the four bytes of the
 encoded magic prefix never change. So what it delivers is the word level (no
 word is zero, and a word repeats with negligible probability), at twice the
-bytes a marker needs. Recommended: the 32-byte word, recorded as a parameter
-of the semantics profile.
+bytes a marker needs. The decision takes the 32-byte word and keeps the unit
+size a parameter of the codec's Lean statement.
 
 **D2, where private evidence may go.** Blocked Issue 26. Decided on
 2026-11-12: position maps and leaf schedules do not leave the runtime. A
 production build exports no private evidence. The diagnostics build, which
 the production policy rejects, still exports it to the Lean checkers.
 
-**D3, the lifetime budget of the stash bound.** Blocks Issue 40. With `R` the
-stash cap, an access overflows with probability at most `14 · 0.6002^R`. For
-a total of `2^-λ` over `Q` node accesses of one map,
-`R ≥ (λ + log2 Q + 3.81) / 0.7365`. An ERC20Lite `transfer` at 16,384
-entries makes 154 node accesses, so `2^40` of them is about 7 billion
-transfers.
+**D3, the lifetime budget of the stash bound.** Blocked Issue 40. Decided on
+2026-11-12: a cap of 152. With `R` the stash cap, an access overflows with
+probability at most `14 · 0.6002^R`. For a total of `2^-λ` over `Q` node
+accesses of one map, `R ≥ (λ + log2 Q + 3.81) / 0.7365`. An ERC20Lite
+`transfer` at 16,384 entries makes 154 node accesses, so `2^40` of them is
+about 7 billion transfers.
 
 | Cap | Per access | Over `2^40` | Over `2^48` | Extra work per node access |
 | --- | --- | --- | --- | --- |
@@ -79,8 +80,8 @@ eviction and compaction, which are linear in the stash and are 86% of a node
 access's instructions; it is not measured. A stash page holds 8 blocks and is
 read and written once per operation, so a read moves about 2% more bytes at
 152. A cap of 128 or more gives every local-scheme map a stash as large as
-itself, so the local scheme needs no stash assumption. Recommended: 152,
-stated as at most `2^-60` over `2^48` node accesses of a map, with the
+itself, so the local scheme needs no stash assumption. The decision takes
+152, stated as at most `2^-60` over `2^48` node accesses of a map, with the
 overflow handling of Issue 40.
 
 #### How to fix
@@ -518,7 +519,7 @@ operators branch on secret operands in the confidential kernel.
 
 ### Issue 35 — Match the record codec to the observer unit
 
-Source: F7 (§8). Size: M. Depends on: D1.
+Source: F7 (§8). Size: M. Depends on: nothing (D1 chose the 32-byte word).
 
 #### Issue description
 
@@ -527,7 +528,7 @@ the claim needs depends on the observer unit.
 
 #### How to fix
 
-By D1 (Issue 22 has the comparison):
+D1 chose the 32-byte word (Issue 22 has the comparison):
 
 | Unit | Encoding | Value | Map record |
 | --- | --- | --- | --- |
@@ -668,7 +669,7 @@ benchmark that returns a secret-derived value releases it to the host.
 
 ### Issue 40 — Give the stash bound a lifetime budget and test deferred write-back
 
-Source: F6 (§7). Size: M. Depends on: D3.
+Source: F6 (§7). Size: M. Depends on: nothing (D3 chose a cap of 152).
 
 #### Issue description
 
