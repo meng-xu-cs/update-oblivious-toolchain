@@ -23,9 +23,9 @@ Generated from `docs/claim-boundary.md` by `mplus-probe --only claim-status`. Do
 
 | id | status | claim |
 | --- | --- | --- |
-| `assumption-bucket-encryption-indcpa` | trusted | bucketEncryptionINDCPA: hides Path ORAM bucket/path ciphertext contents; explicit Lean assumption grounded in the runtime ChaCha20Poly1305 sealed-record boundary. |
-| `assumption-metadata-encryption-indcpa` | trusted | metadataEncryptionINDCPA: hides encrypted position-map metadata pages; explicit Lean assumption paired with the same sealed-record crypto route. |
-| `assumption-stash-overflow-bounded` | trusted | stashOverflowBounded: bounds Path ORAM stash failure for deployed parameters; explicit Lean assumption paired with the JACM stash theorem at Z = 5 and pinned parameters. |
+| `assumption-bucket-encryption-indcpa` | trusted | bucketEncryptionINDCPA: hides Path ORAM bucket/path ciphertext contents; named in Lean and not formalized (a Prop field that no proof uses and the checkers fill with True), grounded in the runtime ChaCha20Poly1305 sealed-record boundary. |
+| `assumption-metadata-encryption-indcpa` | trusted | metadataEncryptionINDCPA: hides encrypted position-map metadata pages; named in Lean and not formalized, paired with the same sealed-record crypto route. |
+| `assumption-stash-overflow-bounded` | trusted | stashOverflowBounded: bounds Path ORAM stash failure for deployed parameters; named in Lean and not formalized, paired with the JACM stash theorem at Z = 5 and pinned parameters. |
 | `assumption-runtime-key-derivation` | trusted | Runtime key derivation: each object's storage key, initial placement and Path ORAM leaf coins derive from a 256-bit master secret from the OS by HKDF-SHA256, one label per use, and the ChaCha20 generator; trusted and not modeled in Lean, with the derivation's call sites pinned by the runtime boundary validation. |
 | `assumption-tee-deployment` | trusted | TEE deployment assumptions: enclave memory confidentiality/integrity, attestation authenticity, rollback resistance, freshness, crash recovery, and patch-level trust; explicit Lean bundle SgxDeploymentAssumptions. |
 | `assumption-parser-preprocessing-equivalence` | trusted | Parser/preprocessing equivalence: connects raw Solidity-like source text to the post-resolution AST consumed by Lean; still a trusted front-end surface. |

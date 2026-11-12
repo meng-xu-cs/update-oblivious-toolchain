@@ -49,13 +49,13 @@
     },
     {
       "path": "capacity_sweep.json",
-      "bytes": 116330,
-      "sha256": "0b0f1f7f7448a1ee760d8bf78b022f1f8aca0eda760aaf30ffa31209d1dbf14b"
+      "bytes": 116296,
+      "sha256": "cae66aaf0df794eaf00a8bd1102c3e20ed7ddb1561c0f36524e4fc14ec2d969e"
     },
     {
       "path": "claim_artifact_manifest.json",
-      "bytes": 69817,
-      "sha256": "1de74a9f7e768bae12d6149af9560895762f92def8d208c29b2933b0c9e0a5be"
+      "bytes": 69910,
+      "sha256": "d685af44ca5f3459b1fe53e97e96eb42c860199815038946770b9dd1b0f8c4c0"
     },
     {
       "path": "claim_consistency.json",
@@ -64,13 +64,13 @@
     },
     {
       "path": "claim_status.json",
-      "bytes": 57457,
-      "sha256": "83baca82661cba3fa443b7ff2ad5ed1839162bc7bfe3312c158a61438dde441d"
+      "bytes": 57550,
+      "sha256": "1a0ba2ff896491fc4c9f7e1c3009c4450abbd2af87d28957ed4c86761a02d57d"
     },
     {
       "path": "claim_status.md",
-      "bytes": 9823,
-      "sha256": "b28437eea8f659a0cf54d97e5ebf8fcfee949c0b0e048791dfa25f71cf6c8617"
+      "bytes": 9916,
+      "sha256": "d232f51245a8498ea8a6e4b7339e3e958fd7c7a04d24159c8689cd2c222efa00"
     },
     {
       "path": "confidential_core_kernel_finish_slot_validation.json",
@@ -284,13 +284,13 @@
     },
     {
       "path": "reviewer_summary.json",
-      "bytes": 126907,
-      "sha256": "6bf9d15c7da7f61f2cc82ec776a35794a13fc16239381f280c79d50909ee06b3"
+      "bytes": 127141,
+      "sha256": "72ca9e933ef034aafe5b57ad6f50e80f166b43a394e8ff241a31d03c7e3b106c"
     },
     {
       "path": "reviewer_summary.md",
-      "bytes": 28791,
-      "sha256": "545240a1653757c71aea998ed04310687ae54aea8d21c38857c62ff041706227"
+      "bytes": 29025,
+      "sha256": "b97ac8f2fe0fed96abc80e6976128f3646b49f43612badef61253e2589c7d68a"
     },
     {
       "path": "runtime_boundary_validation.json",

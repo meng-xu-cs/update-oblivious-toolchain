@@ -3683,17 +3683,17 @@ fn explicit_assumption_summary() -> JsonValue {
         {
             "assumption": "bucketEncryptionINDCPA",
             "meaning": "hides bucket/path ciphertext contents for the concrete local-posmap backend",
-            "status": "explicit Lean assumption in PathOramLocalPosmapV1SecurityAssumptions; W5.4 pairs the IND-CPA assumption with the runtime crypto provenance record (RFC 8439 ChaCha20-Poly1305, Procter 2014 IACR ePrint composition analysis) and the static-drift check `runtime_crypto_primitive_identity_pinned` pinning the Rust crypto surface",
+            "status": "named Lean assumption in PathOramLocalPosmapV1SecurityAssumptions, not formalized: a Prop field that no proof uses and the checkers fill with True; W5.4 pairs the IND-CPA assumption with the runtime crypto provenance record (RFC 8439 ChaCha20-Poly1305, Procter 2014 IACR ePrint composition analysis) and the static-drift check `runtime_crypto_primitive_identity_pinned` pinning the Rust crypto surface",
         },
         {
             "assumption": "metadataEncryptionINDCPA",
             "meaning": "hides encrypted position-map metadata pages",
-            "status": "explicit Lean assumption in PathOramLocalPosmapV1SecurityAssumptions; W5.4 pairs the IND-CPA assumption with the runtime crypto provenance record (RFC 8439 ChaCha20-Poly1305, Procter 2014 IACR ePrint composition analysis) and the static-drift check `runtime_crypto_primitive_identity_pinned` pinning the Rust crypto surface",
+            "status": "named Lean assumption in PathOramLocalPosmapV1SecurityAssumptions, not formalized: a Prop field that no proof uses and the checkers fill with True; W5.4 pairs the IND-CPA assumption with the runtime crypto provenance record (RFC 8439 ChaCha20-Poly1305, Procter 2014 IACR ePrint composition analysis) and the static-drift check `runtime_crypto_primitive_identity_pinned` pinning the Rust crypto surface",
         },
         {
             "assumption": "stashOverflowBounded",
             "meaning": "bounds stash-overflow failure for the deployed parameters",
-            "status": "explicit Lean assumption in PathOramLocalPosmapV1SecurityAssumptions; W5.3 pairs the assumption with the runtime stash-overflow provenance record (Stefanov et al. JACM 2018 Theorem 5.1 at Z = 5; CCS 2013 fallback) and the static-drift check `path_oram_deployed_stash_parameters_pinned` pinning the deployed Z = 5 / stash_bound = min(max(capacity, 1), 114) parameters in crates/uo-core/src/manifest.rs",
+            "status": "named Lean assumption in PathOramLocalPosmapV1SecurityAssumptions, not formalized: a Prop field that no proof uses and the checkers fill with True; W5.3 pairs the assumption with the runtime stash-overflow provenance record (Stefanov et al. JACM 2018 Theorem 5.1 at Z = 5; CCS 2013 fallback) and the static-drift check `path_oram_deployed_stash_parameters_pinned` pinning the deployed Z = 5 / stash_bound = min(max(capacity, 1), 114) parameters in crates/uo-core/src/manifest.rs",
         },
         {
             "assumption": "PaperMainRuntimeKernelBoundary / PaperMainRuntimeKernelSlotBoundary",

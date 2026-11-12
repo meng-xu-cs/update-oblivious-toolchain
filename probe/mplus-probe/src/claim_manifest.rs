@@ -248,7 +248,7 @@ const CLAIM_ENTRIES: &[ClaimEntry] = &[
     ClaimEntry {
         id: "assumption-bucket-encryption-indcpa",
         category: "assumption",
-        text: "bucketEncryptionINDCPA: hides Path ORAM bucket/path ciphertext contents; explicit Lean assumption grounded in the runtime ChaCha20Poly1305 sealed-record boundary.",
+        text: "bucketEncryptionINDCPA: hides Path ORAM bucket/path ciphertext contents; named in Lean and not formalized (a Prop field that no proof uses and the checkers fill with True), grounded in the runtime ChaCha20Poly1305 sealed-record boundary.",
         status: STATUS_TRUSTED,
         doc_anchor: "bucketEncryptionINDCPA",
         source_files: &["runtime/uo-store/src/lib.rs"],
@@ -260,7 +260,7 @@ const CLAIM_ENTRIES: &[ClaimEntry] = &[
     ClaimEntry {
         id: "assumption-metadata-encryption-indcpa",
         category: "assumption",
-        text: "metadataEncryptionINDCPA: hides encrypted position-map metadata pages; explicit Lean assumption paired with the same sealed-record crypto route.",
+        text: "metadataEncryptionINDCPA: hides encrypted position-map metadata pages; named in Lean and not formalized, paired with the same sealed-record crypto route.",
         status: STATUS_TRUSTED,
         doc_anchor: "metadataEncryptionINDCPA",
         source_files: &["runtime/uo-store/src/lib.rs"],
@@ -272,7 +272,7 @@ const CLAIM_ENTRIES: &[ClaimEntry] = &[
     ClaimEntry {
         id: "assumption-stash-overflow-bounded",
         category: "assumption",
-        text: "stashOverflowBounded: bounds Path ORAM stash failure for deployed parameters; explicit Lean assumption paired with the JACM stash theorem at Z = 5 and pinned parameters.",
+        text: "stashOverflowBounded: bounds Path ORAM stash failure for deployed parameters; named in Lean and not formalized, paired with the JACM stash theorem at Z = 5 and pinned parameters.",
         status: STATUS_TRUSTED,
         doc_anchor: "stashOverflowBounded",
         source_files: &["runtime/uo-evm/src/controller.rs"],

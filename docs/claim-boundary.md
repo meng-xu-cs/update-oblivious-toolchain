@@ -317,13 +317,61 @@ The concrete SGX/TEE observer pins live in
 
 | Assumption | Role | Current treatment |
 | --- | --- | --- |
-| `bucketEncryptionINDCPA` | hides Path ORAM bucket/path ciphertext contents | explicit Lean assumption in `PathOramLocalPosmapV1SecurityAssumptions`; provenance is the runtime `ChaCha20Poly1305` sealed-record boundary plus the cited AEAD analysis route. That route needs a nonce to seal once under a key: a record's nonce is the count of the seals under its key (`sealNonceRun_nodup` in `UOToolchain/RuntimeStoreCodecSemantics.lean` for a model of the counter; `seal_nonces_come_from_the_seal_count` in `runtime_boundary_validation.json` for the source) |
-| `metadataEncryptionINDCPA` | hides encrypted position-map metadata pages | explicit Lean assumption paired with the same concrete sealed-record crypto route |
-| `stashOverflowBounded` | bounds Path ORAM stash failure for deployed parameters | explicit Lean assumption paired with the JACM Path ORAM stash theorem at `Z = 5` and pinned deployed parameters |
+| `bucketEncryptionINDCPA` | hides Path ORAM bucket/path ciphertext contents | trusted; named in Lean and not formalized (see below): a `Prop` field of `PathOramLocalPosmapV1SecurityAssumptions`. Its provenance is the runtime `ChaCha20Poly1305` sealed-record boundary plus the cited AEAD analysis route. That route needs a nonce to seal once under a key: a record's nonce is the count of the seals under its key (`sealNonceRun_nodup` in `UOToolchain/RuntimeStoreCodecSemantics.lean` for a model of the counter; `seal_nonces_come_from_the_seal_count` in `runtime_boundary_validation.json` for the source) |
+| `metadataEncryptionINDCPA` | hides encrypted position-map metadata pages | trusted; named in Lean and not formalized, as the row above, and paired with the same concrete sealed-record crypto route |
+| `stashOverflowBounded` | bounds Path ORAM stash failure for deployed parameters | trusted; named in Lean and not formalized, as the first row, and paired with the JACM Path ORAM stash theorem at `Z = 5` and pinned deployed parameters |
 | Runtime key derivation | gives each object a storage key, an initial placement and Path ORAM leaf coins that are pseudo-random and independent of the other objects', which the two encryption assumptions and the leaf-coin model take as given | trusted, not modeled in Lean: a 256-bit master secret from the OS, HKDF-SHA256 (RFC 5869) with one label per use, and the ChaCha20 generator. `runtime_secrets_derive_from_the_master_secret` in `runtime_boundary_validation.json` pins the derivation's call sites, and `runtime/uo-evm/src/secret.rs` tests the RFC's first test vector |
 | TEE deployment assumptions | enclave memory confidentiality/integrity, attestation authenticity, rollback resistance, freshness, crash recovery discipline, patch-level trust | explicit Lean bundle `SgxDeploymentAssumptions`, paired with Intel SGX provenance and probe drift checks |
 | Parser/preprocessing equivalence | connects raw Solidity-like source text to the post-resolution AST consumed by Lean | still trusted front-end surface |
 | Real Keccak equivalence | connects runtime `tiny_keccak::Keccak::v256()` to the Lean mock-hash abstraction | not yet proved; Lean preservation uses the shared abstraction |
+
+### What the Path ORAM Theorem Proves and What It Assumes
+
+The three Path ORAM assumptions are named in Lean and not formalized. Each
+is a `Prop` field of the assumption record. The theorems carry the record,
+no proof uses what its fields say, and the checkers fill the fields with
+`True` (`CheckCanonicalPathOramPaperInstantiation.lean`,
+`CheckCanonicalPathOramPairTheoremInput.lean`). "Computational UO" in the
+name of a theorem therefore refers to these names, not to a proved bound.
+
+What is Lean-proved about a Path ORAM call is combinatorial:
+
+- the leaf schedule of a call is uniform, given uniform coins and leaves,
+  and the leaves it leaves behind stay uniform and independent of it
+  (`UOToolchain/PathOramFreshLeaves.lean`); and
+- the two sides of an admitted pair write storage at the same locations,
+  with the same shapes.
+
+The step from these two facts to "the two sides' storage is computationally
+indistinguishable" is an argument on paper, not in Lean. Over a deployment
+that makes `Q` primitive ORAM accesses, it bounds a distinguisher's
+advantage by
+
+```text
+ε(Q) ≤ ε_PRF + ε_AEAD + ε_nonce + Q · ε_stash
+```
+
+- `ε_PRF` is the advantage in telling the runtime's storage keys and leaf
+  coins from uniform ones. They derive from a 256-bit master secret by
+  HKDF-SHA256 and the ChaCha20 generator (the row "Runtime key derivation").
+  This term takes the Lean statement, which is about uniform coins, to the
+  coins the runtime draws.
+- `ε_AEAD` is the advantage against ChaCha20-Poly1305 as the encryption of
+  the records sealed under the deployment's keys. It is what
+  `bucketEncryptionINDCPA` and `metadataEncryptionINDCPA` name.
+- `ε_nonce` is the probability that one key seals twice with one nonce. It
+  is zero: a nonce is the count of the seals under its key, and a key
+  refuses to seal once the count is exhausted (`sealNonceRun_nodup` for a
+  model of the counter; tested for the Rust code).
+- `ε_stash` is the probability that one access overflows the stash, which
+  `stashOverflowBounded` names: at most `14 · 0.6002^114 < 2^-80` at the
+  deployed parameters, by the cited theorem. `Q` counts primitive accesses,
+  not calls: a private-scheme write at 16,384 entries makes 77 node
+  accesses.
+
+None of the four terms is Lean-proved. The first two are trusted
+cryptographic assumptions, the third follows from the nonce's construction,
+and the fourth is a cited theorem applied to pinned parameters.
 
 The fresh-leaf remapping bridge is not a separate backend assumption. The
 canonical fresh-coin runtime-family and hidden-leaf coverage checkers discharge

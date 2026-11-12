@@ -92,10 +92,10 @@ its engineering part is Wave 4, its certified part is research.
 | 23 | Stop returning the deployment seed to callers | 1 | S | | done | `72d3bfb` |
 | 24 | Give the runtime an independent 256-bit master secret | 1 | M | 23 | done | `6b88d18` |
 | 25 | Split a call's result into a public receipt and private evidence | 1 | M to L | 24 | done | `5a5e3b4` |
-| 26 | Have the runtime issue the proof binding | 1 | M | 25 | done | |
+| 26 | Have the runtime issue the proof binding | 1 | M | 25 | done | `e232687` |
 | 27 | Measure occupancy, executed workloads and every cost | 2 | M | | todo | |
 | 28 | Cover the private scheme in the leakage and abort reports | 2 | S | | todo | |
-| 29 | State what the Path ORAM theorem's cryptographic assumptions mean | 2 | S | | todo | |
+| 29 | State what the Path ORAM theorem's cryptographic assumptions mean | 2 | S | | done | |
 | 30 | Charge external reads in the modeled cost | 3 | S to M | | todo | |
 | 31 | Do not rewrite statically read-only exact objects | 3 | M | 30 | todo | |
 | 32 | Load each exact object once per call | 3 | M | 30 | todo | |

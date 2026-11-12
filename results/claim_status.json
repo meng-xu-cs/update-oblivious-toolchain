@@ -1042,21 +1042,21 @@
       "category": "assumption",
       "id": "assumption-bucket-encryption-indcpa",
       "status": "trusted",
-      "text": "bucketEncryptionINDCPA: hides Path ORAM bucket/path ciphertext contents; explicit Lean assumption grounded in the runtime ChaCha20Poly1305 sealed-record boundary.",
+      "text": "bucketEncryptionINDCPA: hides Path ORAM bucket/path ciphertext contents; named in Lean and not formalized (a Prop field that no proof uses and the checkers fill with True), grounded in the runtime ChaCha20Poly1305 sealed-record boundary.",
       "validation_command": "scripts/lean_assumption_budget.sh"
     },
     {
       "category": "assumption",
       "id": "assumption-metadata-encryption-indcpa",
       "status": "trusted",
-      "text": "metadataEncryptionINDCPA: hides encrypted position-map metadata pages; explicit Lean assumption paired with the same sealed-record crypto route.",
+      "text": "metadataEncryptionINDCPA: hides encrypted position-map metadata pages; named in Lean and not formalized, paired with the same sealed-record crypto route.",
       "validation_command": "scripts/lean_assumption_budget.sh"
     },
     {
       "category": "assumption",
       "id": "assumption-stash-overflow-bounded",
       "status": "trusted",
-      "text": "stashOverflowBounded: bounds Path ORAM stash failure for deployed parameters; explicit Lean assumption paired with the JACM stash theorem at Z = 5 and pinned parameters.",
+      "text": "stashOverflowBounded: bounds Path ORAM stash failure for deployed parameters; named in Lean and not formalized, paired with the JACM stash theorem at Z = 5 and pinned parameters.",
       "validation_command": "scripts/lean_assumption_budget.sh"
     },
     {
