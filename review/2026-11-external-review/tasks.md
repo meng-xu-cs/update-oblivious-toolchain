@@ -1018,6 +1018,58 @@ benchmark that returns a secret-derived value releases it to the host.
 3. Add the return channel's AEAD assumption to the assumption table of
    `docs/claim-boundary.md`.
 
+As built. `PolicyAgreesWithFlow` has no `notEncrypted` field: a return that
+the flow analysis finds secret must be `declassified` or
+`encrypted_to_client`, and `policyAgreesWithFlowB`, which the admission
+checker runs, decides that.
+
+The outcome model takes a return channel (`ReturnChannelModel` in
+`UOToolchain/KernelPaperMain.lean`): a function from the call's rendered
+public arguments and the returned value to an `EncryptedReturnPayload`, with
+a proof that the payload without its ciphertext and tag does not depend on
+the value. Under `encrypted_to_client`, `kernelPublicOutcome` holds a
+returned value as that payload and holds no plaintext return, and the
+output shape and the exit event have the wire length, the canonical length
+plus 28 bytes (`EntrypointPublicPolicy.outputLength`). The release erasure
+already erased the ciphertext and the tag of such a payload
+(`SGXPublicOutcome.withoutReleases`), so `kernelPublicOutcome_safe` needs
+only that the two runs return a value or both return none, which the public
+status gives, and the channel's property. The channel is a new argument of
+the three paper-main theorems for admitted kernel runs and of their
+checked-kernel forms; nothing else in their statements changed.
+
+The model does not derive the frame of a payload from the session or the
+freshness counters: it assumes that the frame is fixed by the public
+arguments, for one call. That the runtime's payloads are so is checked on
+runs. `ConfidentialMixer` has a new entrypoint, `sealedBalanceOf(bytes32)`,
+with a secret commitment, `returns: encrypted_to_client` and
+`status: public`, in every variant. `checkKernelAdmission` admits it (47
+entrypoints in `results/static_checks.json`, 27 on the exact route and 20
+on the Path ORAM route), and a new tamper scenario that declares its return
+`public` is rejected (`kernel_admission/encrypted_return_policy_relabel`).
+`results/trace_equivalence.json` has three new entries, for the exact
+variant and for the two Path ORAM variants. In each, eight runs read
+commitments that hold 5, 9 and nothing. Their outcomes match the model, the
+exact variant's traces are equal and are the exact encoding, and
+`encrypted_return` reports that every payload opens under the caller's
+session to a stored balance, that none opens under another key, that the
+binding, the hash of the associated data, the nonce and the lengths are the
+same in all runs, that no outcome holds a plaintext return, and that runs
+which return different balances return different ciphertexts and tags.
+
+The runtime gained the caller's side of the channel:
+`uo_evm::open_encrypted_return` builds the associated data from the public
+facts of the call, checks the binding, the lengths and the hash, and opens
+the ciphertext under the session. The runtime's tests had their own copy of
+that; they use the function now, with cases for another key, another
+session, other public arguments and each field changed.
+
+Not done: nothing in Lean says what the ciphertext and the tag show of the
+value. The theorem is modulo that release, and the AEAD assumption is a row
+of the assumption table, trusted and not named in Lean, as the issue asked.
+The session key's secrecy and freshness come from the attested key
+exchange, which the repository does not implement.
+
 #### Acceptance criteria
 
 - The new entrypoint is admitted (`kernel_admission_*` in

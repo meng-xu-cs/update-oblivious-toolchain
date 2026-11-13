@@ -1,6 +1,6 @@
 {
   "accepted": true,
-  "scenario_count": 33,
+  "scenario_count": 36,
   "scenarios": [
     {
       "accepted": true,
@@ -57,6 +57,16 @@
       "array_index_count": 0,
       "artifact": "ConfidentialMixer/uo",
       "contract": "ConfidentialMixer",
+      "entrypoint": "sealedBalanceOf(bytes32)",
+      "non_branchless_select_arm_count": 0,
+      "select_count": 0,
+      "struct_field_count": 0
+    },
+    {
+      "accepted": true,
+      "array_index_count": 0,
+      "artifact": "ConfidentialMixer/uo",
+      "contract": "ConfidentialMixer",
       "entrypoint": "totalValue()",
       "non_branchless_select_arm_count": 0,
       "select_count": 0,
@@ -97,6 +107,16 @@
       "array_index_count": 0,
       "artifact": "ConfidentialMixer/oram",
       "contract": "ConfidentialMixer",
+      "entrypoint": "sealedBalanceOf(bytes32)",
+      "non_branchless_select_arm_count": 0,
+      "select_count": 0,
+      "struct_field_count": 0
+    },
+    {
+      "accepted": true,
+      "array_index_count": 0,
+      "artifact": "ConfidentialMixer/oram",
+      "contract": "ConfidentialMixer",
       "entrypoint": "totalValue()",
       "non_branchless_select_arm_count": 0,
       "select_count": 0,
@@ -128,6 +148,16 @@
       "artifact": "ConfidentialMixer/fullscan64",
       "contract": "ConfidentialMixer",
       "entrypoint": "balanceOf(bytes32)",
+      "non_branchless_select_arm_count": 0,
+      "select_count": 0,
+      "struct_field_count": 0
+    },
+    {
+      "accepted": true,
+      "array_index_count": 0,
+      "artifact": "ConfidentialMixer/fullscan64",
+      "contract": "ConfidentialMixer",
+      "entrypoint": "sealedBalanceOf(bytes32)",
       "non_branchless_select_arm_count": 0,
       "select_count": 0,
       "struct_field_count": 0
@@ -334,7 +364,7 @@
     }
   ],
   "total_array_indices": 0,
-  "total_confidential_entrypoints": 33,
+  "total_confidential_entrypoints": 36,
   "total_non_branchless_select_arms": 0,
   "total_selects": 5,
   "total_struct_fields": 0

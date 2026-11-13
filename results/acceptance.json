@@ -1,10 +1,10 @@
 {
   "accepted": true,
   "class_counts": {
-    "advisory_nonclaim": 608,
+    "advisory_nonclaim": 610,
     "deprecated_report": 0,
-    "expected_computational_difference": 101,
-    "expected_negative": 1052,
+    "expected_computational_difference": 107,
+    "expected_negative": 1054,
     "required_failure": 0,
     "unclassified": 0
   },
@@ -264,7 +264,7 @@
         "advisory_nonclaim": 164,
         "deprecated_report": 0,
         "expected_computational_difference": 48,
-        "expected_negative": 526,
+        "expected_negative": 527,
         "required_failure": 0,
         "unclassified": 0
       },
@@ -843,10 +843,11 @@
         "tamper_validation.scenarios.413.accepted",
         "tamper_validation.scenarios.414.accepted",
         "tamper_validation.scenarios.415.accepted",
-        "tamper_validation.scenarios.416.accepted"
+        "tamper_validation.scenarios.416.accepted",
+        "tamper_validation.scenarios.417.accepted"
       ],
-      "false_count": 738,
-      "false_paths": 738,
+      "false_count": 739,
+      "false_paths": 739,
       "mode": "proof_grade",
       "report": "bridge_validation",
       "required": true,
@@ -3061,7 +3062,7 @@
         "advisory_nonclaim": 0,
         "deprecated_report": 0,
         "expected_computational_difference": 0,
-        "expected_negative": 521,
+        "expected_negative": 522,
         "required_failure": 0,
         "unclassified": 0
       },
@@ -3587,10 +3588,11 @@
         "scenarios.413.accepted",
         "scenarios.414.accepted",
         "scenarios.415.accepted",
-        "scenarios.416.accepted"
+        "scenarios.416.accepted",
+        "scenarios.417.accepted"
       ],
-      "false_count": 521,
-      "false_paths": 521,
+      "false_count": 522,
+      "false_paths": 522,
       "mode": "expected_negative",
       "report": "tamper_validation",
       "required": false,
@@ -3604,13 +3606,15 @@
         "computational_uo.0.equality_is_obligation",
         "computational_uo.1.equality_is_obligation",
         "computational_uo.2.equality_is_obligation",
+        "computational_uo.3.equality_is_obligation",
+        "computational_uo.4.equality_is_obligation",
         "positive_control.raw.executable",
         "positive_control.same_same.executable"
       ],
       "class_counts": {
-        "advisory_nonclaim": 5,
+        "advisory_nonclaim": 7,
         "deprecated_report": 0,
-        "expected_computational_difference": 3,
+        "expected_computational_difference": 9,
         "expected_negative": 0,
         "required_failure": 0,
         "unclassified": 0
@@ -3619,10 +3623,16 @@
       "expected_false_paths": [
         "computational_uo.2.logical_access_equal",
         "computational_uo.2.physical_read_equal",
-        "computational_uo.2.physical_trace_equal"
+        "computational_uo.2.physical_trace_equal",
+        "computational_uo.3.logical_access_equal",
+        "computational_uo.3.physical_read_equal",
+        "computational_uo.3.physical_trace_equal",
+        "computational_uo.4.logical_access_equal",
+        "computational_uo.4.physical_read_equal",
+        "computational_uo.4.physical_trace_equal"
       ],
-      "false_count": 8,
-      "false_paths": 8,
+      "false_count": 16,
+      "false_paths": 16,
       "mode": "evaluation",
       "report": "trace_equivalence",
       "required": false,

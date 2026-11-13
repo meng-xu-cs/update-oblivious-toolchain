@@ -39,7 +39,10 @@ use uo_core::{
     CONFIDENTIAL_KERNEL_SLOT_PURE_EXPR_PROFILES, CONFIDENTIAL_KERNEL_STATEMENT_PROFILES,
     RUNTIME_BOUNDARY_OBLIGATIONS, RUNTIME_BOUNDARY_SCHEMA_VERSION,
 };
-use uo_evm::{CallResult, ContractInstance, DiagnosticCallResult, PathOramFreshCoinPlan};
+use uo_evm::{
+    open_encrypted_return, CallResult, ContractInstance, DiagnosticCallResult,
+    PathOramFreshCoinPlan, ReturnChannelSession, RETURN_CHANNEL_SCHEME,
+};
 
 mod acceptance;
 pub use acceptance::{
@@ -16543,10 +16546,12 @@ fn run_tamper_validation() -> Result<JsonValue> {
         ProgramMode::Uo,
     )?)?;
     let withdraw = "withdraw(bytes32,uint256)";
+    let sealed_balance = "sealedBalanceOf(bytes32)";
     type ArtifactTamper = fn(&mut JsonValue, &str);
-    let kernel_admission_tampers: [(&str, &str, ArtifactTamper); 3] = [
+    let kernel_admission_tampers: [(&str, &str, &str, ArtifactTamper); 4] = [
         (
             "kernel_admission/status_policy_relabel",
+            withdraw,
             "declare the withdrawal's status public although it tests the secret balance and writes a map",
             |artifact, entrypoint| {
                 artifact["contract"]["manifest"]["entrypoints"][entrypoint]["status"] =
@@ -16555,6 +16560,7 @@ fn run_tamper_validation() -> Result<JsonValue> {
         ),
         (
             "kernel_admission/return_policy_relabel",
+            withdraw,
             "declare the withdrawal's return public although it returns the secret amount",
             |artifact, entrypoint| {
                 artifact["contract"]["manifest"]["entrypoints"][entrypoint]["returns"] =
@@ -16562,7 +16568,17 @@ fn run_tamper_validation() -> Result<JsonValue> {
             },
         ),
         (
+            "kernel_admission/encrypted_return_policy_relabel",
+            sealed_balance,
+            "declare the return of the sealed balance public, to be handed to the host in the clear, although it is the secret balance and was declared encrypted to the client",
+            |artifact, entrypoint| {
+                artifact["contract"]["manifest"]["entrypoints"][entrypoint]["returns"] =
+                    json!("public");
+            },
+        ),
+        (
             "kernel_admission/public_object_write",
+            withdraw,
             "mark the `total` cell, which the withdrawal writes, as a public object",
             |artifact, _| {
                 for object in artifact["contract"]["state"]
@@ -16577,9 +16593,9 @@ fn run_tamper_validation() -> Result<JsonValue> {
             },
         ),
     ];
-    for (scenario, mutation, tamper) in kernel_admission_tampers {
+    for (scenario, entrypoint, mutation, tamper) in kernel_admission_tampers {
         let mut tampered = mixer.clone();
-        tamper(&mut tampered, withdraw);
+        tamper(&mut tampered, entrypoint);
         scenarios.push(validate_tampered_json_case(
             scenario,
             &tampered,
@@ -16592,7 +16608,7 @@ fn run_tamper_validation() -> Result<JsonValue> {
                 "scenario": scenario,
                 "artifact_kind": "uo_compiled_artifact",
                 "benchmark": "ConfidentialMixer/uo",
-                "entrypoint": withdraw,
+                "entrypoint": entrypoint,
                 "mutation": mutation,
             }),
         )?);
@@ -50156,6 +50172,22 @@ fn run_trace_equivalence(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Resu
     .context("trace_equivalence/ERC20Lite/oram_private_posmap")?;
     let registry_uo = run_registry_key_experiment(&suite["RegistryCRUD"].uo)
         .context("trace_equivalence/RegistryCRUD/uo")?;
+    let mixer_sealed_uo = run_mixer_sealed_balance_experiment(&suite["ConfidentialMixer"].uo)
+        .context("trace_equivalence/ConfidentialMixer/uo_encrypted_return")?;
+    let mixer_sealed_oram = run_mixer_sealed_balance_experiment(
+        suite["ConfidentialMixer"]
+            .oram
+            .as_ref()
+            .ok_or_else(|| anyhow!("missing mixer oram"))?,
+    )
+    .context("trace_equivalence/ConfidentialMixer/oram_encrypted_return")?;
+    let mixer_sealed_private_posmap = run_mixer_sealed_balance_experiment(
+        suite["ConfidentialMixer"]
+            .private_posmap
+            .as_ref()
+            .ok_or_else(|| anyhow!("missing mixer private posmap"))?,
+    )
+    .context("trace_equivalence/ConfidentialMixer/oram_private_posmap_encrypted_return")?;
     Ok(json!({
         "positive_control": {
             "benchmark": "FixedSlotClassifier",
@@ -50168,11 +50200,22 @@ fn run_trace_equivalence(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Resu
             trace_summary("ConfidentialMixer", "uo", &mixer_uo),
             trace_summary("ERC20Lite", "uo", &erc20_uo),
             trace_summary("RegistryCRUD", "uo", &registry_uo),
+            trace_summary("ConfidentialMixer", "uo_encrypted_return", &mixer_sealed_uo),
         ],
         "computational_uo": [
             trace_summary("ConfidentialMixer", "oram", &mixer_oram),
             trace_summary("ERC20Lite", "oram", &erc20_oram),
             trace_summary("ERC20Lite", "oram_private_posmap", &erc20_private_posmap),
+            trace_summary(
+                "ConfidentialMixer",
+                "oram_encrypted_return",
+                &mixer_sealed_oram,
+            ),
+            trace_summary(
+                "ConfidentialMixer",
+                "oram_private_posmap_encrypted_return",
+                &mixer_sealed_private_posmap,
+            ),
         ],
     }))
 }
@@ -53412,6 +53455,9 @@ struct ExperimentOutcome {
     /// Whether every run's final public-state record is the one the Lean model
     /// predicts (`None` off the exact and Path ORAM routes).
     final_public_state_model_matches: Option<bool>,
+    /// What the runs show of the return channel, for an experiment on an
+    /// `encrypted_to_client` entrypoint.
+    encrypted_return: Option<EncryptedReturnChecks>,
 }
 
 enum OptionalExperimentOutcome {
@@ -53526,6 +53572,48 @@ fn run_mixer_key_experiment(artifact: &CompiledArtifact) -> Result<ExperimentOut
             vec![b32(11), Value::uint(3)],
             vec![b32(12), Value::uint(3)],
         ],
+    )
+}
+
+/// The session of the return channel that the probe's calls of an
+/// `encrypted_to_client` entrypoint use: a fixed key and public binding.
+fn probe_return_channel_session() -> Result<ReturnChannelSession> {
+    ReturnChannelSession::new(
+        [0x5a; 32],
+        uo_core::ReturnChannelPublicBinding {
+            scheme: RETURN_CHANNEL_SCHEME.into(),
+            session_id: "11".repeat(32),
+            client_public_key_hash: "22".repeat(32),
+            attestation_transcript_hash: "33".repeat(32),
+        },
+    )
+}
+
+/// The mixer's `sealedBalanceOf` returns a balance to the client on the
+/// call's return channel. The commitment is secret, and the runs read
+/// commitments that hold different balances and commitments that hold
+/// none, so the returned value differs from run to run. The host must see
+/// the same trace and the same outcome in every run but for the AEAD output
+/// of the encrypted return.
+fn run_mixer_sealed_balance_experiment(artifact: &CompiledArtifact) -> Result<ExperimentOutcome> {
+    let session = probe_return_channel_session()?;
+    let setup = [
+        CallSpec {
+            entrypoint: "deposit(bytes32,uint256)",
+            args: vec![b32(1), Value::uint(5)],
+        },
+        CallSpec {
+            entrypoint: "deposit(bytes32,uint256)",
+            args: vec![b32(2), Value::uint(9)],
+        },
+    ];
+    run_binary_experiment_on_channel(
+        artifact,
+        &setup,
+        "sealedBalanceOf(bytes32)",
+        vec![vec![b32(1)], vec![b32(2)], vec![b32(1)], vec![b32(2)]],
+        vec![vec![b32(9)], vec![b32(10)], vec![b32(11)], vec![b32(12)]],
+        Some(&session),
     )
 }
 
@@ -54016,6 +54104,9 @@ struct KernelOutcomeModel {
     entry_input_len: usize,
     return_length: usize,
     returns_value: bool,
+    /// The entrypoint returns its value encrypted to the client
+    /// (`returns: encrypted_to_client`).
+    encrypted_return: bool,
     gas: u64,
     /// The call's ORAM accesses: the manifest's per-object counts, which the
     /// program and its maps' schemes fix; none on the exact route.
@@ -54040,9 +54131,27 @@ fn kernel_outcome_model(
             program.body.last(),
             Some(ConfidentialKernelStatement::Return { value: Some(_) })
         ),
+        encrypted_return: entry.returns == uo_core::ReturnPolicy::EncryptedToClient,
         gas: entry.public_gas_budget,
         oram_accesses,
     })
+}
+
+/// The bytes an encrypted return adds to the canonical bytes of its value:
+/// a 12-byte nonce and a 16-byte tag (`returnChannelOverheadBytes` in
+/// `UOToolchain/KernelPaperMain.lean`).
+const RETURN_CHANNEL_OVERHEAD_BYTES: usize = 28;
+
+impl KernelOutcomeModel {
+    /// What a call that returns a value hands the host
+    /// (`EntrypointPublicPolicy.outputLength`).
+    fn output_length(&self) -> usize {
+        if self.encrypted_return {
+            self.return_length + RETURN_CHANNEL_OVERHEAD_BYTES
+        } else {
+            self.return_length
+        }
+    }
 }
 
 /// Whether a run's public outcome and boundary schedule are the modeled ones.
@@ -54051,7 +54160,11 @@ fn kernel_outcome_model(
 /// call without a return value, has the empty output shape and exits with
 /// nothing. The gas is the entrypoint's modeled cost either way. Between the
 /// entry and the exit, the call leaves and re-enters the enclave around each of
-/// its ORAM accesses, completed or not.
+/// its ORAM accesses, completed or not. A value returned under
+/// `encrypted_to_client` is in the outcome as its encrypted payload, of the
+/// declared plaintext length and of the wire length the exit has, and not in
+/// the clear; under any other policy the outcome holds it in the clear and
+/// no encrypted payload.
 fn run_matches_outcome_model(
     trace: &uo_core::ExecutionTrace,
     entrypoint: &str,
@@ -54063,9 +54176,22 @@ fn run_matches_outcome_model(
     let outcome = certificate.public_outcome();
     let returned = outcome.termination_status && model.returns_value;
     let shape = if returned {
-        uo_core::OutputShape::returned(model.return_length)
+        uo_core::OutputShape::returned(model.output_length())
     } else {
         uo_core::OutputShape::default()
+    };
+    let payloads_as_modeled = if model.encrypted_return {
+        outcome.return_payload.is_none()
+            && outcome.encrypted_return_payload.is_some() == returned
+            && outcome
+                .encrypted_return_payload
+                .as_ref()
+                .is_none_or(|payload| {
+                    payload.plaintext_canonical_len == model.return_length
+                        && payload.wire_len == model.output_length()
+                })
+    } else {
+        outcome.return_payload.is_some() == returned && outcome.encrypted_return_payload.is_none()
     };
     let mut schedule = Vec::with_capacity(2 * model.oram_accesses + 2);
     schedule.push(BoundaryEvent::enter(entrypoint, model.entry_input_len));
@@ -54076,8 +54202,7 @@ fn run_matches_outcome_model(
     schedule.push(BoundaryEvent::exit(entrypoint, shape.return_length));
     outcome.entrypoint_id == entrypoint
         && outcome.output_shape == shape
-        && outcome.return_payload.is_some() == returned
-        && outcome.encrypted_return_payload.is_none()
+        && payloads_as_modeled
         && outcome.gas_used == model.gas
         && certificate.boundary_schedule() == schedule.as_slice()
 }
@@ -54125,13 +54250,19 @@ fn run_target_call_with_public_state(
     setup: &[CallSpec],
     entrypoint: &str,
     args: Vec<Value>,
+    return_channel: Option<&ReturnChannelSession>,
 ) -> Result<PublicStateBracketedCall> {
     let mut instance = ContractInstance::deploy_with_seed(artifact.clone(), PROBE_DEPLOY_SEED)?;
     for call in setup {
         instance.call(call.entrypoint, call.args.clone())?;
     }
     let public_state_before = instance.public_state_digest()?;
-    let result = instance.call_with_diagnostics(entrypoint, args)?;
+    let result = match return_channel {
+        Some(session) => {
+            instance.call_with_return_channel_diagnostics(entrypoint, args, session)?
+        }
+        None => instance.call_with_diagnostics(entrypoint, args)?,
+    };
     let public_state_after = instance.public_state_digest()?;
     Ok(PublicStateBracketedCall {
         result,
@@ -54147,66 +54278,177 @@ fn run_binary_experiment(
     class0: Vec<Vec<Value>>,
     class1: Vec<Vec<Value>>,
 ) -> Result<ExperimentOutcome> {
-    let mut class0_metrics = Vec::new();
-    let mut class1_metrics = Vec::new();
-    let mut class0_hashes = Vec::new();
-    let mut class1_hashes = Vec::new();
+    run_binary_experiment_on_channel(artifact, setup, entrypoint, class0, class1, None)
+}
+
+/// What the runs of an `encrypted_to_client` entrypoint show of its return
+/// channel. The Lean model of the channel (`ReturnChannelModel` in
+/// `UOToolchain/KernelPaperMain.lean`) takes a payload without its AEAD
+/// output to be fixed by the call's public arguments; here the runs differ
+/// in their secrets alone.
+#[derive(Clone, Debug, Serialize)]
+struct EncryptedReturnChecks {
+    /// Runs that returned an encrypted payload.
+    runs: usize,
+    /// Every payload opens under the caller's session, with the associated
+    /// data the caller builds from the public facts of the call.
+    every_return_opens_for_the_session: bool,
+    /// No payload opens under another key.
+    no_return_opens_under_another_key: bool,
+    /// The session binding, the hash of the associated data, the nonce and
+    /// the two lengths are the same in every run.
+    frame_same_in_every_run: bool,
+    /// No outcome and no call result holds the returned value in the clear.
+    no_plaintext_return: bool,
+    /// The values the caller opened, how many of them differ.
+    distinct_returned_values: usize,
+    /// Runs that returned different values returned different ciphertexts
+    /// and tags: the AEAD output is what the policy releases.
+    ciphertext_differs_with_the_value: bool,
+}
+
+impl EncryptedReturnChecks {
+    fn hold(&self) -> bool {
+        self.runs > 0
+            && self.every_return_opens_for_the_session
+            && self.no_return_opens_under_another_key
+            && self.frame_same_in_every_run
+            && self.no_plaintext_return
+            && self.ciphertext_differs_with_the_value
+    }
+}
+
+/// The checks of `EncryptedReturnChecks` over the results of an experiment's
+/// runs.
+fn encrypted_return_checks(
+    artifact: &CompiledArtifact,
+    entrypoint: &str,
+    session: &ReturnChannelSession,
+    results: &[DiagnosticCallResult],
+) -> Result<EncryptedReturnChecks> {
+    let other_key = ReturnChannelSession::new([0xa7; 32], session.binding().clone())?;
+    let mut opened = Vec::new();
+    let mut frames = Vec::new();
+    let mut every_return_opens_for_the_session = true;
+    let mut no_return_opens_under_another_key = true;
+    let mut no_plaintext_return = true;
+    for result in results {
+        let certificate = result
+            .call
+            .trace
+            .runtime_controller_observer_certificate()?;
+        let outcome = certificate.public_outcome();
+        no_plaintext_return &=
+            result.call.return_value.is_none() && outcome.return_payload.is_none();
+        let Some(payload) = outcome.encrypted_return_payload.as_ref() else {
+            continue;
+        };
+        no_plaintext_return &= result.call.encrypted_return.as_ref() == Some(payload);
+        frames.push((
+            payload.binding.clone(),
+            payload.aad_hash.clone(),
+            payload.nonce.clone(),
+            payload.plaintext_canonical_len,
+            payload.wire_len,
+        ));
+        match open_encrypted_return(artifact, entrypoint, &outcome.public_args, payload, session) {
+            Ok(value) => opened.push((value, payload.ciphertext.clone(), payload.tag.clone())),
+            Err(_) => every_return_opens_for_the_session = false,
+        }
+        no_return_opens_under_another_key &= open_encrypted_return(
+            artifact,
+            entrypoint,
+            &outcome.public_args,
+            payload,
+            &other_key,
+        )
+        .is_err();
+    }
+    let distinct_returned_values = opened
+        .iter()
+        .map(|(value, _, _)| value)
+        .collect::<BTreeSet<_>>()
+        .len();
+    let ciphertext_differs_with_the_value = opened.iter().enumerate().all(|(index, lhs)| {
+        opened
+            .iter()
+            .skip(index + 1)
+            .all(|rhs| lhs.0 == rhs.0 || (lhs.1 != rhs.1 && lhs.2 != rhs.2))
+    });
+    Ok(EncryptedReturnChecks {
+        runs: frames.len(),
+        every_return_opens_for_the_session,
+        no_return_opens_under_another_key,
+        frame_same_in_every_run: frames.windows(2).all(|pair| pair[0] == pair[1]),
+        no_plaintext_return,
+        distinct_returned_values,
+        ciphertext_differs_with_the_value: distinct_returned_values > 1
+            && ciphertext_differs_with_the_value,
+    })
+}
+
+/// `run_binary_experiment` for an entrypoint that may return on a return
+/// channel: with a session, every target call is made with it, and the
+/// outcome reports what the runs show of the channel.
+fn run_binary_experiment_on_channel(
+    artifact: &CompiledArtifact,
+    setup: &[CallSpec],
+    entrypoint: &'static str,
+    class0: Vec<Vec<Value>>,
+    class1: Vec<Vec<Value>>,
+    return_channel: Option<&ReturnChannelSession>,
+) -> Result<ExperimentOutcome> {
     let prediction = exact_encoding_prediction(artifact, entrypoint);
     let mut exact_encoding_matches = prediction.as_ref().map(|_| true);
     let route = kernel_trace_route(artifact, entrypoint);
     let outcome_model = route.and_then(|route| kernel_outcome_model(artifact, entrypoint, route));
     let mut outcome_model_matches = route.map(|_| outcome_model.is_some());
     let mut final_public_state_model_matches = route.map(|_| true);
-    for args in class0 {
-        let bracketed = run_target_call_with_public_state(artifact, setup, entrypoint, args)?;
-        let result = &bracketed.result;
-        if let (Some(prediction), Some(matches)) =
-            (prediction.as_ref(), exact_encoding_matches.as_mut())
-        {
-            *matches &= trace_matches_exact_encoding(&result.call.trace, prediction);
+    let mut metrics = [Vec::new(), Vec::new()];
+    let mut hashes = [Vec::new(), Vec::new()];
+    let mut results = Vec::new();
+    for (class, runs) in [class0, class1].into_iter().enumerate() {
+        for args in runs {
+            let bracketed = run_target_call_with_public_state(
+                artifact,
+                setup,
+                entrypoint,
+                args,
+                return_channel,
+            )?;
+            let result = bracketed.result;
+            if let (Some(prediction), Some(matches)) =
+                (prediction.as_ref(), exact_encoding_matches.as_mut())
+            {
+                *matches &= trace_matches_exact_encoding(&result.call.trace, prediction);
+            }
+            if let (Some(model), Some(matches)) =
+                (outcome_model.as_ref(), outcome_model_matches.as_mut())
+            {
+                *matches &= run_matches_outcome_model(&result.call.trace, entrypoint, model);
+            }
+            if let Some(matches) = final_public_state_model_matches.as_mut() {
+                *matches &= run_matches_final_public_state_model(
+                    &result.call.trace,
+                    &bracketed.public_state_before,
+                    &bracketed.public_state_after,
+                );
+            }
+            hashes[class].push(result.call.trace.hashes()?);
+            metrics[class].push(extract_metrics(&result));
+            results.push(result);
         }
-        if let (Some(model), Some(matches)) =
-            (outcome_model.as_ref(), outcome_model_matches.as_mut())
-        {
-            *matches &= run_matches_outcome_model(&result.call.trace, entrypoint, model);
-        }
-        if let Some(matches) = final_public_state_model_matches.as_mut() {
-            *matches &= run_matches_final_public_state_model(
-                &result.call.trace,
-                &bracketed.public_state_before,
-                &bracketed.public_state_after,
-            );
-        }
-        class0_hashes.push(result.call.trace.hashes()?);
-        class0_metrics.push(extract_metrics(result));
     }
-    for args in class1 {
-        let bracketed = run_target_call_with_public_state(artifact, setup, entrypoint, args)?;
-        let result = &bracketed.result;
-        if let (Some(prediction), Some(matches)) =
-            (prediction.as_ref(), exact_encoding_matches.as_mut())
-        {
-            *matches &= trace_matches_exact_encoding(&result.call.trace, prediction);
-        }
-        if let (Some(model), Some(matches)) =
-            (outcome_model.as_ref(), outcome_model_matches.as_mut())
-        {
-            *matches &= run_matches_outcome_model(&result.call.trace, entrypoint, model);
-        }
-        if let Some(matches) = final_public_state_model_matches.as_mut() {
-            *matches &= run_matches_final_public_state_model(
-                &result.call.trace,
-                &bracketed.public_state_before,
-                &bracketed.public_state_after,
-            );
-        }
-        class1_hashes.push(result.call.trace.hashes()?);
-        class1_metrics.push(extract_metrics(result));
-    }
+    let encrypted_return = return_channel
+        .map(|session| encrypted_return_checks(artifact, entrypoint, session, &results))
+        .transpose()?;
+    let [class0_hashes, class1_hashes] = hashes;
+    let [class0_metrics, class1_metrics] = metrics;
     Ok(ExperimentOutcome {
         exact_encoding_matches,
         outcome_model_matches,
         final_public_state_model_matches,
+        encrypted_return,
         opcode_equal: hashes_equal(&class0_hashes, &class1_hashes, |hash| {
             &hash.opcode_trace_hash
         }),
@@ -54716,7 +54958,7 @@ fn trace_summary(benchmark: &str, mode: &str, outcome: &ExperimentOutcome) -> Js
     // related only computationally, so a physical-trace inequality there is an
     // expected computational difference, not a failed obligation.
     let computational = mode.starts_with("oram");
-    json!({
+    let mut summary = json!({
         "benchmark": benchmark,
         "mode": mode,
         "comparison_class": if computational { "computational_oram" } else { "exact_backend" },
@@ -54729,7 +54971,14 @@ fn trace_summary(benchmark: &str, mode: &str, outcome: &ExperimentOutcome) -> Js
         "exact_encoding_matches": outcome.exact_encoding_matches,
         "outcome_model_matches": outcome.outcome_model_matches,
         "final_public_state_model_matches": outcome.final_public_state_model_matches,
-    })
+    });
+    // An experiment on an `encrypted_to_client` entrypoint also reports what
+    // its runs show of the return channel.
+    if let (Some(checks), Some(fields)) = (&outcome.encrypted_return, summary.as_object_mut()) {
+        fields.insert("encrypted_return_checks_hold".into(), json!(checks.hold()));
+        fields.insert("encrypted_return".into(), json!(checks));
+    }
+    summary
 }
 
 fn extract_metrics(result: &DiagnosticCallResult) -> BTreeMap<String, f64> {
@@ -56156,6 +56405,142 @@ mod tests {
             ..model
         };
         assert!(!run_matches_outcome_model(&completed, entrypoint, &drifted));
+    }
+
+    /// An `encrypted_to_client` return follows the outcome model: the outcome
+    /// holds the value as an encrypted payload of the modeled lengths and not
+    /// in the clear, and the call exits with the payload's wire length. A
+    /// model that takes the return for a plaintext one, or for one of another
+    /// length, does not match, and neither does an outcome whose payload was
+    /// dropped or that names the value in the clear.
+    #[test]
+    fn outcome_model_matches_runtime_for_an_encrypted_return() {
+        use super::{
+            encrypted_return_checks, probe_return_channel_session,
+            run_mixer_sealed_balance_experiment, RETURN_CHANNEL_OVERHEAD_BYTES,
+        };
+        let artifact = compile_artifact(
+            "benches/raw/ConfidentialMixer.sol",
+            "benches/raw/ConfidentialMixer.uo.yaml",
+            ProgramMode::Uo,
+        )
+        .unwrap();
+        let entrypoint = "sealedBalanceOf(bytes32)";
+        let model = kernel_outcome_model(&artifact, entrypoint, KernelTraceRoute::Exact).unwrap();
+        assert!(model.returns_value && model.encrypted_return);
+        assert_eq!(model.return_length, 32);
+        assert_eq!(model.output_length(), 32 + RETURN_CHANNEL_OVERHEAD_BYTES);
+        let plain =
+            kernel_outcome_model(&artifact, "balanceOf(bytes32)", KernelTraceRoute::Exact).unwrap();
+        assert!(!plain.encrypted_return);
+        assert_eq!(plain.output_length(), 32);
+
+        let session = probe_return_channel_session().unwrap();
+        let mut instance =
+            ContractInstance::deploy_with_seed(artifact.clone(), PROBE_DEPLOY_SEED).unwrap();
+        instance
+            .call("deposit(bytes32,uint256)", vec![b32(7), Value::uint(5)])
+            .unwrap();
+        // Without a session the entrypoint is refused before it runs.
+        assert!(instance.call(entrypoint, vec![b32(7)]).is_err());
+        let held = instance
+            .call_with_return_channel_diagnostics(entrypoint, vec![b32(7)], &session)
+            .unwrap();
+        let absent = instance
+            .call_with_return_channel_diagnostics(entrypoint, vec![b32(8)], &session)
+            .unwrap();
+        for result in [&held, &absent] {
+            assert!(run_matches_outcome_model(
+                &result.call.trace,
+                entrypoint,
+                &model
+            ));
+            assert_eq!(result.call.return_value, None);
+            let certificate = result
+                .call
+                .trace
+                .runtime_controller_observer_certificate()
+                .unwrap();
+            assert_eq!(
+                certificate.boundary_schedule().last().unwrap().output_len,
+                60
+            );
+        }
+        // The caller opens the two balances.
+        let open = |result: &super::DiagnosticCallResult| {
+            let certificate = result
+                .call
+                .trace
+                .runtime_controller_observer_certificate()
+                .unwrap();
+            let outcome = certificate.public_outcome();
+            super::open_encrypted_return(
+                &artifact,
+                entrypoint,
+                &outcome.public_args,
+                outcome.encrypted_return_payload.as_ref().unwrap(),
+                &session,
+            )
+            .unwrap()
+        };
+        assert_eq!(open(&held), Value::uint(5).canonical_bytes_boxed().unwrap());
+        assert_eq!(
+            open(&absent),
+            Value::uint(0).canonical_bytes_boxed().unwrap()
+        );
+
+        // Models that are not the entrypoint's.
+        let as_plaintext = KernelOutcomeModel {
+            encrypted_return: false,
+            ..model
+        };
+        assert!(!run_matches_outcome_model(
+            &held.call.trace,
+            entrypoint,
+            &as_plaintext
+        ));
+        let other_length = KernelOutcomeModel {
+            return_length: 64,
+            ..model
+        };
+        assert!(!run_matches_outcome_model(
+            &held.call.trace,
+            entrypoint,
+            &other_length
+        ));
+        // A plaintext return does not match a model of an encrypted one.
+        let plain_run = instance.call("balanceOf(bytes32)", vec![b32(7)]).unwrap();
+        assert!(run_matches_outcome_model(
+            &plain_run.trace,
+            "balanceOf(bytes32)",
+            &plain
+        ));
+        assert!(!run_matches_outcome_model(
+            &plain_run.trace,
+            "balanceOf(bytes32)",
+            &KernelOutcomeModel {
+                encrypted_return: true,
+                ..plain
+            }
+        ));
+
+        // The two calls above are two calls of one deployment, so their
+        // nonces differ and their frames with them: the channel checks are
+        // for runs of one call, which the experiment makes.
+        let checks =
+            encrypted_return_checks(&artifact, entrypoint, &session, &[held, absent]).unwrap();
+        assert!(checks.every_return_opens_for_the_session);
+        assert!(checks.no_return_opens_under_another_key);
+        assert!(checks.no_plaintext_return);
+        assert!(!checks.frame_same_in_every_run);
+        assert!(!checks.hold());
+        let experiment = run_mixer_sealed_balance_experiment(&artifact).unwrap();
+        let checks = experiment.encrypted_return.unwrap();
+        assert!(checks.hold(), "{checks:?}");
+        assert_eq!((checks.runs, checks.distinct_returned_values), (8, 3));
+        assert_eq!(experiment.outcome_model_matches, Some(true));
+        assert_eq!(experiment.exact_encoding_matches, Some(true));
+        assert!(experiment.physical_equal && experiment.logical_equal);
     }
 
     #[test]

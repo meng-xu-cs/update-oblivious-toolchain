@@ -186,51 +186,57 @@ theorem fieldSafe {α : Type} {field : IR.OperationalConfig → α}
   exact hField
 
 /-- The modeled public outcome of the denoted run. -/
-def publicOutcome (policy : IR.EntrypointPublicPolicy) (render : IR.Value → String)
+def publicOutcome (policy : IR.EntrypointPublicPolicy) (channel : IR.ReturnChannelModel)
+    (render : IR.Value → String)
     (renderEnv : String × IR.Value → String) (cfg : OramConfig) : SGXPublicOutcome :=
-  IR.kernelPublicOutcome policy render renderEnv kp (denote.kernelOf cfg)
+  IR.kernelPublicOutcome policy channel render renderEnv kp (denote.kernelOf cfg)
 
 /-- The modeled boundary schedule of the denoted run, a call with
 `accessCount` ORAM accesses. -/
-def boundarySchedule (policy : IR.EntrypointPublicPolicy) (render : IR.Value → String)
+def boundarySchedule (policy : IR.EntrypointPublicPolicy) (channel : IR.ReturnChannelModel)
+    (render : IR.Value → String)
     (renderEnv : String × IR.Value → String) (accessCount : Nat) (cfg : OramConfig) :
     List BoundaryEvent :=
   IR.kernelOramBoundarySchedule policy accessCount
-    (denote.publicOutcome policy render renderEnv cfg)
+    (denote.publicOutcome policy channel render renderEnv cfg)
 
 /-- The modeled final public-state record of the denoted run. -/
 def finalPublicState (digest : IR.ObjectStore → String) (deltaDigest : List Nat → String)
     (cfg : OramConfig) : PaperMainFinalPublicStateRollback :=
   IR.kernelFinalPublicState digest deltaDigest kp (denote.kernelOf cfg)
 
-theorem publicOutcome_safe (policy : IR.EntrypointPublicPolicy) (render : IR.Value → String)
+theorem publicOutcome_safe (policy : IR.EntrypointPublicPolicy) (channel : IR.ReturnChannelModel)
+    (render : IR.Value → String)
     (renderEnv : String × IR.Value → String) (hAgree : IR.PolicyAgreesWithFlow kp policy) :
     PublicOutcomeSafeModuloReleases (AdmittedSamePublic admitted)
-      (denote.publicOutcome policy render renderEnv) :=
+      (denote.publicOutcome policy channel render renderEnv) :=
   denote.fieldSafe
-    (field := fun cfg => (IR.kernelPublicOutcome policy render renderEnv kp cfg).withoutReleases)
-    (IR.kernelPublicOutcome_safe kp policy render renderEnv hAgree)
+    (field := fun cfg =>
+      (IR.kernelPublicOutcome policy channel render renderEnv kp cfg).withoutReleases)
+    (IR.kernelPublicOutcome_safe kp policy channel render renderEnv hAgree)
 
-theorem boundarySchedule_safe (policy : IR.EntrypointPublicPolicy) (render : IR.Value → String)
+theorem boundarySchedule_safe (policy : IR.EntrypointPublicPolicy) (channel : IR.ReturnChannelModel)
+    (render : IR.Value → String)
     (renderEnv : String × IR.Value → String) (accessCount : Nat)
     (hAgree : IR.PolicyAgreesWithFlow kp policy) :
     BoundarySafeModuloReleases (AdmittedSamePublic admitted)
-      (denote.publicOutcome policy render renderEnv)
-      (denote.boundarySchedule policy render renderEnv accessCount) :=
+      (denote.publicOutcome policy channel render renderEnv)
+      (denote.boundarySchedule policy channel render renderEnv accessCount) :=
   IR.kernelOramBoundarySchedule_safe policy accessCount
-    (denote.publicOutcome_safe policy render renderEnv hAgree) (fun _ => rfl)
+    (denote.publicOutcome_safe policy channel render renderEnv hAgree) (fun _ => rfl)
 
-theorem finalPublicState_safe (policy : IR.EntrypointPublicPolicy) (render : IR.Value → String)
+theorem finalPublicState_safe (policy : IR.EntrypointPublicPolicy) (channel : IR.ReturnChannelModel)
+    (render : IR.Value → String)
     (renderEnv : String × IR.Value → String) (digest : IR.ObjectStore → String)
     (deltaDigest : List Nat → String) (hAgree : IR.PolicyAgreesWithFlow kp policy) :
     FinalPublicStateSafeModuloReleases (AdmittedSamePublic admitted)
-      (denote.publicOutcome policy render renderEnv)
+      (denote.publicOutcome policy channel render renderEnv)
       (denote.finalPublicState digest deltaDigest) :=
   denote.fieldSafe
     (field := fun cfg =>
       (IR.kernelFinalPublicState digest deltaDigest kp cfg).withoutStatusRelease
-        (IR.kernelPublicOutcome policy render renderEnv kp cfg).statusReleased)
-    (IR.kernelFinalPublicState_safe kp policy render renderEnv digest deltaDigest hAgree)
+        (IR.kernelPublicOutcome policy channel render renderEnv kp cfg).statusReleased)
+    (IR.kernelFinalPublicState_safe kp policy channel render renderEnv digest deltaDigest hAgree)
 
 end KernelDenotation
 
@@ -248,6 +254,7 @@ theorem paperMain_admittedKernelRun_pathOramLocalPosmapV1_noninterference_modulo
     {kp : IR.KernelProgram} {admitted : OramConfig → Prop}
     (denote : KernelDenotation kp admitted)
     (policy : IR.EntrypointPublicPolicy) (hAgree : IR.PolicyAgreesWithFlow kp policy)
+    (channel : IR.ReturnChannelModel)
     (render : IR.Value → String) (renderEnv : String × IR.Value → String)
     (digest : IR.ObjectStore → String) (deltaDigest : List Nat → String)
     (accessCount : Nat) (modelTags : SGXModelTags)
@@ -258,19 +265,20 @@ theorem paperMain_admittedKernelRun_pathOramLocalPosmapV1_noninterference_modulo
     {cfg₁ cfg₂ : OramConfig} (hPair : AdmittedSamePublic admitted cfg₁ cfg₂) :
     PaperMainPathOramReleaseConclusion
       (pathOramLocalPosmapV1NormalizedObservedSGXProofRelation assumptions)
-      (oramToSGXSemantics run (denote.publicOutcome policy render renderEnv)
-        (denote.boundarySchedule policy render renderEnv accessCount) oramControllerMicroTrace)
+      (oramToSGXSemantics run (denote.publicOutcome policy channel render renderEnv)
+        (denote.boundarySchedule policy channel render renderEnv accessCount)
+        oramControllerMicroTrace)
       executionLeakage
-      (oramReleaseMicroLeakage (denote.publicOutcome policy render renderEnv) modelTags)
-      (denote.publicOutcome policy render renderEnv)
+      (oramReleaseMicroLeakage (denote.publicOutcome policy channel render renderEnv) modelTags)
+      (denote.publicOutcome policy channel render renderEnv)
       (denote.finalPublicState digest deltaDigest)
       (fun _ => releaseFunctions)
       cfg₁
       cfg₂ :=
   paperMain_pathOramLocalPosmapV1_noninterference_moduloReleases_on assumptions hOram
-    (denote.publicOutcome_safe policy render renderEnv hAgree)
-    (denote.boundarySchedule_safe policy render renderEnv accessCount hAgree)
-    (denote.finalPublicState_safe policy render renderEnv digest deltaDigest hAgree)
+    (denote.publicOutcome_safe policy channel render renderEnv hAgree)
+    (denote.boundarySchedule_safe policy channel render renderEnv accessCount hAgree)
+    (denote.finalPublicState_safe policy channel render renderEnv digest deltaDigest hAgree)
     (fun _ _ _ => rfl) hPair
 
 /-- **The `path_oram_private_posmap_v1` paper-main theorem modulo declared
@@ -281,6 +289,7 @@ theorem paperMain_admittedKernelRun_pathOramPrivatePosmapV1_noninterference_modu
     {kp : IR.KernelProgram} {admitted : OramConfig → Prop}
     (denote : KernelDenotation kp admitted)
     (policy : IR.EntrypointPublicPolicy) (hAgree : IR.PolicyAgreesWithFlow kp policy)
+    (channel : IR.ReturnChannelModel)
     (render : IR.Value → String) (renderEnv : String × IR.Value → String)
     (digest : IR.ObjectStore → String) (deltaDigest : List Nat → String)
     (accessCount : Nat) (modelTags : SGXModelTags)
@@ -291,19 +300,20 @@ theorem paperMain_admittedKernelRun_pathOramPrivatePosmapV1_noninterference_modu
     {cfg₁ cfg₂ : OramConfig} (hPair : AdmittedSamePublic admitted cfg₁ cfg₂) :
     PaperMainPathOramReleaseConclusion
       (pathOramPrivatePosmapV1NormalizedObservedSGXProofRelation assumptions)
-      (oramToSGXSemantics run (denote.publicOutcome policy render renderEnv)
-        (denote.boundarySchedule policy render renderEnv accessCount) oramControllerMicroTrace)
+      (oramToSGXSemantics run (denote.publicOutcome policy channel render renderEnv)
+        (denote.boundarySchedule policy channel render renderEnv accessCount)
+        oramControllerMicroTrace)
       executionLeakage
-      (oramReleaseMicroLeakage (denote.publicOutcome policy render renderEnv) modelTags)
-      (denote.publicOutcome policy render renderEnv)
+      (oramReleaseMicroLeakage (denote.publicOutcome policy channel render renderEnv) modelTags)
+      (denote.publicOutcome policy channel render renderEnv)
       (denote.finalPublicState digest deltaDigest)
       (fun _ => releaseFunctions)
       cfg₁
       cfg₂ :=
   paperMain_pathOramPrivatePosmapV1_noninterference_moduloReleases_on assumptions hOram
-    (denote.publicOutcome_safe policy render renderEnv hAgree)
-    (denote.boundarySchedule_safe policy render renderEnv accessCount hAgree)
-    (denote.finalPublicState_safe policy render renderEnv digest deltaDigest hAgree)
+    (denote.publicOutcome_safe policy channel render renderEnv hAgree)
+    (denote.boundarySchedule_safe policy channel render renderEnv accessCount hAgree)
+    (denote.finalPublicState_safe policy channel render renderEnv digest deltaDigest hAgree)
     (fun _ _ _ => rfl) hPair
 
 /-- The local-scheme theorem for an entrypoint whose program passes the
@@ -313,6 +323,7 @@ theorem paperMain_checkedKernel_pathOramLocalPosmapV1_noninterference_moduloRele
     {kp : IR.KernelProgram} {state : List IR.StateObject} {policy : IR.EntrypointPublicPolicy}
     (hCheck : kp.admissionCheck state policy = true)
     {admitted : OramConfig → Prop} (denote : KernelDenotation kp admitted)
+    (channel : IR.ReturnChannelModel)
     (render : IR.Value → String) (renderEnv : String × IR.Value → String)
     (digest : IR.ObjectStore → String) (deltaDigest : List Nat → String)
     (accessCount : Nat) (modelTags : SGXModelTags)
@@ -323,17 +334,19 @@ theorem paperMain_checkedKernel_pathOramLocalPosmapV1_noninterference_moduloRele
     {cfg₁ cfg₂ : OramConfig} (hPair : AdmittedSamePublic admitted cfg₁ cfg₂) :
     PaperMainPathOramReleaseConclusion
       (pathOramLocalPosmapV1NormalizedObservedSGXProofRelation assumptions)
-      (oramToSGXSemantics run (denote.publicOutcome policy render renderEnv)
-        (denote.boundarySchedule policy render renderEnv accessCount) oramControllerMicroTrace)
+      (oramToSGXSemantics run (denote.publicOutcome policy channel render renderEnv)
+        (denote.boundarySchedule policy channel render renderEnv accessCount)
+        oramControllerMicroTrace)
       executionLeakage
-      (oramReleaseMicroLeakage (denote.publicOutcome policy render renderEnv) modelTags)
-      (denote.publicOutcome policy render renderEnv)
+      (oramReleaseMicroLeakage (denote.publicOutcome policy channel render renderEnv) modelTags)
+      (denote.publicOutcome policy channel render renderEnv)
       (denote.finalPublicState digest deltaDigest)
       (fun _ => releaseFunctions)
       cfg₁
       cfg₂ :=
   paperMain_admittedKernelRun_pathOramLocalPosmapV1_noninterference_moduloReleases assumptions
-    denote policy (IR.KernelProgram.admissionCheck_sound hCheck).policyAgrees render renderEnv
+    denote policy (IR.KernelProgram.admissionCheck_sound hCheck).policyAgrees channel render
+    renderEnv
     digest deltaDigest accessCount modelTags releaseFunctions hOram hPair
 
 /-- The private-scheme theorem for an entrypoint whose program passes the
@@ -343,6 +356,7 @@ theorem paperMain_checkedKernel_pathOramPrivatePosmapV1_noninterference_moduloRe
     {kp : IR.KernelProgram} {state : List IR.StateObject} {policy : IR.EntrypointPublicPolicy}
     (hCheck : kp.admissionCheck state policy = true)
     {admitted : OramConfig → Prop} (denote : KernelDenotation kp admitted)
+    (channel : IR.ReturnChannelModel)
     (render : IR.Value → String) (renderEnv : String × IR.Value → String)
     (digest : IR.ObjectStore → String) (deltaDigest : List Nat → String)
     (accessCount : Nat) (modelTags : SGXModelTags)
@@ -353,17 +367,19 @@ theorem paperMain_checkedKernel_pathOramPrivatePosmapV1_noninterference_moduloRe
     {cfg₁ cfg₂ : OramConfig} (hPair : AdmittedSamePublic admitted cfg₁ cfg₂) :
     PaperMainPathOramReleaseConclusion
       (pathOramPrivatePosmapV1NormalizedObservedSGXProofRelation assumptions)
-      (oramToSGXSemantics run (denote.publicOutcome policy render renderEnv)
-        (denote.boundarySchedule policy render renderEnv accessCount) oramControllerMicroTrace)
+      (oramToSGXSemantics run (denote.publicOutcome policy channel render renderEnv)
+        (denote.boundarySchedule policy channel render renderEnv accessCount)
+        oramControllerMicroTrace)
       executionLeakage
-      (oramReleaseMicroLeakage (denote.publicOutcome policy render renderEnv) modelTags)
-      (denote.publicOutcome policy render renderEnv)
+      (oramReleaseMicroLeakage (denote.publicOutcome policy channel render renderEnv) modelTags)
+      (denote.publicOutcome policy channel render renderEnv)
       (denote.finalPublicState digest deltaDigest)
       (fun _ => releaseFunctions)
       cfg₁
       cfg₂ :=
   paperMain_admittedKernelRun_pathOramPrivatePosmapV1_noninterference_moduloReleases assumptions
-    denote policy (IR.KernelProgram.admissionCheck_sound hCheck).policyAgrees render renderEnv
+    denote policy (IR.KernelProgram.admissionCheck_sound hCheck).policyAgrees channel render
+    renderEnv
     digest deltaDigest accessCount modelTags releaseFunctions hOram hPair
 
 namespace SeededRuntimePathOramProofBundleOn
@@ -380,23 +396,25 @@ theorem paperMain_admittedKernelRun_localPosmapV1_noninterference_moduloReleases
     (assumptions : PathOramLocalPosmapV1SecurityAssumptions)
     {kp : IR.KernelProgram} (denote : KernelDenotation kp admitted)
     (policy : IR.EntrypointPublicPolicy) (hAgree : IR.PolicyAgreesWithFlow kp policy)
+    (channel : IR.ReturnChannelModel)
     (render : IR.Value → String) (renderEnv : String × IR.Value → String)
     (digest : IR.ObjectStore → String) (deltaDigest : List Nat → String)
     (accessCount : Nat) (releaseFunctions : PaperMainDeclaredReleaseFunctions)
     {cfg₁ cfg₂ : OramConfig} (hPair : AdmittedSamePublic admitted cfg₁ cfg₂) :
     PaperMainPathOramReleaseConclusion
       (pathOramLocalPosmapV1NormalizedObservedSGXProofRelation assumptions)
-      (oramToSGXSemantics bundle.run (denote.publicOutcome policy render renderEnv)
-        (denote.boundarySchedule policy render renderEnv accessCount) oramControllerMicroTrace)
+      (oramToSGXSemantics bundle.run (denote.publicOutcome policy channel render renderEnv)
+        (denote.boundarySchedule policy channel render renderEnv accessCount)
+        oramControllerMicroTrace)
       executionLeakage
-      (oramReleaseMicroLeakage (denote.publicOutcome policy render renderEnv) modelTags)
-      (denote.publicOutcome policy render renderEnv)
+      (oramReleaseMicroLeakage (denote.publicOutcome policy channel render renderEnv) modelTags)
+      (denote.publicOutcome policy channel render renderEnv)
       (denote.finalPublicState digest deltaDigest)
       (fun _ => releaseFunctions)
       cfg₁
       cfg₂ :=
   paperMain_admittedKernelRun_pathOramLocalPosmapV1_noninterference_moduloReleases assumptions
-    denote policy hAgree render renderEnv digest deltaDigest accessCount modelTags
+    denote policy hAgree channel render renderEnv digest deltaDigest accessCount modelTags
     releaseFunctions
     (bundle.computationalUOWithOn hLocal assumptions.toCanonicalLeafValueSecurityAssumptions)
     hPair
@@ -408,23 +426,25 @@ theorem paperMain_admittedKernelRun_privatePosmapV1_noninterference_moduloReleas
     (assumptions : PathOramPrivatePosmapV1SecurityAssumptions)
     {kp : IR.KernelProgram} (denote : KernelDenotation kp admitted)
     (policy : IR.EntrypointPublicPolicy) (hAgree : IR.PolicyAgreesWithFlow kp policy)
+    (channel : IR.ReturnChannelModel)
     (render : IR.Value → String) (renderEnv : String × IR.Value → String)
     (digest : IR.ObjectStore → String) (deltaDigest : List Nat → String)
     (accessCount : Nat) (releaseFunctions : PaperMainDeclaredReleaseFunctions)
     {cfg₁ cfg₂ : OramConfig} (hPair : AdmittedSamePublic admitted cfg₁ cfg₂) :
     PaperMainPathOramReleaseConclusion
       (pathOramPrivatePosmapV1NormalizedObservedSGXProofRelation assumptions)
-      (oramToSGXSemantics bundle.run (denote.publicOutcome policy render renderEnv)
-        (denote.boundarySchedule policy render renderEnv accessCount) oramControllerMicroTrace)
+      (oramToSGXSemantics bundle.run (denote.publicOutcome policy channel render renderEnv)
+        (denote.boundarySchedule policy channel render renderEnv accessCount)
+        oramControllerMicroTrace)
       executionLeakage
-      (oramReleaseMicroLeakage (denote.publicOutcome policy render renderEnv) modelTags)
-      (denote.publicOutcome policy render renderEnv)
+      (oramReleaseMicroLeakage (denote.publicOutcome policy channel render renderEnv) modelTags)
+      (denote.publicOutcome policy channel render renderEnv)
       (denote.finalPublicState digest deltaDigest)
       (fun _ => releaseFunctions)
       cfg₁
       cfg₂ :=
   paperMain_admittedKernelRun_pathOramPrivatePosmapV1_noninterference_moduloReleases assumptions
-    denote policy hAgree render renderEnv digest deltaDigest accessCount modelTags
+    denote policy hAgree channel render renderEnv digest deltaDigest accessCount modelTags
     releaseFunctions
     (bundle.computationalUOWithOnAny
       assumptions.localPosmapAssumptions.toCanonicalLeafValueSecurityAssumptions)

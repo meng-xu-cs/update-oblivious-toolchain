@@ -109,17 +109,24 @@ objects, and whose program writes only confidential objects; such a program
 leaves the public store unchanged (`evalKernelProgram_publicStateTransition`).
 When the entrypoint's declared policies agree with the flow analysis
 (`PolicyAgreesWithFlow`: a status that is not declassified is public, and a
-return that is not declassified is public), each modeled observable is
-public-determined outside its releases, and
+return that is neither declassified nor encrypted to the client is public),
+each modeled observable is public-determined outside its releases, and
 `paperMain_admittedKernelRun_exact_noninterference_moduloReleases` proves the
 paper-main theorem modulo releases with every premise discharged. The exit
 event's output length is the return length, so it reveals whether the call
 completed; the release erasure therefore clears it when the status is
-released (`boundaryWithoutStatusRelease`). Encrypted returns are outside the
-model. The probe checks the runtime's public outcomes, boundary schedules, and
-final public-state records against these models on every exact-route and Path
-ORAM experiment run, completed or aborted (`outcome_model_matches` and
-`final_public_state_model_matches` in `trace_equivalence.json`). Confidential
+released (`boundaryWithoutStatusRelease`). A value returned under
+`encrypted_to_client` is in the modeled outcome as the payload of the call's
+return channel and not in the clear, and the call exits with the payload's
+wire length. The channel is a parameter of the theorems
+(`ReturnChannelModel`): a function from the call's public arguments and the
+returned value to a payload which, without its ciphertext and tag, does not
+depend on the value. The release erases the ciphertext and the tag, so the
+returned value may be secret. The probe checks the runtime's public outcomes,
+boundary schedules, and final public-state records against these models on
+every exact-route and Path ORAM experiment run, completed or aborted
+(`outcome_model_matches` and `final_public_state_model_matches` in
+`trace_equivalence.json`). Confidential
 calls report the same record as public ones: the digests of the public state
 before the call, as the call left it, and as committed, the digest of the
 public delta (the ids of the public objects whose committed value changed), and

@@ -17,6 +17,11 @@ entrypoints:
     returns: declassified
     status: public
     declassifies: [return]
+  sealedBalanceOf(bytes32):
+    secret_args: [commitment]
+    confidential: true
+    returns: encrypted_to_client
+    status: public
   totalValue():
     confidential: true
     returns: declassified

@@ -299,6 +299,22 @@ const CLAIM_ENTRIES: &[ClaimEntry] = &[
             "cargo run -q -p mplus-probe -- --only runtime-boundary-validation --out-dir results",
     },
     ClaimEntry {
+        id: "assumption-return-channel-aead",
+        category: "assumption",
+        text: "Return-channel AEAD: a value returned under encrypted_to_client is hidden from the host by ChaCha20Poly1305 under the session key, with associated data that bind the package, the entrypoint, the public arguments and the session, and a nonce hashed from the runtime's freshness counters; the theorems erase the ciphertext and the tag as a declared release, so the assumption is trusted and not named in Lean, and the session key comes from an attested key exchange the repository does not implement.",
+        status: STATUS_TRUSTED,
+        doc_anchor: "Return-channel AEAD",
+        source_files: &["runtime/uo-evm/src/return_channel.rs"],
+        lean_modules: &["proof/lean/UOToolchain/KernelPaperMain.lean"],
+        runtime_compiler_files: &[
+            "runtime/uo-evm/src/return_channel.rs",
+            "runtime/uo-evm/src/freshness.rs",
+        ],
+        benchmark_result_files: &["results/trace_equivalence.json"],
+        validation_command:
+            "cargo run -q -p mplus-probe -- --only trace-equivalence --out-dir results",
+    },
+    ClaimEntry {
         id: "assumption-tee-deployment",
         category: "assumption",
         text: "TEE deployment assumptions: enclave memory confidentiality/integrity, attestation authenticity, rollback resistance, freshness, crash recovery, and patch-level trust; explicit Lean bundle SgxDeploymentAssumptions.",

@@ -22,6 +22,10 @@ contract ConfidentialMixer {
         return balances[commitment];
     }
 
+    function sealedBalanceOf(bytes32 commitment) public returns (uint256) {
+        return balances[commitment];
+    }
+
     function totalValue() public returns (uint256) {
         return total;
     }

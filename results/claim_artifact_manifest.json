@@ -162,6 +162,16 @@
       "ok": true
     },
     {
+      "detail": "doc_anchor \"Return-channel AEAD\" for assumption-return-channel-aead appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:assumption-return-channel-aead",
+      "ok": true
+    },
+    {
+      "detail": "assumption-return-channel-aead declares an allowed status (trusted)",
+      "name": "status-allowed:assumption-return-channel-aead",
+      "ok": true
+    },
+    {
       "detail": "doc_anchor \"TEE deployment assumptions\" for assumption-tee-deployment appears in docs/claim-boundary.md",
       "name": "anchor-in-doc:assumption-tee-deployment",
       "ok": true
@@ -362,6 +372,11 @@
       "ok": true
     },
     {
+      "detail": "assumption-table row \"Return-channel AEAD\" is covered by the manifest",
+      "name": "assumption-covered:Return-channel AEAD",
+      "ok": true
+    },
+    {
       "detail": "assumption-table row \"TEE deployment assumptions\" is covered by the manifest",
       "name": "assumption-covered:TEE deployment assumptions",
       "ok": true
@@ -457,7 +472,7 @@
       "ok": true
     },
     {
-      "detail": "7 manifest entries in category assumption",
+      "detail": "8 manifest entries in category assumption",
       "name": "category-present:assumption",
       "ok": true
     },
@@ -804,6 +819,26 @@
     {
       "detail": "artifact runtime/uo-evm/src/engine.rs referenced by assumption-runtime-key-derivation exists",
       "name": "file-exists:assumption-runtime-key-derivation:runtime/uo-evm/src/engine.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact runtime/uo-evm/src/return_channel.rs referenced by assumption-return-channel-aead exists",
+      "name": "file-exists:assumption-return-channel-aead:runtime/uo-evm/src/return_channel.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact proof/lean/UOToolchain/KernelPaperMain.lean referenced by assumption-return-channel-aead exists",
+      "name": "file-exists:assumption-return-channel-aead:proof/lean/UOToolchain/KernelPaperMain.lean",
+      "ok": true
+    },
+    {
+      "detail": "artifact runtime/uo-evm/src/return_channel.rs referenced by assumption-return-channel-aead exists",
+      "name": "file-exists:assumption-return-channel-aead:runtime/uo-evm/src/return_channel.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact runtime/uo-evm/src/freshness.rs referenced by assumption-return-channel-aead exists",
+      "name": "file-exists:assumption-return-channel-aead:runtime/uo-evm/src/freshness.rs",
       "ok": true
     },
     {
@@ -1303,6 +1338,27 @@
     },
     {
       "benchmark_result_files": [
+        "results/trace_equivalence.json"
+      ],
+      "category": "assumption",
+      "doc_anchor": "Return-channel AEAD",
+      "id": "assumption-return-channel-aead",
+      "lean_modules": [
+        "proof/lean/UOToolchain/KernelPaperMain.lean"
+      ],
+      "runtime_compiler_files": [
+        "runtime/uo-evm/src/return_channel.rs",
+        "runtime/uo-evm/src/freshness.rs"
+      ],
+      "source_files": [
+        "runtime/uo-evm/src/return_channel.rs"
+      ],
+      "status": "trusted",
+      "text": "Return-channel AEAD: a value returned under encrypted_to_client is hidden from the host by ChaCha20Poly1305 under the session key, with associated data that bind the package, the entrypoint, the public arguments and the session, and a nonce hashed from the runtime's freshness counters; the theorems erase the ciphertext and the tag as a declared release, so the assumption is trusted and not named in Lean, and the session key comes from an attested key exchange the repository does not implement.",
+      "validation_command": "cargo run -q -p mplus-probe -- --only trace-equivalence --out-dir results"
+    },
+    {
+      "benchmark_result_files": [
         "results/lean_assumption_budget.json"
       ],
       "category": "assumption",
@@ -1596,7 +1652,7 @@
       "validation_command": "cargo run -q -p mplus-probe -- --only acceptance-check --out-dir results"
     }
   ],
-  "entry_count": 34,
+  "entry_count": 35,
   "schema": "uo.claim_artifact_manifest.v1",
   "source_of_truth": "docs/claim-boundary.md"
 }

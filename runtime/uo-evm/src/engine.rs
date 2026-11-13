@@ -372,6 +372,21 @@ impl ContractInstance {
         })
     }
 
+    /// `call_with_return_channel`, with the call's telemetry.
+    #[cfg(feature = "diagnostics")]
+    pub fn call_with_return_channel_diagnostics(
+        &mut self,
+        entrypoint: &str,
+        args: Vec<Value>,
+        session: &ReturnChannelSession,
+    ) -> Result<DiagnosticCallResult> {
+        let (call, zero_writes) = self.call_impl(entrypoint, args, None, Some(session), None)?;
+        Ok(DiagnosticCallResult {
+            call,
+            telemetry: CallTelemetry { zero_writes },
+        })
+    }
+
     /// The digest of the committed public state, as a call's public-state
     /// transition record reports it.
     #[cfg(feature = "diagnostics")]
@@ -581,14 +596,10 @@ mod tests {
         production_translation_validation_certificate_sha256, ProductionCallEvidence,
         ProductionReceipt,
     };
-    use crate::return_channel::{
-        return_channel_aad_bytes, ReturnChannelSession, RETURN_CHANNEL_SCHEME,
-    };
+    use crate::return_channel::{ReturnChannelSession, RETURN_CHANNEL_SCHEME};
     use crate::runtime::ensure_contract_runtime_cold;
     use crate::runtime::objects::RuntimeObject;
     use crate::runtime::ContractRuntime;
-    use chacha20poly1305::aead::AeadInPlace;
-    use chacha20poly1305::{ChaCha20Poly1305, KeyInit, Nonce, Tag};
     use sha2::{Digest, Sha256};
     use std::collections::{BTreeMap, BTreeSet};
     use std::fs;
@@ -693,28 +704,9 @@ mod tests {
         payload: &EncryptedReturnPayload,
         session: &ReturnChannelSession,
     ) -> Vec<u8> {
-        let aad = return_channel_aad_bytes(
-            artifact,
-            entrypoint,
-            payload.plaintext_canonical_len,
-            public_args,
-            &payload.binding,
-        )
-        .unwrap();
-        assert_eq!(payload.aad_hash, hex::encode(Sha256::digest(&aad)));
-        let mut ciphertext = hex::decode(&payload.ciphertext).unwrap();
-        let nonce = hex::decode(&payload.nonce).unwrap();
-        let tag = hex::decode(&payload.tag).unwrap();
-        let cipher = ChaCha20Poly1305::new_from_slice(session.key_for_test()).unwrap();
-        cipher
-            .decrypt_in_place_detached(
-                Nonce::from_slice(&nonce),
-                &aad,
-                ciphertext.as_mut_slice(),
-                Tag::from_slice(&tag),
-            )
-            .unwrap();
-        ciphertext
+        crate::open_encrypted_return(artifact, entrypoint, public_args, payload, session)
+            .unwrap()
+            .into_vec()
     }
 
     fn b32(byte: u8) -> Value {
@@ -1052,6 +1044,86 @@ bounds:
             decrypted,
             Value::uint(7).canonical_bytes_boxed().unwrap().into_vec()
         );
+
+        // What a client runs to open a return refuses a payload under
+        // another key or another session, for other public arguments, and
+        // with any field changed.
+        let open = |payload: &EncryptedReturnPayload, session: &ReturnChannelSession| {
+            crate::open_encrypted_return(
+                &artifact,
+                "f(uint256)",
+                &public_outcome.public_args,
+                payload,
+                session,
+            )
+            .map_err(|err| err.to_string())
+        };
+        assert!(open(payload, &session).is_ok());
+        let other_key = ReturnChannelSession::new([9u8; 32], session.binding().clone()).unwrap();
+        assert!(open(payload, &other_key)
+            .unwrap_err()
+            .contains("does not open under this session"));
+        let other_session = ReturnChannelSession::new(
+            [7u8; 32],
+            ReturnChannelPublicBinding {
+                session_id: "44".repeat(32),
+                ..session.binding().clone()
+            },
+        )
+        .unwrap();
+        assert!(open(payload, &other_session)
+            .unwrap_err()
+            .contains("bound to another session"));
+        assert!(crate::open_encrypted_return(
+            &artifact,
+            "f(uint256)",
+            &["1".to_string()],
+            payload,
+            &session
+        )
+        .unwrap_err()
+        .to_string()
+        .contains("names other associated data"));
+        let flipped = |hex: &str| {
+            let mut bytes = hex::decode(hex).unwrap();
+            bytes[0] ^= 1;
+            hex::encode(bytes)
+        };
+        let mut changed = payload.clone();
+        changed.ciphertext = flipped(&payload.ciphertext);
+        assert!(open(&changed, &session)
+            .unwrap_err()
+            .contains("does not open"));
+        let mut changed = payload.clone();
+        changed.tag = flipped(&payload.tag);
+        assert!(open(&changed, &session)
+            .unwrap_err()
+            .contains("does not open"));
+        let mut changed = payload.clone();
+        changed.nonce = flipped(&payload.nonce);
+        assert!(open(&changed, &session)
+            .unwrap_err()
+            .contains("does not open"));
+        let mut changed = payload.clone();
+        changed.aad_hash = flipped(&payload.aad_hash);
+        assert!(open(&changed, &session)
+            .unwrap_err()
+            .contains("names other associated data"));
+        let mut changed = payload.clone();
+        changed.wire_len += 1;
+        assert!(open(&changed, &session)
+            .unwrap_err()
+            .contains("lengths are not those"));
+        let mut changed = payload.clone();
+        changed.plaintext_canonical_len -= 1;
+        assert!(open(&changed, &session)
+            .unwrap_err()
+            .contains("lengths are not those"));
+        let mut changed = payload.clone();
+        changed.nonce.truncate(22);
+        assert!(open(&changed, &session)
+            .unwrap_err()
+            .contains("malformed nonce"));
 
         let second = instance
             .call_with_return_channel("f(uint256)", vec![Value::uint(8)], &session)

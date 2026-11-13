@@ -1,7 +1,7 @@
 use crate::freshness::RuntimeCallFreshness;
 use anyhow::{bail, Result};
 use chacha20poly1305::aead::AeadInPlace;
-use chacha20poly1305::{ChaCha20Poly1305, KeyInit, Nonce};
+use chacha20poly1305::{ChaCha20Poly1305, KeyInit, Nonce, Tag};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::fmt;
@@ -40,11 +40,6 @@ impl ReturnChannelSession {
 
     pub fn binding(&self) -> &ReturnChannelPublicBinding {
         &self.binding
-    }
-
-    #[cfg(test)]
-    pub(crate) fn key_for_test(&self) -> &[u8; 32] {
-        &self.key
     }
 }
 
@@ -113,6 +108,75 @@ pub(crate) fn encrypt_return_value(
         plaintext_canonical_len: return_canonical_len,
         wire_len,
     })
+}
+
+/// What the client of a session does with an encrypted return. It builds the
+/// associated data again from what it knows of the call (the admitted
+/// package, the entrypoint, the call's public arguments and its own session
+/// binding), checks that the payload is bound to its session and names the
+/// hash of that data and the lengths of the entrypoint's return, and opens
+/// the ciphertext under the session key. The result is the canonical bytes
+/// of the value the call returned. A payload that was not sealed under this
+/// session for this call does not open.
+pub fn open_encrypted_return(
+    artifact: &CompiledArtifact,
+    entrypoint: &str,
+    public_args: &[String],
+    payload: &EncryptedReturnPayload,
+    session: &ReturnChannelSession,
+) -> Result<Box<[u8]>> {
+    let return_canonical_len = artifact
+        .contract
+        .manifest
+        .entrypoints
+        .get(entrypoint)
+        .ok_or_else(|| anyhow::anyhow!("manifest entry missing for {entrypoint}"))?
+        .return_canonical_len
+        .ok_or_else(|| {
+            anyhow::anyhow!("manifest return_canonical_len missing for encrypted return entrypoint")
+        })?;
+    if &payload.binding != session.binding() {
+        bail!("encrypted return is bound to another session");
+    }
+    if payload.plaintext_canonical_len != return_canonical_len
+        || payload.wire_len != NONCE_BYTES + return_canonical_len + TAG_BYTES
+    {
+        bail!("encrypted return lengths are not those of {entrypoint}");
+    }
+    let aad = return_channel_aad_bytes(
+        artifact,
+        entrypoint,
+        return_canonical_len,
+        public_args,
+        session.binding(),
+    )?;
+    if payload.aad_hash != hex::encode(Sha256::digest(&aad)) {
+        bail!("encrypted return names other associated data");
+    }
+    let nonce = hex::decode(&payload.nonce)?;
+    let tag = hex::decode(&payload.tag)?;
+    let mut plaintext = hex::decode(&payload.ciphertext)?;
+    if nonce.len() != NONCE_BYTES
+        || tag.len() != TAG_BYTES
+        || plaintext.len() != return_canonical_len
+    {
+        bail!("encrypted return has a malformed nonce, tag or ciphertext");
+    }
+    let cipher = ChaCha20Poly1305::new_from_slice(&session.key)
+        .map_err(|_| anyhow::anyhow!("invalid encrypted return channel key length"))?;
+    if cipher
+        .decrypt_in_place_detached(
+            Nonce::from_slice(&nonce),
+            &aad,
+            plaintext.as_mut_slice(),
+            Tag::from_slice(&tag),
+        )
+        .is_err()
+    {
+        plaintext.zeroize();
+        bail!("encrypted return does not open under this session");
+    }
+    Ok(plaintext.into_boxed_slice())
 }
 
 pub(crate) fn return_channel_aad_bytes(

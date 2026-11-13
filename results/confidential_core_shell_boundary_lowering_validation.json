@@ -1866,7 +1866,7 @@
           "select_count": 0,
           "struct_field_count": 0
         },
-        "entrypoint_count": 4
+        "entrypoint_count": 5
       },
       "confidential_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
@@ -2223,7 +2223,7 @@
           "select_count": 0,
           "struct_field_count": 0
         },
-        "entrypoint_count": 4
+        "entrypoint_count": 5
       },
       "confidential_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
@@ -4544,7 +4544,7 @@
           "select_count": 0,
           "struct_field_count": 0
         },
-        "entrypoint_count": 4
+        "entrypoint_count": 5
       },
       "confidential_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",

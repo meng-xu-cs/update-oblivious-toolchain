@@ -27,18 +27,19 @@ runs it over an artifact.
 /-- Decides `PolicyAgreesWithFlow`. -/
 def policyAgreesWithFlowB (kp : KernelProgram) (policy : EntrypointPublicPolicy) : Bool :=
   (policy.statusPolicy == "declassified" || !kp.flowSummary.statusSecret) &&
-    (policy.returnPolicy == "declassified" || !kp.flowSummary.returnSecret) &&
-    policy.returnPolicy != "encrypted_to_client"
+    (policy.returnPolicy == "declassified" || policy.returnPolicy == "encrypted_to_client" ||
+      !kp.flowSummary.returnSecret)
 
 theorem policyAgreesWithFlow_of_check {kp : KernelProgram} {policy : EntrypointPublicPolicy}
     (h : policyAgreesWithFlowB kp policy = true) : PolicyAgreesWithFlow kp policy := by
   simp only [policyAgreesWithFlowB, Bool.and_eq_true, Bool.or_eq_true, beq_iff_eq,
-    Bool.not_eq_true', bne_iff_ne, ne_eq] at h
-  obtain ⟨⟨hStatus, hReturn⟩, hEncrypted⟩ := h
+    Bool.not_eq_true'] at h
+  obtain ⟨hStatus, hReturn⟩ := h
   exact
     { statusPublic := fun hNot => hStatus.resolve_left hNot
-      returnPublic := fun hNot => hReturn.resolve_left hNot
-      notEncrypted := hEncrypted }
+      returnPublic := fun hNot hNotEncrypted =>
+        (hReturn.resolve_left fun hReleased =>
+          hReleased.elim hNot hNotEncrypted) }
 
 /-- The program-side premises of the paper-main theorem for admitted kernel
 programs. -/
@@ -93,32 +94,32 @@ same `View_SGX ∖ rel`. -/
 theorem paperMain_checkedKernel_exact_noninterference_moduloReleases
     {kp : IR.KernelProgram} {state : List IR.StateObject} {policy : IR.EntrypointPublicPolicy}
     (hCheck : kp.admissionCheck state policy = true)
-    (encodeRun : List IR.KernelStatement → Trace)
+    (encodeRun : List IR.KernelStatement → Trace) (channel : IR.ReturnChannelModel)
     (render : IR.Value → String) (renderEnv : String × IR.Value → String)
     (digest : IR.ObjectStore → String) (deltaDigest : List Nat → String)
     (controllerShape : SGXControllerShape) (releaseFunctions : PaperMainDeclaredReleaseFunctions)
     {a₁ a₂ : IR.AdmittedKernelRun kp} (hPublic : a₁.samePublic a₂) :
     (paperMainViewOfRun
         (fun a : IR.AdmittedKernelRun kp => IR.kernelExactTrace encodeRun policy.gas kp a.cfg)
-        (fun a => IR.kernelPublicOutcome policy render renderEnv kp a.cfg)
+        (fun a => IR.kernelPublicOutcome policy channel render renderEnv kp a.cfg)
         (fun a => IR.kernelBoundarySchedule policy
-          (IR.kernelPublicOutcome policy render renderEnv kp a.cfg))
+          (IR.kernelPublicOutcome policy channel render renderEnv kp a.cfg))
         (fun _ => controllerShape)
         (fun a => IR.kernelFinalPublicState digest deltaDigest kp a.cfg)
         (fun _ => releaseFunctions)
         a₁).withoutReleases =
       (paperMainViewOfRun
         (fun a : IR.AdmittedKernelRun kp => IR.kernelExactTrace encodeRun policy.gas kp a.cfg)
-        (fun a => IR.kernelPublicOutcome policy render renderEnv kp a.cfg)
+        (fun a => IR.kernelPublicOutcome policy channel render renderEnv kp a.cfg)
         (fun a => IR.kernelBoundarySchedule policy
-          (IR.kernelPublicOutcome policy render renderEnv kp a.cfg))
+          (IR.kernelPublicOutcome policy channel render renderEnv kp a.cfg))
         (fun _ => controllerShape)
         (fun a => IR.kernelFinalPublicState digest deltaDigest kp a.cfg)
         (fun _ => releaseFunctions)
         a₂).withoutReleases :=
   paperMain_admittedKernelRun_exact_noninterference_moduloReleases kp policy
-    (IR.KernelProgram.admissionCheck_sound hCheck).policyAgrees encodeRun render renderEnv
-    digest deltaDigest controllerShape releaseFunctions hPublic
+    (IR.KernelProgram.admissionCheck_sound hCheck).policyAgrees encodeRun channel render
+    renderEnv digest deltaDigest controllerShape releaseFunctions hPublic
 
 end UOToolchain
 

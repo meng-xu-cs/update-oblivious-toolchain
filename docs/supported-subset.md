@@ -79,7 +79,11 @@ Sidecar metadata requirements:
   analysis proved sound in `UOToolchain/KernelFlow.lean`
 - `returns: encrypted_to_client` must not declare `declassifies: [return]`;
   the host-visible outcome contains ciphertext, nonce, AAD hash, and session
-  binding evidence, not the plaintext return
+  binding evidence, not the plaintext return. The caller opens the payload
+  with `uo_evm::open_encrypted_return` under its session
+- an entrypoint whose return value depends on secrets must declare
+  `returns: declassified` or `returns: encrypted_to_client`; the Lean
+  admission checker rejects `returns: public` for it
 - an entrypoint may set `initializer: true` to mark the one-time public setup
   phase; when a contract has an initializer, other entrypoints default to
   `requires_initialized: true` unless explicitly set otherwise

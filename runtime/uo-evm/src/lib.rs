@@ -40,7 +40,7 @@ pub use oram::avl_map_replay::{
     path_oram_avl_map_replay, AvlMapReplay, AvlMapReplayOperation, AvlMapReplayRun,
     PATH_ORAM_AVL_MAP_REPLAY_SCHEMA,
 };
-pub use return_channel::{ReturnChannelSession, RETURN_CHANNEL_SCHEME};
+pub use return_channel::{open_encrypted_return, ReturnChannelSession, RETURN_CHANNEL_SCHEME};
 #[cfg(feature = "diagnostics")]
 pub use runtime::PathOramFreshCoinPlan;
 

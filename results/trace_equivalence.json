@@ -41,6 +41,54 @@
       "outcome_model_matches": true,
       "physical_read_equal": false,
       "physical_trace_equal": false
+    },
+    {
+      "benchmark": "ConfidentialMixer",
+      "comparison_class": "computational_oram",
+      "encrypted_return": {
+        "ciphertext_differs_with_the_value": true,
+        "distinct_returned_values": 3,
+        "every_return_opens_for_the_session": true,
+        "frame_same_in_every_run": true,
+        "no_plaintext_return": true,
+        "no_return_opens_under_another_key": true,
+        "runs": 8
+      },
+      "encrypted_return_checks_hold": true,
+      "equality_is_obligation": false,
+      "exact_encoding_matches": null,
+      "final_public_state_model_matches": true,
+      "logical_access_equal": false,
+      "logical_write_equal": true,
+      "mode": "oram_encrypted_return",
+      "opcode_equal": true,
+      "outcome_model_matches": true,
+      "physical_read_equal": false,
+      "physical_trace_equal": false
+    },
+    {
+      "benchmark": "ConfidentialMixer",
+      "comparison_class": "computational_oram",
+      "encrypted_return": {
+        "ciphertext_differs_with_the_value": true,
+        "distinct_returned_values": 3,
+        "every_return_opens_for_the_session": true,
+        "frame_same_in_every_run": true,
+        "no_plaintext_return": true,
+        "no_return_opens_under_another_key": true,
+        "runs": 8
+      },
+      "encrypted_return_checks_hold": true,
+      "equality_is_obligation": false,
+      "exact_encoding_matches": null,
+      "final_public_state_model_matches": true,
+      "logical_access_equal": false,
+      "logical_write_equal": true,
+      "mode": "oram_private_posmap_encrypted_return",
+      "opcode_equal": true,
+      "outcome_model_matches": true,
+      "physical_read_equal": false,
+      "physical_trace_equal": false
     }
   ],
   "exact_uo": [
@@ -109,6 +157,30 @@
       "logical_access_equal": true,
       "logical_write_equal": true,
       "mode": "uo",
+      "opcode_equal": true,
+      "outcome_model_matches": true,
+      "physical_read_equal": true,
+      "physical_trace_equal": true
+    },
+    {
+      "benchmark": "ConfidentialMixer",
+      "comparison_class": "exact_backend",
+      "encrypted_return": {
+        "ciphertext_differs_with_the_value": true,
+        "distinct_returned_values": 3,
+        "every_return_opens_for_the_session": true,
+        "frame_same_in_every_run": true,
+        "no_plaintext_return": true,
+        "no_return_opens_under_another_key": true,
+        "runs": 8
+      },
+      "encrypted_return_checks_hold": true,
+      "equality_is_obligation": true,
+      "exact_encoding_matches": true,
+      "final_public_state_model_matches": true,
+      "logical_access_equal": true,
+      "logical_write_equal": true,
+      "mode": "uo_encrypted_return",
       "opcode_equal": true,
       "outcome_model_matches": true,
       "physical_read_equal": true,

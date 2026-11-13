@@ -4,14 +4,14 @@
     "schema": "uo-admitted-package-v5",
     "source_language": "uo-solidity-like-dsl-v1",
     "semantics_profile": "uo-evm-modular256-v1",
-    "source_sha256": "234fe8ee8ec1332afc02b3f7446ef82d93ed2c0d62180b88012be70e98a57262",
-    "metadata_sha256": "b4aca72470514bbc6ddfb6f372c9bff3b3d5815a2feeb25603fc3fed4cc23cf3",
-    "raw_metadata_sha256": "b34d1ac2da7c92c958ff6e5d9afee7eb6c8214c56cb2790a0aaf9c845b7744ef",
-    "metadata_canonicalization_sha256": "64d142abe365c5a14aad6e56121ac38a4b611bf73a04529ba672c43cfd6853f1",
+    "source_sha256": "6a2ace18696aa7c93618dc5287c2edb418b65481d052ab3edeec47b6315448dd",
+    "metadata_sha256": "d191b029162b4a2c6f7ddbd3eb6e3ce9d52f281db3c87557f88498d095544cc2",
+    "raw_metadata_sha256": "cd288c1acd8b9cbccd5b6817b774c7961264048f545a45b6c628a183ea022730",
+    "metadata_canonicalization_sha256": "7c9a554810394a433ff883856953638ce5cf04897da49af25d0e676af3565685",
     "compilation_mode": "uo",
     "compiler_version": "0.1.0",
-    "toolchain_manifest_sha256": "bcf9141fea19b3320647c5f8f8e623fb5110d9865ad028bb1ffeca0c721f3d0a",
-    "package_sha256": "c9cf1a90da684b39757904997f516a95c14b3d953bfb988ab6369062b7831af6"
+    "toolchain_manifest_sha256": "0d0b59b074f73fed78fa69859bd43c07e719eec79a2f0c67df53dcc43bb41545",
+    "package_sha256": "27bd4714831d85f3c4a2c56942f26c449bd165ee32a005ca1d48d9f8856621a5"
   },
   "contract": {
     "contract": "ConfidentialMixer",
@@ -740,6 +740,98 @@
         }
       },
       {
+        "signature": "sealedBalanceOf(bytes32)",
+        "params": [
+          [
+            "commitment",
+            {
+              "Scalar": "Bytes32"
+            }
+          ]
+        ],
+        "return_type": {
+          "Scalar": {
+            "Uint": 256
+          }
+        },
+        "body": [
+          {
+            "Return": {
+              "value": {
+                "MapGet": {
+                  "object_id": 1,
+                  "key": {
+                    "Var": "commitment"
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "secret_args": [
+          0
+        ],
+        "confidential": true,
+        "confidential_program": {
+          "entrypoint_id": "sealedBalanceOf(bytes32)",
+          "params": [
+            {
+              "name": "commitment",
+              "ty": {
+                "Scalar": "Bytes32"
+              }
+            }
+          ],
+          "return_type": {
+            "Scalar": {
+              "Uint": 256
+            }
+          },
+          "secret_args": [
+            0
+          ],
+          "body": [
+            {
+              "kind": "return",
+              "value": {
+                "kind": "map_get",
+                "object_id": 1,
+                "key": {
+                  "kind": "var",
+                  "name": "commitment"
+                }
+              }
+            }
+          ]
+        },
+        "confidential_slot_program": {
+          "entrypoint_id": "sealedBalanceOf(bytes32)",
+          "param_count": 1,
+          "return_type": {
+            "Scalar": {
+              "Uint": 256
+            }
+          },
+          "secret_args": [
+            0
+          ],
+          "slot_count": 1,
+          "body": [
+            {
+              "kind": "return",
+              "value": {
+                "kind": "map_get",
+                "object_id": 1,
+                "key": {
+                  "kind": "slot",
+                  "slot": 0
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
         "signature": "totalValue()",
         "params": [],
         "return_type": {
@@ -1154,6 +1246,110 @@
           ],
           "oram_accesses": {}
         },
+        "sealedBalanceOf(bytes32)": {
+          "secret_args": [
+            0
+          ],
+          "param_names": [
+            "commitment"
+          ],
+          "entry_input_len": 32,
+          "public_gas_budget": 2257,
+          "arena_bytes": 4096,
+          "max_stack_words": 64,
+          "max_hash_part_bytes": 0,
+          "return_canonical_len": 32,
+          "returns": "encrypted_to_client",
+          "status": "public",
+          "declassifies": [],
+          "public_state_declassifies": [],
+          "confidential_program": {
+            "entrypoint_id": "sealedBalanceOf(bytes32)",
+            "params": [
+              {
+                "name": "commitment",
+                "ty": {
+                  "Scalar": "Bytes32"
+                }
+              }
+            ],
+            "return_type": {
+              "Scalar": {
+                "Uint": 256
+              }
+            },
+            "secret_args": [
+              0
+            ],
+            "body": [
+              {
+                "kind": "return",
+                "value": {
+                  "kind": "map_get",
+                  "object_id": 1,
+                  "key": {
+                    "kind": "var",
+                    "name": "commitment"
+                  }
+                }
+              }
+            ]
+          },
+          "confidential_slot_program": {
+            "entrypoint_id": "sealedBalanceOf(bytes32)",
+            "param_count": 1,
+            "return_type": {
+              "Scalar": {
+                "Uint": 256
+              }
+            },
+            "secret_args": [
+              0
+            ],
+            "slot_count": 1,
+            "body": [
+              {
+                "kind": "return",
+                "value": {
+                  "kind": "map_get",
+                  "object_id": 1,
+                  "key": {
+                    "kind": "slot",
+                    "slot": 0
+                  }
+                }
+              }
+            ]
+          },
+          "kernel_steps": [
+            {
+              "opcode": "Begin",
+              "object_id": null
+            },
+            {
+              "opcode": "MapGet",
+              "object_id": 1
+            },
+            {
+              "opcode": "Commit",
+              "object_id": null
+            },
+            {
+              "opcode": "Wipe",
+              "object_id": null
+            }
+          ],
+          "uocell_reads": 0,
+          "uocell_writes": 0,
+          "uoarray_reads": 0,
+          "uoarray_writes": 0,
+          "uomap_reads": 1,
+          "uomap_writes": 0,
+          "max_commit_ops": 0,
+          "max_load_ops": 8,
+          "may_write_objects": [],
+          "oram_accesses": {}
+        },
         "totalValue()": {
           "secret_args": [],
           "param_names": [],
@@ -1530,7 +1726,7 @@
     }
   },
   "diagnostics": [],
-  "transformed_source": "function deposit(bytes32,uint256)(bytes32 commitment, uint256 amount) {\n  let oldBalance = map_get(1, commitment)\n  map[1][commitment] = (oldBalance Add amount) @ Some(\"true\")\n  cell[2] = (cell_get(2) Add amount) @ Some(\"true\")\n}\n\nfunction withdraw(bytes32,uint256)(bytes32 commitment, uint256 amount) {\n  let oldBalance = map_get(1, commitment)\n  abort_if Not((oldBalance Gte amount))\n  map[1][commitment] = (oldBalance Sub amount) @ Some(\"true\")\n  cell[2] = (cell_get(2) Sub amount) @ Some(\"true\")\n  return amount\n}\n\nfunction balanceOf(bytes32)(bytes32 commitment) {\n  return map_get(1, commitment)\n}\n\nfunction totalValue()() {\n  return cell_get(2)\n}",
+  "transformed_source": "function deposit(bytes32,uint256)(bytes32 commitment, uint256 amount) {\n  let oldBalance = map_get(1, commitment)\n  map[1][commitment] = (oldBalance Add amount) @ Some(\"true\")\n  cell[2] = (cell_get(2) Add amount) @ Some(\"true\")\n}\n\nfunction withdraw(bytes32,uint256)(bytes32 commitment, uint256 amount) {\n  let oldBalance = map_get(1, commitment)\n  abort_if Not((oldBalance Gte amount))\n  map[1][commitment] = (oldBalance Sub amount) @ Some(\"true\")\n  cell[2] = (cell_get(2) Sub amount) @ Some(\"true\")\n  return amount\n}\n\nfunction balanceOf(bytes32)(bytes32 commitment) {\n  return map_get(1, commitment)\n}\n\nfunction sealedBalanceOf(bytes32)(bytes32 commitment) {\n  return map_get(1, commitment)\n}\n\nfunction totalValue()() {\n  return cell_get(2)\n}",
   "disassembly": [
     "fn deposit(bytes32,uint256):",
     "  0000 let oldBalance = map_get(1, commitment)",
@@ -1543,6 +1739,8 @@
     "  0003 cell[2] = (cell_get(2) Sub amount) @ Some(\"true\")",
     "  0004 return amount",
     "fn balanceOf(bytes32):",
+    "  0000 return map_get(1, commitment)",
+    "fn sealedBalanceOf(bytes32):",
     "  0000 return map_get(1, commitment)",
     "fn totalValue():",
     "  0000 return cell_get(2)"

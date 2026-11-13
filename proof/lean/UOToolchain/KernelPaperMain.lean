@@ -284,12 +284,56 @@ structure EntrypointPublicPolicy where
 /-- The entrypoint's declared policies agree with the information-flow analysis
 of its kernel program, as the compiler's policy validation requires: a status
 that is not declassified is public, and a return that is neither declassified
-nor encrypted is public. Encrypted returns are outside this model. -/
+nor encrypted to the client is public. -/
 structure PolicyAgreesWithFlow (kp : KernelProgram) (policy : EntrypointPublicPolicy) :
     Prop where
   statusPublic : policy.statusPolicy ≠ "declassified" → kp.flowSummary.statusSecret = false
-  returnPublic : policy.returnPolicy ≠ "declassified" → kp.flowSummary.returnSecret = false
-  notEncrypted : policy.returnPolicy ≠ "encrypted_to_client"
+  returnPublic : policy.returnPolicy ≠ "declassified" →
+    policy.returnPolicy ≠ "encrypted_to_client" → kp.flowSummary.returnSecret = false
+
+/-- The bytes an encrypted return adds to the canonical bytes of its value: the
+12-byte nonce and the 16-byte tag of the return channel's AEAD (`NONCE_BYTES`
+and `TAG_BYTES` in `runtime/uo-evm/src/return_channel.rs`). -/
+def returnChannelOverheadBytes : Nat := 28
+
+/-- The length of what a call that returns a value hands the host: the
+canonical bytes of the value, or the wire form of its encryption to the
+client. -/
+def EntrypointPublicPolicy.outputLength (policy : EntrypointPublicPolicy) : Nat :=
+  if policy.returnPolicy = "encrypted_to_client" then
+    policy.returnLength + returnChannelOverheadBytes
+  else policy.returnLength
+
+/-- A model of a call's return channel: the payload that an
+`encrypted_to_client` return of a value is, in a call with the given rendered
+public arguments. Without its AEAD output a payload is the session binding, the
+hash of the associated data, the nonce and the two lengths. The runtime computes
+them from the session, the artifact, the entrypoint, the public arguments and
+its public freshness counters, and not from the value; `frame` states that. The
+ciphertext and the tag depend on the value, and the declared release erases
+them. -/
+structure ReturnChannelModel where
+  payload : List String → Value → EncryptedReturnPayload
+  frame : ∀ (publicArgs : List String) (v₁ v₂ : Value),
+    (payload publicArgs v₁).withoutCiphertext = (payload publicArgs v₂).withoutCiphertext
+
+/-- A return channel whose frame is fixed by the public arguments and whose
+AEAD output is any function of them and of the value. -/
+def ReturnChannelModel.ofFrame (frame : List String → EncryptedReturnPayload)
+    (ciphertext tag : List String → Value → String) : ReturnChannelModel :=
+  { payload := fun publicArgs value =>
+      { frame publicArgs with
+        ciphertext := ciphertext publicArgs value, tag := tag publicArgs value }
+    frame := fun _ _ _ => rfl }
+
+/-- Two returns that are both present or both absent have payloads that differ
+in their AEAD output alone. -/
+theorem ReturnChannelModel.map_payload_withoutCiphertext (channel : ReturnChannelModel)
+    (publicArgs : List String) {r₁ r₂ : Option Value} (h : r₁.isSome = r₂.isSome) :
+    (r₁.map (channel.payload publicArgs)).map EncryptedReturnPayload.withoutCiphertext =
+      (r₂.map (channel.payload publicArgs)).map EncryptedReturnPayload.withoutCiphertext := by
+  cases r₁ <;> cases r₂ <;> simp_all
+  exact channel.frame _ _ _
 
 /-- The run completed without a recorded abort. -/
 def kernelRunCompleted (kp : KernelProgram) (cfg : OperationalConfig) : Bool :=
@@ -299,10 +343,12 @@ def kernelRunCompleted (kp : KernelProgram) (cfg : OperationalConfig) : Bool :=
 def kernelRunReturn (kp : KernelProgram) (cfg : OperationalConfig) : Option Value :=
   if kernelRunCompleted kp cfg then (evalKernelProgram kp cfg).publicResult else none
 
-/-- The public outcome the runtime reports for a run. -/
-def kernelPublicOutcome (policy : EntrypointPublicPolicy) (render : Value → String)
-    (renderEnv : String × Value → String) (kp : KernelProgram) (cfg : OperationalConfig) :
-    SGXPublicOutcome :=
+/-- The public outcome the runtime reports for a run. A returned value is in
+the outcome as its rendering, or, under `encrypted_to_client`, as its encryption
+on the call's return channel and not in the clear. -/
+def kernelPublicOutcome (policy : EntrypointPublicPolicy) (channel : ReturnChannelModel)
+    (render : Value → String) (renderEnv : String × Value → String) (kp : KernelProgram)
+    (cfg : OperationalConfig) : SGXPublicOutcome :=
   { entrypointId := policy.entrypointId
   , publicArgs := cfg.publicArgs.map render
   , publicEnv := cfg.publicEnv.map renderEnv
@@ -310,11 +356,16 @@ def kernelPublicOutcome (policy : EntrypointPublicPolicy) (render : Value → St
   , statusPolicy := policy.statusPolicy
   , outputShape :=
       if (kernelRunReturn kp cfg).isSome then
-        { returnPresent := true, returnLength := policy.returnLength }
+        { returnPresent := true, returnLength := policy.outputLength }
       else OutputShape.erased
   , returnPolicy := policy.returnPolicy
-  , returnPayload := (kernelRunReturn kp cfg).map render
-  , encryptedReturnPayload := none
+  , returnPayload :=
+      if policy.returnPolicy = "encrypted_to_client" then none
+      else (kernelRunReturn kp cfg).map render
+  , encryptedReturnPayload :=
+      if policy.returnPolicy = "encrypted_to_client" then
+        (kernelRunReturn kp cfg).map (channel.payload (cfg.publicArgs.map render))
+      else none
   , declassifies := policy.declassifies
   , gasUsed := policy.gas
   }
@@ -369,18 +420,31 @@ theorem AdmittedKernelRun.flow_ni {kp : KernelProgram} {lhs rhs : AdmittedKernel
     (publicArgsAgree_of_layout lhs.layout rhs.layout hArgs)
 
 theorem kernelPublicOutcome_statusReleased (policy : EntrypointPublicPolicy)
-    (render : Value → String) (renderEnv : String × Value → String) (kp : KernelProgram)
-    (cfg : OperationalConfig) :
-    (kernelPublicOutcome policy render renderEnv kp cfg).statusReleased =
+    (channel : ReturnChannelModel) (render : Value → String)
+    (renderEnv : String × Value → String) (kp : KernelProgram) (cfg : OperationalConfig) :
+    (kernelPublicOutcome policy channel render renderEnv kp cfg).statusReleased =
       (policy.statusPolicy == "declassified") := rfl
 
+/-- Under `encrypted_to_client` the outcome holds no return value in the
+clear. -/
+theorem kernelPublicOutcome_returnPayload_encrypted (policy : EntrypointPublicPolicy)
+    (channel : ReturnChannelModel) (render : Value → String)
+    (renderEnv : String × Value → String) (kp : KernelProgram) (cfg : OperationalConfig)
+    (hEncrypted : policy.returnPolicy = "encrypted_to_client") :
+    (kernelPublicOutcome policy channel render renderEnv kp cfg).returnPayload = none := by
+  simp [kernelPublicOutcome, hEncrypted]
+
 /-- The modeled public outcome is public-determined outside its declared
-releases. -/
+releases. Under `encrypted_to_client` the returned value may be secret: the
+outcome holds it only as the AEAD output of the return channel, which the
+release erases, and what is left of the payload is fixed by the public
+arguments. -/
 theorem kernelPublicOutcome_safe (kp : KernelProgram) (policy : EntrypointPublicPolicy)
-    (render : Value → String) (renderEnv : String × Value → String)
-    (hAgree : PolicyAgreesWithFlow kp policy) :
+    (channel : ReturnChannelModel) (render : Value → String)
+    (renderEnv : String × Value → String) (hAgree : PolicyAgreesWithFlow kp policy) :
     PublicOutcomeSafeModuloReleases AdmittedKernelRun.samePublic
-      (fun a : AdmittedKernelRun kp => kernelPublicOutcome policy render renderEnv kp a.cfg) := by
+      (fun a : AdmittedKernelRun kp =>
+        kernelPublicOutcome policy channel render renderEnv kp a.cfg) := by
   intro a₁ a₂ hPublic
   obtain ⟨hStatusNI, hReturnNI⟩ := AdmittedKernelRun.flow_ni hPublic
   have hArgs : a₁.cfg.publicArgs = a₂.cfg.publicArgs :=
@@ -391,8 +455,8 @@ theorem kernelPublicOutcome_safe (kp : KernelProgram) (policy : EntrypointPublic
     a₁.args a₁.store
   have hSome₂ := evalKernelProgram_publicResult_isSome kp a₂.cfg a₂.wellTyped a₂.returnsLast
     a₂.args a₂.store
-  show (kernelPublicOutcome policy render renderEnv kp a₁.cfg).withoutReleases =
-    (kernelPublicOutcome policy render renderEnv kp a₂.cfg).withoutReleases
+  show (kernelPublicOutcome policy channel render renderEnv kp a₁.cfg).withoutReleases =
+    (kernelPublicOutcome policy channel render renderEnv kp a₂.cfg).withoutReleases
   by_cases hReleased : policy.statusPolicy = "declassified"
   · simp [SGXPublicOutcome.withoutReleases, kernelPublicOutcome, SGXPublicOutcome.statusReleased,
       hReleased, hArgs, hEnvs]
@@ -411,13 +475,20 @@ theorem kernelPublicOutcome_safe (kp : KernelProgram) (policy : EntrypointPublic
         SGXPublicOutcome.statusReleased, SGXPublicOutcome.returnReleased,
         SGXPublicOutcome.returnEncrypted, hReleased, hReturnReleased, hArgs, hEnvs,
         hCompleted, hReturnSome]
-    · have hReturnEq : kernelRunReturn kp a₁.cfg = kernelRunReturn kp a₂.cfg := by
-        unfold kernelRunReturn
-        rw [hCompleted, hReturnNI (hAgree.returnPublic hReturnReleased)]
-      simp [SGXPublicOutcome.withoutReleases, kernelPublicOutcome,
-        SGXPublicOutcome.statusReleased, SGXPublicOutcome.returnReleased,
-        SGXPublicOutcome.returnEncrypted, hReleased, hReturnReleased, hArgs, hEnvs,
-        hCompleted, hReturnEq]
+    · by_cases hEncrypted : policy.returnPolicy = "encrypted_to_client"
+      · have hSealed := channel.map_payload_withoutCiphertext
+          (a₂.cfg.publicArgs.map render) hReturnSome
+        simp [SGXPublicOutcome.withoutReleases, kernelPublicOutcome,
+          SGXPublicOutcome.statusReleased, SGXPublicOutcome.returnReleased,
+          SGXPublicOutcome.returnEncrypted, hReleased, hEncrypted, hArgs, hEnvs,
+          hCompleted, hReturnSome, hSealed]
+      · have hReturnEq : kernelRunReturn kp a₁.cfg = kernelRunReturn kp a₂.cfg := by
+          unfold kernelRunReturn
+          rw [hCompleted, hReturnNI (hAgree.returnPublic hReturnReleased hEncrypted)]
+        simp [SGXPublicOutcome.withoutReleases, kernelPublicOutcome,
+          SGXPublicOutcome.statusReleased, SGXPublicOutcome.returnReleased,
+          SGXPublicOutcome.returnEncrypted, hReleased, hReturnReleased, hEncrypted, hArgs,
+          hEnvs, hCompleted, hReturnEq]
 
 /-- The modeled boundary schedule is public-determined outside the status
 release whenever the outcome is public-determined outside its releases. -/
@@ -469,20 +540,22 @@ theorem evalKernelProgram_publicStateTransition (kp : KernelProgram)
 /-- The modeled final public-state record is public-determined outside the
 status release. -/
 theorem kernelFinalPublicState_safe (kp : KernelProgram) (policy : EntrypointPublicPolicy)
-    (render : Value → String) (renderEnv : String × Value → String)
+    (channel : ReturnChannelModel) (render : Value → String)
+    (renderEnv : String × Value → String)
     (digest : ObjectStore → String) (deltaDigest : List Nat → String)
     (hAgree : PolicyAgreesWithFlow kp policy) :
     FinalPublicStateSafeModuloReleases AdmittedKernelRun.samePublic
-      (fun a : AdmittedKernelRun kp => kernelPublicOutcome policy render renderEnv kp a.cfg)
+      (fun a : AdmittedKernelRun kp =>
+        kernelPublicOutcome policy channel render renderEnv kp a.cfg)
       (fun a : AdmittedKernelRun kp => kernelFinalPublicState digest deltaDigest kp a.cfg) := by
   intro a₁ a₂ hPublic
   obtain ⟨hStatusNI, _⟩ := AdmittedKernelRun.flow_ni hPublic
   have hStore : a₁.cfg.publicState = a₂.cfg.publicState :=
     congrArg OperationalPublicProjection.publicState hPublic
   show (kernelFinalPublicState digest deltaDigest kp a₁.cfg).withoutStatusRelease
-      (kernelPublicOutcome policy render renderEnv kp a₁.cfg).statusReleased =
+      (kernelPublicOutcome policy channel render renderEnv kp a₁.cfg).statusReleased =
     (kernelFinalPublicState digest deltaDigest kp a₂.cfg).withoutStatusRelease
-      (kernelPublicOutcome policy render renderEnv kp a₂.cfg).statusReleased
+      (kernelPublicOutcome policy channel render renderEnv kp a₂.cfg).statusReleased
   rw [kernelPublicOutcome_statusReleased, kernelPublicOutcome_statusReleased]
   unfold kernelFinalPublicState
   rw [evalKernelProgram_publicStateTransition kp a₁, evalKernelProgram_publicStateTransition kp a₂]
@@ -537,12 +610,46 @@ example : mixerWithdraw.flowSummary.statusSecret = true ∧
     mixerWithdraw.flowSummary.returnSecret = true := by decide
 
 example : PolicyAgreesWithFlow mixerWithdraw withdrawPolicy :=
-  ⟨by decide, by decide, by decide⟩
+  ⟨by decide, by decide⟩
 
 /-- A policy that declared `withdraw`'s status public would disagree with the
 analysis. -/
 example : ¬ PolicyAgreesWithFlow mixerWithdraw { withdrawPolicy with statusPolicy := "public" } :=
   fun h => absurd (h.statusPublic (by decide)) (by decide)
+
+/-! The mixer's `sealedBalanceOf` returns a balance to the client that asked
+for it, on the call's return channel. Its return is secret and its status
+public, and its declared policies (`returns: encrypted_to_client`,
+`status: public`) agree with the analysis; `returns: public` would not. A call
+that returns hands the host the 60 bytes of the encrypted value. -/
+
+private def mixerSealedBalanceOf : KernelProgram :=
+  { entrypointId := "sealedBalanceOf(bytes32)"
+  , params := [⟨"commitment", .scalar .bytes32⟩]
+  , returnType := some (.scalar (.uint 256))
+  , secretArgs := [0]
+  , body := [ .retStmt (some (.mapGet 1 (.var "commitment"))) ] }
+
+private def sealedBalanceOfPolicy : EntrypointPublicPolicy :=
+  { entrypointId := "sealedBalanceOf(bytes32)", statusPolicy := "public"
+  , returnPolicy := "encrypted_to_client", declassifies := []
+  , returnLength := 32, entryInputLen := 32, gas := 2257 }
+
+example : mixerSealedBalanceOf.wellTyped mixerState = true := by decide
+
+example : mixerSealedBalanceOf.writesOnlyConfidential mixerState = true := by decide
+
+example : mixerSealedBalanceOf.flowSummary.statusSecret = false ∧
+    mixerSealedBalanceOf.flowSummary.returnSecret = true := by decide
+
+example : PolicyAgreesWithFlow mixerSealedBalanceOf sealedBalanceOfPolicy :=
+  ⟨by decide, by decide⟩
+
+example : ¬ PolicyAgreesWithFlow mixerSealedBalanceOf
+    { sealedBalanceOfPolicy with returnPolicy := "public" } :=
+  fun h => absurd (h.returnPublic (by decide) (by decide)) (by decide)
+
+example : sealedBalanceOfPolicy.outputLength = 60 := by decide
 
 /-- A completed `withdraw` exits the enclave with its 32-byte return and an
 aborted one with nothing, so their boundary schedules differ; they agree once
@@ -572,25 +679,25 @@ record, and the entrypoint's fixed controller shape and release functions. -/
 theorem paperMain_admittedKernelRun_exact_noninterference_moduloReleases
     (kp : IR.KernelProgram) (policy : IR.EntrypointPublicPolicy)
     (hAgree : IR.PolicyAgreesWithFlow kp policy)
-    (encodeRun : List IR.KernelStatement → Trace)
+    (encodeRun : List IR.KernelStatement → Trace) (channel : IR.ReturnChannelModel)
     (render : IR.Value → String) (renderEnv : String × IR.Value → String)
     (digest : IR.ObjectStore → String) (deltaDigest : List Nat → String)
     (controllerShape : SGXControllerShape) (releaseFunctions : PaperMainDeclaredReleaseFunctions)
     {a₁ a₂ : IR.AdmittedKernelRun kp} (hPublic : a₁.samePublic a₂) :
     (paperMainViewOfRun
         (fun a : IR.AdmittedKernelRun kp => IR.kernelExactTrace encodeRun policy.gas kp a.cfg)
-        (fun a => IR.kernelPublicOutcome policy render renderEnv kp a.cfg)
+        (fun a => IR.kernelPublicOutcome policy channel render renderEnv kp a.cfg)
         (fun a => IR.kernelBoundarySchedule policy
-          (IR.kernelPublicOutcome policy render renderEnv kp a.cfg))
+          (IR.kernelPublicOutcome policy channel render renderEnv kp a.cfg))
         (fun _ => controllerShape)
         (fun a => IR.kernelFinalPublicState digest deltaDigest kp a.cfg)
         (fun _ => releaseFunctions)
         a₁).withoutReleases =
       (paperMainViewOfRun
         (fun a : IR.AdmittedKernelRun kp => IR.kernelExactTrace encodeRun policy.gas kp a.cfg)
-        (fun a => IR.kernelPublicOutcome policy render renderEnv kp a.cfg)
+        (fun a => IR.kernelPublicOutcome policy channel render renderEnv kp a.cfg)
         (fun a => IR.kernelBoundarySchedule policy
-          (IR.kernelPublicOutcome policy render renderEnv kp a.cfg))
+          (IR.kernelPublicOutcome policy channel render renderEnv kp a.cfg))
         (fun _ => controllerShape)
         (fun a => IR.kernelFinalPublicState digest deltaDigest kp a.cfg)
         (fun _ => releaseFunctions)
@@ -599,11 +706,12 @@ theorem paperMain_admittedKernelRun_exact_noninterference_moduloReleases
     (fun lhs rhs _ => viewMPlus_injective
       (IR.admittedKernel_exactUO encodeRun policy.gas lhs.toAdmittedKernelConfig
         rhs.toAdmittedKernelConfig))
-    (IR.kernelPublicOutcome_safe kp policy render renderEnv hAgree)
+    (IR.kernelPublicOutcome_safe kp policy channel render renderEnv hAgree)
     (IR.kernelBoundarySchedule_safe policy
-      (IR.kernelPublicOutcome_safe kp policy render renderEnv hAgree) (fun _ => rfl))
+      (IR.kernelPublicOutcome_safe kp policy channel render renderEnv hAgree) (fun _ => rfl))
     (fun _ _ _ => rfl)
-    (IR.kernelFinalPublicState_safe kp policy render renderEnv digest deltaDigest hAgree)
+    (IR.kernelFinalPublicState_safe kp policy channel render renderEnv digest deltaDigest
+      hAgree)
     (fun _ _ _ => rfl)
     hPublic
 

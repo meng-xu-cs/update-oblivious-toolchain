@@ -91,13 +91,41 @@ assumed. `paperMain_admittedKernelRun_exact_noninterference_moduloReleases`
 (`UOToolchain/KernelPaperMain.lean`) proves the theorem for every run of an
 entrypoint whose kernel program is well typed over the state layout, returns
 only as its last statement, writes only confidential objects, and declares
-policies that agree with the flow analysis. The view is built from Lean models
+policies that agree with the flow analysis: a status that depends on secrets
+is declared `declassified`, and a return that depends on secrets is declared
+`declassified` or `encrypted_to_client`. The view is built from Lean models
 of the runtime's public observables: the exact store's trace, the public
 outcome, the boundary schedule, and the final public-state record. These four
 conditions are decided per entrypoint on the compiled artifacts by
 `checkKernelAdmission` (`UOToolchain/KernelAdmission.lean`). Every confidential
 entrypoint of the benchmark artifacts is admitted
-(`kernel_admission_*` in `results/static_checks.json`). Entrypoints that access
+(`kernel_admission_*` in `results/static_checks.json`).
+
+Under `returns: encrypted_to_client` the returned value may be secret. The
+outcome model holds it as the payload of the call's return channel and not in
+the clear (`kernelPublicOutcome`,
+`kernelPublicOutcome_returnPayload_encrypted`), and the call exits with the
+payload's wire length: the value's canonical length and 28 bytes of nonce and
+tag. The channel is a parameter of the theorems (`ReturnChannelModel`): any
+function from the call's public arguments and the returned value to a payload
+which, without its ciphertext and tag, does not depend on the value. That is
+the model's statement of what the runtime computes. The session binding is the
+caller's. The associated data are the admitted package, the contract, the
+entrypoint, the return length, the public arguments and the binding. The nonce
+is a hash of the runtime's public freshness counters, the binding and the
+hash of the associated data. The lengths are the entrypoint's. That the
+runtime's payloads have this form is checked on runs, not proved of the Rust
+code. `ConfidentialMixer.sealedBalanceOf` returns a secret balance this way,
+on the exact route and on both Path ORAM schemes. In
+`results/trace_equivalence.json`, runs of it on commitments with different
+balances match the outcome model, show one binding, one hash of associated
+data, one nonce and the same lengths, and return payloads that open under the
+caller's session to the balances stored and under no other key
+(`encrypted_return` in the entries whose mode ends in `encrypted_return`). A
+tamper scenario declares that return `public` and the admission checker
+rejects it. What the released ciphertext and tag show of the value is for the
+AEAD to bound: see the row "Return-channel AEAD" under Explicit Assumptions.
+Entrypoints that access
 an ORAM map are reported on the `path_oram` route, which this exact theorem does
 not cover. On that route the same models discharge the Path ORAM theorems'
 outcome, boundary, final-state, and release premises
@@ -485,6 +513,7 @@ checked by recompiling the source.
 | `metadataEncryptionINDCPA` | hides encrypted position-map metadata pages | trusted; named in Lean and not formalized, as the row above, and paired with the same concrete sealed-record crypto route |
 | `stashOverflowBounded` | bounds Path ORAM stash failure for deployed parameters | trusted; named in Lean and not formalized, as the first row, and paired with the JACM Path ORAM stash theorem at `Z = 5` and pinned deployed parameters |
 | Runtime key derivation | gives each object a storage key, an initial placement and Path ORAM leaf coins that are pseudo-random and independent of the other objects', which the two encryption assumptions and the leaf-coin model take as given | trusted, not modeled in Lean: a 256-bit master secret from the OS, HKDF-SHA256 (RFC 5869) with one label per use, and the ChaCha20 generator. `runtime_secrets_derive_from_the_master_secret` in `runtime_boundary_validation.json` pins the derivation's call sites, and `runtime/uo-evm/src/secret.rs` tests the RFC's first test vector |
+| Return-channel AEAD | hides a value returned under `encrypted_to_client` from the host. The theorems erase the payload's ciphertext and tag as a declared release, so what those bytes show of the value is in no Lean statement | trusted, not named in Lean: `ChaCha20Poly1305` under the session key, with the associated data and the nonce that `runtime/uo-evm/src/return_channel.rs` builds. The nonce is the first 96 bits of a hash of the runtime's freshness epoch, rollback counter and call counter, the session binding and the hash of the associated data, so two calls of a deployment seal under different nonces unless those 96 bits collide. That the session key is fresh and known to the client alone comes from the attested key exchange of the deployment, which the repository does not implement (the next row) |
 | TEE deployment assumptions | enclave memory confidentiality/integrity, attestation authenticity, rollback resistance, freshness, crash recovery discipline, patch-level trust | explicit Lean bundle `SgxDeploymentAssumptions`, paired with Intel SGX provenance and probe drift checks |
 | Parser/preprocessing equivalence | connects raw Solidity-like source text to the post-resolution AST consumed by Lean | still trusted front-end surface |
 | Real Keccak equivalence | connects runtime `tiny_keccak::Keccak::v256()` to the Lean mock-hash abstraction | not yet proved; Lean preservation uses the shared abstraction |
