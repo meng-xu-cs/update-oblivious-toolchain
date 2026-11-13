@@ -108,13 +108,13 @@
       {
         "bytes": 6336622,
         "estimated": false,
-        "metric": "tamper_validation.scenarios[400].artifact_json_bytes",
+        "metric": "tamper_validation.scenarios[402].artifact_json_bytes",
         "report": "tamper_validation"
       },
       {
         "bytes": 6336622,
         "estimated": false,
-        "metric": "tamper_validation.scenarios[401].artifact_json_bytes",
+        "metric": "tamper_validation.scenarios[403].artifact_json_bytes",
         "report": "tamper_validation"
       },
       {
@@ -126,7 +126,7 @@
       {
         "bytes": 4637416,
         "estimated": false,
-        "metric": "tamper_validation.scenarios[403].artifact_json_bytes",
+        "metric": "tamper_validation.scenarios[405].artifact_json_bytes",
         "report": "tamper_validation"
       },
       {
@@ -156,7 +156,7 @@
       {
         "bytes": 3165286,
         "estimated": false,
-        "metric": "tamper_validation.scenarios[397].artifact_json_bytes",
+        "metric": "tamper_validation.scenarios[399].artifact_json_bytes",
         "report": "tamper_validation"
       },
       {
@@ -419,78 +419,78 @@
     "theorem_facing_large_artifacts_require_enumeration": false
   },
   "proof_checking_cost_ms": {
-    "canonical_pathoram_pair_validation": 220821,
-    "confidential_core_kernel_finish_slot_validation": 2922,
-    "confidential_core_kernel_interface_slot_finish_boundary_validation": 3212,
-    "confidential_core_kernel_interface_slot_validation": 3001,
-    "confidential_core_lowering_validation": 2929,
-    "confidential_core_shell_boundary_lowering_validation": 2807,
-    "confidential_core_shell_boundary_slot_validation": 3112,
-    "confidential_core_slot_validation": 3145,
-    "confidential_core_validation": 3562,
-    "confidential_fragment_validation": 0,
-    "confidential_proof_family_assurance_validation": 3390,
-    "confidential_proof_family_boundary_validation": 3445,
-    "confidential_proof_family_finish_slot_boundary_validation": 3468,
-    "confidential_proof_family_kernel_interface_validation": 3427,
-    "confidential_proof_family_refinement_boundary_validation": 3139,
-    "confidential_proof_family_slot_assurance_validation": 3260,
-    "confidential_proof_family_slot_boundary_validation": 3175,
-    "confidential_proof_family_validation": 3110,
-    "controller_observer_validation": 2842,
-    "correctness": 3218,
-    "fresh_coin_validation": 18536,
-    "kernel_confinement_boundary_validation": 2396,
-    "kernel_dsl_validation": 2920,
-    "kernel_finish_boundary_validation": 2201,
-    "kernel_interface_confinement_boundary_validation": 2419,
-    "kernel_interface_singleton_boundary_validation": 2441,
-    "kernel_interface_validation": 2347,
-    "kernel_lowering_validation": 2949,
-    "kernel_model_alignment_validation": 15208,
-    "kernel_refinement_boundary_validation": 2349,
-    "kernel_refinement_validation": 3123,
-    "kernel_slot_boundary_validation": 3113,
-    "kernel_slot_dsl_validation": 3061,
-    "kernel_validation": 2809,
-    "leakage_auc": 71617,
-    "mutual_information": 77232,
-    "overheads": 196027,
+    "canonical_pathoram_pair_validation": 201412,
+    "confidential_core_kernel_finish_slot_validation": 3128,
+    "confidential_core_kernel_interface_slot_finish_boundary_validation": 3272,
+    "confidential_core_kernel_interface_slot_validation": 3180,
+    "confidential_core_lowering_validation": 3183,
+    "confidential_core_shell_boundary_lowering_validation": 3068,
+    "confidential_core_shell_boundary_slot_validation": 2893,
+    "confidential_core_slot_validation": 3258,
+    "confidential_core_validation": 2977,
+    "confidential_fragment_validation": 1,
+    "confidential_proof_family_assurance_validation": 3377,
+    "confidential_proof_family_boundary_validation": 3859,
+    "confidential_proof_family_finish_slot_boundary_validation": 3628,
+    "confidential_proof_family_kernel_interface_validation": 3801,
+    "confidential_proof_family_refinement_boundary_validation": 3517,
+    "confidential_proof_family_slot_assurance_validation": 3844,
+    "confidential_proof_family_slot_boundary_validation": 3580,
+    "confidential_proof_family_validation": 3946,
+    "controller_observer_validation": 3050,
+    "correctness": 3026,
+    "fresh_coin_validation": 17041,
+    "kernel_confinement_boundary_validation": 2204,
+    "kernel_dsl_validation": 3013,
+    "kernel_finish_boundary_validation": 2245,
+    "kernel_interface_confinement_boundary_validation": 2277,
+    "kernel_interface_singleton_boundary_validation": 2107,
+    "kernel_interface_validation": 2308,
+    "kernel_lowering_validation": 3237,
+    "kernel_model_alignment_validation": 7766,
+    "kernel_refinement_boundary_validation": 2660,
+    "kernel_refinement_validation": 3010,
+    "kernel_slot_boundary_validation": 3123,
+    "kernel_slot_dsl_validation": 3154,
+    "kernel_validation": 3060,
+    "leakage_auc": 72491,
+    "mutual_information": 70816,
+    "overheads": 185264,
     "paper_main_family_boundary_validation": 0,
     "paper_main_slot_boundary_validation": 0,
-    "pathoram_hidden_validation": 2517,
-    "pathoram_pair_validation": 12973,
-    "runtime_boundary_validation": 1617,
-    "runtime_confidential_statement_trace_bridge_boundary_validation": 896,
-    "runtime_implementation_confidential_statement_trace_bridge_refinement_boundary_validation": 4796,
-    "runtime_implementation_confinement_boundary_validation": 46222,
-    "runtime_implementation_interface_validation": 3162,
-    "runtime_implementation_kernel_machine_confinement_boundary_validation": 45559,
-    "runtime_implementation_kernel_meeting_boundary_validation": 45628,
-    "runtime_implementation_kernel_meeting_confinement_boundary_validation": 86367,
-    "runtime_implementation_public_bridge_observer_refinement_boundary_validation": 30536,
-    "runtime_implementation_residual_helper_shell_machine_refinement_boundary_validation": 30878,
-    "runtime_implementation_shared_kernel_machine_refinement_boundary_validation": 45615,
-    "runtime_implementation_shared_kernel_refinement_boundary_validation": 42710,
-    "runtime_implementation_slot_adapter_machine_refinement_boundary_validation": 4088,
-    "runtime_implementation_small_confidential_kernel_machine_refinement_boundary_validation": 44873,
-    "runtime_kernel_machine_finish_boundary_validation": 2793,
-    "runtime_kernel_machine_finish_witness_validation": 3077,
-    "runtime_public_bridge_boundary_validation": 939,
-    "runtime_residual_helper_shell_boundary_validation": 2198,
-    "runtime_shared_confidential_kernel_boundary_validation": 3153,
-    "runtime_slot_adapter_boundary_validation": 686,
-    "runtime_small_confidential_kernel_boundary_validation": 3844,
-    "seeded_witness_validation": 9461,
-    "shell_boundary_lowering_validation": 2878,
-    "shell_boundary_slot_validation": 2864,
-    "shell_boundary_validation": 3039,
-    "static_checks": 2978,
-    "tamper_validation": 965718,
-    "total_probe_ms": 2203022,
-    "trace_equivalence": 56412,
-    "trusted_kernel_validation": 2858,
-    "witness_validation": 2458
+    "pathoram_hidden_validation": 2747,
+    "pathoram_pair_validation": 11237,
+    "runtime_boundary_validation": 1695,
+    "runtime_confidential_statement_trace_bridge_boundary_validation": 786,
+    "runtime_implementation_confidential_statement_trace_bridge_refinement_boundary_validation": 4743,
+    "runtime_implementation_confinement_boundary_validation": 47004,
+    "runtime_implementation_interface_validation": 3058,
+    "runtime_implementation_kernel_machine_confinement_boundary_validation": 46608,
+    "runtime_implementation_kernel_meeting_boundary_validation": 47189,
+    "runtime_implementation_kernel_meeting_confinement_boundary_validation": 89674,
+    "runtime_implementation_public_bridge_observer_refinement_boundary_validation": 33278,
+    "runtime_implementation_residual_helper_shell_machine_refinement_boundary_validation": 30976,
+    "runtime_implementation_shared_kernel_machine_refinement_boundary_validation": 44876,
+    "runtime_implementation_shared_kernel_refinement_boundary_validation": 44387,
+    "runtime_implementation_slot_adapter_machine_refinement_boundary_validation": 4365,
+    "runtime_implementation_small_confidential_kernel_machine_refinement_boundary_validation": 48284,
+    "runtime_kernel_machine_finish_boundary_validation": 3045,
+    "runtime_kernel_machine_finish_witness_validation": 2864,
+    "runtime_public_bridge_boundary_validation": 760,
+    "runtime_residual_helper_shell_boundary_validation": 2397,
+    "runtime_shared_confidential_kernel_boundary_validation": 3040,
+    "runtime_slot_adapter_boundary_validation": 721,
+    "runtime_small_confidential_kernel_boundary_validation": 3156,
+    "seeded_witness_validation": 7848,
+    "shell_boundary_lowering_validation": 2858,
+    "shell_boundary_slot_validation": 3150,
+    "shell_boundary_validation": 3096,
+    "static_checks": 2809,
+    "tamper_validation": 967865,
+    "total_probe_ms": 2177334,
+    "trace_equivalence": 59024,
+    "trusted_kernel_validation": 3180,
+    "witness_validation": 2349
   },
   "runtime_overheads": {
     "cases": [
@@ -3580,7 +3580,7 @@
         },
         {
           "file": "proof/lean/UOToolchain/RuntimeImplementationInterface.lean",
-          "nonempty_loc": 19621
+          "nonempty_loc": 19633
         },
         {
           "file": "proof/lean/UOToolchain/RuntimeImplementationInterfaceJson.lean",
@@ -3800,7 +3800,7 @@
         }
       ],
       "root": "proof/lean",
-      "total_nonempty_loc": 126396
+      "total_nonempty_loc": 126408
     },
     "measurement": "non-empty source lines",
     "outer_runtime_risk_surface": {
@@ -3808,14 +3808,14 @@
       "files": [
         {
           "file": "runtime/uo-evm/src/engine.rs",
-          "nonempty_loc": 2987
+          "nonempty_loc": 3193
         },
         {
           "file": "runtime/uo-evm/src/shell.rs",
           "nonempty_loc": 574
         }
       ],
-      "total_nonempty_loc": 3561
+      "total_nonempty_loc": 3767
     },
     "trusted_runtime_surface": {
       "file_count": 4,
@@ -3826,7 +3826,7 @@
         },
         {
           "file": "runtime/uo-evm/src/state.rs",
-          "nonempty_loc": 1366
+          "nonempty_loc": 1483
         },
         {
           "file": "runtime/uo-evm/src/theorem.rs",
@@ -3837,7 +3837,7 @@
           "nonempty_loc": 11031
         }
       ],
-      "total_nonempty_loc": 13274
+      "total_nonempty_loc": 13391
     }
   },
   "wp6_closure_audit": [

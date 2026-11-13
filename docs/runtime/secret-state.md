@@ -18,8 +18,8 @@ and the ownership boundaries that keep them auditable.
 | `PrivateEvidence`, and the `ExecutionTrace` that holds it | `crates/uo-core/src/trace.rs` | a call's replay tag, kernel witnesses and Path ORAM leaf schedule, counters, position maps and leaf transitions; fields private to `uo-core`, wiped on drop, serializable only in a test or diagnostics build; a call returns it only in such a build |
 | `CommittedRuntimeWitnessSnapshot` | `crates/uo-core/src/trace.rs` | hidden witness snapshot wrapper built from `state.rs`: the access counters and position maps of the contract's Path ORAM objects. A test or diagnostics runtime keeps one from call to call (`ContractRuntime::kept_witness`) and copies it only through `duplicate`; a production runtime builds and keeps none (invariant 15) |
 | `RuntimeShadowState` / `ConfidentialRuntimeShadowState` / `PublicRuntimeShadowState` | `runtime/uo-evm/src/state.rs` | runtime-only reopened state; public shell receives only public wrapper |
-| `RuntimeObject` graph | `runtime/uo-evm/src/objects.rs` | runtime-owned object state and commit/restore paths |
-| `OramState` and ORAM transcript/write evidence | `runtime/uo-evm/src/oram.rs` | runtime-owned ORAM state; generated helpers own codec/rebuild/write-log internals |
+| `RuntimeObject` graph | `runtime/uo-evm/src/objects.rs` | runtime-owned object state and commit/restore paths. A committed object is cold and is never changed: the committed state and the states staged from it hold the same object (invariant 16) |
+| `OramState` and ORAM transcript/write evidence | `runtime/uo-evm/src/oram.rs` | runtime-owned ORAM state; generated helpers own codec/rebuild/write-log internals. The sealed records of a map's storage (`SealedPage`) are held by reference by the committed map and by the copy a call loads |
 | Store cipher key and plaintext staging buffers | `runtime/uo-store/src/*` | store/codec layer; generated helpers own exact-size seal/open/filler surface. The cipher also holds the count of the seals under its key, which is public |
 
 ## Invariants
@@ -118,6 +118,29 @@ and the ownership boundaries that keep them auditable.
     they differ. A measurement turns the audit off for the calls it times
     (`set_position_map_witness_audit`) and audits where it does not time.
 
+16. A call copies no committed object, and a committed object never
+    changes. The state a call is staged on is a table of the committed
+    objects themselves. A call loads its own copy of the objects it runs
+    on, with what it decrypts, and its commit puts new objects in the place
+    of those and keeps the others: the runtime takes the staged table only
+    when the call has passed every check, and drops it otherwise, so a call
+    that fails leaves the committed objects as they were. An object that
+    more than one table holds cannot be changed, since only the one holder
+    of an object is handed it for change.
+
+    The sealed records of a Path ORAM map are held by reference in the same
+    way. The copy of a map that a call loads shares the committed map's
+    records, a write to a shared record changes a copy of it, and a record
+    is zeroed only when its last holder is dropped: the copy a failed call
+    wrote is zeroed, and the committed record it would have replaced is
+    not. An exact object (a cell, an array or a full-scan map) is opened
+    whole when a call loads it, and its sealed slots are copied then.
+
+    An object keeps the digest of its sealed records once it was asked
+    for, and forgets it when it is handed out for change. So the digest of
+    the ciphertext store (invariant 13) reads the records of the objects
+    written since the last digest and of no other.
+
 ### What a nonce shows
 
 A record's nonce shows how many records were sealed under its object's key
@@ -156,7 +179,7 @@ write/read evidence, direct store cipher calls outside the codec layer, and
 reintroduction of host-visible hidden-state errors that should be modeled
 confidential aborts.
 
-Invariants 9 to 15 have ten bits in `runtime_boundary_validation.json`:
+Invariants 9 to 16 have eleven bits in `runtime_boundary_validation.json`:
 `deployment_seed_stays_out_of_call_traces`,
 `production_errors_carry_no_runtime_freshness_value`,
 `contract_instance_debug_is_opaque`,
@@ -165,10 +188,10 @@ Invariants 9 to 15 have ten bits in `runtime_boundary_validation.json`:
 `private_evidence_stays_inside_the_runtime`,
 `production_calls_issue_chained_receipts`,
 `sealed_writes_are_classified_from_their_bytes`,
-`production_calls_record_no_position_map_witness` and
-`evidence_builds_audit_the_kept_position_map_witness`. Each is a check of
-source text, and a probe unit test shows that it rejects the drifts it
-guards against.
+`production_calls_record_no_position_map_witness`,
+`evidence_builds_audit_the_kept_position_map_witness` and
+`a_call_copies_no_committed_object`. Each is a check of source text, and a
+probe unit test shows that it rejects the drifts it guards against.
 `cargo test -p uo-evm` runs the tests behind all but the two about secrets
 and nonces in the build a production runtime uses
 (`runtime/uo-evm/tests/production_boundary.rs`, and the production tests
@@ -238,6 +261,26 @@ the hidden-state check accepts after it.
 certificate it checks (`kept_witness_audits`), and the capacity sweep,
 which times its calls with the audit off, audits after every occupancy
 level (`kept_witness_matches_store_after_every_level`).
+
+Invariant 16 is pinned in the Lean implementation interface
+(`runtimeShadowStateUsesFixedSortedCommitTable` and
+`runtimeOramUsesLeanGeneratedBlockBucketCodecs`), with two scenarios that
+the Lean checker must reject: an object handed out for change with its
+digest kept
+(`runtime_implementation_interface/committed_object_digest_stale_drift`),
+and a call staged on copies of the committed objects
+(`runtime_implementation_interface/staged_call_copies_committed_objects_drift`).
+Its tests are in `runtime/uo-evm/src/engine.rs` and
+`runtime/uo-evm/src/oram.rs`. One reads where each sealed record of each
+object is in memory: a staged runtime's records are the committed
+runtime's, an object a call did not load stays where it was through calls
+that commit, abort and fail, and of a map it loaded a call replaces some
+records and keeps the others. One counts the objects whose records a
+digest reads: those the call loaded, and none after a failed call, with
+the digest equal to the one that reads every record again. One writes to a
+shared record and sees the other holder's record unchanged, and sees that
+wiping zeroes a record only for its last holder. The atomicity and rollback
+tests of the runtime run on the shared objects as they ran on copies.
 
 Invariant 11 also has a Lean statement and tests. `sealNonceRun_nodup` and
 `sealNonceRun_disjoint_of_le` in `UOToolchain/RuntimeStoreCodecSemantics.lean`

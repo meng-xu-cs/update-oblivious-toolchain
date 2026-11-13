@@ -1,7 +1,7 @@
 //! Wall-clock time the instrumented runtime spends on the parts of a call
-//! that a measurement tells apart from the call's own work: copying the
-//! committed state for the call to run on, loading the call's objects from
-//! the copy, the hidden position-map witnesses of the call's start and end,
+//! that a measurement tells apart from the call's own work: staging the
+//! call on the committed state, loading the call's objects from it, the
+//! hidden position-map witnesses of the call's start and end,
 //! and the execution trace with the proof bundles it builds and checks. The
 //! runtime keeps the witness from call to call and moves it by each call's
 //! leaf transitions; it decodes one from storage for the first call, after a
@@ -22,11 +22,12 @@ use std::time::Instant;
 #[cfg(feature = "diagnostics")]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct InstrumentationTotals {
-    /// Copying the committed state, ciphertext included, for a call to run
-    /// on.
+    /// Staging a call: making the table of the committed objects that the
+    /// call runs on. The objects are shared, so none is copied.
     pub staging_ns: u128,
-    /// Loading the call's objects from that copy: copying each one's storage
-    /// again and decoding it.
+    /// Loading the call's objects from that table: opening an exact
+    /// object's slots, and for a Path ORAM map taking a reference to each
+    /// of its sealed records and decoding its metadata pages.
     pub load_ns: u128,
     /// The position-map witnesses of the calls: copying the kept one,
     /// moving it by a call's leaf transitions, and decoding it from storage
@@ -99,7 +100,7 @@ fn timed<T>(f: impl FnOnce() -> T, add: impl FnOnce(&mut InstrumentationTotals, 
     out
 }
 
-/// Run `f`, the copying of the committed state for a call.
+/// Run `f`, the staging of a call on the committed state.
 pub(crate) fn time_staging<T>(f: impl FnOnce() -> T) -> T {
     #[cfg(feature = "diagnostics")]
     {
@@ -171,6 +172,28 @@ pub(crate) fn count_witness_audit() {
     {
         WITNESS_AUDITS.with(|audits| audits.set(audits.get().saturating_add(1)));
     }
+}
+
+/// Record that one object's sealed records were read for a digest of the
+/// ciphertext. An object keeps its digest, so a test counts here the
+/// objects a digest could not take from before: those written since.
+pub(crate) fn count_sealed_records_digest() {
+    #[cfg(test)]
+    {
+        SEALED_RECORDS_DIGESTS.with(|digests| digests.set(digests.get().saturating_add(1)));
+    }
+}
+
+/// How many times this thread has read an object's sealed records for a
+/// digest of the ciphertext.
+#[cfg(test)]
+pub(crate) fn sealed_records_digests_computed() -> u64 {
+    SEALED_RECORDS_DIGESTS.with(std::cell::Cell::get)
+}
+
+#[cfg(test)]
+thread_local! {
+    static SEALED_RECORDS_DIGESTS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
 }
 
 /// Record that a position-map witness opened `records` sealed records.

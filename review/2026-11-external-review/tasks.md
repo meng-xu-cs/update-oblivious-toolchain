@@ -773,6 +773,63 @@ compute again only those of the objects a call wrote. A tree of digests
 over the buckets of a Path ORAM map, which a path write updates in
 logarithmic time, is part of Issue 44.
 
+As built. A committed object is held by reference
+(`RuntimeObjectEntry` holds an `Arc`). The state a call is staged on is a
+table of the committed objects themselves (`RuntimeObjectTable::share`), so
+staging copies no object. A commit puts new objects in the place of those
+the call loaded and keeps the others as they are: it used to copy every
+object the call did not load a second time. A committed object is never
+changed, and only the one holder of an object is handed it for change, so a
+call that fails leaves the committed objects as they were. No sealed object
+has a cold clone any more (`clone_committed_cold` is gone from the object
+graph).
+
+The sealed records of a Path ORAM map are held by reference too
+(`SealedPage` in `runtime/uo-evm/src/oram.rs`, in the storage types the
+generated codecs take). The copy of a map that a call loads shares the
+committed map's records. A write to a shared record changes a copy of it,
+so a call copies the records it writes and no other, and a record is zeroed
+when its last holder is dropped.
+
+An object keeps the digest of its sealed records (`TableObject`), and
+forgets it when it is handed out for change. The digest of the ciphertext
+store is built from the objects' digests as before, so a production receipt
+reads the records of the objects its call wrote and of no other. The digest
+of a Path ORAM map that a call wrote still reads the whole map: a tree of
+digests over its buckets is Issue 44.
+
+Not done: an exact object (a cell, an array or a full-scan map) is still
+copied when a call loads it. The call opens every slot of it then, which
+costs far more than the copy, and a call that writes it replaces every
+slot. So a call on an exact object still holds two copies of that object's
+ciphertext, and the second criterion is met for Path ORAM maps and for the
+objects a call does not load.
+
+Measured in the validation run's quick profile (two rounds of each call,
+`results/capacity_sweep.json`), before and after on one machine: staging a
+call takes a microsecond at every capacity, where it took 6.5 ms on the tree
+and 1.7 ms on the full scan at 16,384 entries; loading the tree takes 1.4 ms
+there where it took 6.2 ms. The traces and the counts of the sweep are the
+ones they were (`counts_sha256` has not moved). The sweep's resident-memory
+figures do not show the saving: at these sizes they are those of the probe
+process, its traces and its proof objects. That a call holds no second copy
+is tested by address instead: a staged runtime's records are the committed
+runtime's, an object a call did not load stays where it was through calls
+that commit, abort and fail, and of a map it loaded a call replaces some
+records and keeps the others. A test counts the objects whose records a
+ciphertext digest reads: those the call loaded.
+
+Two tamper scenarios are new (410 in all): an object handed out for change
+with its digest kept, and a call staged on copies of the committed objects.
+
+Found on the way, and not changed: every call takes the public-state
+snapshot three times, and a snapshot decodes every public (non-confidential)
+sealed object from storage, the ones the call did not load included. The
+benchmarks' large objects are confidential, so the sweep does not show it.
+Its digest is one hash over all the public objects, so keeping a snapshot
+per object would need a digest built from per-object digests, which changes
+the public-state digest of every trace.
+
 #### Acceptance criteria
 
 - The staging time of Issue 27's breakdown does not grow with the capacity

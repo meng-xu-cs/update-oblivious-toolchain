@@ -10104,6 +10104,54 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "mutation": "keep the position-map witness a call moved by its own leaf transitions without comparing it with the decode of the whole store, so the implementation interface must reject a kept witness that is not checked against the store after a call",
         }),
     )?);
+    let mut tampered_runtime_implementation_object_digest_stale =
+        runtime_implementation_interface.clone();
+    tampered_runtime_implementation_object_digest_stale.state_source = replace_exactly_once(
+        &tampered_runtime_implementation_object_digest_stale.state_source,
+        "        held.sealed_records = OnceLock::new();\n",
+        "",
+        "runtime implementation object-digest tamper",
+    )?;
+    scenarios.push(validate_tampered_json_case(
+        "runtime_implementation_interface/committed_object_digest_stale_drift",
+        &tampered_runtime_implementation_object_digest_stale,
+        |interface_path| {
+            Ok(Command::new(&runtime_implementation_interface_checker)
+                .arg(interface_path)
+                .output()?)
+        },
+        json!({
+            "scenario": "runtime_implementation_interface/committed_object_digest_stale_drift",
+            "artifact_kind": "proofgrade_runtime_implementation_interface",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "hand an object out to be changed with the digest of its sealed records kept, so the implementation interface must reject a ciphertext digest that can be the digest of records the object no longer holds",
+        }),
+    )?);
+    let mut tampered_runtime_implementation_staging_copies =
+        runtime_implementation_interface.clone();
+    tampered_runtime_implementation_staging_copies.state_source = replace_exactly_once(
+        &tampered_runtime_implementation_staging_copies.state_source,
+        "            object: Arc::clone(&self.object),\n",
+        "            object: Arc::new(self.object.duplicate()),\n",
+        "runtime implementation staging-copy tamper",
+    )?;
+    scenarios.push(validate_tampered_json_case(
+        "runtime_implementation_interface/staged_call_copies_committed_objects_drift",
+        &tampered_runtime_implementation_staging_copies,
+        |interface_path| {
+            Ok(Command::new(&runtime_implementation_interface_checker)
+                .arg(interface_path)
+                .output()?)
+        },
+        json!({
+            "scenario": "runtime_implementation_interface/staged_call_copies_committed_objects_drift",
+            "artifact_kind": "proofgrade_runtime_implementation_interface",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "stage a call on a copy of every committed object instead of on the committed objects themselves, so the implementation interface must reject staging that takes time and memory in the size of the store",
+        }),
+    )?);
     let tampered_runtime_small_confidential_kernel_generated_object_helpers_commit =
         ImportedRuntimeImplementationSmallConfidentialKernelBoundary {
             implementation_interface:
@@ -14029,8 +14077,8 @@ fn run_tamper_validation() -> Result<JsonValue> {
         tampered_runtime_implementation_oram_refresh
             .generated_oram_codecs_source
             .replace(
-                "pub(super) fn refresh_path_state_from_storage(\n    spec: &StateObject,\n    parameters: &OramParameters,\n    cipher: &StoreCipher,\n    directory_pages: &[Box<[u8]>],\n    allocator: &mut AllocatorSession,",
-                "pub(super) fn refresh_path_state_from_storage(\n    spec: &StateObject,\n    parameters: &OramParameters,\n    cipher: &StoreCipher,\n    directory_pages: &[Box<[u8]>],\n    buckets: &[Box<[u8]>],\n    allocator: &mut AllocatorSession,",
+                "pub(super) fn refresh_path_state_from_storage(\n    spec: &StateObject,\n    parameters: &OramParameters,\n    cipher: &StoreCipher,\n    directory_pages: &[SealedPage],\n    allocator: &mut AllocatorSession,",
+                "pub(super) fn refresh_path_state_from_storage(\n    spec: &StateObject,\n    parameters: &OramParameters,\n    cipher: &StoreCipher,\n    directory_pages: &[SealedPage],\n    buckets: &[SealedPage],\n    allocator: &mut AllocatorSession,",
             );
     if tampered_runtime_implementation_oram_refresh.generated_oram_codecs_source
         == runtime_implementation_interface.generated_oram_codecs_source
@@ -27547,7 +27595,7 @@ fn check_runtime_secrets_derive_from_the_master_secret(
         && engine_impl_source.matches("RuntimeMasterSecret::").count() == 2
         && !engine_impl_source.contains("seed_from_u64")
         && state_source.contains("let secret = master.object_secret(spec.id, &spec.name)?;")
-        && state_source.contains("object: RuntimeObject::instantiate(spec, &secret)?,")
+        && state_source.contains("RuntimeObject::instantiate(spec, &secret)?,")
         && objects_production_source.contains("let mut rng = secret.rng()?;")
         && objects_production_source
             .contains("let leaf_coin_seed = secret.path_oram_leaf_seed()?;")
@@ -28222,6 +28270,80 @@ fn check_evidence_builds_audit_the_kept_position_map_witness(
             "fn run_latency_memory(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<JsonValue> {\n    // Calls are timed with the audit of the kept witness off.\n    let _witness_audit_off = capacity_sweep::WitnessAudit",
             "Off::new();",
         ))
+}
+
+/// Whether a call is staged, loaded and committed without copying the
+/// store. A committed object is held by reference: the state a call is
+/// staged on is a table of the committed objects, and a commit puts new
+/// objects in the place of those the call loaded and keeps the others. No
+/// sealed object has a cold clone. A Path ORAM map's sealed records are held
+/// by reference too: the copy of the map that a call loads shares them, a
+/// write copies the record it replaces, and a record is zeroed only by its
+/// last holder. An object keeps the digest of its sealed records and
+/// forgets it when it is handed out to be changed, so a digest of the
+/// ciphertext reads the objects written since the last one.
+fn check_a_call_copies_no_committed_object(
+    state_source: &str,
+    objects_source: &str,
+    oram_source: &str,
+    generated_oram_codecs_source: &str,
+) -> bool {
+    state_source.contains(
+        "struct RuntimeObjectEntry {\n    object_id: u32,\n    object: Arc<TableObject>,\n}",
+    ) && state_source.contains(
+        "struct TableObject {\n    object: RuntimeObject,\n    sealed_records: OnceLock<SealedRecordsDigest>,\n}",
+    ) && state_source.contains(
+        "    fn share(&self) -> Self {\n        Self {\n            object_id: self.object_id,\n            object: Arc::clone(&self.object),\n        }\n    }",
+    ) && state_source.contains(
+        "    fn share(&self) -> Result<Self> {\n        let mut entries = FixedBoxBuilder::new(self.entries.len());\n        for entry in self.entries.iter() {\n            entries.push(entry.share())?;\n        }\n        Ok(Self::new(entries.finish()?))\n    }",
+    ) && state_source.contains(
+        "    fn share(&self) -> Result<Self> {\n        Ok(Self {\n            objects: self.objects.share()?,\n        })\n    }",
+    ) && state_source.contains("            committed: self.committed.share()?,\n")
+        // A commit keeps the committed object of every object the call did
+        // not load, and takes the call's own for the others.
+        && state_source.contains(
+            "                Some(Ordering::Greater) | None => {\n                    // The call did not load this object: the next state\n                    // holds the committed one itself.\n                    next_objects.push(old.share())?;\n                }",
+        )
+        && state_source.contains(
+            "                    let object = entry.into_owned().ok_or_else(|| {\n                        anyhow!(\"object {id} of the call was shared with another state at commit\")\n                    })?;",
+        )
+        && state_source.contains(
+            "        if Arc::strong_count(&self.object) > 1 {\n            if !self.object.object.committed_cache_is_cold() {\n                bail!(\"object {object_id} was shared with committed state and not cold\");\n            }\n            return Ok(self);\n        }",
+        )
+        // Nothing clones a committed sealed object.
+        && !state_source.contains("clone_cold")
+        && !state_source.contains("clone_committed_cold")
+        && !objects_source.contains("clone_committed_cold")
+        && !oram_source.contains("clone_committed_cold")
+        // An object's digest is that of its records.
+        && state_source.contains(
+            "        if let Some(digest) = self.sealed_records.get() {\n            return Ok(*digest);\n        }\n        let digest = SealedRecordsDigest::of(object_id, &self.object)?;",
+        )
+        && state_source.contains(
+            "        let held = Arc::get_mut(&mut self.object)?;\n        held.sealed_records = OnceLock::new();\n        Some(&mut held.object)",
+        )
+        && state_source.matches("Arc::get_mut(").count() == 1
+        && state_source.contains(
+            "        for entry in self.entries.iter() {\n            entry\n                .object\n                .sealed_records_digest(entry.object_id)?\n                .add_to(entry.object_id, &mut store);\n        }",
+        )
+        // The sealed records of a Path ORAM map.
+        && oram_source.contains(
+            "pub(crate) struct OramStorage {\n    directory_pages: Box<[SealedPage]>,\n    buckets: Box<[SealedPage]>,\n    access_counter_slot: Box<[u8]>,\n}",
+        )
+        && oram_source.contains("#[derive(Clone, Debug)]\npub(crate) struct SealedPage(Arc<[u8]>);")
+        && oram_source.contains(
+            "    fn deref_mut(&mut self) -> &mut [u8] {\n        Arc::make_mut(&mut self.0)\n    }",
+        )
+        && oram_source.contains(
+            "    pub(crate) fn wipe(&mut self) {\n        if let Some(bytes) = Arc::get_mut(&mut self.0) {\n            bytes.fill(0);\n        }\n    }",
+        )
+        && generated_oram_codecs_source.contains(
+            "fn clone_oram_storage(storage: &super::OramStorage) -> super::OramStorage {\n    super::OramStorage {\n        directory_pages: storage.directory_pages.clone(),\n        buckets: storage.buckets.clone(),\n        access_counter_slot: storage.access_counter_slot.clone(),\n    }\n}",
+        )
+        && generated_oram_codecs_source.contains(
+            "        for page in &mut self.storage.directory_pages {\n            page.wipe();\n        }\n        for bucket in &mut self.storage.buckets {\n            bucket.wipe();\n        }",
+        )
+        && !generated_oram_codecs_source.contains("[Box<[u8]>],")
 }
 
 fn production_source_slice(source: &str) -> String {
@@ -40488,7 +40610,6 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
 
     let runtime_restricted_signatures = [
         "pub(in crate::runtime) fn clone_for_tx",
-        "pub(in crate::runtime) fn clone_committed_cold",
         "pub(in crate::runtime) fn path_oram_position_map_witness",
         "pub(in crate::runtime) fn path_oram_access_counter_witness",
         "pub(in crate::runtime) fn get_cell",
@@ -40570,10 +40691,14 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && state_source.contains("if !object.is_update_oblivious_backend() {")
         && state_source
             .contains("confidential kernel program {} targets raw backend object {} ({})");
+    // A committed object is shared between the committed state and the
+    // states staged from it, so no sealed object has a cold clone: the one
+    // copy of a sealed object is its load for a call. A raw object is copied.
     let runtime_object_graph_uses_explicit_cold_clone_helpers = objects_source
         .contains("fn clone_committed_public(&self) -> Self {")
-        && objects_source.contains("fn clone_committed_cold(&self) -> Self {")
-        && objects_source.contains("fn clone_committed_cold(&self) -> Result<Self> {")
+        && !objects_source.contains("fn clone_committed_cold(")
+        && !objects_source.contains(".clone_committed_cold(")
+        && !oram_source.contains("fn clone_committed_cold(")
         && objects_source
             .contains("impl RawMapObject {\n    fn clone_committed_public(&self) -> Self {")
         && objects_source.contains(
@@ -40584,25 +40709,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         )
         && objects_source
             .contains("Self::RawMap(object) => Ok(Self::RawMap(object.clone_committed_public())),")
-        && objects_source
-            .contains("pub(in crate::runtime) fn clone_committed_cold(&self) -> Result<Self> {")
-        && objects_source
-            .contains("Self::RawCell(object) => Self::RawCell(object.clone_committed_public()),")
-        && objects_source
-            .contains("Self::UoCell(object) => Self::UoCell(object.clone_committed_cold()),")
-        && objects_source
-            .contains("Self::RawArray(object) => Self::RawArray(object.clone_committed_public()),")
-        && objects_source
-            .contains("Self::UoArray(object) => Self::UoArray(object.clone_committed_cold()),")
-        && objects_source
-            .contains("Self::RawMap(object) => Self::RawMap(object.clone_committed_public()),")
-        && objects_source.contains(
-            "Self::UoSmallMap(object) => Self::UoSmallMap(object.clone_committed_cold()?),",
-        )
-        && objects_source.contains(
-            "Self::UoOramMap(object) => Self::UoOramMap(object.clone_committed_cold()?),",
-        )
-        && objects_source.contains("oram: self.oram.clone_committed_cold(&self.spec)?,")
+        && objects_source.contains("oram: object.oram.clone_for_tx(&object.spec, allocator)?,")
         && objects_source.contains("cipher: self.cipher.clone_for_runtime_state(),")
         && !objects_source.contains("oram: self.oram.clone(),")
         && !objects_source.contains("cipher: self.cipher.clone(),")
@@ -40739,8 +40846,9 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && generated_oram_codecs_source.contains("entries: Box::<[MapEntry]>::default(),")
         && generated_oram_codecs_source
             .contains("position_map: Box::<[MaskedUsizeOption]>::default(),")
-        && generated_oram_codecs_source.contains("directory_pages: Box::<[Box<[u8]>]>::default(),")
-        && generated_oram_codecs_source.contains("buckets: Box::<[Box<[u8]>]>::default(),")
+        && generated_oram_codecs_source
+            .contains("directory_pages: Box::<[SealedPage]>::default(),")
+        && generated_oram_codecs_source.contains("buckets: Box::<[SealedPage]>::default(),")
         && generated_oram_codecs_source.contains("access_counter_slot: Box::<[u8]>::default(),");
     let contract_instance_public_clone_removed = !engine_source
         .contains("impl Clone for ContractInstance")
@@ -41175,10 +41283,11 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && state_source.contains("let mut objects = FixedBoxBuilder::new(contract_state.len());")
         && state_source
             .contains("let mut next_objects = FixedBoxBuilder::new(committed.objects.len());")
-        && state_source
-            .contains("found_index.and_then(|index| self.entries.get(index).map(|entry| &entry.object))")
         && state_source.contains(
-            "found_index.and_then(|index| self.entries.get_mut(index).map(|entry| &mut entry.object))",
+            "found_index.and_then(|index| self.entries.get(index).map(RuntimeObjectEntry::object))",
+        )
+        && state_source.contains(
+            "        found_index.and_then(|index| {\n            self.entries\n                .get_mut(index)\n                .and_then(RuntimeObjectEntry::object_mut)\n        })",
         )
         && state_source.contains("for pair in objects.windows(2) {")
         && state_source.contains("if let [left, right] = pair {")
@@ -44322,15 +44431,12 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         resource_event_constructor_files == expected_resource_event_constructor_files;
     let state_only_runtime_helper_surface_checks = [
         (
-            "object: object.clone_for_tx(trace, allocator)?,",
+            "object.clone_for_tx(trace, allocator)?,",
             vec![String::from("runtime/uo-evm/src/state.rs")],
         ),
         (
-            "clone_committed_cold()",
-            vec![
-                String::from("runtime/uo-evm/src/objects.rs"),
-                String::from("runtime/uo-evm/src/state.rs"),
-            ],
+            "next_objects.push(old.share())?;",
+            vec![String::from("runtime/uo-evm/src/state.rs")],
         ),
         (
             "path_oram_position_map_witness()?",
@@ -44345,7 +44451,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             vec![String::from("runtime/uo-evm/src/state.rs")],
         ),
         (
-            ".commit(old, aborted, may_write, recorder, allocator)?;",
+            "object.commit(old.object(), aborted, may_write, recorder, allocator)?;",
             vec![String::from("runtime/uo-evm/src/state.rs")],
         ),
         (
@@ -45808,6 +45914,12 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             &objects_production_source,
             &production_source_slice(&core_trace_source),
         );
+    let a_call_copies_no_committed_object = check_a_call_copies_no_committed_object(
+        &production_source_slice(&state_source),
+        &objects_production_source,
+        &production_source_slice(&oram_source),
+        &generated_oram_codecs_source,
+    );
     let evidence_builds_audit_the_kept_position_map_witness =
         check_evidence_builds_audit_the_kept_position_map_witness(
             &production_source_slice(&state_source),
@@ -46195,15 +46307,16 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     ];
     let runtime_public_field_surface_is_public_shape_only =
         runtime_public_field_lines == expected_runtime_public_field_lines;
-    let oram_storage_fields_private = oram_source.contains("directory_pages: Box<[Box<[u8]>]>,")
-        && oram_source.contains("buckets: Box<[Box<[u8]>]>,")
+    let oram_storage_fields_private = oram_source.contains("directory_pages: Box<[SealedPage]>,")
+        && oram_source.contains("buckets: Box<[SealedPage]>,")
         && oram_source.contains("access_counter_slot: Box<[u8]>,")
-        && !oram_source.contains("pub directory_pages: Box<[Box<[u8]>]>,")
-        && !oram_source.contains("pub buckets: Box<[Box<[u8]>]>,")
-        && !oram_source.contains("pub access_counter_slot: Box<[u8]>,");
+        && !oram_source.contains("pub directory_pages:")
+        && !oram_source.contains("pub buckets:")
+        && !oram_source.contains("pub access_counter_slot:");
     let oram_storage_uses_fixed_page_arrays = oram_source
-        .contains("directory_pages: Box<[Box<[u8]>]>,")
-        && oram_source.contains("buckets: Box<[Box<[u8]>]>,");
+        .contains("directory_pages: Box<[SealedPage]>,")
+        && oram_source.contains("buckets: Box<[SealedPage]>,")
+        && oram_source.contains("pub(crate) struct SealedPage(Arc<[u8]>);");
     let oram_storage_uses_fixed_counter_buffer =
         oram_source.contains("access_counter_slot: Box<[u8]>,");
     let oram_state_uses_fixed_entry_buffer = oram_source.contains("entries: Box<[MapEntry]>,");
@@ -47221,6 +47334,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "private_evidence_stays_inside_the_runtime": private_evidence_stays_inside_the_runtime,
         "production_calls_record_no_position_map_witness": production_calls_record_no_position_map_witness,
         "evidence_builds_audit_the_kept_position_map_witness": evidence_builds_audit_the_kept_position_map_witness,
+        "a_call_copies_no_committed_object": a_call_copies_no_committed_object,
         "production_calls_issue_chained_receipts": production_calls_issue_chained_receipts,
         "theorem_certificate_constructor_checks":
             theorem_certificate_constructor_checks,
@@ -48168,6 +48282,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && private_evidence_stays_inside_the_runtime
             && production_calls_record_no_position_map_witness
             && evidence_builds_audit_the_kept_position_map_witness
+            && a_call_copies_no_committed_object
             && production_calls_issue_chained_receipts
             && theorem_certificate_constructor_surface_restricted
             && runtime_public_call_trace_bundle_surface_restricted
@@ -56711,6 +56826,100 @@ mod tests {
             "            let audited = true;",
         );
         assert!(!audits(&state, &instrumentation, &probe, &no_level));
+    }
+
+    #[test]
+    fn committed_object_sharing_check_rejects_the_drifts_it_guards() {
+        use super::{check_a_call_copies_no_committed_object, repo_root};
+        let root = repo_root();
+        let whole = |rel: &str| std::fs::read_to_string(root.join(rel)).unwrap();
+        let state = production_source_slice(&whole("runtime/uo-evm/src/state.rs"));
+        let objects = production_source_slice(&whole("runtime/uo-evm/src/objects.rs"));
+        let oram = production_source_slice(&whole("runtime/uo-evm/src/oram.rs"));
+        let codecs = whole("runtime/uo-evm/src/generated_oram_codecs.rs");
+        let ok = |state: &str, objects: &str, oram: &str, codecs: &str| {
+            check_a_call_copies_no_committed_object(state, objects, oram, codecs)
+        };
+        // One place of `source` changed.
+        let drift = |source: &str, from: &str, to: &str| {
+            assert_eq!(source.matches(from).count(), 1, "{from}");
+            source.replacen(from, to, 1)
+        };
+        assert!(ok(&state, &objects, &oram, &codecs));
+
+        // A staged table of copies of the committed objects.
+        let copies = drift(
+            &state,
+            "            object: Arc::clone(&self.object),\n",
+            "            object: Arc::new(self.object.duplicate()),\n",
+        );
+        assert!(!ok(&copies, &objects, &oram, &codecs));
+        let copies = drift(
+            &state,
+            "            committed: self.committed.share()?,\n",
+            "            committed: self.committed.clone_cold()?,\n",
+        );
+        assert!(!ok(&copies, &objects, &oram, &codecs));
+        // A commit that copies the objects the call did not load.
+        let copies = drift(
+            &state,
+            "                    next_objects.push(old.share())?;\n",
+            "                    next_objects.push(old.duplicate()?)?;\n",
+        );
+        assert!(!ok(&copies, &objects, &oram, &codecs));
+        // A cold clone of a sealed object, back in the object graph.
+        let cloned = format!(
+            "{objects}\nimpl CellObject {{\n    fn clone_committed_cold(&self) -> Self {{\n        todo!()\n    }}\n}}\n"
+        );
+        assert!(!ok(&state, &cloned, &oram, &codecs));
+        // An object that keeps its digest when it is handed out for change.
+        let stale = drift(
+            &state,
+            "        held.sealed_records = OnceLock::new();\n",
+            "",
+        );
+        assert!(!ok(&stale, &objects, &oram, &codecs));
+        // A digest that is taken from before whatever the object holds now.
+        let stale = drift(
+            &state,
+            "        let digest = SealedRecordsDigest::of(object_id, &self.object)?;",
+            "        let digest = SealedRecordsDigest { count: 0, digest: [0u8; 32] };",
+        );
+        assert!(!ok(&stale, &objects, &oram, &codecs));
+        // A shared object that is taken for cold without a look.
+        let unchecked = drift(
+            &state,
+            "            if !self.object.object.committed_cache_is_cold() {\n                bail!(\"object {object_id} was shared with committed state and not cold\");\n            }\n",
+            "",
+        );
+        assert!(!ok(&unchecked, &objects, &oram, &codecs));
+        // Storage whose records each state owns: a load copies them all.
+        let owned = drift(
+            &oram,
+            "    directory_pages: Box<[SealedPage]>,\n    buckets: Box<[SealedPage]>,\n",
+            "    directory_pages: Box<[Box<[u8]>]>,\n    buckets: Box<[Box<[u8]>]>,\n",
+        );
+        assert!(!ok(&state, &objects, &owned, &codecs));
+        // A wipe that zeroes a copy of every record another state holds.
+        let wiped = drift(
+            &oram,
+            "        if let Some(bytes) = Arc::get_mut(&mut self.0) {\n            bytes.fill(0);\n        }\n",
+            "        Arc::make_mut(&mut self.0).fill(0);\n",
+        );
+        assert!(!ok(&state, &objects, &wiped, &codecs));
+        let wiped = drift(
+            &codecs,
+            "        for bucket in &mut self.storage.buckets {\n            bucket.wipe();\n        }",
+            "        for bucket in &mut self.storage.buckets {\n            bucket.fill(0);\n        }",
+        );
+        assert!(!ok(&state, &objects, &oram, &wiped));
+        // A generated function that takes owned records.
+        let owned = drift(
+            &codecs,
+            "    buckets: &mut [SealedPage],\n    access_leaf: usize,",
+            "    buckets: &mut [Box<[u8]>],\n    access_leaf: usize,",
+        );
+        assert!(!ok(&state, &objects, &oram, &owned));
     }
 
     #[test]

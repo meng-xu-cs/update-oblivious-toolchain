@@ -2400,6 +2400,220 @@ bounds:
         assert_eq!(aborted, 1);
     }
 
+    /// Where each sealed record of each object of a runtime is in memory.
+    fn sealed_record_addresses(runtime: &ContractRuntime) -> BTreeMap<u32, Vec<*const u8>> {
+        runtime
+            .object_entries_for_test()
+            .filter_map(|(object_id, object)| {
+                let (_, records) = object.sealed_storage_for_test()?;
+                Some((
+                    object_id,
+                    records.into_iter().map(<[u8]>::as_ptr).collect::<Vec<_>>(),
+                ))
+            })
+            .collect()
+    }
+
+    /// Staging a call copies no object: the staged runtime holds the
+    /// committed objects themselves. A call replaces the objects it loaded
+    /// and no other, so an object a call did not load stays where it was in
+    /// memory through any number of calls, whether they commit, abort or
+    /// fail.
+    #[test]
+    fn staging_a_call_copies_no_object_and_a_call_replaces_only_its_own() {
+        let artifact = compile_bench(
+            bench_raw!("ERC20Lite.sol"),
+            include_str!(bench_raw!("ERC20Lite.private-posmap.yaml")),
+            ProgramMode::Uo,
+        );
+        let mut instance = ContractInstance::deploy_with_seed(artifact, 0x37).unwrap();
+        let ids: Vec<u32> = instance
+            .state
+            .object_entries_for_test()
+            .map(|(object_id, _)| object_id)
+            .collect();
+        let object_id = |name: &str| {
+            instance
+                .state
+                .object_entries_for_test()
+                .find(|(_, object)| object.name() == name)
+                .map(|(object_id, _)| object_id)
+                .unwrap()
+        };
+        let (balances, allowances) = (object_id("balances"), object_id("allowances"));
+        assert_eq!(ids.len(), 2);
+
+        // The staged runtime's records are the committed runtime's.
+        let committed = sealed_record_addresses(&instance.state);
+        assert!(committed.values().all(|records| !records.is_empty()));
+        let staged = crate::runtime::stage_contract_runtime(&instance.state).unwrap();
+        assert_eq!(sealed_record_addresses(&staged), committed);
+        drop(staged);
+        assert_eq!(sealed_record_addresses(&instance.state), committed);
+
+        let owner = Value::Address([0xA1; 20]);
+        let spender = Value::Address([0xB2; 20]);
+        let to = Value::Address([0xC3; 20]);
+        // (entrypoint, arguments, aborts, the objects it loads)
+        let calls: Vec<(&str, Vec<Value>, bool, Vec<u32>)> = vec![
+            (
+                "mint(address,uint256)",
+                vec![owner.clone(), Value::uint(10)],
+                false,
+                vec![balances],
+            ),
+            (
+                "approve(address,address,uint256)",
+                vec![owner.clone(), spender.clone(), Value::uint(5)],
+                false,
+                vec![allowances],
+            ),
+            // More than the owner has: the call aborts.
+            (
+                "transfer(address,address,uint256)",
+                vec![owner.clone(), to.clone(), Value::uint(100)],
+                true,
+                vec![balances],
+            ),
+            (
+                "balanceOf(address)",
+                vec![owner.clone()],
+                false,
+                vec![balances],
+            ),
+            (
+                "allowanceOf(address,address)",
+                vec![owner.clone(), spender.clone()],
+                false,
+                vec![allowances],
+            ),
+            (
+                "transferFrom(address,address,address,uint256)",
+                vec![owner.clone(), spender.clone(), to.clone(), Value::uint(2)],
+                false,
+                vec![balances, allowances],
+            ),
+        ];
+        for (index, (entrypoint, args, aborts, loaded)) in calls.into_iter().enumerate() {
+            let before = sealed_record_addresses(&instance.state);
+            let result = instance.call(entrypoint, args).unwrap();
+            assert_eq!(result.aborted, aborts, "call {index}, {entrypoint}");
+            let after = sealed_record_addresses(&instance.state);
+            for id in &ids {
+                assert_eq!(
+                    after[id] != before[id],
+                    loaded.contains(id),
+                    "call {index}, {entrypoint}, object {id}"
+                );
+                // Of a map it loaded, a call replaces the records it wrote:
+                // the paths it read and the metadata pages. The others are
+                // the committed map's own records still.
+                if loaded.contains(id) {
+                    let replaced = after[id]
+                        .iter()
+                        .zip(&before[id])
+                        .filter(|(after, before)| after != before)
+                        .count();
+                    assert!(
+                        0 < replaced && replaced < after[id].len(),
+                        "call {index}, {entrypoint}, object {id}: {replaced} of {}",
+                        after[id].len()
+                    );
+                }
+            }
+        }
+
+        // A call that fails replaces nothing.
+        let before = sealed_record_addresses(&instance.state);
+        assert!(instance
+            .call("mint(address,uint256)", vec![owner.clone()])
+            .is_err());
+        assert_eq!(sealed_record_addresses(&instance.state), before);
+    }
+
+    /// An object keeps the digest of its sealed records, so a digest of the
+    /// ciphertext reads the records of the objects written since the last
+    /// one and of no other. The digest is what reading every record again
+    /// gives.
+    #[test]
+    fn a_ciphertext_digest_reads_only_the_objects_written_since_the_last() {
+        let artifact = compile_bench(
+            bench_raw!("ERC20Lite.sol"),
+            include_str!(bench_raw!("ERC20Lite.private-posmap.yaml")),
+            ProgramMode::Uo,
+        );
+        let mut instance = ContractInstance::deploy_with_seed(artifact, 0x37).unwrap();
+        // The digest, and how many objects it read the records of.
+        let digest = |instance: &ContractInstance| {
+            let before = crate::instrumentation::sealed_records_digests_computed();
+            let digest = instance.state.ciphertext_store_digest().unwrap();
+            let read = crate::instrumentation::sealed_records_digests_computed() - before;
+            assert_eq!(
+                digest,
+                instance
+                    .state
+                    .ciphertext_store_digest_from_records()
+                    .unwrap()
+            );
+            (digest, read)
+        };
+        let (deployed, read) = digest(&instance);
+        assert_eq!(read, 2);
+        assert_eq!(digest(&instance), (deployed.clone(), 0));
+        // A staged runtime has the committed objects, digests included.
+        let staged = crate::runtime::stage_contract_runtime(&instance.state).unwrap();
+        let before = crate::instrumentation::sealed_records_digests_computed();
+        assert_eq!(staged.ciphertext_store_digest().unwrap(), deployed);
+        assert_eq!(
+            crate::instrumentation::sealed_records_digests_computed(),
+            before
+        );
+        drop(staged);
+
+        let owner = Value::Address([0xA1; 20]);
+        let spender = Value::Address([0xB2; 20]);
+        let to = Value::Address([0xC3; 20]);
+        // (entrypoint, arguments, the objects it loads)
+        let calls: Vec<(&str, Vec<Value>, u64)> = vec![
+            (
+                "mint(address,uint256)",
+                vec![owner.clone(), Value::uint(10)],
+                1,
+            ),
+            (
+                "approve(address,address,uint256)",
+                vec![owner.clone(), spender.clone(), Value::uint(5)],
+                1,
+            ),
+            // This one aborts, and writes what a committed one does.
+            (
+                "transfer(address,address,uint256)",
+                vec![owner.clone(), to.clone(), Value::uint(100)],
+                1,
+            ),
+            // A read of a Path ORAM map writes the path it read.
+            ("balanceOf(address)", vec![owner.clone()], 1),
+            (
+                "transferFrom(address,address,address,uint256)",
+                vec![owner.clone(), spender.clone(), to.clone(), Value::uint(2)],
+                2,
+            ),
+        ];
+        let mut last = deployed;
+        for (index, (entrypoint, args, loaded)) in calls.into_iter().enumerate() {
+            instance.call(entrypoint, args).unwrap();
+            let (next, read) = digest(&instance);
+            assert_eq!(read, loaded, "call {index}, {entrypoint}");
+            assert_ne!(next, last, "call {index}, {entrypoint}");
+            assert_eq!(digest(&instance), (next.clone(), 0));
+            last = next;
+        }
+
+        // A call that fails writes nothing, and nothing is read again.
+        assert!(instance.call("mint(address,uint256)", vec![owner]).is_err());
+        assert_eq!(digest(&instance), (last, 0));
+    }
+
     #[test]
     fn an_abort_on_a_large_full_scan_map_stays_within_the_allocator_budget() {
         // An aborting call once opened every slot of an exact map a second

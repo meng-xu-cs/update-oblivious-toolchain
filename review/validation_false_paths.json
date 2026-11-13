@@ -367,6 +367,7 @@
     "false_count": 0,
     "false_paths": [],
     "top_level_booleans": {
+      "a_call_copies_no_committed_object": true,
       "accepted": true,
       "all_kernel_restricted_signatures_present": true,
       "all_restricted_signatures_present": true,

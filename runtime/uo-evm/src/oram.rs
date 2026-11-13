@@ -2,13 +2,14 @@ use crate::freshness::PathOramLeafSeed;
 use anyhow::{anyhow, bail, Result};
 use rand_chacha::ChaCha20Rng;
 use serde_json::json;
+use std::sync::Arc;
 use uo_allocator::{AllocatorPlan, AllocatorSession};
 use uo_core::ir::StateObject;
 use uo_core::manifest::{
     is_path_oram_scheme, OramManifest, PATH_ORAM_PRIVATE_POSMAP_SCHEME, SURROGATE_ORAM_SCHEME,
 };
 use uo_core::trace::{LogicalEvent, PhysicalReadEvent, WriteClass};
-use uo_core::Value;
+use uo_core::{FixedBoxBuilder, Value};
 // A production build decodes no position-map witness: the two functions
 // that do are compiled into test and diagnostics builds alone.
 #[cfg_attr(not(any(test, feature = "diagnostics")), allow(unused_imports))]
@@ -163,9 +164,58 @@ impl OramParameters {
 
 #[derive(Debug)]
 pub(crate) struct OramStorage {
-    directory_pages: Box<[Box<[u8]>]>,
-    buckets: Box<[Box<[u8]>]>,
+    directory_pages: Box<[SealedPage]>,
+    buckets: Box<[SealedPage]>,
     access_counter_slot: Box<[u8]>,
+}
+
+/// One sealed record of a map's storage: a bucket or a metadata page. The
+/// committed map and the copy of it that a call loads hold the same record,
+/// so loading a map copies no record. A write to a record that another
+/// state holds copies it first and changes the copy: the committed map is
+/// as it was until the call commits. A record this state alone holds is
+/// written in place.
+#[derive(Clone, Debug)]
+pub(crate) struct SealedPage(Arc<[u8]>);
+
+impl SealedPage {
+    /// The records of a map's storage, each held by this state alone.
+    fn from_records(records: Box<[Box<[u8]>]>) -> Result<Box<[Self]>> {
+        let mut pages = FixedBoxBuilder::new(records.len());
+        for record in std::iter::IntoIterator::into_iter(records) {
+            pages.push(Self::from(record))?;
+        }
+        pages.finish()
+    }
+
+    /// Zero the record if no other state holds it. A record that another
+    /// state holds is ciphertext that state still reads.
+    pub(crate) fn wipe(&mut self) {
+        if let Some(bytes) = Arc::get_mut(&mut self.0) {
+            bytes.fill(0);
+        }
+    }
+}
+
+impl From<Box<[u8]>> for SealedPage {
+    fn from(record: Box<[u8]>) -> Self {
+        Self(Arc::from(record))
+    }
+}
+
+impl std::ops::Deref for SealedPage {
+    type Target = [u8];
+
+    fn deref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl std::ops::DerefMut for SealedPage {
+    /// The record, to write it: a copy of it if another state holds it.
+    fn deref_mut(&mut self) -> &mut [u8] {
+        Arc::make_mut(&mut self.0)
+    }
 }
 
 #[derive(Debug)]
@@ -535,10 +585,6 @@ impl OramState {
         Ok(cloned)
     }
 
-    pub(crate) fn clone_committed_cold(&self, spec: &StateObject) -> Result<Self> {
-        cold_clone_oram_state(spec, self)
-    }
-
     /// The map's slots as the call sees them. On a Path ORAM map they are its
     /// directory, each slot's occupancy and key with no value: the values
     /// live only in the blocks.
@@ -575,8 +621,8 @@ impl OramState {
                 stash: FixedStash::placeholder(),
                 tree: Some(tree),
                 storage: OramStorage {
-                    directory_pages,
-                    buckets,
+                    directory_pages: SealedPage::from_records(directory_pages)?,
+                    buckets: SealedPage::from_records(buckets)?,
                     access_counter_slot: bootstrap_oram_counter_slot(spec, &cipher, rng)?,
                 },
                 access_counter: 0,
@@ -608,8 +654,8 @@ impl OramState {
                 stash: FixedStash::placeholder(),
                 tree: None,
                 storage: OramStorage {
-                    directory_pages,
-                    buckets,
+                    directory_pages: SealedPage::from_records(directory_pages)?,
+                    buckets: SealedPage::from_records(buckets)?,
                     access_counter_slot: bootstrap_oram_counter_slot(spec, &cipher, rng)?,
                 },
                 access_counter: 0,
@@ -654,8 +700,8 @@ impl OramState {
                 stash,
                 tree: None,
                 storage: OramStorage {
-                    directory_pages,
-                    buckets,
+                    directory_pages: SealedPage::from_records(directory_pages)?,
+                    buckets: SealedPage::from_records(buckets)?,
                     access_counter_slot: bootstrap_oram_counter_slot(spec, &cipher, rng)?,
                 },
                 access_counter: 0,
@@ -950,7 +996,8 @@ mod tests {
         encode_path_metadata_pages, generated_oram_codecs::decode_path_metadata_pages,
         oram_bucket_bytes, oram_bucket_from_entries, oram_bucket_with_live_blocks,
         repeat_boxed_map_entries, repeat_boxed_masked_usize_options, MapEntry, MaskedUsizeOption,
-        OramBlock, OramParameters, OramState, PathOramLeafCoinSource, SURROGATE_ORAM_SCHEME,
+        OramBlock, OramParameters, OramState, PathOramLeafCoinSource, SealedPage,
+        SURROGATE_ORAM_SCHEME,
     };
     use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
@@ -1027,9 +1074,8 @@ mod tests {
         spec: &StateObject,
         state: &OramState,
     ) -> (Vec<MapEntry>, Vec<Option<usize>>) {
-        let mut rebuilt = state.clone_committed_cold(spec).unwrap();
-        let mut allocator = allocator_for_path_oram(&rebuilt.parameters);
-        rebuilt.refresh_from_storage(spec, &mut allocator).unwrap();
+        let mut allocator = allocator_for_path_oram(&state.parameters);
+        let rebuilt = state.clone_for_tx(spec, &mut allocator).unwrap();
         (
             map_entries_snapshot(&rebuilt.entries),
             options_from_masked_position_map(&rebuilt.position_map),
@@ -1081,15 +1127,18 @@ mod tests {
         }
         state.stash = working_stash;
         let mut allocator = allocator_for_path_oram(&state.parameters);
-        state.storage.directory_pages = encode_path_metadata_pages(
-            spec,
-            &state.parameters,
-            &state.cipher,
-            &masked_position_map,
-            &state.entries,
-            &stash,
-            &mut allocator,
-            &mut rng,
+        state.storage.directory_pages = SealedPage::from_records(
+            encode_path_metadata_pages(
+                spec,
+                &state.parameters,
+                &state.cipher,
+                &masked_position_map,
+                &state.entries,
+                &stash,
+                &mut allocator,
+                &mut rng,
+            )
+            .unwrap(),
         )
         .unwrap();
         state
@@ -1138,15 +1187,18 @@ mod tests {
         for (slot, key) in directory {
             entries[*slot] = MapEntry::new(true, key.clone(), Value::uint(0));
         }
-        state.storage.directory_pages = encode_path_metadata_pages(
-            spec,
-            &state.parameters,
-            &state.cipher,
-            &masked_position_map,
-            &entries,
-            stash,
-            &mut allocator,
-            &mut rng,
+        state.storage.directory_pages = SealedPage::from_records(
+            encode_path_metadata_pages(
+                spec,
+                &state.parameters,
+                &state.cipher,
+                &masked_position_map,
+                &entries,
+                stash,
+                &mut allocator,
+                &mut rng,
+            )
+            .unwrap(),
         )
         .unwrap();
     }
@@ -1334,6 +1386,51 @@ mod tests {
         assert!(overflowed);
     }
 
+    /// A sealed record of a map's storage is shared by the states that
+    /// hold it. A write to a record that another state holds changes a copy
+    /// and leaves the other state its own; a write to a record held alone
+    /// is made in place. Wiping zeroes a record only when no other state
+    /// holds it.
+    #[test]
+    fn a_shared_sealed_record_is_copied_when_it_is_written() {
+        let record: Box<[u8]> = vec![7u8; 64].into_boxed_slice();
+        let mut committed = SealedPage::from(record);
+        let committed_ptr = committed.as_ptr();
+
+        // A record held alone is written where it is.
+        committed[0] = 8;
+        assert_eq!(committed.as_ptr(), committed_ptr);
+
+        // Loading shares it.
+        let mut loaded = committed.clone();
+        assert_eq!(loaded.as_ptr(), committed_ptr);
+        // Wiping a shared record leaves it.
+        loaded.wipe();
+        assert_eq!(loaded[..2], [8, 7]);
+        assert_eq!(loaded.as_ptr(), committed_ptr);
+
+        // A write copies it, and the other holder has the record as it was.
+        loaded[1] = 9;
+        assert_ne!(loaded.as_ptr(), committed_ptr);
+        assert_eq!(loaded[..2], [8, 9]);
+        assert_eq!(committed[..2], [8, 7]);
+        assert_eq!(committed.as_ptr(), committed_ptr);
+        // The copy is now held alone and is written in place.
+        let loaded_ptr = loaded.as_ptr();
+        loaded[2] = 10;
+        assert_eq!(loaded.as_ptr(), loaded_ptr);
+
+        // A record held alone is zeroed by a wipe.
+        loaded.wipe();
+        assert!(loaded.iter().all(|byte| *byte == 0));
+        assert_eq!(committed[..2], [8, 7]);
+        // Once the other holder is gone, so is this one.
+        let mut last = committed.clone();
+        drop(committed);
+        last.wipe();
+        assert!(last.iter().all(|byte| *byte == 0));
+    }
+
     #[test]
     fn surrogate_commit_reads_old_entries_from_storage_on_abort() {
         let spec = oram_spec();
@@ -1349,22 +1446,25 @@ mod tests {
             value: Value::uint(7),
         };
 
+        // Where the records of a state's storage are, and what they hold.
+        fn page_ptrs(pages: &[SealedPage]) -> Vec<*const u8> {
+            pages.iter().map(|page| page.as_ptr()).collect()
+        }
+        fn page_bytes(pages: &[SealedPage]) -> Vec<Vec<u8>> {
+            pages.iter().map(|page| page.to_vec()).collect()
+        }
+        let old_directory_pages = page_bytes(&old.storage.directory_pages);
+        let old_buckets = page_bytes(&old.storage.buckets);
+
         let mut shadow_allocator = allocator_for_path_oram(&old.parameters);
         let mut new = old.clone_for_tx(&spec, &mut shadow_allocator).unwrap();
         shadow_allocator.finish().unwrap();
         let entries_ptr = new.entries.as_ptr();
-        let directory_page_ptrs = new
-            .storage
-            .directory_pages
-            .iter()
-            .map(|page| page.as_ptr())
-            .collect::<Vec<_>>();
-        let bucket_ptrs = new
-            .storage
-            .buckets
-            .iter()
-            .map(|bucket| bucket.as_ptr())
-            .collect::<Vec<_>>();
+        // The loaded map holds the committed map's records: none is copied.
+        let directory_page_ptrs = page_ptrs(&new.storage.directory_pages);
+        let bucket_ptrs = page_ptrs(&new.storage.buckets);
+        assert_eq!(directory_page_ptrs, page_ptrs(&old.storage.directory_pages));
+        assert_eq!(bucket_ptrs, page_ptrs(&old.storage.buckets));
         let counter_ptr = new.storage.access_counter_slot.as_ptr();
         new.entries[0] = MapEntry {
             occupied: true,
@@ -1381,25 +1481,40 @@ mod tests {
 
         assert_eq!(map_entries_snapshot(&commit.next.entries), expected_entries);
         assert_eq!(commit.next.entries.as_ptr(), entries_ptr);
+        // The commit wrote every metadata page and a window of buckets. A
+        // record it wrote is a copy of its own, since the committed map
+        // holds the record it replaces; a record it did not write is still
+        // the committed map's. The committed map is as it was.
+        let next_directory_page_ptrs = page_ptrs(&commit.next.storage.directory_pages);
+        assert_eq!(next_directory_page_ptrs.len(), directory_page_ptrs.len());
+        assert!(next_directory_page_ptrs
+            .iter()
+            .zip(&directory_page_ptrs)
+            .all(|(next, loaded)| next != loaded));
+        let next_bucket_ptrs = page_ptrs(&commit.next.storage.buckets);
+        assert_eq!(next_bucket_ptrs.len(), bucket_ptrs.len());
+        let written_buckets = next_bucket_ptrs
+            .iter()
+            .zip(&bucket_ptrs)
+            .filter(|(next, loaded)| next != loaded)
+            .count();
         assert_eq!(
+            written_buckets,
             commit
                 .next
-                .storage
-                .directory_pages
-                .iter()
-                .map(|page| page.as_ptr())
-                .collect::<Vec<_>>(),
-            directory_page_ptrs
+                .parameters
+                .buckets_per_access
+                .min(bucket_ptrs.len())
         );
+        assert_eq!(page_ptrs(&old.storage.buckets), bucket_ptrs);
         assert_eq!(
-            commit
-                .next
-                .storage
-                .buckets
-                .iter()
-                .map(|bucket| bucket.as_ptr())
-                .collect::<Vec<_>>(),
-            bucket_ptrs
+            page_bytes(&old.storage.directory_pages),
+            old_directory_pages
+        );
+        assert_eq!(page_bytes(&old.storage.buckets), old_buckets);
+        assert_ne!(
+            page_bytes(&commit.next.storage.directory_pages),
+            old_directory_pages
         );
         assert_eq!(
             commit.next.storage.access_counter_slot.as_ptr(),
@@ -1407,10 +1522,10 @@ mod tests {
         );
         assert_eq!(commit.next.access_counter, 1);
 
-        let mut rebuilt = commit.next.clone_committed_cold(&spec).unwrap();
-        let mut refresh_allocator = allocator_for_path_oram(&rebuilt.parameters);
-        rebuilt
-            .refresh_from_storage(&spec, &mut refresh_allocator)
+        let mut refresh_allocator = allocator_for_path_oram(&commit.next.parameters);
+        let rebuilt = commit
+            .next
+            .clone_for_tx(&spec, &mut refresh_allocator)
             .unwrap();
         refresh_allocator.finish().unwrap();
         assert_eq!(map_entries_snapshot(&rebuilt.entries), expected_entries);
@@ -1660,9 +1775,14 @@ mod tests {
             max_load_ops: 0,
         })
         .unwrap();
-        let err =
-            decode_path_metadata_pages(&spec, &parameters, &cipher, &pages, &mut decode_allocator)
-                .unwrap_err();
+        let err = decode_path_metadata_pages(
+            &spec,
+            &parameters,
+            &cipher,
+            &SealedPage::from_records(pages.clone()).unwrap(),
+            &mut decode_allocator,
+        )
+        .unwrap_err();
         assert!(err
             .to_string()
             .contains("decoded ORAM stash for balances exceeds manifest bound"));
@@ -1711,9 +1831,14 @@ mod tests {
             max_load_ops: 0,
         })
         .unwrap();
-        let (decoded_position_map, decoded_stash) =
-            decode_path_metadata_pages(&spec, &parameters, &cipher, &pages, &mut decode_allocator)
-                .unwrap();
+        let (decoded_position_map, decoded_stash) = decode_path_metadata_pages(
+            &spec,
+            &parameters,
+            &cipher,
+            &SealedPage::from_records(pages.clone()).unwrap(),
+            &mut decode_allocator,
+        )
+        .unwrap();
         assert_eq!(
             options_from_masked_position_map(decoded_position_map.as_ref()),
             position_map_options
@@ -1883,7 +2008,8 @@ mod tests {
         state.storage.buckets[leaf_bucket] = state
             .cipher
             .seal_and_wipe_boxed(aad.as_bytes(), &mut payload, &mut rng)
-            .unwrap();
+            .unwrap()
+            .into();
 
         let mut allocator = allocator_for_path_oram(&state.parameters);
         state.refresh_from_storage(&spec, &mut allocator).unwrap();
@@ -1934,7 +2060,8 @@ mod tests {
         state.storage.buckets[0] = state
             .cipher
             .seal_and_wipe_boxed(aad.as_bytes(), &mut payload, &mut rng)
-            .unwrap();
+            .unwrap()
+            .into();
 
         let mut allocator = allocator_for_path_oram(&state.parameters);
         state.refresh_from_storage(&spec, &mut allocator).unwrap();
@@ -2030,7 +2157,8 @@ mod tests {
         state.storage.buckets[off_path_bucket] = state
             .cipher
             .seal_and_wipe_boxed(aad.as_bytes(), &mut payload, &mut rng)
-            .unwrap();
+            .unwrap()
+            .into();
 
         let mut allocator = allocator_for_path_oram(&state.parameters);
         state.refresh_from_storage(&spec, &mut allocator).unwrap();

@@ -398,7 +398,15 @@ at 16,384 entries where it took 393 ms, and 0.05 ms at 4,096 where it took
 99 ms. What is left is the copy of the two position maps into the call's
 evidence. It grows with the capacity as that evidence does (2.6 MB of JSON
 for a tree read at 16,384 entries), and a production call makes no such
-copy. The full profile is run again when Issues 37 and 38 are done, and the
+copy.
+
+Nor does a call copy the store any more (Issue 37 of the review). In the
+quick profile, staging a call takes a microsecond at every capacity, where
+it took 6.5 ms on the tree and 1.7 ms on the full scan at 16,384 entries,
+and loading the tree takes 1.4 ms there where it took 6.2 ms: the call
+takes a reference to each sealed record of the map and copies only the
+records it writes. Loading a full-scan map is still the decryption of every
+slot. The full profile is run again when Issue 38 is done, and the
 whole-call figures above stand until then.
 
 Against the baseline, at 16,384 entries: a full-scan read took 72.2 ms of
@@ -416,10 +424,10 @@ a tree read was the faster one from 4,096 entries and a tree write the
 slower one at every capacity. The full scan's saving on reads moved the
 first break-even up to 16,384 entries, and the tree's saving brought its
 write level with the full scan's there. The tree's advantage in bytes,
-physical operations and gas is as it was. What still grows with the store
-on the tree is the copy of the state and the load of the map (Issue 37 of
-the review); the profile is run again when that issue and Issue 38 are
-done.
+physical operations and gas is as it was. The copy of the state and most of
+the load of the map, which this profile still has on the tree, are gone
+since (Issue 37 of the review, above); the profile is run again when Issue
+38 is done.
 
 The sweep also found a defect, which is fixed. An aborting call opened every
 slot of an exact map again to restore it, and the allocator's budget of
@@ -457,9 +465,18 @@ consume and compares them with a decode of every bucket of a tree before
 and after each call, so an audited call takes time linear in the capacity
 even where the ORAM's own work is logarithmic; a measured call and a
 production call do not pay for the audit, and a production call exports no
-witness. What still grows with the store in every call on the tree is the
-copy of the committed state and the load of the map, and in a production
-call the digest of the stored ciphertext (Issue 37 of the review).
+witness.
+
+A call no longer copies the store either (Issue 37 of the review). It is
+staged on the committed objects themselves, which are held by reference,
+and the copy of a Path ORAM map that it loads shares the map's sealed
+records: a write copies the record it replaces, and the others stay the
+committed map's. An object keeps the digest of its sealed records, so the
+ciphertext digest of a production receipt reads the objects the call wrote
+and no other. What a call on the tree still does in the size of the map is
+small: it takes a reference to each record when it loads the map and drops
+one when it commits. The digest of a map the call wrote reads the whole
+map; a tree of digests over its buckets is future work (Issue 44).
 
 ## Current Route
 

@@ -20,7 +20,7 @@ use super::{
     decode_oram_directory_page_into_slice, decode_scalar_value, encode_oram_directory_page_into,
     filler_boxed_oram_payload, fixed_scalar_width, reseal_oram_payload_and_record_write,
     seal_boxed_oram_payload, with_opened_oram_payload, MapEntry, OramParameters, OramState,
-    OramTranscript, OramWrite, OramWriteBatch, OramWriteLog, PathOramLeafCoinSource,
+    OramTranscript, OramWrite, OramWriteBatch, OramWriteLog, PathOramLeafCoinSource, SealedPage,
     ORAM_DIRECTORY_PAGE_ENTRIES, ORAM_LEAF_LABEL_BYTES, ORAM_SLOT_INDEX_BYTES,
 };
 
@@ -519,8 +519,8 @@ impl OramState {
             stash: FixedStash::placeholder(),
             tree: None,
             storage: super::OramStorage {
-                directory_pages: Box::<[Box<[u8]>]>::default(),
-                buckets: Box::<[Box<[u8]>]>::default(),
+                directory_pages: Box::<[SealedPage]>::default(),
+                buckets: Box::<[SealedPage]>::default(),
                 access_counter_slot: Box::<[u8]>::default(),
             },
             access_counter: 0,
@@ -542,10 +542,10 @@ impl OramState {
             tree.wipe_secrets();
         }
         for page in &mut self.storage.directory_pages {
-            page.fill(0);
+            page.wipe();
         }
         for bucket in &mut self.storage.buckets {
-            bucket.fill(0);
+            bucket.wipe();
         }
         self.storage.access_counter_slot.fill(0);
         self.access_counter = 0;
@@ -1006,7 +1006,7 @@ pub(super) fn rewrite_surrogate_directory_pages_in_place(
     empty_entry: &MapEntry,
     allocator: &mut AllocatorSession,
     rng: &mut ChaCha20Rng,
-    directory_pages: &mut [Box<[u8]>],
+    directory_pages: &mut [SealedPage],
     writes: &mut OramWriteLog,
 ) -> Result<()> {
     if directory_pages.len() != parameters.metadata_pages {
@@ -1053,7 +1053,7 @@ pub(super) fn rewrite_surrogate_bucket_window_in_place(
     access_counter: u64,
     allocator: &mut AllocatorSession,
     rng: &mut ChaCha20Rng,
-    buckets: &mut [Box<[u8]>],
+    buckets: &mut [SealedPage],
     writes: &mut OramWriteLog,
 ) -> Result<()> {
     if buckets.len() != parameters.bucket_count {
@@ -1971,7 +1971,7 @@ pub(super) fn decode_surrogate_entries_from_storage_into(
     spec: &StateObject,
     parameters: &OramParameters,
     cipher: &StoreCipher,
-    directory_pages: &[Box<[u8]>],
+    directory_pages: &[SealedPage],
     allocator: &mut AllocatorSession,
     empty_entry: &MapEntry,
     entries: &mut [MapEntry],
@@ -2072,7 +2072,7 @@ pub(super) fn path_position_map_witness_leaves(
     spec: &StateObject,
     parameters: &OramParameters,
     cipher: &StoreCipher,
-    directory_pages: &[Box<[u8]>],
+    directory_pages: &[SealedPage],
 ) -> Result<Box<[RuntimeMaskedUsizeOptionWitness]>> {
     let position_map = path_position_map_from_storage(spec, parameters, cipher, directory_pages)?;
     position_map_to_witness_boxed(&position_map)
@@ -2640,7 +2640,7 @@ pub(super) fn rewrite_path_metadata_pages_in_place(
     stash: &[OramBlock],
     allocator: &mut AllocatorSession,
     rng: &mut ChaCha20Rng,
-    directory_pages: &mut [Box<[u8]>],
+    directory_pages: &mut [SealedPage],
     writes: &mut OramWriteLog,
 ) -> Result<()> {
     if directory_pages.len() != parameters.metadata_pages {
@@ -2714,7 +2714,7 @@ pub(super) fn decode_path_metadata_pages(
     spec: &StateObject,
     parameters: &OramParameters,
     cipher: &StoreCipher,
-    pages: &[Box<[u8]>],
+    pages: &[SealedPage],
     allocator: &mut AllocatorSession,
 ) -> Result<(Box<[MaskedUsizeOption]>, FixedStash)> {
     let mut position_map =
@@ -2738,7 +2738,7 @@ pub(super) fn decode_path_metadata_pages_into(
     spec: &StateObject,
     parameters: &OramParameters,
     cipher: &StoreCipher,
-    pages: &[Box<[u8]>],
+    pages: &[SealedPage],
     allocator: &mut AllocatorSession,
     position_map: &mut [MaskedUsizeOption],
     entries: &mut [MapEntry],
@@ -2833,7 +2833,7 @@ pub(super) fn load_path_buckets_into_stash(
     spec: &StateObject,
     parameters: &OramParameters,
     cipher: &StoreCipher,
-    buckets: &[Box<[u8]>],
+    buckets: &[SealedPage],
     access_leaf: usize,
     allocator: &mut AllocatorSession,
     stash: &mut FixedStash,
@@ -2923,7 +2923,7 @@ pub(super) fn rebuild_path_buckets_from_stash(
     spec: &StateObject,
     parameters: &OramParameters,
     cipher: &StoreCipher,
-    buckets: &mut [Box<[u8]>],
+    buckets: &mut [SealedPage],
     access_leaf: usize,
     allocator: &mut AllocatorSession,
     rng: &mut ChaCha20Rng,
@@ -3073,7 +3073,7 @@ pub(super) fn reconstruct_path_entries_from_storage_into(
     spec: &StateObject,
     parameters: &OramParameters,
     cipher: &StoreCipher,
-    buckets: &[Box<[u8]>],
+    buckets: &[SealedPage],
     allocator: &mut AllocatorSession,
     empty_entry: &MapEntry,
     position_map: &[MaskedUsizeOption],
@@ -3175,7 +3175,7 @@ pub(super) fn refresh_path_state_from_storage(
     spec: &StateObject,
     parameters: &OramParameters,
     cipher: &StoreCipher,
-    directory_pages: &[Box<[u8]>],
+    directory_pages: &[SealedPage],
     allocator: &mut AllocatorSession,
     empty_entry: &MapEntry,
     position_map: &mut [MaskedUsizeOption],
@@ -3214,8 +3214,8 @@ pub(super) fn path_entries_from_storage(
     spec: &StateObject,
     parameters: &OramParameters,
     cipher: &StoreCipher,
-    directory_pages: &[Box<[u8]>],
-    buckets: &[Box<[u8]>],
+    directory_pages: &[SealedPage],
+    buckets: &[SealedPage],
     empty_entry: &MapEntry,
 ) -> Result<Box<[MapEntry]>> {
     let scratch = parameters
@@ -3266,7 +3266,7 @@ pub(super) fn decode_path_position_map_pages(
     spec: &StateObject,
     parameters: &OramParameters,
     cipher: &StoreCipher,
-    pages: &[Box<[u8]>],
+    pages: &[SealedPage],
     allocator: &mut AllocatorSession,
 ) -> Result<Box<[MaskedUsizeOption]>> {
     let mut position_map =
@@ -3287,7 +3287,7 @@ pub(super) fn path_position_map_from_storage(
     spec: &StateObject,
     parameters: &OramParameters,
     cipher: &StoreCipher,
-    directory_pages: &[Box<[u8]>],
+    directory_pages: &[SealedPage],
 ) -> Result<Box<[MaskedUsizeOption]>> {
     let scratch = parameters.directory_page_bytes.max(8);
     // One payload opened per position-map page.
@@ -3312,7 +3312,7 @@ pub(super) fn decode_path_position_map_pages_into(
     spec: &StateObject,
     parameters: &OramParameters,
     cipher: &StoreCipher,
-    pages: &[Box<[u8]>],
+    pages: &[SealedPage],
     allocator: &mut AllocatorSession,
     position_map: &mut [MaskedUsizeOption],
     mut directory: Option<&mut [MapEntry]>,
@@ -5255,7 +5255,7 @@ pub(super) fn refresh_tree_state_from_storage(
     spec: &StateObject,
     parameters: &OramParameters,
     cipher: &StoreCipher,
-    directory_pages: &[Box<[u8]>],
+    directory_pages: &[SealedPage],
     allocator: &mut AllocatorSession,
     state: &mut TreeState,
 ) -> Result<()> {

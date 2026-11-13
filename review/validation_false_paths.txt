@@ -367,6 +367,7 @@ false_paths:
 ## results/runtime_boundary_validation.json
 false_count: 0
 top_level_booleans:
+  a_call_copies_no_committed_object: true
   accepted: true
   all_kernel_restricted_signatures_present: true
   all_restricted_signatures_present: true

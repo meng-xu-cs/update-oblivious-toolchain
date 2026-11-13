@@ -43,12 +43,13 @@ pub(crate) fn ensure_contract_runtime_cold(
     runtime.ensure_cold(expected_object_ids, context)
 }
 
-/// Deep cold clone of the committed runtime for staged (transactional)
-/// execution. The returned runtime is mutated by `run_contract_call` and
+/// The committed runtime for staged (transactional) execution: a runtime
+/// that holds the committed objects themselves, shared and not copied.
+/// `run_contract_call` replaces in it the objects the call loaded, and it is
 /// committed back into the engine only on full success.
 pub(crate) fn stage_contract_runtime(runtime: &ContractRuntime) -> Result<ContractRuntime> {
-    // The committed state must be cold before it is cloned for staging; cloning
-    // cold-ifies objects, so this gate runs on the original committed state.
+    // The committed state must be cold before a call is staged on it: the
+    // staged runtime shares its objects.
     runtime.ensure_committed_cold_for_call()?;
     crate::instrumentation::time_staging(|| runtime.staged_clone())
 }

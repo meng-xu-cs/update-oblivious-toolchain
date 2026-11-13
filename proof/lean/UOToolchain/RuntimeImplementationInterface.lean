@@ -4065,20 +4065,29 @@ def RuntimeImplementationInterface.runtimeShadowStateUsesFixedSortedCommitTable
   sourceContainsAll iface.stateProductionSource
     [ "pub(in crate::runtime) fn shadow_load("
     , ".clone_for_shadow(object_ids, recorder, allocator)?,"
-    , "object: object.clone_for_tx(trace, allocator)?,"
+    , "object.clone_for_tx(trace, allocator)?,"
     , "pub(in crate::runtime) fn commit_against("
     , "let shadow_len = self.objects.len();"
     , "std::iter::IntoIterator::into_iter(std::mem::take(&mut self.objects).into_entries())"
     , ".peekable();"
     , "let mut next_objects = FixedBoxBuilder::new(committed.objects.len());"
     , "let mut committed_object_ids = FixedBoxBuilder::new(shadow_len);"
-    , "for (id, old) in committed.objects.iter() {"
+    , "for old in committed.objects.entries.iter() {"
+    , "let id = old.object_id;"
     , "match shadow.peek().map(|entry| entry.object_id.cmp(&id)) {"
     , "let may_write = may_write_objects.contains(&id);"
-    , ".commit(old, aborted, may_write, recorder, allocator)?;"
-    , "old.clone_committed_cold()?,"
-    , "found_index.and_then(|index| self.entries.get(index).map(|entry| &entry.object))"
-    , "found_index.and_then(|index| self.entries.get_mut(index).map(|entry| &mut entry.object))"
+    , "object.commit(old.object(), aborted, may_write, recorder, allocator)?;"
+    -- A committed object is shared, not copied: staging a call makes a
+    -- table of the committed objects, and a commit puts new objects in the
+    -- place of those the call loaded and keeps the others as they are.
+    , "next_objects.push(old.share())?;"
+    , "fn share(&self) -> Self {\n        Self {\n            object_id: self.object_id,\n            object: Arc::clone(&self.object),\n        }\n    }"
+    , "let object = entry.into_owned().ok_or_else(|| {"
+    , "found_index.and_then(|index| self.entries.get(index).map(RuntimeObjectEntry::object))"
+    , ".and_then(RuntimeObjectEntry::object_mut)"
+    -- An object keeps the digest of its sealed records, and forgets it
+    -- when it is handed out to be changed.
+    , "let held = Arc::get_mut(&mut self.object)?;\n        held.sealed_records = OnceLock::new();\n        Some(&mut held.object)"
     , "self.objects = RuntimeObjectTable::new(next_objects.finish()?);"
     , "committed_object_ids.finish()"
     ] ∧
@@ -4097,20 +4106,29 @@ def RuntimeImplementationInterface.checkRuntimeShadowStateUsesFixedSortedCommitT
   checkSourceContainsAll iface.stateProductionSource
     [ "pub(in crate::runtime) fn shadow_load("
     , ".clone_for_shadow(object_ids, recorder, allocator)?,"
-    , "object: object.clone_for_tx(trace, allocator)?,"
+    , "object.clone_for_tx(trace, allocator)?,"
     , "pub(in crate::runtime) fn commit_against("
     , "let shadow_len = self.objects.len();"
     , "std::iter::IntoIterator::into_iter(std::mem::take(&mut self.objects).into_entries())"
     , ".peekable();"
     , "let mut next_objects = FixedBoxBuilder::new(committed.objects.len());"
     , "let mut committed_object_ids = FixedBoxBuilder::new(shadow_len);"
-    , "for (id, old) in committed.objects.iter() {"
+    , "for old in committed.objects.entries.iter() {"
+    , "let id = old.object_id;"
     , "match shadow.peek().map(|entry| entry.object_id.cmp(&id)) {"
     , "let may_write = may_write_objects.contains(&id);"
-    , ".commit(old, aborted, may_write, recorder, allocator)?;"
-    , "old.clone_committed_cold()?,"
-    , "found_index.and_then(|index| self.entries.get(index).map(|entry| &entry.object))"
-    , "found_index.and_then(|index| self.entries.get_mut(index).map(|entry| &mut entry.object))"
+    , "object.commit(old.object(), aborted, may_write, recorder, allocator)?;"
+    -- A committed object is shared, not copied: staging a call makes a
+    -- table of the committed objects, and a commit puts new objects in the
+    -- place of those the call loaded and keeps the others as they are.
+    , "next_objects.push(old.share())?;"
+    , "fn share(&self) -> Self {\n        Self {\n            object_id: self.object_id,\n            object: Arc::clone(&self.object),\n        }\n    }"
+    , "let object = entry.into_owned().ok_or_else(|| {"
+    , "found_index.and_then(|index| self.entries.get(index).map(RuntimeObjectEntry::object))"
+    , ".and_then(RuntimeObjectEntry::object_mut)"
+    -- An object keeps the digest of its sealed records, and forgets it
+    -- when it is handed out to be changed.
+    , "let held = Arc::get_mut(&mut self.object)?;\n        held.sealed_records = OnceLock::new();\n        Some(&mut held.object)"
     , "self.objects = RuntimeObjectTable::new(next_objects.finish()?);"
     , "committed_object_ids.finish()"
     ] &&
@@ -5150,7 +5168,7 @@ def RuntimeImplementationInterface.runtimeOramOpenUsesSharedDecodeShell
     , "pub(super) fn load_path_buckets_into_stash("
     , "pub(super) fn refresh_path_state_from_storage("
     , "pub(super) fn reconstruct_path_entries_from_storage_into("
-    , "pub(super) fn refresh_path_state_from_storage(\n    spec: &StateObject,\n    parameters: &OramParameters,\n    cipher: &StoreCipher,\n    directory_pages: &[Box<[u8]>],\n    allocator: &mut AllocatorSession,"
+    , "pub(super) fn refresh_path_state_from_storage(\n    spec: &StateObject,\n    parameters: &OramParameters,\n    cipher: &StoreCipher,\n    directory_pages: &[SealedPage],\n    allocator: &mut AllocatorSession,"
     , "pub(super) fn path_directory_key_width("
     , "let key = Value::confidential_select(present, key, zero_key.clone())?;"
     , "with_opened_oram_payload("
@@ -5340,6 +5358,13 @@ def RuntimeImplementationInterface.runtimeOramUsesLeanGeneratedBlockBucketCodecs
     -- evidence: a production build records no hidden ORAM state.
     , "#[cfg(any(test, feature = \"diagnostics\"))]\n    pub(crate) fn path_position_map_witness("
     , "#[cfg(any(test, feature = \"diagnostics\"))]\n    pub(crate) fn access_counter_witness("
+    -- The sealed records of a map's storage are held by reference: the
+    -- copy of a map that a call loads shares them, a write copies the
+    -- record it replaces, and only its last holder zeroes a record.
+    , "directory_pages: Box<[SealedPage]>,\n    buckets: Box<[SealedPage]>,"
+    , "pub(crate) struct SealedPage(Arc<[u8]>);"
+    , "fn deref_mut(&mut self) -> &mut [u8] {\n        Arc::make_mut(&mut self.0)\n    }"
+    , "if let Some(bytes) = Arc::get_mut(&mut self.0) {\n            bytes.fill(0);\n        }"
     , "cold_commit_oram_state("
     , "bootstrap_surrogate_directory_pages("
     , "bootstrap_filler_buckets(spec, &parameters, &cipher, rng)?;"
@@ -5917,7 +5942,7 @@ def RuntimeImplementationInterface.checkRuntimeOramOpenUsesSharedDecodeShell
     , "pub(super) fn load_path_buckets_into_stash("
     , "pub(super) fn refresh_path_state_from_storage("
     , "pub(super) fn reconstruct_path_entries_from_storage_into("
-    , "pub(super) fn refresh_path_state_from_storage(\n    spec: &StateObject,\n    parameters: &OramParameters,\n    cipher: &StoreCipher,\n    directory_pages: &[Box<[u8]>],\n    allocator: &mut AllocatorSession,"
+    , "pub(super) fn refresh_path_state_from_storage(\n    spec: &StateObject,\n    parameters: &OramParameters,\n    cipher: &StoreCipher,\n    directory_pages: &[SealedPage],\n    allocator: &mut AllocatorSession,"
     , "pub(super) fn path_directory_key_width("
     , "let key = Value::confidential_select(present, key, zero_key.clone())?;"
     , "with_opened_oram_payload("
@@ -6107,6 +6132,13 @@ def RuntimeImplementationInterface.checkRuntimeOramUsesLeanGeneratedBlockBucketC
     -- evidence: a production build records no hidden ORAM state.
     , "#[cfg(any(test, feature = \"diagnostics\"))]\n    pub(crate) fn path_position_map_witness("
     , "#[cfg(any(test, feature = \"diagnostics\"))]\n    pub(crate) fn access_counter_witness("
+    -- The sealed records of a map's storage are held by reference: the
+    -- copy of a map that a call loads shares them, a write copies the
+    -- record it replaces, and only its last holder zeroes a record.
+    , "directory_pages: Box<[SealedPage]>,\n    buckets: Box<[SealedPage]>,"
+    , "pub(crate) struct SealedPage(Arc<[u8]>);"
+    , "fn deref_mut(&mut self) -> &mut [u8] {\n        Arc::make_mut(&mut self.0)\n    }"
+    , "if let Some(bytes) = Arc::get_mut(&mut self.0) {\n            bytes.fill(0);\n        }"
     , "cold_commit_oram_state("
     , "bootstrap_surrogate_directory_pages("
     , "bootstrap_filler_buckets(spec, &parameters, &cipher, rng)?;"
@@ -7749,27 +7781,17 @@ def RuntimeImplementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyIn
     , "#[derive(Debug)]\npub(crate) struct RawMapObject {"
     , "#[derive(Debug)]\npub(crate) struct SmallMapObject {"
     , "#[derive(Debug)]\npub(crate) struct OramMapObject {"
+    -- A committed sealed object is shared between the committed state and
+    -- the states staged from it, so it has no cold clone: its one copy is
+    -- its load for a call. A raw object is copied.
     , "fn clone_committed_public(&self) -> Self {"
-    , "fn clone_committed_cold(&self) -> Result<Self> {"
-    , "fn clone_committed_public(&self) -> Self {"
-    , "fn clone_committed_cold(&self) -> Self {"
     , "impl RawMapObject {\n    fn clone_committed_public(&self) -> Self {"
-    , "fn clone_committed_cold(&self) -> Result<Self> {"
-    , "fn clone_committed_cold(&self) -> Self {"
-    , "oram: self.oram.clone_committed_cold(&self.spec)?,"
     , "cipher: self.cipher.clone_for_runtime_state(),"
-    , "leaf_coin_source: PathOramLeafCoinSource::from_domain_seed(&self.leaf_coin_seed),"
+    , "oram: object.oram.clone_for_tx(&object.spec, allocator)?,"
+    , "leaf_coin_source: PathOramLeafCoinSource::from_domain_seed(&object.leaf_coin_seed),"
     , "Self::RawCell(object) => Ok(Self::RawCell(object.clone_committed_public())),"
     , "Self::RawArray(object) => Ok(Self::RawArray(object.clone_committed_public())),"
     , "Self::RawMap(object) => Ok(Self::RawMap(object.clone_committed_public())),"
-    , "pub(in crate::runtime) fn clone_committed_cold(&self) -> Result<Self> {"
-    , "Self::RawCell(object) => Self::RawCell(object.clone_committed_public()),"
-    , "Self::UoCell(object) => Self::UoCell(object.clone_committed_cold()),"
-    , "Self::RawArray(object) => Self::RawArray(object.clone_committed_public()),"
-    , "Self::UoArray(object) => Self::UoArray(object.clone_committed_cold()),"
-    , "Self::RawMap(object) => Self::RawMap(object.clone_committed_public()),"
-    , "Self::UoSmallMap(object) => Self::UoSmallMap(object.clone_committed_cold()?),"
-    , "Self::UoOramMap(object) => Self::UoOramMap(object.clone_committed_cold()?),"
     , "let mut next = old.clone_committed_public();"
     , "object.wipe_staged();"
     , "trace.raw_physical_write_from_buffers("
@@ -8050,27 +8072,17 @@ def RuntimeImplementationInterface.checkRuntimeHandwrittenConfidentialWorkLivesO
     , "#[derive(Debug)]\npub(crate) struct RawMapObject {"
     , "#[derive(Debug)]\npub(crate) struct SmallMapObject {"
     , "#[derive(Debug)]\npub(crate) struct OramMapObject {"
+    -- A committed sealed object is shared between the committed state and
+    -- the states staged from it, so it has no cold clone: its one copy is
+    -- its load for a call. A raw object is copied.
     , "fn clone_committed_public(&self) -> Self {"
-    , "fn clone_committed_cold(&self) -> Result<Self> {"
-    , "fn clone_committed_public(&self) -> Self {"
-    , "fn clone_committed_cold(&self) -> Self {"
     , "impl RawMapObject {\n    fn clone_committed_public(&self) -> Self {"
-    , "fn clone_committed_cold(&self) -> Result<Self> {"
-    , "fn clone_committed_cold(&self) -> Self {"
-    , "oram: self.oram.clone_committed_cold(&self.spec)?,"
     , "cipher: self.cipher.clone_for_runtime_state(),"
-    , "leaf_coin_source: PathOramLeafCoinSource::from_domain_seed(&self.leaf_coin_seed),"
+    , "oram: object.oram.clone_for_tx(&object.spec, allocator)?,"
+    , "leaf_coin_source: PathOramLeafCoinSource::from_domain_seed(&object.leaf_coin_seed),"
     , "Self::RawCell(object) => Ok(Self::RawCell(object.clone_committed_public())),"
     , "Self::RawArray(object) => Ok(Self::RawArray(object.clone_committed_public())),"
     , "Self::RawMap(object) => Ok(Self::RawMap(object.clone_committed_public())),"
-    , "pub(in crate::runtime) fn clone_committed_cold(&self) -> Result<Self> {"
-    , "Self::RawCell(object) => Self::RawCell(object.clone_committed_public()),"
-    , "Self::UoCell(object) => Self::UoCell(object.clone_committed_cold()),"
-    , "Self::RawArray(object) => Self::RawArray(object.clone_committed_public()),"
-    , "Self::UoArray(object) => Self::UoArray(object.clone_committed_cold()),"
-    , "Self::RawMap(object) => Self::RawMap(object.clone_committed_public()),"
-    , "Self::UoSmallMap(object) => Self::UoSmallMap(object.clone_committed_cold()?),"
-    , "Self::UoOramMap(object) => Self::UoOramMap(object.clone_committed_cold()?),"
     , "let mut next = old.clone_committed_public();"
     , "object.wipe_staged();"
     , "trace.raw_physical_write_from_buffers("

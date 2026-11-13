@@ -7,8 +7,7 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
-#[cfg(any(test, feature = "diagnostics"))]
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use uo_allocator::{AllocatorPlan, AllocatorSession};
 use uo_core::{
     ir::StateObject, manifest::EntrypointManifest, ConfidentialKernelSlotProgram, FixedBoxBuilder,
@@ -55,10 +54,31 @@ pub(in crate::runtime) struct RuntimeShadowState {
     objects: RuntimeObjectTable,
 }
 
+/// An object of a table. A committed object never changes: a call loads a
+/// copy of the objects it runs on, and its commit puts new objects in their
+/// place. So the committed state and every state staged from it hold the
+/// same object, and staging a call copies none. Only the table that alone
+/// holds an object, a call's table of the objects it loaded, can change it.
 #[derive(Debug)]
 struct RuntimeObjectEntry {
     object_id: u32,
+    object: Arc<TableObject>,
+}
+
+/// An object with the digest of its sealed records, once that was asked
+/// for. The digest stands for as long as the object is not changed, so the
+/// digest of an object a call left alone is not computed again.
+#[derive(Debug)]
+struct TableObject {
     object: RuntimeObject,
+    sealed_records: OnceLock<SealedRecordsDigest>,
+}
+
+/// How many sealed records an object holds in storage, and their digest.
+#[derive(Clone, Copy, Debug)]
+struct SealedRecordsDigest {
+    count: u64,
+    digest: [u8; 32],
 }
 
 #[derive(Serialize)]
@@ -129,12 +149,105 @@ pub(in crate::runtime) struct PublicRuntimeShadowState {
     may_write_objects: Option<Box<[u32]>>,
 }
 
-impl RuntimeObjectEntry {
-    fn into_cold_committed(self) -> Result<Self> {
+impl SealedRecordsDigest {
+    /// Read every sealed record of `object`: the digest of the records,
+    /// each with its length, and their count.
+    fn of(object_id: u32, object: &RuntimeObject) -> Result<Self> {
+        let mut records = Sha256::new();
+        let mut count = 0u64;
+        let mut too_long = false;
+        object.for_each_sealed_record(&mut |record| {
+            count = count.saturating_add(1);
+            match u64::try_from(record.len()) {
+                Ok(len) => records.update(len.to_be_bytes()),
+                Err(_) => too_long = true,
+            }
+            records.update(record);
+        });
+        if too_long {
+            bail!("a sealed record of object {object_id} is too long to digest");
+        }
+        crate::instrumentation::count_sealed_records_digest();
         Ok(Self {
-            object_id: self.object_id,
-            object: self.object.into_cold_committed()?,
+            count,
+            digest: records.finalize().into(),
         })
+    }
+
+    /// Add an object's part to the digest of the whole store.
+    fn add_to(&self, object_id: u32, store: &mut Sha256) {
+        store.update(object_id.to_be_bytes());
+        store.update(self.count.to_be_bytes());
+        store.update(self.digest);
+    }
+}
+
+impl TableObject {
+    /// The digest of the object's sealed records. It reads every record the
+    /// first time and none after.
+    fn sealed_records_digest(&self, object_id: u32) -> Result<SealedRecordsDigest> {
+        if let Some(digest) = self.sealed_records.get() {
+            return Ok(*digest);
+        }
+        let digest = SealedRecordsDigest::of(object_id, &self.object)?;
+        // Whoever stores it first stores what this computed.
+        let _ = self.sealed_records.set(digest);
+        Ok(digest)
+    }
+}
+
+impl RuntimeObjectEntry {
+    fn new(object_id: u32, object: RuntimeObject) -> Self {
+        Self {
+            object_id,
+            object: Arc::new(TableObject {
+                object,
+                sealed_records: OnceLock::new(),
+            }),
+        }
+    }
+
+    /// The same object in another table.
+    fn share(&self) -> Self {
+        Self {
+            object_id: self.object_id,
+            object: Arc::clone(&self.object),
+        }
+    }
+
+    fn object(&self) -> &RuntimeObject {
+        &self.object.object
+    }
+
+    /// The object, to change it, if no other table holds it. Its digest is
+    /// forgotten.
+    fn object_mut(&mut self) -> Option<&mut RuntimeObject> {
+        let held = Arc::get_mut(&mut self.object)?;
+        held.sealed_records = OnceLock::new();
+        Some(&mut held.object)
+    }
+
+    /// The object itself, if no other table holds it.
+    fn into_owned(self) -> Option<RuntimeObject> {
+        Arc::into_inner(self.object).map(|held| held.object)
+    }
+
+    /// The entry as committed state holds it. An object another table
+    /// holds too is a committed one the call did not load: it is kept as it
+    /// is, and it is cold. An object this table alone holds is the call's
+    /// own, and what it decrypted is wiped.
+    fn into_cold_committed(self) -> Result<Self> {
+        let object_id = self.object_id;
+        if Arc::strong_count(&self.object) > 1 {
+            if !self.object.object.committed_cache_is_cold() {
+                bail!("object {object_id} was shared with committed state and not cold");
+            }
+            return Ok(self);
+        }
+        let object = self
+            .into_owned()
+            .ok_or_else(|| anyhow!("object {object_id} gained a holder while it was committed"))?;
+        Ok(Self::new(object_id, object.into_cold_committed()?))
     }
 }
 
@@ -150,15 +263,19 @@ impl RuntimeObjectTable {
     fn iter(&self) -> impl Iterator<Item = (u32, &RuntimeObject)> {
         self.entries
             .iter()
-            .map(|entry| (entry.object_id, &entry.object))
+            .map(|entry| (entry.object_id, entry.object()))
     }
 
     fn values(&self) -> impl Iterator<Item = &RuntimeObject> {
-        self.entries.iter().map(|entry| &entry.object)
+        self.entries.iter().map(RuntimeObjectEntry::object)
     }
 
+    /// The objects this table alone holds, to change them: in a call's
+    /// table, every object.
     fn values_mut(&mut self) -> impl Iterator<Item = &mut RuntimeObject> {
-        self.entries.iter_mut().map(|entry| &mut entry.object)
+        self.entries
+            .iter_mut()
+            .filter_map(RuntimeObjectEntry::object_mut)
     }
 
     fn object_ids(&self) -> Result<Box<[u32]>> {
@@ -173,7 +290,7 @@ impl RuntimeObjectTable {
         let mut allocator = public_state_snapshot_allocator()?;
         let mut snapshots = Vec::new();
         for entry in &self.entries {
-            if let Some(payload) = entry.object.public_state_snapshot_value(&mut allocator)? {
+            if let Some(payload) = entry.object().public_state_snapshot_value(&mut allocator)? {
                 snapshots.push(RuntimePublicObjectStateSnapshot {
                     object_id: entry.object_id,
                     payload,
@@ -185,29 +302,29 @@ impl RuntimeObjectTable {
 
     /// A digest of every sealed record in storage, by object and by slot. It
     /// commits to the ciphertext that a host keeping the storage holds, and
-    /// to nothing else. Each object's records are hashed on their own, so
-    /// that the digest of an object the call left alone does not change.
+    /// to nothing else. Each object's records are hashed on their own, and
+    /// an object keeps its digest: the records of an object the call left
+    /// alone are not read again.
     fn ciphertext_store_digest(&self) -> Result<String> {
         let mut store = Sha256::new();
         store.update(CIPHERTEXT_STORE_DIGEST_DOMAIN);
+        for entry in self.entries.iter() {
+            entry
+                .object
+                .sealed_records_digest(entry.object_id)?
+                .add_to(entry.object_id, &mut store);
+        }
+        Ok(hex::encode(store.finalize()))
+    }
+
+    /// The digest of the ciphertext with every record read again: what
+    /// `ciphertext_store_digest` must equal.
+    #[cfg(test)]
+    fn ciphertext_store_digest_from_records(&self) -> Result<String> {
+        let mut store = Sha256::new();
+        store.update(CIPHERTEXT_STORE_DIGEST_DOMAIN);
         for (object_id, object) in self.iter() {
-            let mut records = Sha256::new();
-            let mut count = 0u64;
-            let mut too_long = false;
-            object.for_each_sealed_record(&mut |record| {
-                count = count.saturating_add(1);
-                match u64::try_from(record.len()) {
-                    Ok(len) => records.update(len.to_be_bytes()),
-                    Err(_) => too_long = true,
-                }
-                records.update(record);
-            });
-            if too_long {
-                bail!("a sealed record of object {object_id} is too long to digest");
-            }
-            store.update(object_id.to_be_bytes());
-            store.update(count.to_be_bytes());
-            store.update(records.finalize());
+            SealedRecordsDigest::of(object_id, object)?.add_to(object_id, &mut store);
         }
         Ok(hex::encode(store.finalize()))
     }
@@ -233,7 +350,7 @@ impl RuntimeObjectTable {
                 found_index = Some(index);
             }
         }
-        found_index.and_then(|index| self.entries.get(index).map(|entry| &entry.object))
+        found_index.and_then(|index| self.entries.get(index).map(RuntimeObjectEntry::object))
     }
 
     fn get_mut(&mut self, object_id: u32) -> Option<&mut RuntimeObject> {
@@ -243,7 +360,11 @@ impl RuntimeObjectTable {
                 found_index = Some(index);
             }
         }
-        found_index.and_then(|index| self.entries.get_mut(index).map(|entry| &mut entry.object))
+        found_index.and_then(|index| {
+            self.entries
+                .get_mut(index)
+                .and_then(RuntimeObjectEntry::object_mut)
+        })
     }
 
     /// Load `object_ids` for a call, in the order given. Loading a sealed
@@ -261,10 +382,10 @@ impl RuntimeObjectTable {
                 let object = self
                     .get(*object_id)
                     .ok_or_else(|| anyhow!("missing committed object {}", object_id))?;
-                entries.push(RuntimeObjectEntry {
-                    object_id: *object_id,
-                    object: object.clone_for_tx(trace, allocator)?,
-                })?;
+                entries.push(RuntimeObjectEntry::new(
+                    *object_id,
+                    object.clone_for_tx(trace, allocator)?,
+                ))?;
             }
             Ok(Self::new(entries.finish()?))
         })
@@ -279,13 +400,13 @@ impl RuntimeObjectTable {
         Ok(Self::new(entries.finish()?))
     }
 
-    fn clone_cold(&self) -> Result<Self> {
+    /// A table of the same objects: what a call is staged on. It copies no
+    /// object, so it takes time in the number of objects and none in their
+    /// sizes.
+    fn share(&self) -> Result<Self> {
         let mut entries = FixedBoxBuilder::new(self.entries.len());
         for entry in self.entries.iter() {
-            entries.push(RuntimeObjectEntry {
-                object_id: entry.object_id,
-                object: entry.object.clone_committed_cold()?,
-            })?;
+            entries.push(entry.share())?;
         }
         Ok(Self::new(entries.finish()?))
     }
@@ -301,14 +422,14 @@ impl RuntimeObjectTable {
             .iter_mut()
             .find(|entry| entry.object_id == object_id)
         {
-            entry.object = object;
+            *entry = RuntimeObjectEntry::new(object_id, object);
             return;
         }
         let mut entries = std::mem::take(&mut self.entries).into_vec();
         let insert_at = match entries.binary_search_by_key(&object_id, |entry| entry.object_id) {
             Ok(index) | Err(index) => index,
         };
-        entries.insert(insert_at, RuntimeObjectEntry { object_id, object });
+        entries.insert(insert_at, RuntimeObjectEntry::new(object_id, object));
         self.entries = entries.into_boxed_slice();
     }
 
@@ -318,9 +439,9 @@ impl RuntimeObjectTable {
         let index = entries
             .binary_search_by_key(&object_id, |entry| entry.object_id)
             .ok()?;
-        let removed = entries.remove(index).object;
+        let removed = entries.remove(index).into_owned();
         self.entries = entries.into_boxed_slice();
-        Some(removed)
+        removed
     }
 }
 
@@ -338,13 +459,14 @@ impl ContractRuntime {
         })
     }
 
-    /// Deep cold clone of the committed state for staged (transactional)
-    /// execution. The returned runtime can be mutated by a call and committed
-    /// back only on full success; on any failure it is dropped, leaving the
-    /// original committed state untouched.
+    /// The committed state for staged (transactional) execution: a table
+    /// of the committed objects themselves, which are shared and not copied.
+    /// A call replaces, in the returned runtime, the objects it loaded, and
+    /// the runtime is committed back only on full success; on any failure
+    /// it is dropped, leaving the original committed state untouched.
     pub(in crate::runtime) fn staged_clone(&self) -> Result<Self> {
         Ok(Self {
-            committed: self.committed.clone_cold()?,
+            committed: self.committed.share()?,
             #[cfg(any(test, feature = "diagnostics"))]
             kept_witness: self.kept_witness.clone(),
             #[cfg(any(test, feature = "diagnostics"))]
@@ -675,6 +797,14 @@ impl ContractRuntime {
             .ensure_cold_call_boundary(public_object_ids, context)
     }
 
+    /// The digest of the ciphertext with every record read again.
+    #[cfg(test)]
+    pub(crate) fn ciphertext_store_digest_from_records(&self) -> Result<String> {
+        self.committed
+            .objects
+            .ciphertext_store_digest_from_records()
+    }
+
     #[cfg(test)]
     pub(crate) fn object_entries_for_test(&self) -> impl Iterator<Item = (u32, &RuntimeObject)> {
         self.committed.object_entries_for_test()
@@ -733,10 +863,10 @@ impl CommittedRuntimeState {
         let mut objects = FixedBoxBuilder::new(contract_state.len());
         for spec in contract_state {
             let secret = master.object_secret(spec.id, &spec.name)?;
-            objects.push(RuntimeObjectEntry {
-                object_id: spec.id,
-                object: RuntimeObject::instantiate(spec, &secret)?,
-            })?;
+            objects.push(RuntimeObjectEntry::new(
+                spec.id,
+                RuntimeObject::instantiate(spec, &secret)?,
+            ))?;
         }
         let mut objects = objects.finish()?;
         objects.sort_by_key(|entry| entry.object_id);
@@ -752,9 +882,9 @@ impl CommittedRuntimeState {
         })
     }
 
-    fn clone_cold(&self) -> Result<Self> {
+    fn share(&self) -> Result<Self> {
         Ok(Self {
-            objects: self.objects.clone_cold()?,
+            objects: self.objects.share()?,
         })
     }
 
@@ -1056,7 +1186,8 @@ impl RuntimeShadowState {
                 .peekable();
         let mut next_objects = FixedBoxBuilder::new(committed.objects.len());
         let mut committed_object_ids = FixedBoxBuilder::new(shadow_len);
-        for (id, old) in committed.objects.iter() {
+        for old in committed.objects.entries.iter() {
+            let id = old.object_id;
             match shadow.peek().map(|entry| entry.object_id.cmp(&id)) {
                 Some(Ordering::Less) => {
                     let Some(entry) = shadow.next() else {
@@ -1073,20 +1204,18 @@ impl RuntimeShadowState {
                         return Err(anyhow!("peeked shadow entry vanished during commit"));
                     };
                     let may_write = may_write_objects.contains(&id);
-                    let committed_object = entry
-                        .object
-                        .commit(old, aborted, may_write, recorder, allocator)?;
-                    committed_object_ids.push(id)?;
-                    next_objects.push(RuntimeObjectEntry {
-                        object_id: id,
-                        object: committed_object,
+                    let object = entry.into_owned().ok_or_else(|| {
+                        anyhow!("object {id} of the call was shared with another state at commit")
                     })?;
+                    let committed_object =
+                        object.commit(old.object(), aborted, may_write, recorder, allocator)?;
+                    committed_object_ids.push(id)?;
+                    next_objects.push(RuntimeObjectEntry::new(id, committed_object))?;
                 }
                 Some(Ordering::Greater) | None => {
-                    next_objects.push(RuntimeObjectEntry {
-                        object_id: id,
-                        object: old.clone_committed_cold()?,
-                    })?;
+                    // The call did not load this object: the next state
+                    // holds the committed one itself.
+                    next_objects.push(old.share())?;
                 }
             }
         }

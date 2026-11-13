@@ -67,19 +67,6 @@ impl CellObject {
         }
     }
 
-    fn clone_committed_cold(&self) -> Self {
-        Self {
-            spec: self.spec.clone(),
-            value: cold_zero_value(&self.spec.value_type),
-            physical: self.physical.clone(),
-            cipher: self.cipher.clone_for_runtime_state(),
-            accessed: false,
-            written: false,
-            loaded_value: None,
-            rng: self.rng.clone(),
-        }
-    }
-
     fn wipe_secrets(&mut self) {
         wipe_value_and_physical_slot(&mut self.value, &mut self.physical);
         wipe_loaded_cell_value(&mut self.loaded_value);
@@ -153,19 +140,6 @@ impl ArrayObject {
         Self {
             spec: self.spec.clone(),
             values: self.values.clone(),
-            physical_slots: self.physical_slots.clone(),
-            cipher: self.cipher.clone_for_runtime_state(),
-            accessed: false,
-            written_slots: boxed_false_flags(self.physical_slots.len()),
-            loaded_values: None,
-            rng: self.rng.clone(),
-        }
-    }
-
-    fn clone_committed_cold(&self) -> Self {
-        Self {
-            spec: self.spec.clone(),
-            values: cold_zero_boxed_values(self.values.len(), &self.spec.value_type),
             physical_slots: self.physical_slots.clone(),
             cipher: self.cipher.clone_for_runtime_state(),
             accessed: false,
@@ -319,28 +293,6 @@ pub(crate) struct SmallMapObject {
 }
 
 impl SmallMapObject {
-    fn clone_committed_cold(&self) -> Result<Self> {
-        let key_type = self
-            .spec
-            .key_type
-            .as_ref()
-            .ok_or_else(|| anyhow!("small-map object {} missing key type", self.spec.name))?;
-        Ok(Self {
-            spec: self.spec.clone(),
-            entries: cold_zero_small_map_entries(
-                self.entries.len(),
-                key_type,
-                &self.spec.value_type,
-            ),
-            physical_slots: self.physical_slots.clone(),
-            cipher: self.cipher.clone_for_runtime_state(),
-            accessed: false,
-            dirty: false,
-            loaded_entries: None,
-            rng: self.rng.clone(),
-        })
-    }
-
     fn wipe_secrets(&mut self) {
         wipe_small_map_entries_and_slots(&mut self.entries, &mut self.physical_slots);
         self.loaded_entries = None;
@@ -426,23 +378,6 @@ pub(crate) struct OramMapObject {
 }
 
 impl OramMapObject {
-    fn clone_committed_cold(&self) -> Result<Self> {
-        Ok(Self {
-            spec: self.spec.clone(),
-            oram: self.oram.clone_committed_cold(&self.spec)?,
-            accessed: false,
-            dirty: false,
-            leaf_coin_seed: self.leaf_coin_seed.duplicate(),
-            leaf_coin_source: PathOramLeafCoinSource::from_domain_seed(&self.leaf_coin_seed),
-            rng: self.rng.clone(),
-            pending_view: None,
-            pending_puts: Vec::new(),
-            presence_plan: Box::default(),
-            next_put: 0,
-            last_get: None,
-        })
-    }
-
     fn clear_pending(&mut self) {
         self.pending_view = None;
         self.pending_puts.clear();
@@ -699,18 +634,6 @@ impl RuntimeObject {
                 last_get: None,
             })),
         }
-    }
-
-    pub(in crate::runtime) fn clone_committed_cold(&self) -> Result<Self> {
-        Ok(match self {
-            Self::RawCell(object) => Self::RawCell(object.clone_committed_public()),
-            Self::UoCell(object) => Self::UoCell(object.clone_committed_cold()),
-            Self::RawArray(object) => Self::RawArray(object.clone_committed_public()),
-            Self::UoArray(object) => Self::UoArray(object.clone_committed_cold()),
-            Self::RawMap(object) => Self::RawMap(object.clone_committed_public()),
-            Self::UoSmallMap(object) => Self::UoSmallMap(object.clone_committed_cold()?),
-            Self::UoOramMap(object) => Self::UoOramMap(object.clone_committed_cold()?),
-        })
     }
 
     pub(in crate::runtime) fn into_cold_committed(mut self) -> Result<Self> {
