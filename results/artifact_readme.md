@@ -588,6 +588,10 @@ multi-access and multi-object runs as well.
 `pathoram_hidden_validation.json` checks the direct Path-ORAM hidden-state
 certificate emitted from `ExecutionTrace` for the theorem-backed path-ORAM
 benchmark vehicle, again without going through the full witness extractor.
+The position maps of a certificate are the witness the runtime keeps from
+call to call and moves by each call's leaf transitions; every call of a
+scenario compared that witness with the decode of the whole store, and the
+report counts the comparisons (`kept_witness_audits`).
 The hidden-state validator now keys position-map certificates by `object_id`
 rather than list position, which removes an accidental single-order assumption
 and allows the multi-object `ERC20Lite/pathoram/transferFrom` witness to check

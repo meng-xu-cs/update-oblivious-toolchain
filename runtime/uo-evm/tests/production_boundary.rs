@@ -34,6 +34,23 @@ fn single_access_map() -> CompiledArtifact {
         .unwrap()
 }
 
+/// A contract with a map of each Path ORAM scheme: `balances` keeps its
+/// position map in a private tree, `allowances` keeps it in the enclave.
+/// Every entrypoint is confidential.
+fn two_scheme_token() -> CompiledArtifact {
+    let source = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../benches/raw/ERC20Lite.sol"
+    );
+    let metadata = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../benches/raw/ERC20Lite.private-posmap.yaml"
+    ));
+    let parsed: ContractMetadata = serde_yaml::from_str(metadata).unwrap();
+    uo_solc::compile_with_metadata_bytes(source, &parsed, metadata.as_bytes(), ProgramMode::Uo)
+        .unwrap()
+}
+
 fn policy() -> ProductionRuntimePolicy {
     ProductionRuntimePolicy {
         runtime_binary_sha256: "aa".repeat(32),
@@ -437,4 +454,115 @@ fn a_call_returns_its_receipt_and_no_private_evidence() {
     for field in uo_core::PRIVATE_EVIDENCE_FIELDS {
         assert!(!debug.contains(field), "{field}");
     }
+}
+
+/// A production call records no position-map witness: it decodes no map for
+/// one and keeps none, and it builds no proof object, since those carry the
+/// position maps. It still runs every check of its evidence that needs no
+/// position map, and a call that fails one returns an error. This test runs
+/// calls of a contract with a map of each Path ORAM scheme, all through
+/// confidential entrypoints: calls that touch one map, the other and both,
+/// an abort, reads that hit and miss, and a refused call. Each returns what
+/// the contract computes.
+#[test]
+fn production_calls_run_without_a_position_map_witness() {
+    let artifact = two_scheme_token();
+    let mut instance = ContractInstance::deploy(artifact).unwrap();
+    let owner = Value::Address([0xA1; 20]);
+    let spender = Value::Address([0xB2; 20]);
+    let to = Value::Address([0xC3; 20]);
+    let stranger = Value::Address([0xEE; 20]);
+    // (entrypoint, arguments, aborts, the value it returns)
+    let calls: Vec<(&str, Vec<Value>, bool, Option<Value>)> = vec![
+        // The tree alone: an insert.
+        (
+            "mint(address,uint256)",
+            vec![owner.clone(), Value::uint(10)],
+            false,
+            None,
+        ),
+        // The local scheme's map alone.
+        (
+            "approve(address,address,uint256)",
+            vec![owner.clone(), spender.clone(), Value::uint(5)],
+            false,
+            None,
+        ),
+        // The tree: an update and an insert.
+        (
+            "transfer(address,address,uint256)",
+            vec![owner.clone(), to.clone(), Value::uint(3)],
+            false,
+            Some(Value::uint(1)),
+        ),
+        // More than the owner has: the call aborts and changes nothing.
+        (
+            "transfer(address,address,uint256)",
+            vec![owner.clone(), to.clone(), Value::uint(100)],
+            true,
+            None,
+        ),
+        // Both maps.
+        (
+            "transferFrom(address,address,address,uint256)",
+            vec![owner.clone(), spender.clone(), to.clone(), Value::uint(2)],
+            false,
+            Some(Value::uint(1)),
+        ),
+        // Reads that hit, and one that misses.
+        (
+            "balanceOf(address)",
+            vec![owner.clone()],
+            false,
+            Some(Value::uint(5)),
+        ),
+        (
+            "balanceOf(address)",
+            vec![to.clone()],
+            false,
+            Some(Value::uint(5)),
+        ),
+        (
+            "allowanceOf(address,address)",
+            vec![owner.clone(), spender.clone()],
+            false,
+            Some(Value::uint(3)),
+        ),
+        (
+            "balanceOf(address)",
+            vec![stranger],
+            false,
+            Some(Value::uint(0)),
+        ),
+        // A write of zero, which deletes the key, and a read of it.
+        (
+            "approve(address,address,uint256)",
+            vec![owner.clone(), spender.clone(), Value::uint(0)],
+            false,
+            None,
+        ),
+        (
+            "allowanceOf(address,address)",
+            vec![owner.clone(), spender.clone()],
+            false,
+            Some(Value::uint(0)),
+        ),
+    ];
+    for (index, (entrypoint, args, aborts, returns)) in calls.into_iter().enumerate() {
+        let result = instance.call(entrypoint, args).unwrap();
+        assert_eq!(result.aborted, aborts, "call {index}, {entrypoint}");
+        assert_eq!(result.return_value, returns, "call {index}, {entrypoint}");
+        // The call ran its checks: its receipt carries the theorems' view
+        // of it, and its storage events.
+        assert!(result.receipt.theorem_trace.public_outcome.is_some());
+        assert!(!result.receipt.physical_reads.is_empty());
+        assert!(!result.receipt.physical_writes.is_empty());
+    }
+
+    // A call that is refused before it runs changes nothing.
+    assert!(instance
+        .call("mint(address,uint256)", vec![owner.clone()])
+        .is_err());
+    let read = instance.call("balanceOf(address)", vec![owner]).unwrap();
+    assert_eq!(read.return_value, Some(Value::uint(5)));
 }

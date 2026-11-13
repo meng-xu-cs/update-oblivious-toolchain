@@ -65,6 +65,20 @@ pub(crate) fn bulk_load_contract_map_for_diagnostics(
     runtime.bulk_load_map_for_diagnostics(object_name, entries)
 }
 
+/// Compare the witness a deployed runtime keeps for its calls with the
+/// decode of its whole store. Only a test or diagnostics build keeps one.
+#[cfg(any(test, feature = "diagnostics"))]
+pub(crate) fn audit_contract_kept_witness(runtime: &ContractRuntime) -> Result<bool> {
+    runtime.audit_kept_witness("when asked")
+}
+
+/// Decode the witness of a deployed runtime's calls from its whole store and
+/// keep it. Only a test or diagnostics build keeps one.
+#[cfg(any(test, feature = "diagnostics"))]
+pub(crate) fn keep_decoded_contract_witness(runtime: &mut ContractRuntime) -> Result<()> {
+    runtime.keep_decoded_witness()
+}
+
 pub(crate) fn run_contract_call(
     runtime: &mut ContractRuntime,
     artifact: &CompiledArtifact,

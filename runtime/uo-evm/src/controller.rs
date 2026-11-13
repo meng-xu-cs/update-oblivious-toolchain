@@ -262,6 +262,19 @@ impl CallRecorder {
         self.path_oram_leaf_state_transitions.push(transition);
     }
 
+    /// The leaf each Path ORAM access of the call read, in order.
+    #[cfg(any(test, feature = "diagnostics"))]
+    pub(crate) fn path_oram_leaf_schedule(&self) -> &[RuntimeOramLeafWitness] {
+        &self.path_oram_leaf_schedule
+    }
+
+    /// What each Path ORAM access of the call did to its map's position
+    /// map, in order.
+    #[cfg(any(test, feature = "diagnostics"))]
+    pub(crate) fn path_oram_leaf_state_transitions(&self) -> &[RuntimePathOramTransitionWitness] {
+        &self.path_oram_leaf_state_transitions
+    }
+
     fn bump_region(&mut self, region: ControllerRegion, delta: usize) {
         self.page_trace_regions.bump(region, delta);
     }

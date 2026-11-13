@@ -774,7 +774,10 @@ fn max_stash_bound(artifact: &CompiledArtifact) -> usize {
         .unwrap_or_default()
 }
 
-/// Fill the map up to `level` keys through the bulk loader.
+/// Fill the map up to `level` keys through the bulk loader. No call made the
+/// load, so the runtime no longer keeps a position-map witness for its
+/// calls: decode it again here, where nothing is timed, so that the calls
+/// the sweep times open no record for their witnesses.
 fn fill_to_level(
     instance: &mut ContractInstance,
     keys: &mut SweepKeys,
@@ -794,8 +797,27 @@ fn fill_to_level(
             .map(|(key, value)| (Value::Bytes32(*key), Value::uint(*value)))
             .collect(),
     )?;
+    instance.keep_decoded_position_map_witness()?;
     keys.stored.extend(added);
     Ok(missing)
+}
+
+/// A measurement times its calls with the audit of the kept position-map
+/// witness off, since the audit decodes the whole store. The sweep audits
+/// once after each occupancy level instead. The guard turns the audit off
+/// for this thread and restores what was set before.
+pub(crate) struct WitnessAuditOff(bool);
+
+impl WitnessAuditOff {
+    pub(crate) fn new() -> Self {
+        Self(uo_evm::set_position_map_witness_audit(false))
+    }
+}
+
+impl Drop for WitnessAuditOff {
+    fn drop(&mut self) {
+        uo_evm::set_position_map_witness_audit(self.0);
+    }
 }
 
 /// The identification every row of one cell starts with.
@@ -1066,6 +1088,10 @@ struct SweepOutput {
     /// Per occupancy label: the executed workloads' mean latencies.
     workload_latencies: BTreeMap<String, SweepWorkloadLatencies>,
     toolchain_manifest_sha256: Option<String>,
+    /// The occupancy levels measured, and those after which the witness the
+    /// runtime kept through the level's calls equalled the decoded store.
+    measured_levels: usize,
+    audited_levels: usize,
 }
 
 /// Measure one backend at one capacity: compile, deploy, and at each
@@ -1131,12 +1157,15 @@ fn sweep_backend_capacity(
     }));
 
     let mut instance = ContractInstance::deploy_with_seed(artifact.clone(), PROBE_DEPLOY_SEED)?;
+    // The first call would decode the witness the runtime keeps; do it now.
+    instance.keep_decoded_position_map_witness()?;
     let mut keys = SweepKeys::new(capacity);
     let mut workload_order =
         SplitMix64(SWEEP_KEY_SEED.rotate_left(17).wrapping_add(capacity as u64));
     let lean_here = lean_checker.filter(|_| parameters.lean_capacities.contains(&capacity));
     for (cell_index, (level, labels)) in parameters.cells(capacity).into_iter().enumerate() {
         let cell = || cell_row(label, capacity, level, &labels);
+        uo_evm::take_instrumentation_totals();
         let fill_started = Instant::now();
         let loaded = match fill_to_level(&mut instance, &mut keys, level) {
             Ok(loaded) => loaded,
@@ -1152,6 +1181,9 @@ fn sweep_backend_capacity(
             }
         };
         let fill_ms = fill_started.elapsed().as_millis();
+        // The sealed records the decode of the kept witness opened after
+        // the load: none when the level needed no load.
+        let witness_decode_records = uo_evm::take_instrumentation_totals().witness_records_opened;
         let digest_ns = median_of(
             (0..3)
                 .map(|_| -> Result<u128> {
@@ -1166,6 +1198,10 @@ fn sweep_backend_capacity(
         fill.insert("status".into(), json!("ok"));
         fill.insert("keys_loaded".into(), json!(loaded));
         fill.insert(
+            "witness_decode_records".into(),
+            json!(witness_decode_records),
+        );
+        fill.insert(
             "timing".into(),
             json!({
                 "fill_ms": fill_ms,
@@ -1175,7 +1211,7 @@ fn sweep_backend_capacity(
         );
         output.fills.push(JsonValue::Object(fill));
 
-        let measured = (|| -> Result<(Vec<JsonValue>, Vec<JsonValue>)> {
+        let measured = (|| -> Result<(Vec<JsonValue>, Vec<JsonValue>, bool)> {
             // Each kind of call, in rounds.
             let mut samples: BTreeMap<SweepOperation, Vec<SweepSample>> = BTreeMap::new();
             for round in 0..parameters.warmups + parameters.trials {
@@ -1257,12 +1293,20 @@ fn sweep_backend_capacity(
                         .insert(label.clone(), latencies.clone());
                 }
             }
-            Ok((rows, workloads))
+            // The calls of this level kept the runtime's position-map
+            // witness by their leaf transitions. Decode it from the whole
+            // store, as every call did before, and compare.
+            let audited = instance
+                .audit_kept_position_map_witness()
+                .context("auditing the kept position-map witness")?;
+            Ok((rows, workloads, audited))
         })();
         match measured {
-            Ok((rows, workloads)) => {
+            Ok((rows, workloads, audited)) => {
                 output.rows.extend(rows);
                 output.workloads.extend(workloads);
+                output.measured_levels += 1;
+                output.audited_levels += usize::from(audited);
             }
             Err(err) => {
                 // A failed call may have left the map off its level.
@@ -1302,7 +1346,11 @@ fn sweep_with_parameters(parameters: &SweepParameters) -> Result<JsonValue> {
     let mut fills = Vec::new();
     let mut rows = Vec::new();
     let mut workloads = Vec::new();
+    // Calls are timed with the audit of the kept witness off.
+    let _witness_audit_off = WitnessAuditOff::new();
     let mut failed_cells = 0usize;
+    let mut measured_levels = 0usize;
+    let mut audited_levels = 0usize;
     let mut cost_same_for_every_trial = true;
     let mut reads_and_writes_within_manifest_bounds = true;
     let mut cost_same_at_every_occupancy = true;
@@ -1332,6 +1380,8 @@ fn sweep_with_parameters(parameters: &SweepParameters) -> Result<JsonValue> {
             rows.extend(output.rows);
             workloads.extend(output.workloads);
             failed_cells += output.failed_cells;
+            measured_levels += output.measured_levels;
+            audited_levels += output.audited_levels;
             cost_same_for_every_trial &= output.cost_same_for_every_trial;
             reads_and_writes_within_manifest_bounds &= output.within_manifest_bounds;
             toolchain_manifest_sha256 =
@@ -1438,6 +1488,8 @@ fn sweep_with_parameters(parameters: &SweepParameters) -> Result<JsonValue> {
             "reads_and_writes_within_manifest_bounds": reads_and_writes_within_manifest_bounds,
             "cost_same_at_every_occupancy": cost_same_at_every_occupancy,
             "cost_same_for_every_kind_of_an_entrypoint": cost_same_for_every_kind_of_an_entrypoint,
+            "kept_witness_matches_store_after_every_level": measured_levels > 0
+                && audited_levels == measured_levels,
         },
         "artifacts": artifacts,
         "fills": fills,
@@ -1670,6 +1722,7 @@ mod tests {
             "reads_and_writes_within_manifest_bounds",
             "cost_same_at_every_occupancy",
             "cost_same_for_every_kind_of_an_entrypoint",
+            "kept_witness_matches_store_after_every_level",
         ] {
             assert_eq!(first["count_checks"][check], json!(true), "{check}");
         }
@@ -1697,9 +1750,10 @@ mod tests {
         }
         // The untraced work is what the map's public shape says: a call on
         // a Path ORAM map reads the counter and the metadata pages at its
-        // start, and its two witness snapshots open every bucket and
-        // metadata page of a tree, or every position-map page of the local
-        // scheme. The full scan has neither.
+        // start. Its witness snapshots are copies of the one the runtime
+        // keeps and open no record. The decode of the kept witness after a
+        // load opens every bucket and metadata page of a tree, or every
+        // position-map page of the local scheme. The full scan has neither.
         for (label, backend, scheme) in super::CAPACITY_SWEEP_BACKENDS {
             for capacity in [4usize, 16] {
                 let artifact = super::sweep_map_artifact(capacity, backend, scheme).unwrap();
@@ -1717,7 +1771,7 @@ mod tests {
                         } else {
                             capacity.div_ceil(8)
                         };
-                        (1 + oram.metadata_pages, 2 * opened)
+                        (1 + oram.metadata_pages, opened)
                     }
                 };
                 let mut seen = 0;
@@ -1731,11 +1785,7 @@ mod tests {
                         json!(call_start),
                         "{label} {capacity}"
                     );
-                    assert_eq!(
-                        row["witness_scan_records"],
-                        json!(witness),
-                        "{label} {capacity}"
-                    );
+                    assert_eq!(row["witness_scan_records"], json!(0), "{label} {capacity}");
                     // The manifest's load bound, which the modeled cost
                     // charges, is what the call reads, traced and at its
                     // start, on the full scan and the local scheme; on the
@@ -1760,6 +1810,23 @@ mod tests {
                 }
                 assert!(seen > 0, "{label} {capacity}");
                 assert_eq!(oram.is_some(), witness > 0, "{label} {capacity}");
+                // Every level of the test loads keys, so the kept witness
+                // is decoded once after each fill.
+                let mut fills_seen = 0;
+                for fill in
+                    first["fills"].as_array().unwrap().iter().filter(|fill| {
+                        fill["backend"] == label && fill["capacity"] == json!(capacity)
+                    })
+                {
+                    fills_seen += 1;
+                    assert!(fill["keys_loaded"].as_u64().unwrap() > 0);
+                    assert_eq!(
+                        fill["witness_decode_records"],
+                        json!(witness),
+                        "{label} {capacity}"
+                    );
+                }
+                assert!(fills_seen > 0, "{label} {capacity}");
             }
         }
         for workload in first["workloads"].as_array().unwrap() {

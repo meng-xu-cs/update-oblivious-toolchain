@@ -2589,37 +2589,14 @@ impl RuntimeRefinementWitness {
             self.oram_position_map_after.clone(),
             self.oram_leaf_state_transitions.clone(),
         )?;
-        let reconstructed_accesses = reconstruct_oram_accesses_from_logical_trace(
-            &self.trace.logical_accesses,
+        validate_refinement_outcome(
+            &self.trace,
+            &self.public_outcome,
+            self.kernel_witness.as_ref(),
+            self.runtime_kernel_refinement_witness.as_ref(),
+            &self.controller_certificate,
             &self.oram_objects,
-        )?;
-        if self.trace.gas_used != self.public_outcome.gas_used {
-            return Err(RefinementWitnessError::GasMismatch {
-                trace_gas: self.trace.gas_used,
-                public_outcome_gas: self.public_outcome.gas_used,
-            });
-        }
-        if let Some(kernel_witness) = &self.kernel_witness {
-            kernel_witness
-                .validate_for_entrypoint(&self.public_outcome.entrypoint_id)
-                .map_err(RefinementWitnessError::KernelWitness)?;
-        }
-        if let Some(runtime_kernel_refinement_witness) = &self.runtime_kernel_refinement_witness {
-            let kernel_witness = self.kernel_witness.as_ref().ok_or(
-                RefinementWitnessError::RuntimeKernelRefinement(
-                    RuntimeKernelRefinementWitnessError::MissingKernelWitness,
-                ),
-            )?;
-            runtime_kernel_refinement_witness
-                .validate_with_kernel_witness(kernel_witness)
-                .map_err(RefinementWitnessError::RuntimeKernelRefinement)?;
-        }
-        if self.controller_certificate.observed_oram_accesses.as_ref()
-            != reconstructed_accesses.as_slice()
-        {
-            return Err(RefinementWitnessError::OramAccessScheduleMismatch);
-        }
-        Ok(())
+        )
     }
 
     pub fn to_json(&self) -> Result<String, serde_json::Error> {
@@ -4855,6 +4832,46 @@ impl RuntimePathOramHiddenCertificate {
     }
 }
 
+/// What a refinement witness checks of a call besides its certificates: the
+/// trace's gas is the public outcome's, the kernel witness is the
+/// entrypoint's and agrees with the kernel's refinement witness, and the
+/// ORAM accesses of the logical trace are those the controller observed.
+fn validate_refinement_outcome(
+    trace: &RefinementTrace,
+    public_outcome: &PublicOutcomeTrace,
+    kernel_witness: Option<&RuntimeKernelWitness>,
+    runtime_kernel_refinement_witness: Option<&RuntimeKernelRefinementWitness>,
+    controller_certificate: &RuntimeControllerCertificate,
+    oram_objects: &[RuntimeOramObjectWitness],
+) -> Result<(), RefinementWitnessError> {
+    let reconstructed_accesses =
+        reconstruct_oram_accesses_from_logical_trace(&trace.logical_accesses, oram_objects)?;
+    if trace.gas_used != public_outcome.gas_used {
+        return Err(RefinementWitnessError::GasMismatch {
+            trace_gas: trace.gas_used,
+            public_outcome_gas: public_outcome.gas_used,
+        });
+    }
+    if let Some(kernel_witness) = kernel_witness {
+        kernel_witness
+            .validate_for_entrypoint(&public_outcome.entrypoint_id)
+            .map_err(RefinementWitnessError::KernelWitness)?;
+    }
+    if let Some(runtime_kernel_refinement_witness) = runtime_kernel_refinement_witness {
+        let kernel_witness =
+            kernel_witness.ok_or(RefinementWitnessError::RuntimeKernelRefinement(
+                RuntimeKernelRefinementWitnessError::MissingKernelWitness,
+            ))?;
+        runtime_kernel_refinement_witness
+            .validate_with_kernel_witness(kernel_witness)
+            .map_err(RefinementWitnessError::RuntimeKernelRefinement)?;
+    }
+    if controller_certificate.observed_oram_accesses.as_ref() != reconstructed_accesses.as_slice() {
+        return Err(RefinementWitnessError::OramAccessScheduleMismatch);
+    }
+    Ok(())
+}
+
 fn refinement_physical_writes_as_shape_events(
     trace: &RefinementTrace,
 ) -> Result<Vec<PhysicalWriteEvent>, RefinementWitnessError> {
@@ -6366,6 +6383,26 @@ fn validate_path_oram_leaf_state(
     }
     let mut current = runtime_path_oram_state_by_object(before, oram_objects)?;
     let expected_after = runtime_path_oram_state_by_object(after, oram_objects)?;
+    apply_path_oram_leaf_transitions(&mut current, leaf_schedule, transitions, oram_objects)?;
+    if current != expected_after {
+        return Err(RefinementWitnessError::OramLeafStateMismatch);
+    }
+    Ok(())
+}
+
+/// Move the position maps `current` by a call's leaf transitions: a real
+/// access finds its slot under the leaf the map gives it and leaves it under
+/// the access's fresh leaf, an insert fills an empty slot and a delete
+/// empties one. An access that disagrees with the map is an error.
+fn apply_path_oram_leaf_transitions(
+    current: &mut BTreeMap<u32, Box<[RuntimeMaskedUsizeOptionWitness]>>,
+    leaf_schedule: &[RuntimeOramLeafWitness],
+    transitions: &[RuntimePathOramTransitionWitness],
+    oram_objects: &[RuntimeOramObjectWitness],
+) -> Result<(), RefinementWitnessError> {
+    if leaf_schedule.len() != transitions.len() {
+        return Err(RefinementWitnessError::OramLeafStateMismatch);
+    }
     for (step, transition) in leaf_schedule.iter().zip(transitions.iter()) {
         let object = runtime_oram_object_by_id(oram_objects, step.object_id)?;
         if !is_path_oram_scheme(&object.scheme)
@@ -6511,9 +6548,6 @@ fn validate_path_oram_leaf_state(
                 *slot = RuntimeMaskedUsizeOptionWitness::none();
             }
         }
-    }
-    if current != expected_after {
-        return Err(RefinementWitnessError::OramLeafStateMismatch);
     }
     Ok(())
 }
@@ -6786,7 +6820,7 @@ fn wipe_runtime_oram_position_maps(witnesses: &mut [RuntimePathOramPositionMapWi
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct CommittedRuntimeWitnessSnapshot {
     runtime_oram_access_counters: Box<[RuntimeOramAccessCounterWitness]>,
     runtime_oram_position_maps: Box<[RuntimePathOramPositionMapWitness]>,
@@ -6801,6 +6835,58 @@ impl CommittedRuntimeWitnessSnapshot {
             runtime_oram_access_counters,
             runtime_oram_position_maps,
         }
+    }
+
+    /// A copy of the snapshot, for a call's evidence.
+    pub fn duplicate(&self) -> Self {
+        Self {
+            runtime_oram_access_counters: self.runtime_oram_access_counters.clone(),
+            runtime_oram_position_maps: self.runtime_oram_position_maps.clone(),
+        }
+    }
+
+    /// Make this the snapshot after a call: the position maps moved by the
+    /// call's leaf transitions, which is how the hidden-state check relates
+    /// the maps before a call to the maps after it, and the access counters
+    /// the objects have now. An access that disagrees with the maps is an
+    /// error, and leaves the snapshot as it was.
+    pub fn advance(
+        &mut self,
+        artifact: &CompiledArtifact,
+        runtime_oram_access_counters: Box<[RuntimeOramAccessCounterWitness]>,
+        leaf_schedule: &[RuntimeOramLeafWitness],
+        transitions: &[RuntimePathOramTransitionWitness],
+    ) -> Result<(), RefinementWitnessError> {
+        self.advance_with_objects(
+            &runtime_oram_objects(artifact),
+            runtime_oram_access_counters,
+            leaf_schedule,
+            transitions,
+        )
+    }
+
+    fn advance_with_objects(
+        &mut self,
+        oram_objects: &[RuntimeOramObjectWitness],
+        runtime_oram_access_counters: Box<[RuntimeOramAccessCounterWitness]>,
+        leaf_schedule: &[RuntimeOramLeafWitness],
+        transitions: &[RuntimePathOramTransitionWitness],
+    ) -> Result<(), RefinementWitnessError> {
+        let mut current =
+            runtime_path_oram_state_by_object(&self.runtime_oram_position_maps, oram_objects)?;
+        apply_path_oram_leaf_transitions(&mut current, leaf_schedule, transitions, oram_objects)?;
+        for position_map in self.runtime_oram_position_maps.iter_mut() {
+            let mut leaves = current
+                .remove(&position_map.object_id)
+                .ok_or(RefinementWitnessError::OramLeafStateMismatch)?;
+            std::mem::swap(&mut position_map.leaves, &mut leaves);
+            for leaf in leaves.iter_mut() {
+                leaf.wipe();
+            }
+        }
+        wipe_runtime_oram_access_counters(&mut self.runtime_oram_access_counters);
+        self.runtime_oram_access_counters = runtime_oram_access_counters;
+        Ok(())
     }
 
     pub fn into_hidden_oram_state(
@@ -6884,13 +6970,21 @@ impl CommittedRuntimeWitnessSnapshotBuilder {
 
 #[derive(Debug)]
 pub struct TracedRuntimeCallStart {
-    runtime_state_before: CommittedRuntimeWitnessSnapshot,
+    runtime_state_before: Option<CommittedRuntimeWitnessSnapshot>,
 }
 
 impl TracedRuntimeCallStart {
     pub fn new(runtime_state_before: CommittedRuntimeWitnessSnapshot) -> Self {
         Self {
-            runtime_state_before,
+            runtime_state_before: Some(runtime_state_before),
+        }
+    }
+
+    /// The start of a call that records no hidden ORAM state: a call whose
+    /// private evidence stays inside the runtime.
+    pub fn unwitnessed() -> Self {
+        Self {
+            runtime_state_before: None,
         }
     }
 }
@@ -6898,7 +6992,7 @@ impl TracedRuntimeCallStart {
 #[derive(Debug)]
 pub struct TracedRuntimeCallOutcome {
     call_outcome: RuntimeCallOutcome,
-    runtime_state_after: CommittedRuntimeWitnessSnapshot,
+    runtime_state_after: Option<CommittedRuntimeWitnessSnapshot>,
 }
 
 impl TracedRuntimeCallOutcome {
@@ -6908,27 +7002,42 @@ impl TracedRuntimeCallOutcome {
     ) -> Self {
         Self {
             call_outcome,
-            runtime_state_after,
+            runtime_state_after: Some(runtime_state_after),
         }
     }
 
+    /// The outcome of a call that records no hidden ORAM state.
+    pub fn unwitnessed(call_outcome: RuntimeCallOutcome) -> Self {
+        Self {
+            call_outcome,
+            runtime_state_after: None,
+        }
+    }
+
+    /// The call's outcome with its hidden ORAM state before and after, or
+    /// with none when the call recorded none. A snapshot of one end alone is
+    /// dropped.
     pub fn into_finalized_call_trace_parts(
         self,
         call_start: TracedRuntimeCallStart,
     ) -> FinalizedRuntimeCallTraceParts {
-        let (runtime_oram_access_counters_before, runtime_oram_position_map_before) =
-            call_start.runtime_state_before.into_hidden_oram_state();
-        let (runtime_oram_access_counters_after, runtime_oram_position_map_after) =
-            self.runtime_state_after.into_hidden_oram_state();
-        FinalizedRuntimeCallTraceParts::new(
-            self.call_outcome,
-            TracedRuntimeCallWitnessState::new(
-                runtime_oram_access_counters_before,
-                runtime_oram_access_counters_after,
-                runtime_oram_position_map_before,
-                runtime_oram_position_map_after,
-            ),
-        )
+        let runtime_witness_state =
+            match (call_start.runtime_state_before, self.runtime_state_after) {
+                (Some(runtime_state_before), Some(runtime_state_after)) => {
+                    let (runtime_oram_access_counters_before, runtime_oram_position_map_before) =
+                        runtime_state_before.into_hidden_oram_state();
+                    let (runtime_oram_access_counters_after, runtime_oram_position_map_after) =
+                        runtime_state_after.into_hidden_oram_state();
+                    Some(TracedRuntimeCallWitnessState::new(
+                        runtime_oram_access_counters_before,
+                        runtime_oram_access_counters_after,
+                        runtime_oram_position_map_before,
+                        runtime_oram_position_map_after,
+                    ))
+                }
+                _ => None,
+            };
+        FinalizedRuntimeCallTraceParts::new(self.call_outcome, runtime_witness_state)
     }
 }
 
@@ -7035,13 +7144,13 @@ impl Drop for TracedRuntimeCallWitnessState {
 #[derive(Debug)]
 pub struct FinalizedRuntimeCallTraceParts {
     runtime_call_outcome: RuntimeCallOutcome,
-    runtime_witness_state: TracedRuntimeCallWitnessState,
+    runtime_witness_state: Option<TracedRuntimeCallWitnessState>,
 }
 
 impl FinalizedRuntimeCallTraceParts {
     pub fn new(
         runtime_call_outcome: RuntimeCallOutcome,
-        runtime_witness_state: TracedRuntimeCallWitnessState,
+        runtime_witness_state: Option<TracedRuntimeCallWitnessState>,
     ) -> Self {
         Self {
             runtime_call_outcome,
@@ -7059,7 +7168,7 @@ impl FinalizedRuntimeCallTraceParts {
         Option<Value>,
         Box<[String]>,
         Option<RuntimePublicStateTransition>,
-        TracedRuntimeCallWitnessState,
+        Option<TracedRuntimeCallWitnessState>,
     ) {
         let Self {
             runtime_call_outcome,
@@ -7130,7 +7239,7 @@ impl RuntimePublicCallTraceBundle {
         public_state_transition: Option<RuntimePublicStateTransition>,
         runtime_kernel_machine_finish_witness: RuntimeKernelMachineFinishWitness,
         runtime_kernel_finish_bundle: RuntimeKernelFinishBundle,
-        runtime_witness_state: TracedRuntimeCallWitnessState,
+        runtime_witness_state: Option<TracedRuntimeCallWitnessState>,
     ) -> RuntimeExecutionTraceFinalizationInput {
         let Self {
             logical_accesses,
@@ -7142,12 +7251,18 @@ impl RuntimePublicCallTraceBundle {
             runtime_oram_leaf_schedule,
             runtime_oram_leaf_state_transitions,
         } = self;
+        // A call that recorded no hidden ORAM state has no access counters
+        // and no position maps, and says so.
+        let runtime_oram_position_maps_unrecorded = runtime_witness_state.is_none();
         let (
             runtime_oram_access_counters_before,
             runtime_oram_access_counters_after,
             runtime_oram_position_map_before,
             runtime_oram_position_map_after,
-        ) = runtime_witness_state.into_execution_trace_parts();
+        ) = match runtime_witness_state {
+            Some(runtime_witness_state) => runtime_witness_state.into_execution_trace_parts(),
+            None => Default::default(),
+        };
         RuntimeExecutionTraceFinalizationInput::new(
             opcode_trace,
             logical_accesses,
@@ -7167,6 +7282,7 @@ impl RuntimePublicCallTraceBundle {
             runtime_oram_position_map_before,
             runtime_oram_position_map_after,
             runtime_oram_leaf_state_transitions,
+            runtime_oram_position_maps_unrecorded,
         )
     }
 }
@@ -7191,6 +7307,9 @@ pub struct RuntimeExecutionTraceFinalizationInput {
     runtime_oram_position_map_before: Box<[RuntimePathOramPositionMapWitness]>,
     runtime_oram_position_map_after: Box<[RuntimePathOramPositionMapWitness]>,
     runtime_oram_leaf_state_transitions: Box<[RuntimePathOramTransitionWitness]>,
+    /// Set for a call that recorded no access counters and no position maps:
+    /// one whose private evidence stays inside the runtime.
+    runtime_oram_position_maps_unrecorded: bool,
 }
 
 #[derive(Debug, PartialEq)]
@@ -7356,6 +7475,7 @@ impl RuntimeExecutionTraceFinalizationInput {
         runtime_oram_position_map_before: Box<[RuntimePathOramPositionMapWitness]>,
         runtime_oram_position_map_after: Box<[RuntimePathOramPositionMapWitness]>,
         runtime_oram_leaf_state_transitions: Box<[RuntimePathOramTransitionWitness]>,
+        runtime_oram_position_maps_unrecorded: bool,
     ) -> Self {
         Self {
             opcode_trace,
@@ -7376,6 +7496,7 @@ impl RuntimeExecutionTraceFinalizationInput {
             runtime_oram_position_map_before,
             runtime_oram_position_map_after,
             runtime_oram_leaf_state_transitions,
+            runtime_oram_position_maps_unrecorded,
         }
     }
 }
@@ -7572,6 +7693,7 @@ impl ExecutionTrace {
             runtime_oram_position_map_before,
             runtime_oram_position_map_after,
             runtime_oram_leaf_state_transitions,
+            runtime_oram_position_maps_unrecorded,
         } = input;
         let mut trace = Self::from_runtime_trace_parts(RuntimeExecutionTraceParts::new(
             opcode_trace,
@@ -7596,11 +7718,64 @@ impl ExecutionTrace {
             runtime_oram_position_map_after,
             runtime_oram_leaf_state_transitions,
         )?);
-        if confidential {
-            trace.runtime_confidential_proof_bundle_family(artifact)?;
+        if runtime_oram_position_maps_unrecorded {
+            // The call recorded no position maps: its evidence stays inside
+            // the runtime. The proof bundles carry the position maps, so
+            // none is built; what their constructors check of the evidence
+            // besides the position maps is checked here.
+            trace.check_evidence_without_position_maps(artifact, confidential)?;
+        } else {
+            if confidential {
+                trace.runtime_confidential_proof_bundle_family(artifact)?;
+            }
+            trace.materialize_runtime_trusted_kernel_bundle()?;
         }
-        trace.materialize_runtime_trusted_kernel_bundle()?;
         Ok(trace)
+    }
+
+    /// The checks of a call that recorded no hidden ORAM state. They are
+    /// those of the trusted kernel bundle without its position maps: the
+    /// controller's certificate, the leaf schedule against the trace, the
+    /// kernel witness, and the outcome. A confidential call's kernel
+    /// witness is also checked against the artifact's kernel programs, as
+    /// its proof bundle family checks it.
+    fn check_evidence_without_position_maps(
+        &self,
+        artifact: &CompiledArtifact,
+        confidential: bool,
+    ) -> Result<(), RuntimeExecutionTraceFinalizationError> {
+        if !self.evidence.runtime_oram_access_counters_before.is_empty()
+            || !self.evidence.runtime_oram_access_counters_after.is_empty()
+            || !self.evidence.runtime_oram_position_map_before.is_empty()
+            || !self.evidence.runtime_oram_position_map_after.is_empty()
+            || self.evidence.runtime_oram_leaf_schedule.len()
+                != self.evidence.runtime_oram_leaf_state_transitions.len()
+        {
+            return Err(RefinementWitnessError::OramLeafStateMismatch.into());
+        }
+        let kernel_witness = self.checked_runtime_kernel_witness()?;
+        let controller_observer = self.reconstructed_runtime_controller_observer_certificate()?;
+        let refinement_trace = self.refinement_trace();
+        let physical_writes = refinement_physical_writes_as_shape_events(&refinement_trace)?;
+        validate_path_oram_leaf_schedule(
+            &self.evidence.runtime_oram_leaf_schedule,
+            &refinement_trace.logical_accesses,
+            &refinement_trace.physical_reads,
+            &physical_writes,
+            &self.evidence.runtime_oram_objects,
+        )?;
+        validate_refinement_outcome(
+            &refinement_trace,
+            &controller_observer.public_outcome,
+            kernel_witness.as_ref(),
+            None,
+            &controller_observer.controller_certificate,
+            &self.evidence.runtime_oram_objects,
+        )?;
+        if confidential {
+            self.check_runtime_confidential_kernel_bundles(artifact)?;
+        }
+        Ok(())
     }
 
     pub fn hashes(&self) -> Result<TraceHashBundle, serde_json::Error> {
@@ -8392,28 +8567,30 @@ mod tests {
         extract_runtime_path_oram_fresh_coin_scaffold, extract_runtime_path_oram_fresh_coin_values,
         is_update_write, max_runtime_kernel_refinement_event_count,
         runtime_path_oram_fresh_coin_scaffold_of_step, runtime_path_oram_fresh_coin_values_of_step,
-        BoundaryEvent, CanonicalFreshCoinRuntimePathOramTheoremInput,
+        validate_path_oram_leaf_state, BoundaryEvent,
+        CanonicalFreshCoinRuntimePathOramTheoremInput,
         CanonicalFreshCoinRuntimePathOramWitnessFamily, CanonicalFreshCoinTheoremInputError,
-        CanonicalFreshCoinWitnessFamilyError, ExecutionTrace, ExitEvent, KernelWitnessError,
-        LogicalEvent, NormalizedMicroTrace, NormalizedPageEvent, OutputShape, PageEventKind,
-        PhysicalReadEvent, PhysicalWriteEvent, PrivateEvidence, PublicOutcomeTrace, PublicReceipt,
-        RefinementWitnessError, RuntimeControllerCertificate, RuntimeExecutionTraceParts,
-        RuntimeKernelBoundaryTracker, RuntimeKernelBoundaryTrackerError,
-        RuntimeKernelExecutionTracker, RuntimeKernelFinishBundle,
-        RuntimeKernelFinishBundleAccessError, RuntimeKernelFinishBundleError,
-        RuntimeKernelFinishSnapshot, RuntimeKernelFinishSnapshotError,
-        RuntimeKernelRefinementEventWitness, RuntimeKernelRefinementTracker,
-        RuntimeKernelRefinementTrackerError, RuntimeKernelRefinementWitness,
-        RuntimeKernelRefinementWitnessError, RuntimeKernelStepWitness,
-        RuntimeKernelTelemetrySnapshot, RuntimeKernelWitness, RuntimeMaskedUsizeOptionWitness,
-        RuntimeOramAccessWitness, RuntimeOramLeafScaffoldWitness, RuntimeOramLeafWitness,
-        RuntimeOramObjectWitness, RuntimePaperMainSlotFamilyBundleError,
-        RuntimePathOramPositionMapWitness, RuntimePathOramTransitionKind,
-        RuntimePathOramTransitionWitness, RuntimePrimitiveEventKind, RuntimeRefinementWitness,
-        SeededRuntimePaperMainFamilyBundle, SeededRuntimePaperMainFamilyBundleError,
-        SeededRuntimePaperMainSlotFamilyBundle, SeededRuntimePaperMainSlotFamilyBundleError,
-        SeededRuntimePathOramWitnessFamily, SeededRuntimeWitnessFamilyError, TheoremTrace,
-        WriteClass, STORAGE_OBSERVER_UNIT_BYTES,
+        CanonicalFreshCoinWitnessFamilyError, CommittedRuntimeWitnessSnapshot, ExecutionTrace,
+        ExitEvent, KernelWitnessError, LogicalEvent, NormalizedMicroTrace, NormalizedPageEvent,
+        OutputShape, PageEventKind, PhysicalReadEvent, PhysicalWriteEvent, PrivateEvidence,
+        PublicOutcomeTrace, PublicReceipt, RefinementWitnessError, RuntimeControllerCertificate,
+        RuntimeExecutionTraceParts, RuntimeKernelBoundaryTracker,
+        RuntimeKernelBoundaryTrackerError, RuntimeKernelExecutionTracker,
+        RuntimeKernelFinishBundle, RuntimeKernelFinishBundleAccessError,
+        RuntimeKernelFinishBundleError, RuntimeKernelFinishSnapshot,
+        RuntimeKernelFinishSnapshotError, RuntimeKernelRefinementEventWitness,
+        RuntimeKernelRefinementTracker, RuntimeKernelRefinementTrackerError,
+        RuntimeKernelRefinementWitness, RuntimeKernelRefinementWitnessError,
+        RuntimeKernelStepWitness, RuntimeKernelTelemetrySnapshot, RuntimeKernelWitness,
+        RuntimeMaskedUsizeOptionWitness, RuntimeOramAccessCounterWitness, RuntimeOramAccessWitness,
+        RuntimeOramLeafScaffoldWitness, RuntimeOramLeafWitness, RuntimeOramObjectWitness,
+        RuntimePaperMainSlotFamilyBundleError, RuntimePathOramPositionMapWitness,
+        RuntimePathOramTransitionKind, RuntimePathOramTransitionWitness, RuntimePrimitiveEventKind,
+        RuntimeRefinementWitness, SeededRuntimePaperMainFamilyBundle,
+        SeededRuntimePaperMainFamilyBundleError, SeededRuntimePaperMainSlotFamilyBundle,
+        SeededRuntimePaperMainSlotFamilyBundleError, SeededRuntimePathOramWitnessFamily,
+        SeededRuntimeWitnessFamilyError, TheoremTrace, TracedRuntimeCallStart, WriteClass,
+        STORAGE_OBSERVER_UNIT_BYTES,
     };
     use crate::{
         CompiledArtifact, CompiledContract, CompiledFunction, ConfidentialKernelSlotExpr,
@@ -10916,6 +11093,198 @@ mod tests {
             trace.runtime_refinement_witness().unwrap_err(),
             RefinementWitnessError::OramLeafStateMismatch
         );
+    }
+
+    fn sample_access_counters(access_counter: u64) -> Box<[RuntimeOramAccessCounterWitness]> {
+        vec![RuntimeOramAccessCounterWitness {
+            object_id: 7,
+            object_name: "records".into(),
+            access_counter,
+        }]
+        .into_boxed_slice()
+    }
+
+    /// A kept witness snapshot moved by a call's leaf transitions is the
+    /// snapshot after the call: the pair the hidden-state check accepts.
+    #[test]
+    fn a_witness_snapshot_advanced_by_a_calls_transitions_is_the_snapshot_after_it() {
+        let objects = [sample_oram_object()];
+        let schedule = sample_oram_leaf_schedule();
+        let transitions = sample_path_oram_leaf_state_transitions();
+        let before = CommittedRuntimeWitnessSnapshot::new(
+            sample_access_counters(4),
+            sample_path_oram_position_map_before().into_boxed_slice(),
+        );
+        let after = CommittedRuntimeWitnessSnapshot::new(
+            sample_access_counters(5),
+            sample_path_oram_position_map_after().into_boxed_slice(),
+        );
+        assert_ne!(before, after);
+
+        let mut kept = before.duplicate();
+        assert_eq!(kept, before);
+        kept.advance_with_objects(&objects, sample_access_counters(5), &schedule, &transitions)
+            .unwrap();
+        assert_eq!(kept, after);
+        validate_path_oram_leaf_state(
+            &schedule,
+            &transitions,
+            &sample_path_oram_position_map_before(),
+            &kept.runtime_oram_position_maps,
+            &objects,
+        )
+        .unwrap();
+
+        // The copy that was advanced is its own: the one it was made from
+        // is as it was.
+        assert_eq!(
+            before.runtime_oram_position_maps.as_ref(),
+            sample_path_oram_position_map_before().as_slice()
+        );
+    }
+
+    /// An access that found its slot under another leaf than the kept
+    /// snapshot gives it is an error, and the snapshot stays as it was. So
+    /// is a call with a transition that has no leaf access.
+    #[test]
+    fn a_witness_snapshot_refuses_transitions_that_disagree_with_it() {
+        let objects = [sample_oram_object()];
+        let mut stale_maps = sample_path_oram_position_map_before();
+        stale_maps[0].leaves[0] = RuntimeMaskedUsizeOptionWitness::some(2);
+        let stale = CommittedRuntimeWitnessSnapshot::new(
+            sample_access_counters(4),
+            stale_maps.into_boxed_slice(),
+        );
+        let mut kept = stale.duplicate();
+        assert_eq!(
+            kept.advance_with_objects(
+                &objects,
+                sample_access_counters(5),
+                &sample_oram_leaf_schedule(),
+                &sample_path_oram_leaf_state_transitions(),
+            )
+            .unwrap_err(),
+            RefinementWitnessError::OramLeafStateMismatch
+        );
+        assert_eq!(kept, stale);
+
+        let mut kept = CommittedRuntimeWitnessSnapshot::new(
+            sample_access_counters(4),
+            sample_path_oram_position_map_before().into_boxed_slice(),
+        );
+        let unmoved = kept.duplicate();
+        assert_eq!(
+            kept.advance_with_objects(
+                &objects,
+                sample_access_counters(5),
+                &[],
+                &sample_path_oram_leaf_state_transitions(),
+            )
+            .unwrap_err(),
+            RefinementWitnessError::OramLeafStateMismatch
+        );
+        assert_eq!(kept, unmoved);
+    }
+
+    /// A call that recorded no hidden ORAM state at one of its ends has none.
+    #[test]
+    fn a_call_start_without_a_snapshot_records_no_hidden_state() {
+        let snapshot = || {
+            CommittedRuntimeWitnessSnapshot::new(
+                sample_access_counters(4),
+                sample_path_oram_position_map_before().into_boxed_slice(),
+            )
+        };
+        assert!(TracedRuntimeCallStart::unwitnessed()
+            .runtime_state_before
+            .is_none());
+        assert_eq!(
+            TracedRuntimeCallStart::new(snapshot()).runtime_state_before,
+            Some(snapshot())
+        );
+    }
+
+    /// The evidence of a call that recorded no position maps: the sample
+    /// call's, without them.
+    fn sample_trace_without_position_maps() -> ExecutionTrace {
+        let mut trace = sample_runtime_execution_trace_with_seed(0);
+        trace.evidence.runtime_oram_position_map_before = Box::default();
+        trace.evidence.runtime_oram_position_map_after = Box::default();
+        trace
+    }
+
+    /// A call that records no position maps builds no proof bundle. What
+    /// the bundle's constructors check of the rest of its evidence is still
+    /// checked: the leaf schedule against the trace's storage events, the
+    /// transitions against the schedule, the controller's certificate, and
+    /// the outcome.
+    #[test]
+    fn a_call_without_position_maps_still_checks_the_rest_of_its_evidence() {
+        let artifact = sample_runtime_paper_main_artifact();
+        let check = |trace: &ExecutionTrace| {
+            trace
+                .check_evidence_without_position_maps(&artifact, false)
+                .map_err(|err| err.to_string())
+        };
+        check(&sample_trace_without_position_maps()).unwrap();
+        // The same evidence with its position maps is what a witnessed call
+        // builds its bundle from.
+        sample_runtime_execution_trace_with_seed(0)
+            .runtime_trusted_kernel_bundle()
+            .unwrap();
+
+        // A call on this route recorded no hidden state at either end.
+        let mut trace = sample_trace_without_position_maps();
+        trace.evidence.runtime_oram_position_map_before =
+            sample_path_oram_position_map_before().into_boxed_slice();
+        assert!(check(&trace).is_err());
+        let mut trace = sample_trace_without_position_maps();
+        trace.evidence.runtime_oram_position_map_after =
+            sample_path_oram_position_map_after().into_boxed_slice();
+        assert!(check(&trace).is_err());
+        let mut trace = sample_trace_without_position_maps();
+        trace.evidence.runtime_oram_access_counters_before = sample_access_counters(4);
+        assert!(check(&trace).is_err());
+        let mut trace = sample_trace_without_position_maps();
+        trace.evidence.runtime_oram_access_counters_after = sample_access_counters(5);
+        assert!(check(&trace).is_err());
+
+        // One transition for each leaf access.
+        let mut trace = sample_trace_without_position_maps();
+        trace.evidence.runtime_oram_leaf_state_transitions = Box::default();
+        assert!(check(&trace).is_err());
+
+        // The leaf schedule is the one of the paths the trace read.
+        let mut trace = sample_trace_without_position_maps();
+        trace.evidence.runtime_oram_leaf_schedule[0].leaf = 1;
+        assert!(check(&trace).is_err());
+        let mut trace = sample_trace_without_position_maps();
+        trace.evidence.runtime_oram_leaf_schedule = Box::default();
+        trace.evidence.runtime_oram_leaf_state_transitions = Box::default();
+        assert!(check(&trace).is_err());
+        let mut trace = sample_trace_without_position_maps();
+        trace.receipt.physical_reads[4].location = "records@bucket16".into();
+        assert!(check(&trace).is_err());
+
+        // The controller's certificate and the outcome are those of the
+        // trace.
+        let mut trace = sample_trace_without_position_maps();
+        trace.evidence.runtime_controller_certificate = None;
+        assert!(check(&trace).is_err());
+        let mut trace = sample_trace_without_position_maps();
+        trace
+            .evidence
+            .runtime_controller_certificate
+            .as_mut()
+            .unwrap()
+            .entry_input_len += 1;
+        assert!(check(&trace).is_err());
+        let mut trace = sample_trace_without_position_maps();
+        trace.receipt.gas_used += 1;
+        assert!(check(&trace).is_err());
+        let mut trace = sample_trace_without_position_maps();
+        trace.receipt.theorem_trace.public_outcome = None;
+        assert!(check(&trace).is_err());
     }
 
     #[test]

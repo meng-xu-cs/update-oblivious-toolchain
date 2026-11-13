@@ -21,7 +21,7 @@
   "checker_path": "checker/uo-check/src/lib.rs",
   "checker_uses_manifest_slot_schedule_directly": true,
   "checker_uses_shared_confidential_kernel_lowering": true,
-  "committed_runtime_witness_snapshot_derive_line": "#[derive(Debug)]",
+  "committed_runtime_witness_snapshot_derive_line": "#[derive(Debug, PartialEq)]",
   "committed_runtime_witness_snapshot_nonclone": true,
   "committed_runtime_witness_snapshot_surface_files": [
     "crates/uo-core/src/lib.rs",
@@ -226,6 +226,7 @@
   "engine_uses_manifest_public_call_summary": true,
   "engine_uses_opaque_committed_state": true,
   "engine_uses_runtime_public_object_universe": true,
+  "evidence_builds_audit_the_kept_position_map_witness": true,
   "execution_trace_builder_surface_files": [
     "runtime/uo-evm/src/theorem.rs"
   ],
@@ -1155,6 +1156,7 @@
   "probe_path": "probe/mplus-probe/src/lib.rs",
   "probe_reads_runtime_telemetry_from_diagnostic_channel": true,
   "production_calls_issue_chained_receipts": true,
+  "production_calls_record_no_position_map_witness": true,
   "production_errors_carry_no_runtime_freshness_value": true,
   "proof_grade_canonical_pair_instantiation_threads_runtime_boundary": true,
   "proof_grade_paper_main_bundles_discharge_minimal_runtime_boundary": true,
@@ -1567,19 +1569,19 @@
       "owner": "runtime/uo-kernel-runtime/src/lib.rs and crates/uo-core/src/{confidential_kernel,trace,confidential_core,trusted_kernel}.rs"
     },
     {
-      "boundary": "shared post-call handoff bundle capturing the after-call hidden witness snapshot plus RuntimeCallOutcome before final execution-trace packaging",
+      "boundary": "shared post-call handoff bundle capturing RuntimeCallOutcome before final execution-trace packaging, with the after-call hidden witness snapshot in a build that can export a call's evidence and with none in a production build",
       "checked": true,
       "name": "TracedRuntimeCallOutcome",
       "owner": "crates/uo-core/src/trace.rs"
     },
     {
-      "boundary": "shared final traced-call handoff bundle carrying one RuntimeCallOutcome plus one boxed hidden before/after ORAM witness carrier into theorem finalization",
+      "boundary": "shared final traced-call handoff bundle carrying one RuntimeCallOutcome into theorem finalization, plus one boxed hidden before/after ORAM witness carrier when the call recorded a snapshot at both ends and none otherwise",
       "checked": true,
       "name": "FinalizedRuntimeCallTraceParts",
       "owner": "crates/uo-core/src/trace.rs"
     },
     {
-      "boundary": "shared pre-call handoff token carrying the hidden committed-state snapshot without exposing the raw snapshot type outside the traced-call bridge",
+      "boundary": "shared pre-call handoff token carrying the hidden committed-state snapshot, or none in a production build, without exposing the raw snapshot type outside the traced-call bridge",
       "checked": true,
       "name": "TracedRuntimeCallStart",
       "owner": "crates/uo-core/src/trace.rs"
@@ -1603,7 +1605,7 @@
       "owner": "runtime/uo-evm/src/state.rs"
     },
     {
-      "boundary": "shared hidden ORAM witness snapshot wrapper built only from state.rs through the shared exact-size CommittedRuntimeWitnessSnapshotBuilder, stored in boxed fixed-size buffers for the public-bounded ORAM witness set, used only to assemble traced-call start/outcome/witness handoff bundles, and wiping those hidden witness buffers on drop",
+      "boundary": "shared hidden ORAM witness snapshot wrapper built only from state.rs through the shared exact-size CommittedRuntimeWitnessSnapshotBuilder, stored in boxed fixed-size buffers for the public-bounded ORAM witness set, kept by a runtime that can export a call's evidence from one call to the next, moved there by each call's leaf transitions and compared with the decode of the store before and after every call, copied only by its duplicate method, used otherwise only to assemble traced-call start/outcome/witness handoff bundles, and wiping those hidden witness buffers on drop; a production runtime builds and keeps none",
       "checked": true,
       "name": "CommittedRuntimeWitnessSnapshot",
       "owner": "crates/uo-core/src/trace.rs"

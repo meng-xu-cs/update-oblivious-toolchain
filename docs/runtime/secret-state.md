@@ -16,7 +16,7 @@ and the ownership boundaries that keep them auditable.
 | `Value` aggregate payloads | `crates/uo-core/src/types.rs` | shared value layer; boxed fixed-size aggregate buffers |
 | `RuntimeCallOutcome` and traced-call wrappers | `crates/uo-core/src/trace.rs` | theorem-handoff wrappers, non-`Clone`, consumed by finalization helpers |
 | `PrivateEvidence`, and the `ExecutionTrace` that holds it | `crates/uo-core/src/trace.rs` | a call's replay tag, kernel witnesses and Path ORAM leaf schedule, counters, position maps and leaf transitions; fields private to `uo-core`, wiped on drop, serializable only in a test or diagnostics build; a call returns it only in such a build |
-| `CommittedRuntimeWitnessSnapshot` | `crates/uo-core/src/trace.rs` | hidden witness snapshot wrapper built from `state.rs` |
+| `CommittedRuntimeWitnessSnapshot` | `crates/uo-core/src/trace.rs` | hidden witness snapshot wrapper built from `state.rs`: the access counters and position maps of the contract's Path ORAM objects. A test or diagnostics runtime keeps one from call to call (`ContractRuntime::kept_witness`) and copies it only through `duplicate`; a production runtime builds and keeps none (invariant 15) |
 | `RuntimeShadowState` / `ConfidentialRuntimeShadowState` / `PublicRuntimeShadowState` | `runtime/uo-evm/src/state.rs` | runtime-only reopened state; public shell receives only public wrapper |
 | `RuntimeObject` graph | `runtime/uo-evm/src/objects.rs` | runtime-owned object state and commit/restore paths |
 | `OramState` and ORAM transcript/write evidence | `runtime/uo-evm/src/oram.rs` | runtime-owned ORAM state; generated helpers own codec/rebuild/write-log internals |
@@ -93,6 +93,31 @@ and the ownership boundaries that keep them auditable.
     record is not sealed over, and a write that fails the check never
     reaches a trace as an `Update`.
 
+15. A production call records no witness of its hidden ORAM state. The
+    witness of a call is the access counters and position maps of the
+    contract's Path ORAM objects before the call and after it. The proof
+    objects carry it, and only a test or diagnostics build can export
+    those. In a production build the functions that decode a position map
+    or read an access counter for a witness do not exist, the runtime keeps
+    no witness, and a call builds no proof object. `uo-core` still checks
+    the rest of the call's evidence as the proof objects' constructors
+    check it: the controller's certificate, the leaf schedule against the
+    storage events, one leaf transition for each leaf access, the kernel
+    witness, the outcome and, for a confidential call, the kernel witness
+    against the artifact's kernel programs. A call that fails a check
+    returns an error.
+
+    A build that exports evidence keeps the witness from one call to the
+    next. The snapshot before a call is the snapshot after the call before
+    it, and a call moves it by its own leaf transitions, so only the first
+    call, and the first after a bulk load, decodes a map. The witness after
+    a call is then computed from the witness before it, and the check that
+    the transitions carry one to the other no longer says anything about
+    the store. The audit does: every call compares the kept witness with
+    the decode of the whole store, before it runs and after, and fails if
+    they differ. A measurement turns the audit off for the calls it times
+    (`set_position_map_witness_audit`) and audits where it does not time.
+
 ### What a nonce shows
 
 A record's nonce shows how many records were sealed under its object's key
@@ -131,17 +156,19 @@ write/read evidence, direct store cipher calls outside the codec layer, and
 reintroduction of host-visible hidden-state errors that should be modeled
 confidential aborts.
 
-Invariants 9 to 14 have eight bits in `runtime_boundary_validation.json`:
+Invariants 9 to 15 have ten bits in `runtime_boundary_validation.json`:
 `deployment_seed_stays_out_of_call_traces`,
 `production_errors_carry_no_runtime_freshness_value`,
 `contract_instance_debug_is_opaque`,
 `runtime_secrets_derive_from_the_master_secret`,
 `seal_nonces_come_from_the_seal_count`,
 `private_evidence_stays_inside_the_runtime`,
-`production_calls_issue_chained_receipts` and
-`sealed_writes_are_classified_from_their_bytes`. Each is a check of source
-text, and a probe unit test shows that it rejects the drifts it guards
-against.
+`production_calls_issue_chained_receipts`,
+`sealed_writes_are_classified_from_their_bytes`,
+`production_calls_record_no_position_map_witness` and
+`evidence_builds_audit_the_kept_position_map_witness`. Each is a check of
+source text, and a probe unit test shows that it rejects the drifts it
+guards against.
 `cargo test -p uo-evm` runs the tests behind all but the two about secrets
 and nonces in the build a production runtime uses
 (`runtime/uo-evm/tests/production_boundary.rs`, and the production tests
@@ -179,6 +206,38 @@ differ in the marker of every unit. The codec's tests also show that a
 record with a zero unit, a unit with the other marker or a byte after its
 content is not read, and that a buffer that holds no record is not sealed
 over.
+
+Invariant 15 is pinned in the Lean implementation interface
+(`stateStagesConfidentialCallsInsideRuntime`,
+`theoremFinalizerUsesSharedTraceBridge`,
+`runtimeOramUsesLeanGeneratedBlockBucketCodecs` and
+`engineDelegatesToRuntimeBridge`), with three scenarios that the Lean
+checker must reject: a production call that starts with a witness decoded
+from the store
+(`runtime_implementation_interface/production_call_witness_snapshot_drift`),
+a witness decoder that every build has
+(`runtime_implementation_interface/position_map_witness_decoder_ungated_drift`),
+and a kept witness that is not compared with the store after a call
+(`runtime_implementation_interface/kept_witness_audit_skip_drift`). Its
+tests are in three places. `runtime/uo-evm/src/engine.rs` runs calls that
+touch a map of each Path ORAM scheme, and both, with an abort, reads that
+hit and miss, a refused call and a bulk load, and sees after each that the
+kept witness equals the decode of the store and that the witness before a
+call is the witness after the one before it; it sees a call fail when the
+kept witness is another runtime's; and it runs the same calls from one seed
+with and without a witness and sees the same return values, receipts and
+ciphertext. A test build audits every call, so every call of the runtime's
+test suite is such a comparison.
+`production_calls_run_without_a_position_map_witness` in
+`runtime/uo-evm/tests/production_boundary.rs` runs those calls in the
+build a production runtime uses. `crates/uo-core/src/trace.rs` tests the
+checks that a call without position maps still runs, one rejected drift
+for each, and that a snapshot moved by a call's transitions is the snapshot
+the hidden-state check accepts after it.
+`pathoram_hidden_validation.json` counts the audits behind each
+certificate it checks (`kept_witness_audits`), and the capacity sweep,
+which times its calls with the audit off, audits after every occupancy
+level (`kept_witness_matches_store_after_every_level`).
 
 Invariant 11 also has a Lean statement and tests. `sealNonceRun_nodup` and
 `sealNonceRun_disjoint_of_le` in `UOToolchain/RuntimeStoreCodecSemantics.lean`

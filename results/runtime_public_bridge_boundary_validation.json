@@ -1,20 +1,20 @@
 {
   "accepted": true,
-  "artifact_json_bytes": 1595451,
+  "artifact_json_bytes": 1639500,
   "checker": "proof/lean/.lake/build/bin/checkProofGradeRuntimePublicBridgeBoundary",
   "lean_checker_input": "source-backed runtime public bridge boundary",
   "lean_checker_kind": "runtime public bridge boundary",
-  "lean_stdout": "validated runtime public bridge boundary for source-backed uo-evm bridge (269638 bridge bytes)",
+  "lean_stdout": "validated runtime public bridge boundary for source-backed uo-evm bridge (293353 bridge bytes)",
   "public_bridge_boundary_theorem_checked": true,
   "source_bytes": {
-    "controller": 21368,
+    "controller": 21903,
     "core_lib": 8623,
-    "engine": 107480,
-    "runtime_evm_lib": 83829,
-    "runtime_module": 3509,
+    "engine": 121973,
+    "runtime_evm_lib": 83901,
+    "runtime_module": 4141,
     "shell": 21767,
-    "state": 46694,
-    "theorem": 6359
+    "state": 55014,
+    "theorem": 6557
   },
   "source_files": [
     "runtime/uo-evm/src/lib.rs",

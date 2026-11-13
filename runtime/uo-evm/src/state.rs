@@ -7,12 +7,17 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
+#[cfg(any(test, feature = "diagnostics"))]
+use std::sync::Arc;
 use uo_allocator::{AllocatorPlan, AllocatorSession};
 use uo_core::{
-    ir::StateObject, manifest::EntrypointManifest, CommittedRuntimeWitnessSnapshot,
-    CommittedRuntimeWitnessSnapshotBuilder, ConfidentialKernelSlotProgram, FixedBoxBuilder,
+    ir::StateObject, manifest::EntrypointManifest, ConfidentialKernelSlotProgram, FixedBoxBuilder,
     RuntimeCallOutcome, RuntimeKernelFinishBundle, RuntimePublicStateTransition,
     TracedRuntimeCallOutcome, TracedRuntimeCallStart, Value,
+};
+#[cfg(any(test, feature = "diagnostics"))]
+use uo_core::{
+    CommittedRuntimeWitnessSnapshot, CommittedRuntimeWitnessSnapshotBuilder, CompiledArtifact,
 };
 use uo_kernel_runtime::{
     RuntimeKernelConfidentialStore, RuntimeKernelMachine as PublicRuntimeKernel,
@@ -29,6 +34,20 @@ pub(in crate::runtime) struct CommittedRuntimeState {
 #[derive(Debug)]
 pub(crate) struct ContractRuntime {
     committed: CommittedRuntimeState,
+    /// The hidden ORAM state of the committed objects as a call's witness
+    /// records it: their access counters and position maps before the next
+    /// call. A call's evidence takes its snapshot before from here, and
+    /// leaves here its snapshot after, which is this one moved by the call's
+    /// own leaf transitions. So only the first call decodes a map for its
+    /// witness. `None` until a call needs it, and after a load that no call
+    /// made. Only a build that can export a call's evidence keeps it: a
+    /// production runtime records no hidden ORAM state.
+    #[cfg(any(test, feature = "diagnostics"))]
+    kept_witness: Option<Arc<CommittedRuntimeWitnessSnapshot>>,
+    /// Whether this runtime's calls record no witness of their hidden ORAM
+    /// state, as the calls of a production build. Only a test sets it.
+    #[cfg(any(test, feature = "diagnostics"))]
+    unwitnessed: bool,
 }
 
 #[derive(Debug, Default)]
@@ -312,6 +331,10 @@ impl ContractRuntime {
     ) -> Result<Self> {
         Ok(Self {
             committed: CommittedRuntimeState::deploy(contract_state, master)?,
+            #[cfg(any(test, feature = "diagnostics"))]
+            kept_witness: None,
+            #[cfg(any(test, feature = "diagnostics"))]
+            unwitnessed: false,
         })
     }
 
@@ -322,6 +345,10 @@ impl ContractRuntime {
     pub(in crate::runtime) fn staged_clone(&self) -> Result<Self> {
         Ok(Self {
             committed: self.committed.clone_cold()?,
+            #[cfg(any(test, feature = "diagnostics"))]
+            kept_witness: self.kept_witness.clone(),
+            #[cfg(any(test, feature = "diagnostics"))]
+            unwitnessed: self.unwitnessed,
         })
     }
 
@@ -362,6 +389,9 @@ impl ContractRuntime {
             &mut allocator,
         )?;
         self.committed = shadow.into_cold_committed_state()?;
+        // No call made this load, so no transition moves the kept witness:
+        // the next call decodes it again.
+        self.kept_witness = None;
         Ok(())
     }
 
@@ -391,7 +421,7 @@ impl ContractRuntime {
     }
 
     pub(in crate::runtime) fn begin_traced_call(
-        &self,
+        &mut self,
         entrypoint: &str,
         manifest_entry: &EntrypointManifest,
         args: &[Value],
@@ -400,11 +430,25 @@ impl ContractRuntime {
         let public_call = PublicCallSummary::from_manifest_entry(manifest_entry, args)?;
         let recorder =
             CallRecorder::begin_with_input_len(entrypoint, public_call.entry_input_len());
-        Ok((
-            TracedRuntimeCallStart::new(self.witness_snapshot()?),
-            public_call,
-            recorder,
-        ))
+        // A call records its hidden ORAM state where its evidence can be
+        // exported, and nowhere else.
+        #[cfg(any(test, feature = "diagnostics"))]
+        let call_start = if self.records_witness() {
+            TracedRuntimeCallStart::new(self.witness_before_call()?)
+        } else {
+            TracedRuntimeCallStart::unwitnessed()
+        };
+        #[cfg(not(any(test, feature = "diagnostics")))]
+        let call_start = TracedRuntimeCallStart::unwitnessed();
+        Ok((call_start, public_call, recorder))
+    }
+
+    /// Whether this runtime's calls record their hidden ORAM state. Every
+    /// call of a build that can export evidence does, but for a runtime a
+    /// test has set to run as a production build.
+    #[cfg(any(test, feature = "diagnostics"))]
+    fn records_witness(&self) -> bool {
+        !self.unwitnessed
     }
 
     fn ensure_ready_for_call(&self, context: &str) -> Result<()> {
@@ -420,18 +464,114 @@ impl ContractRuntime {
         self.ensure_ready_for_call("before executing the next call from committed storage")
     }
 
+    #[cfg(any(test, feature = "diagnostics"))]
     pub(in crate::runtime) fn finish_traced_call(
-        &self,
+        &mut self,
         call_outcome: RuntimeCallOutcome,
+        artifact: &CompiledArtifact,
+        recorder: &CallRecorder,
     ) -> Result<TracedRuntimeCallOutcome> {
+        if !self.records_witness() {
+            return Ok(TracedRuntimeCallOutcome::unwitnessed(call_outcome));
+        }
         Ok(TracedRuntimeCallOutcome::new(
             call_outcome,
-            self.witness_snapshot()?,
+            self.witness_after_call(artifact, recorder)?,
         ))
     }
 
-    fn witness_snapshot(&self) -> Result<CommittedRuntimeWitnessSnapshot> {
-        crate::instrumentation::time_witness(|| self.committed.witness_snapshot())
+    #[cfg(not(any(test, feature = "diagnostics")))]
+    pub(in crate::runtime) fn finish_traced_call(
+        &mut self,
+        call_outcome: RuntimeCallOutcome,
+    ) -> Result<TracedRuntimeCallOutcome> {
+        Ok(TracedRuntimeCallOutcome::unwitnessed(call_outcome))
+    }
+
+    /// The witness snapshot before a call: a copy of the kept one. The
+    /// first call, and the first after a load that no call made, decodes it
+    /// from the whole store.
+    #[cfg(any(test, feature = "diagnostics"))]
+    fn witness_before_call(&mut self) -> Result<CommittedRuntimeWitnessSnapshot> {
+        crate::instrumentation::time_witness(|| {
+            let kept = match &self.kept_witness {
+                Some(kept) => {
+                    if crate::instrumentation::witness_audit_enabled() {
+                        self.audit_kept_witness("before a call")?;
+                    }
+                    Arc::clone(kept)
+                }
+                None => {
+                    let decoded = Arc::new(self.committed.witness_snapshot()?);
+                    self.kept_witness = Some(Arc::clone(&decoded));
+                    decoded
+                }
+            };
+            Ok(kept.duplicate())
+        })
+    }
+
+    /// The witness snapshot after a call: the one before it moved by the
+    /// leaf transitions the call recorded, with the access counters the
+    /// objects have now. It becomes the kept snapshot. The transitions are
+    /// those the hidden-state check applies, and an access that found its
+    /// slot under another leaf than the kept map gives it fails the call.
+    #[cfg(any(test, feature = "diagnostics"))]
+    fn witness_after_call(
+        &mut self,
+        artifact: &CompiledArtifact,
+        recorder: &CallRecorder,
+    ) -> Result<CommittedRuntimeWitnessSnapshot> {
+        crate::instrumentation::time_witness(|| {
+            let kept = self
+                .kept_witness
+                .as_ref()
+                .ok_or_else(|| anyhow!("a call finished with no witness snapshot of its start"))?;
+            let mut next = kept.duplicate();
+            next.advance(
+                artifact,
+                self.committed.path_oram_access_counter_witnesses()?,
+                recorder.path_oram_leaf_schedule(),
+                recorder.path_oram_leaf_state_transitions(),
+            )
+            .map_err(|err| {
+                anyhow!("a call's leaf transitions do not apply to its position maps: {err}")
+            })?;
+            let after = next.duplicate();
+            self.kept_witness = Some(Arc::new(next));
+            if crate::instrumentation::witness_audit_enabled() {
+                self.audit_kept_witness("after a call")?;
+            }
+            Ok(after)
+        })
+    }
+
+    /// Decode the witness snapshot from the whole store and keep it, as the
+    /// first call does. A measurement does this after a bulk load, so that
+    /// the calls it times open no record for their witnesses.
+    #[cfg(any(test, feature = "diagnostics"))]
+    pub(in crate::runtime) fn keep_decoded_witness(&mut self) -> Result<()> {
+        let decoded = crate::instrumentation::time_witness(|| self.committed.witness_snapshot())?;
+        self.kept_witness = Some(Arc::new(decoded));
+        Ok(())
+    }
+
+    /// Decode the witness snapshot from the whole store, as every call did
+    /// before the snapshot was kept, and fail unless the kept one equals it.
+    /// With nothing kept there is nothing to compare, and the result is
+    /// `false`. Every call audits, before and after, unless a measurement
+    /// has turned the audit off (`set_position_map_witness_audit`).
+    #[cfg(any(test, feature = "diagnostics"))]
+    pub(in crate::runtime) fn audit_kept_witness(&self, context: &str) -> Result<bool> {
+        let Some(kept) = &self.kept_witness else {
+            return Ok(false);
+        };
+        let decoded = self.committed.witness_snapshot()?;
+        crate::instrumentation::count_witness_audit();
+        if decoded != **kept {
+            bail!("the kept position-map witness differs from the decoded store {context}");
+        }
+        Ok(true)
     }
 
     /// Load the objects a public call runs on: `object_ids`, the objects
@@ -548,6 +688,22 @@ impl ContractRuntime {
     #[cfg(test)]
     pub(crate) fn insert_object_for_test(&mut self, object_id: u32, object: RuntimeObject) {
         self.committed.insert_object_for_test(object_id, object);
+        self.kept_witness = None;
+    }
+
+    /// Take the kept witness of `other` in place of this runtime's: a kept
+    /// witness that is not the one of this runtime's store.
+    #[cfg(test)]
+    pub(crate) fn replace_kept_witness_for_test(&mut self, other: &Self) {
+        self.kept_witness = other.kept_witness.clone();
+    }
+
+    /// Run this runtime's calls as a production build runs them: with no
+    /// witness of their hidden ORAM state, kept or recorded.
+    #[cfg(test)]
+    pub(crate) fn run_unwitnessed_for_test(&mut self) {
+        self.unwitnessed = true;
+        self.kept_witness = None;
     }
 
     #[cfg(test)]
@@ -669,6 +825,32 @@ impl CommittedRuntimeState {
         }
     }
 
+    /// The access counters of the Path ORAM objects, in the order of the
+    /// witness snapshot. They are in memory: no record is opened.
+    #[cfg(any(test, feature = "diagnostics"))]
+    fn path_oram_access_counter_witnesses(
+        &self,
+    ) -> Result<Box<[uo_core::RuntimeOramAccessCounterWitness]>> {
+        let path_oram_object_count = self
+            .objects
+            .values()
+            .filter(|object| object.exposes_path_oram_witnesses())
+            .count();
+        let mut counters = FixedBoxBuilder::new(path_oram_object_count);
+        for object in self.objects.values() {
+            if let Some(counter) = object.path_oram_access_counter_witness() {
+                counters.push(counter)?;
+            }
+        }
+        counters.finish()
+    }
+
+    /// The witness snapshot decoded from the whole store: every bucket and
+    /// metadata page of a private-scheme map, every position-map page of a
+    /// local-scheme one. A call's witness is kept from call to call
+    /// (`ContractRuntime::kept_witness`); this is where the kept one starts
+    /// and what an audit compares it with.
+    #[cfg(any(test, feature = "diagnostics"))]
     fn witness_snapshot(&self) -> Result<CommittedRuntimeWitnessSnapshot> {
         let path_oram_object_count = self
             .objects

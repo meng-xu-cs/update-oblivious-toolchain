@@ -6,7 +6,10 @@ use crate::deployment::{
 use crate::freshness::RuntimeFreshnessState;
 use crate::return_channel::ReturnChannelSession;
 #[cfg(any(test, feature = "diagnostics"))]
-use crate::runtime::bulk_load_contract_map_for_diagnostics;
+use crate::runtime::{
+    audit_contract_kept_witness, bulk_load_contract_map_for_diagnostics,
+    keep_decoded_contract_witness,
+};
 use crate::runtime::{
     deploy_contract_runtime, run_contract_call, stage_contract_runtime, ContractRuntime,
     PathOramFreshCoinPlan,
@@ -395,6 +398,27 @@ impl ContractInstance {
         entries: Vec<(Value, Value)>,
     ) -> Result<()> {
         bulk_load_contract_map_for_diagnostics(&mut self.state, map, entries)
+    }
+
+    /// Decode the position-map witness of the Path ORAM maps from the whole
+    /// store and fail unless the witness the runtime keeps for its calls
+    /// equals it. `false` when no call has needed a witness since the
+    /// deployment or the last bulk load, so that none is kept. A production
+    /// build keeps no witness and has no such function.
+    #[cfg(any(test, feature = "diagnostics"))]
+    pub fn audit_kept_position_map_witness(&self) -> Result<bool> {
+        audit_contract_kept_witness(&self.state)
+    }
+
+    /// Decode the position-map witness of the Path ORAM maps from the whole
+    /// store and keep it for the next calls, as the first call after a
+    /// deployment or a bulk load does. The capacity sweep does it after it
+    /// fills a map, so that the calls it times open no record for their
+    /// witnesses. A production build keeps no witness and has no such
+    /// function.
+    #[cfg(any(test, feature = "diagnostics"))]
+    pub fn keep_decoded_position_map_witness(&mut self) -> Result<()> {
+        keep_decoded_contract_witness(&mut self.state)
     }
 
     fn call_impl(
@@ -2076,6 +2100,304 @@ bounds:
                 .bulk_load_map_for_diagnostics("absent", Vec::new())
                 .is_err());
         }
+    }
+
+    /// The position maps a call's witness records before and after, as the
+    /// runtime refinement witness of its trace holds them.
+    fn witnessed_position_maps(result: &CallResult) -> (serde_json::Value, serde_json::Value) {
+        let witness =
+            serde_json::to_value(result.trace.runtime_refinement_witness().unwrap()).unwrap();
+        (
+            witness["oram_position_map_before"].clone(),
+            witness["oram_position_map_after"].clone(),
+        )
+    }
+
+    /// The runtime keeps the position-map witness of its calls: the witness
+    /// before a call is the one after the call before it, and a call moves
+    /// it by its own leaf transitions. No call but the first decodes a map
+    /// for its witness. A test build compares the kept witness with the
+    /// decode of the whole store before and after every call, so every call
+    /// of this suite checks the two against each other. This test also asks
+    /// after each call, for a contract with a map of each Path ORAM scheme:
+    /// calls that touch one map, the other, and both, an abort, reads that
+    /// hit and miss, a call that is refused, and a bulk load.
+    #[test]
+    fn the_kept_position_map_witness_equals_the_decoded_store_after_every_call() {
+        let artifact = compile_bench(
+            bench_raw!("ERC20Lite.sol"),
+            include_str!(bench_raw!("ERC20Lite.private-posmap.yaml")),
+            ProgramMode::Uo,
+        );
+        let mut instance = ContractInstance::deploy_with_seed(artifact, 0x36).unwrap();
+        // Nothing is kept until a call needs a witness.
+        assert!(!instance.audit_kept_position_map_witness().unwrap());
+
+        let owner = Value::Address([0xA1; 20]);
+        let spender = Value::Address([0xB2; 20]);
+        let to = Value::Address([0xC3; 20]);
+        let stranger = Value::Address([0xEE; 20]);
+        let calls: Vec<(&str, Vec<Value>, bool)> = vec![
+            // The tree alone: an insert.
+            (
+                "mint(address,uint256)",
+                vec![owner.clone(), Value::uint(10)],
+                false,
+            ),
+            // The local scheme's map alone.
+            (
+                "approve(address,address,uint256)",
+                vec![owner.clone(), spender.clone(), Value::uint(5)],
+                false,
+            ),
+            // The tree: an update and an insert.
+            (
+                "transfer(address,address,uint256)",
+                vec![owner.clone(), to.clone(), Value::uint(3)],
+                false,
+            ),
+            // A call that aborts makes its accesses all the same.
+            (
+                "transfer(address,address,uint256)",
+                vec![owner.clone(), to.clone(), Value::uint(100)],
+                true,
+            ),
+            // Both maps.
+            (
+                "transferFrom(address,address,address,uint256)",
+                vec![owner.clone(), spender.clone(), to.clone(), Value::uint(2)],
+                false,
+            ),
+            // Reads that hit, and one that misses.
+            ("balanceOf(address)", vec![owner.clone()], false),
+            (
+                "allowanceOf(address,address)",
+                vec![owner.clone(), spender.clone()],
+                false,
+            ),
+            ("balanceOf(address)", vec![stranger], false),
+            // A write of the value a key has, and a write of zero.
+            (
+                "approve(address,address,uint256)",
+                vec![owner.clone(), spender.clone(), Value::uint(3)],
+                false,
+            ),
+            (
+                "approve(address,address,uint256)",
+                vec![owner.clone(), spender.clone(), Value::uint(0)],
+                false,
+            ),
+        ];
+        let mut last_after: Option<serde_json::Value> = None;
+        for (index, (entrypoint, args, aborts)) in calls.into_iter().enumerate() {
+            let result = instance.call(entrypoint, args).unwrap();
+            assert_eq!(result.aborted, aborts, "call {index}, {entrypoint}");
+            assert!(
+                instance.audit_kept_position_map_witness().unwrap(),
+                "call {index}, {entrypoint}"
+            );
+            let (before, after) = witnessed_position_maps(&result);
+            // Both maps are witnessed, whichever the call touched.
+            assert_eq!(before.as_array().unwrap().len(), 2);
+            if let Some(last_after) = &last_after {
+                assert_eq!(&before, last_after, "call {index}, {entrypoint}");
+            }
+            last_after = Some(after);
+        }
+
+        // A call that is refused before it runs leaves the kept witness as
+        // it was.
+        assert!(instance
+            .call("mint(address,uint256)", vec![owner.clone()])
+            .is_err());
+        assert!(instance.audit_kept_position_map_witness().unwrap());
+        let read = instance
+            .call("balanceOf(address)", vec![owner.clone()])
+            .unwrap();
+        assert_eq!(read.return_value, Some(Value::uint(5)));
+        assert_eq!(
+            Some(witnessed_position_maps(&read).0),
+            last_after,
+            "the refused call moved the witness"
+        );
+
+        // A bulk load is not a call: no transition moves the witness, so
+        // none is kept after it, and the next call decodes one again.
+        let loaded = Value::Address([0xD4; 20]);
+        instance
+            .bulk_load_map_for_diagnostics("balances", vec![(loaded.clone(), Value::uint(9))])
+            .unwrap();
+        assert!(!instance.audit_kept_position_map_witness().unwrap());
+        let read = instance.call("balanceOf(address)", vec![loaded]).unwrap();
+        assert_eq!(read.return_value, Some(Value::uint(9)));
+        assert!(instance.audit_kept_position_map_witness().unwrap());
+
+        // A measurement decodes the witness itself after a load.
+        instance
+            .bulk_load_map_for_diagnostics(
+                "balances",
+                vec![(Value::Address([0xD5; 20]), Value::uint(4))],
+            )
+            .unwrap();
+        instance.keep_decoded_position_map_witness().unwrap();
+        assert!(instance.audit_kept_position_map_witness().unwrap());
+        instance.call("balanceOf(address)", vec![owner]).unwrap();
+        assert!(instance.audit_kept_position_map_witness().unwrap());
+    }
+
+    /// A kept witness that is not the one of the store fails the next call,
+    /// which changes nothing.
+    #[test]
+    fn a_kept_position_map_witness_that_differs_from_the_store_fails_the_call() {
+        let artifact = compile_bench(
+            bench_raw!("ERC20Lite.sol"),
+            include_str!(bench_raw!("ERC20Lite.private-posmap.yaml")),
+            ProgramMode::Uo,
+        );
+        let mint = |instance: &mut ContractInstance, owner: u8| {
+            instance.call(
+                "mint(address,uint256)",
+                vec![Value::Address([owner; 20]), Value::uint(7)],
+            )
+        };
+        // Two deployments place their nodes under different leaves.
+        let mut instance = ContractInstance::deploy_with_seed(artifact.clone(), 1).unwrap();
+        let mut other = ContractInstance::deploy_with_seed(artifact, 2).unwrap();
+        mint(&mut instance, 0x11).unwrap();
+        mint(&mut other, 0x11).unwrap();
+        assert!(instance.audit_kept_position_map_witness().unwrap());
+        let digest = instance.state.ciphertext_store_digest().unwrap();
+        let freshness = instance.freshness.snapshot();
+
+        instance.state.replace_kept_witness_for_test(&other.state);
+        let err = instance.audit_kept_position_map_witness().unwrap_err();
+        assert!(
+            format!("{err:#}").contains("kept position-map witness differs from the decoded store"),
+            "{err:#}"
+        );
+        let err = mint(&mut instance, 0x22).unwrap_err();
+        assert!(
+            format!("{err:#}")
+                .contains("kept position-map witness differs from the decoded store before a call"),
+            "{err:#}"
+        );
+        // The call was staged and dropped: the store and the freshness
+        // counters are those of before it.
+        assert_eq!(instance.state.ciphertext_store_digest().unwrap(), digest);
+        assert_eq!(instance.freshness.snapshot(), freshness);
+
+        // With its own witness decoded again the runtime takes calls.
+        instance.keep_decoded_position_map_witness().unwrap();
+        mint(&mut instance, 0x22).unwrap();
+        assert!(instance.audit_kept_position_map_witness().unwrap());
+    }
+
+    /// A call that records no witness of its hidden ORAM state, as every
+    /// call of a production build, is the same call: from the same seed it
+    /// returns the same values, issues the same receipt and leaves the same
+    /// ciphertext in storage as the call that records one, and the checks
+    /// that need no position map accept it. Its evidence holds no position
+    /// map and no access counter, so no proof object can be built from it.
+    #[test]
+    fn a_call_without_a_witness_is_the_same_call() {
+        let artifact = compile_bench(
+            bench_raw!("ERC20Lite.sol"),
+            include_str!(bench_raw!("ERC20Lite.private-posmap.yaml")),
+            ProgramMode::Uo,
+        );
+        let mut witnessed = ContractInstance::deploy_with_seed(artifact.clone(), 0x36).unwrap();
+        let mut unwitnessed = ContractInstance::deploy_with_seed(artifact, 0x36).unwrap();
+        unwitnessed.state.run_unwitnessed_for_test();
+
+        let owner = Value::Address([0xA1; 20]);
+        let spender = Value::Address([0xB2; 20]);
+        let to = Value::Address([0xC3; 20]);
+        let calls: Vec<(&str, Vec<Value>)> = vec![
+            (
+                "mint(address,uint256)",
+                vec![owner.clone(), Value::uint(10)],
+            ),
+            (
+                "approve(address,address,uint256)",
+                vec![owner.clone(), spender.clone(), Value::uint(5)],
+            ),
+            (
+                "transfer(address,address,uint256)",
+                vec![owner.clone(), to.clone(), Value::uint(3)],
+            ),
+            // This one aborts.
+            (
+                "transfer(address,address,uint256)",
+                vec![owner.clone(), to.clone(), Value::uint(100)],
+            ),
+            (
+                "transferFrom(address,address,address,uint256)",
+                vec![owner.clone(), spender.clone(), to.clone(), Value::uint(2)],
+            ),
+            ("balanceOf(address)", vec![owner.clone()]),
+            (
+                "allowanceOf(address,address)",
+                vec![owner.clone(), spender.clone()],
+            ),
+            ("balanceOf(address)", vec![Value::Address([0xEE; 20])]),
+        ];
+        let mut aborted = 0;
+        for (index, (entrypoint, args)) in calls.into_iter().enumerate() {
+            let with = witnessed.call(entrypoint, args.clone()).unwrap();
+            let without = unwitnessed.call(entrypoint, args).unwrap();
+            let context = format!("call {index}, {entrypoint}");
+            assert_eq!(without.aborted, with.aborted, "{context}");
+            assert_eq!(without.return_value, with.return_value, "{context}");
+            assert_eq!(without.trace.receipt, with.trace.receipt, "{context}");
+            assert_eq!(
+                unwitnessed.state.ciphertext_store_digest().unwrap(),
+                witnessed.state.ciphertext_store_digest().unwrap(),
+                "{context}"
+            );
+            aborted += usize::from(with.aborted);
+
+            // The evidence both calls hold is the same.
+            assert_eq!(
+                without.trace.exact_runtime_kernel_witness().unwrap(),
+                with.trace.exact_runtime_kernel_witness().unwrap(),
+                "{context}"
+            );
+            assert_eq!(
+                without
+                    .trace
+                    .runtime_controller_observer_certificate()
+                    .unwrap(),
+                with.trace
+                    .runtime_controller_observer_certificate()
+                    .unwrap(),
+                "{context}"
+            );
+
+            // The hidden ORAM state is in the evidence of one alone.
+            let (before, after) = witnessed_position_maps(&with);
+            assert_eq!(before.as_array().unwrap().len(), 2, "{context}");
+            assert_eq!(after.as_array().unwrap().len(), 2, "{context}");
+            assert!(!with
+                .trace
+                .runtime_public_oram_access_counters_before()
+                .is_empty());
+            assert!(without
+                .trace
+                .runtime_public_oram_access_counters_before()
+                .is_empty());
+            assert!(with.trace.runtime_trusted_kernel_bundle().is_ok());
+            assert!(without
+                .trace
+                .runtime_path_oram_hidden_certificate()
+                .is_err());
+            assert!(without.trace.runtime_trusted_kernel_bundle().is_err());
+            assert!(without.trace.runtime_refinement_witness().is_err());
+
+            // Nothing is kept for the runtime that records nothing.
+            assert!(witnessed.audit_kept_position_map_witness().unwrap());
+            assert!(!unwitnessed.audit_kept_position_map_witness().unwrap());
+        }
+        assert_eq!(aborted, 1);
     }
 
     #[test]

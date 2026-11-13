@@ -1042,6 +1042,31 @@ impl ExecutionTrace {
         )
     }
 
+    /// The checks of a confidential call's proof bundle family that need no
+    /// hidden ORAM state: the call's kernel interface bundle, and its kernel
+    /// witness against the artifact's kernel program, slot program and
+    /// lowering. The other bundles of the family carry the position maps; a
+    /// call that recorded none builds none of them.
+    pub(crate) fn check_runtime_confidential_kernel_bundles(
+        &self,
+        artifact: &CompiledArtifact,
+    ) -> Result<(), RuntimeConfidentialProofBundleFamilyError> {
+        let runtime_kernel_interface_bundle = self.runtime_kernel_interface_bundle(artifact)?;
+        let entrypoint = runtime_kernel_interface_bundle.entrypoint_id().to_owned();
+        let runtime_kernel_witness = runtime_kernel_interface_bundle.kernel_witness().clone();
+        artifact.runtime_kernel_dsl_bundle_for_entrypoint(
+            runtime_kernel_witness.clone(),
+            &entrypoint,
+        )?;
+        artifact.runtime_kernel_slot_dsl_bundle_for_entrypoint(
+            runtime_kernel_witness.clone(),
+            &entrypoint,
+        )?;
+        artifact
+            .runtime_kernel_lowering_bundle_for_entrypoint(runtime_kernel_witness, &entrypoint)?;
+        Ok(())
+    }
+
     pub fn runtime_confidential_proof_bundle_family(
         &self,
         artifact: &CompiledArtifact,

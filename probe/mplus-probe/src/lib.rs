@@ -5011,6 +5011,7 @@ fn run_pathoram_hidden_validation() -> Result<JsonValue> {
     Ok(json!({
         "checker": display_report_path(&checker),
         "scenario_count": scenarios.len(),
+        "kept_witness_audit": "every call of a scenario compared the position-map witness the runtime keeps with the decode of the whole store, after it ran and, but for the first call of a deployment, before it ran; kept_witness_audits counts the comparisons, 2 * (setup_calls + 1) - 1",
         "scenarios": scenarios,
     }))
 }
@@ -10028,6 +10029,79 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "benchmark": "SingleAccessMap/pathoram/put",
             "entrypoint": target.entrypoint,
             "mutation": "seal a record over another under the marker of the record it replaces instead of the other marker, so a unit would differ from the unit it replaces only if its ciphertext bytes do; the implementation interface must reject a reseal that does not change the marker",
+        }),
+    )?);
+    let mut tampered_runtime_implementation_production_witness_snapshot =
+        runtime_implementation_interface.clone();
+    tampered_runtime_implementation_production_witness_snapshot.state_source =
+        replace_exactly_once(
+            &tampered_runtime_implementation_production_witness_snapshot.state_source,
+            "        #[cfg(not(any(test, feature = \"diagnostics\")))]\n        let call_start = TracedRuntimeCallStart::unwitnessed();",
+            "        #[cfg(not(any(test, feature = \"diagnostics\")))]\n        let call_start = TracedRuntimeCallStart::new(self.witness_before_call()?);",
+            "runtime implementation production witness-snapshot tamper",
+        )?;
+    scenarios.push(validate_tampered_json_case(
+        "runtime_implementation_interface/production_call_witness_snapshot_drift",
+        &tampered_runtime_implementation_production_witness_snapshot,
+        |interface_path| {
+            Ok(Command::new(&runtime_implementation_interface_checker)
+                .arg(interface_path)
+                .output()?)
+        },
+        json!({
+            "scenario": "runtime_implementation_interface/production_call_witness_snapshot_drift",
+            "artifact_kind": "proofgrade_runtime_implementation_interface",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "start a production call with a witness of the position maps decoded from the whole store, so the implementation interface must reject a production call that records hidden ORAM state",
+        }),
+    )?);
+    let mut tampered_runtime_implementation_witness_decoder_ungated =
+        runtime_implementation_interface.clone();
+    tampered_runtime_implementation_witness_decoder_ungated.oram_source = replace_exactly_once(
+        &tampered_runtime_implementation_witness_decoder_ungated.oram_source,
+        "    #[cfg(any(test, feature = \"diagnostics\"))]\n    pub(crate) fn path_position_map_witness(",
+        "    pub(crate) fn path_position_map_witness(",
+        "runtime implementation witness-decoder gate tamper",
+    )?;
+    scenarios.push(validate_tampered_json_case(
+        "runtime_implementation_interface/position_map_witness_decoder_ungated_drift",
+        &tampered_runtime_implementation_witness_decoder_ungated,
+        |interface_path| {
+            Ok(Command::new(&runtime_implementation_interface_checker)
+                .arg(interface_path)
+                .output()?)
+        },
+        json!({
+            "scenario": "runtime_implementation_interface/position_map_witness_decoder_ungated_drift",
+            "artifact_kind": "proofgrade_runtime_implementation_interface",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "compile the decoder of a map's position-map witness into every build, so the implementation interface must reject a production build that can decode a position map for a witness",
+        }),
+    )?);
+    let mut tampered_runtime_implementation_kept_witness_audit =
+        runtime_implementation_interface.clone();
+    tampered_runtime_implementation_kept_witness_audit.state_source = replace_exactly_once(
+        &tampered_runtime_implementation_kept_witness_audit.state_source,
+        "            if crate::instrumentation::witness_audit_enabled() {\n                self.audit_kept_witness(\"after a call\")?;\n            }\n",
+        "",
+        "runtime implementation kept-witness audit tamper",
+    )?;
+    scenarios.push(validate_tampered_json_case(
+        "runtime_implementation_interface/kept_witness_audit_skip_drift",
+        &tampered_runtime_implementation_kept_witness_audit,
+        |interface_path| {
+            Ok(Command::new(&runtime_implementation_interface_checker)
+                .arg(interface_path)
+                .output()?)
+        },
+        json!({
+            "scenario": "runtime_implementation_interface/kept_witness_audit_skip_drift",
+            "artifact_kind": "proofgrade_runtime_implementation_interface",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "keep the position-map witness a call moved by its own leaf transitions without comparing it with the decode of the whole store, so the implementation interface must reject a kept witness that is not checked against the store after a call",
         }),
     )?);
     let tampered_runtime_small_confidential_kernel_generated_object_helpers_commit =
@@ -25042,7 +25116,23 @@ fn validate_pathoram_hidden_case(
     target: &CallSpec,
     checker: &Path,
 ) -> Result<JsonValue> {
+    // The position maps of the certificate are the runtime's kept witness:
+    // the maps before the call are those after the call before it, and the
+    // maps after it are those moved by the call's own leaf transitions.
+    // Every call compares the witness it keeps with the decode of the whole
+    // store, after it ran and, but for the first call of a deployment,
+    // which decodes the witness it keeps, before it runs. A call whose
+    // witness differs fails. Count the comparisons these calls made.
+    let audits_before = uo_evm::position_map_witness_audits();
     let trace = run_target_call(artifact, setup, target.entrypoint, target.args.clone())?;
+    let kept_witness_audits = uo_evm::position_map_witness_audits() - audits_before;
+    let calls = setup.len() as u64 + 1;
+    if kept_witness_audits != 2 * calls - 1 {
+        return Err(anyhow!(
+            "the {calls} calls of {name} compared their kept position-map witness with the store {kept_witness_audits} times, not {}",
+            2 * calls - 1
+        ));
+    }
     let certificate = trace.runtime_path_oram_hidden_certificate()?;
     let (certificate_path, certificate_json_bytes) = write_temp_json(name, &certificate)?;
     let output = Command::new(checker).arg(&certificate_path).output()?;
@@ -25061,6 +25151,7 @@ fn validate_pathoram_hidden_case(
         "leaf_steps": certificate.oram_leaf_schedule().len(),
         "public_leaf_scaffold_steps": certificate.oram_leaf_public_scaffold().len(),
         "position_map_objects": certificate.oram_position_map_before().len(),
+        "kept_witness_audits": kept_witness_audits,
         "certificate_json_bytes": certificate_json_bytes,
         "lean_stdout": String::from_utf8_lossy(&output.stdout).trim(),
         "accepted": true,
@@ -27958,6 +28049,179 @@ fn check_contract_instance_debug_is_opaque(engine_impl_source: &str) -> bool {
         && engine_impl_source.contains("impl std::fmt::Debug for ContractInstance {")
         && engine_impl_source
             .contains("f.debug_struct(\"ContractInstance\").finish_non_exhaustive()")
+}
+
+/// The attribute of an item that only a build which can export a call's
+/// evidence has: a test build or a diagnostics build.
+const EVIDENCE_BUILD_GATE: &str = "#[cfg(any(test, feature = \"diagnostics\"))]";
+
+/// Whether `source` defines each function of `names` once, on the line under
+/// the attribute that leaves it out of a production build.
+fn defined_only_in_evidence_builds(source: &str, names: &[&str]) -> bool {
+    let lines: Vec<&str> = source.lines().collect();
+    names.iter().all(|name| {
+        let definition = format!("fn {name}(");
+        let mut definitions = lines
+            .iter()
+            .enumerate()
+            .filter(|(_, line)| line.contains(&definition));
+        match (definitions.next(), definitions.next()) {
+            (Some((index, _)), None) => index > 0 && lines[index - 1].trim() == EVIDENCE_BUILD_GATE,
+            _ => false,
+        }
+    })
+}
+
+/// Whether a production call records no witness of its hidden ORAM state.
+/// The functions that decode a position map or read an access counter for a
+/// witness, and those that keep, move and audit the witness, exist only in a
+/// build that can export a call's evidence, so a production build cannot
+/// call one: it would not compile. The runtime's kept witness is a field of
+/// such a build alone. In a production build a call starts and ends with no
+/// snapshot, and `uo-core` then builds no proof bundle, which would carry
+/// the position maps, and runs the checks of the evidence that need none.
+fn check_production_calls_record_no_position_map_witness(
+    state_source: &str,
+    theorem_source: &str,
+    oram_source: &str,
+    objects_source: &str,
+    core_trace_source: &str,
+) -> bool {
+    defined_only_in_evidence_builds(
+        state_source,
+        &[
+            "witness_before_call",
+            "witness_after_call",
+            "keep_decoded_witness",
+            "audit_kept_witness",
+            "records_witness",
+            "path_oram_access_counter_witnesses",
+            "witness_snapshot",
+        ],
+    ) && defined_only_in_evidence_builds(
+        oram_source,
+        &["path_position_map_witness", "access_counter_witness"],
+    ) && defined_only_in_evidence_builds(
+        objects_source,
+        &[
+            "path_oram_position_map_witness",
+            "exposes_path_oram_witnesses",
+            "path_oram_access_counter_witness",
+        ],
+    )
+        // The decoders of a position map have one caller each.
+        && oram_source.matches("tree_position_map_witness_leaves(").count() == 1
+        && oram_source.matches("path_position_map_witness_leaves(").count() == 1
+        && !state_source.contains("position_map_witness_leaves(")
+        && !objects_source.contains("position_map_witness_leaves(")
+        && state_source.contains(
+            "    #[cfg(any(test, feature = \"diagnostics\"))]\n    kept_witness: Option<Arc<CommittedRuntimeWitnessSnapshot>>,\n",
+        )
+        && state_source.matches("kept_witness: Option<").count() == 1
+        // A production call starts and ends with no snapshot.
+        && state_source.contains(
+            "        #[cfg(any(test, feature = \"diagnostics\"))]\n        let call_start = if self.records_witness() {\n            TracedRuntimeCallStart::new(self.witness_before_call()?)\n        } else {\n            TracedRuntimeCallStart::unwitnessed()\n        };\n        #[cfg(not(any(test, feature = \"diagnostics\")))]\n        let call_start = TracedRuntimeCallStart::unwitnessed();\n        Ok((call_start, public_call, recorder))",
+        )
+        && state_source.matches("TracedRuntimeCallStart::new(").count() == 1
+        && state_source.contains(
+            "    #[cfg(not(any(test, feature = \"diagnostics\")))]\n    pub(in crate::runtime) fn finish_traced_call(\n        &mut self,\n        call_outcome: RuntimeCallOutcome,\n    ) -> Result<TracedRuntimeCallOutcome> {\n        Ok(TracedRuntimeCallOutcome::unwitnessed(call_outcome))\n    }",
+        )
+        && state_source.contains(
+            "    #[cfg(any(test, feature = \"diagnostics\"))]\n    pub(in crate::runtime) fn finish_traced_call(\n        &mut self,\n        call_outcome: RuntimeCallOutcome,\n        artifact: &CompiledArtifact,\n        recorder: &CallRecorder,\n    ) -> Result<TracedRuntimeCallOutcome> {\n        if !self.records_witness() {\n            return Ok(TracedRuntimeCallOutcome::unwitnessed(call_outcome));\n        }\n        Ok(TracedRuntimeCallOutcome::new(\n            call_outcome,\n            self.witness_after_call(artifact, recorder)?,\n        ))\n    }",
+        )
+        && state_source.matches("TracedRuntimeCallOutcome::new(").count() == 1
+        && theorem_source.contains(
+            "    #[cfg(any(test, feature = \"diagnostics\"))]\n    let traced_outcome = runtime.finish_traced_call(call_outcome, artifact, &context.recorder)?;\n    #[cfg(not(any(test, feature = \"diagnostics\")))]\n    let traced_outcome = runtime.finish_traced_call(call_outcome)?;",
+        )
+        && theorem_source.matches(".finish_traced_call(").count() == 2
+        // Without a snapshot of both ends a call has no hidden ORAM state,
+        // and its trace is finalized by the checks that need none.
+        && core_trace_source.contains(
+            "    pub fn unwitnessed() -> Self {\n        Self {\n            runtime_state_before: None,\n        }\n    }",
+        )
+        && core_trace_source.contains(
+            "    pub fn unwitnessed(call_outcome: RuntimeCallOutcome) -> Self {\n        Self {\n            call_outcome,\n            runtime_state_after: None,\n        }\n    }",
+        )
+        && core_trace_source.contains(
+            "            match (call_start.runtime_state_before, self.runtime_state_after) {\n                (Some(runtime_state_before), Some(runtime_state_after)) => {",
+        )
+        && core_trace_source.contains(
+            "                _ => None,\n            };\n        FinalizedRuntimeCallTraceParts::new(self.call_outcome, runtime_witness_state)",
+        )
+        && core_trace_source.contains(
+            "        let runtime_oram_position_maps_unrecorded = runtime_witness_state.is_none();",
+        )
+        && core_trace_source.matches("runtime_oram_position_maps_unrecorded = ").count() == 1
+        && core_trace_source.contains(
+            "            trace.check_evidence_without_position_maps(artifact, confidential)?;\n        } else {\n            if confidential {\n                trace.runtime_confidential_proof_bundle_family(artifact)?;\n            }\n            trace.materialize_runtime_trusted_kernel_bundle()?;\n        }\n        Ok(trace)",
+        )
+        && core_trace_source.contains(
+            "        if !self.evidence.runtime_oram_access_counters_before.is_empty()\n            || !self.evidence.runtime_oram_access_counters_after.is_empty()\n            || !self.evidence.runtime_oram_position_map_before.is_empty()\n            || !self.evidence.runtime_oram_position_map_after.is_empty()\n            || self.evidence.runtime_oram_leaf_schedule.len()\n                != self.evidence.runtime_oram_leaf_state_transitions.len()\n        {\n            return Err(RefinementWitnessError::OramLeafStateMismatch.into());\n        }\n        let kernel_witness = self.checked_runtime_kernel_witness()?;\n        let controller_observer = self.reconstructed_runtime_controller_observer_certificate()?;",
+        )
+        && core_trace_source.contains(
+            "        validate_path_oram_leaf_schedule(\n            &self.evidence.runtime_oram_leaf_schedule,\n            &refinement_trace.logical_accesses,\n            &refinement_trace.physical_reads,\n            &physical_writes,\n            &self.evidence.runtime_oram_objects,\n        )?;\n        validate_refinement_outcome(\n            &refinement_trace,\n            &controller_observer.public_outcome,\n            kernel_witness.as_ref(),\n            None,\n            &controller_observer.controller_certificate,\n            &self.evidence.runtime_oram_objects,\n        )?;\n        if confidential {\n            self.check_runtime_confidential_kernel_bundles(artifact)?;\n        }\n        Ok(())",
+        )
+}
+
+/// Whether every call of a build that exports evidence audits the witness
+/// the runtime keeps. The witness before a call is a copy of the kept one
+/// and the witness after it is that copy moved by the call's own leaf
+/// transitions, so the check that the transitions carry one to the other
+/// says nothing about the store. The audit does: before and after the call
+/// it decodes the witness from the whole store, as every call did before
+/// the witness was kept, and fails the call unless the kept one equals it.
+/// The audit is on for every thread until it is turned off, and the probe
+/// turns it off in one place, for the calls it times.
+fn check_evidence_builds_audit_the_kept_position_map_witness(
+    state_source: &str,
+    instrumentation_source: &str,
+    probe_source: &str,
+    capacity_sweep_source: &str,
+) -> bool {
+    // Written in two parts, so that this function's own text does not count.
+    let switch_call = concat!("set_position_map_witness", "_audit(");
+    let guard = concat!("WitnessAudit", "Off::new()");
+    state_source.contains(
+        "            let kept = match &self.kept_witness {\n                Some(kept) => {\n                    if crate::instrumentation::witness_audit_enabled() {\n                        self.audit_kept_witness(\"before a call\")?;\n                    }\n                    Arc::clone(kept)\n                }\n                None => {\n                    let decoded = Arc::new(self.committed.witness_snapshot()?);\n                    self.kept_witness = Some(Arc::clone(&decoded));\n                    decoded\n                }\n            };\n            Ok(kept.duplicate())",
+    ) && state_source.contains(
+        "            let after = next.duplicate();\n            self.kept_witness = Some(Arc::new(next));\n            if crate::instrumentation::witness_audit_enabled() {\n                self.audit_kept_witness(\"after a call\")?;\n            }\n            Ok(after)",
+    ) && state_source.contains(
+        "        let decoded = self.committed.witness_snapshot()?;\n        crate::instrumentation::count_witness_audit();\n        if decoded != **kept {\n            bail!(\"the kept position-map witness differs from the decoded store {context}\");\n        }\n        Ok(true)",
+    ) && state_source.matches("witness_audit_enabled()").count() == 2
+        // On until turned off, for each thread.
+        && instrumentation_source.contains(
+            "    static WITNESS_AUDIT_OFF: Cell<bool> = const { Cell::new(false) };",
+        )
+        && instrumentation_source.contains(concat!(
+            "pub fn set_position_map_witness",
+            "_audit(on: bool) -> bool {\n    WITNESS_AUDIT_OFF.with(|off| !off.replace(!on))\n}",
+        ))
+        && instrumentation_source.contains(
+            "pub(crate) fn witness_audit_enabled() -> bool {\n    #[cfg(feature = \"diagnostics\")]\n    {\n        cfg!(test) || !WITNESS_AUDIT_OFF.with(Cell::get)\n    }\n    #[cfg(not(feature = \"diagnostics\"))]\n    {\n        true\n    }\n}",
+        )
+        && instrumentation_source.matches("WITNESS_AUDIT_OFF").count() == 3
+        // The probe turns the audit off through one guard, which turns it
+        // back on, and only where it times calls: in the capacity sweep,
+        // which audits after each level, and in the latency report.
+        && capacity_sweep_source.contains(concat!(
+            "impl WitnessAuditOff {\n    pub(crate) fn new() -> Self {\n        Self(uo_evm::set_position_map_witness",
+            "_audit(false))\n    }\n}\n\nimpl Drop for WitnessAuditOff {\n    fn drop(&mut self) {\n        uo_evm::set_position_map_witness",
+            "_audit(self.0);\n    }\n}",
+        ))
+        && capacity_sweep_source.matches(switch_call).count() == 2
+        && capacity_sweep_source.matches(guard).count() == 1
+        && capacity_sweep_source.contains(
+            "            let audited = instance\n                .audit_kept_position_map_witness()\n                .context(\"auditing the kept position-map witness\")?;",
+        )
+        && capacity_sweep_source.contains(
+            "            \"kept_witness_matches_store_after_every_level\": measured_levels > 0\n                && audited_levels == measured_levels,",
+        )
+        && probe_source.matches(switch_call).count() == 0
+        && probe_source.matches(guard).count() == 1
+        && probe_source.contains(concat!(
+            "fn run_latency_memory(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<JsonValue> {\n    // Calls are timed with the audit of the kept witness off.\n    let _witness_audit_off = capacity_sweep::WitnessAudit",
+            "Off::new();",
+        ))
 }
 
 fn production_source_slice(source: &str) -> String {
@@ -40070,7 +40334,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && theorem_source.contains("runtime.begin_traced_call(")
         && state_source.contains("fn public_object_ids(&self) -> Result<Box<[u32]>>")
         && state_source.contains(
-            "pub(in crate::runtime) fn begin_traced_call(\n        &self,\n        entrypoint: &str,\n        manifest_entry: &EntrypointManifest,\n        args: &[Value],\n    ) -> Result<(",
+            "pub(in crate::runtime) fn begin_traced_call(\n        &mut self,\n        entrypoint: &str,\n        manifest_entry: &EntrypointManifest,\n        args: &[Value],\n    ) -> Result<(",
         )
         && state_source.contains("fn ensure_ready_for_call(&self, context: &str) -> Result<()>")
         && !state_source
@@ -40812,11 +41076,15 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !theorem_source.contains(".into_hidden_oram_state()");
     let theorem_only_runtime_helper_visibility_restricted = state_source
         .contains(
-            "pub(in crate::runtime) fn begin_traced_call(\n        &self,\n        entrypoint: &str,\n        manifest_entry: &EntrypointManifest,\n        args: &[Value],\n    ) -> Result<(TracedRuntimeCallStart, PublicCallSummary, CallRecorder)>",
+            "pub(in crate::runtime) fn begin_traced_call(\n        &mut self,\n        entrypoint: &str,\n        manifest_entry: &EntrypointManifest,\n        args: &[Value],\n    ) -> Result<(TracedRuntimeCallStart, PublicCallSummary, CallRecorder)>",
         )
         && state_source.contains(
-            "pub(in crate::runtime) fn finish_traced_call(\n        &self,\n        call_outcome: RuntimeCallOutcome,\n    ) -> Result<TracedRuntimeCallOutcome>",
+            "    #[cfg(any(test, feature = \"diagnostics\"))]\n    pub(in crate::runtime) fn finish_traced_call(\n        &mut self,\n        call_outcome: RuntimeCallOutcome,\n        artifact: &CompiledArtifact,\n        recorder: &CallRecorder,\n    ) -> Result<TracedRuntimeCallOutcome>",
         )
+        && state_source.contains(
+            "    #[cfg(not(any(test, feature = \"diagnostics\")))]\n    pub(in crate::runtime) fn finish_traced_call(\n        &mut self,\n        call_outcome: RuntimeCallOutcome,\n    ) -> Result<TracedRuntimeCallOutcome>",
+        )
+        && state_source.matches("fn finish_traced_call(").count() == 2
         && core_trace_source.contains("pub struct CommittedRuntimeWitnessSnapshot {")
         && core_trace_source.contains("pub struct TracedRuntimeCallStart {")
         && core_trace_source.contains("pub struct TracedRuntimeCallOutcome {")
@@ -40828,7 +41096,13 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && core_trace_source.contains("pub fn into_execution_trace_inputs(")
         && state_source.contains("fn ensure_ready_for_call(&self, context: &str) -> Result<()>")
         && state_source.contains(
-            "fn witness_snapshot(&self) -> Result<CommittedRuntimeWitnessSnapshot> {\n        crate::instrumentation::time_witness(|| self.committed.witness_snapshot())\n    }",
+            "    #[cfg(any(test, feature = \"diagnostics\"))]\n    fn witness_before_call(&mut self) -> Result<CommittedRuntimeWitnessSnapshot> {",
+        )
+        && state_source.contains(
+            "    #[cfg(any(test, feature = \"diagnostics\"))]\n    fn witness_after_call(\n        &mut self,\n        artifact: &CompiledArtifact,\n        recorder: &CallRecorder,\n    ) -> Result<CommittedRuntimeWitnessSnapshot> {",
+        )
+        && state_source.contains(
+            "    #[cfg(any(test, feature = \"diagnostics\"))]\n    fn witness_snapshot(&self) -> Result<CommittedRuntimeWitnessSnapshot> {",
         )
         && state_source.contains("CommittedRuntimeWitnessSnapshotBuilder::new(")
         && state_source.contains("let path_oram_object_count = self")
@@ -41990,7 +42264,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         .and_then(|suffix| suffix.split("impl FinalizedRuntimeCallTraceParts {").next())
         .map(|struct_body| {
             struct_body.contains("runtime_call_outcome: RuntimeCallOutcome")
-                && struct_body.contains("runtime_witness_state: TracedRuntimeCallWitnessState")
+                && struct_body
+                    .contains("runtime_witness_state: Option<TracedRuntimeCallWitnessState>")
                 && !struct_body.contains("pub runtime_call_outcome:")
                 && !struct_body.contains("pub runtime_witness_state:")
         })
@@ -45525,6 +45800,23 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     );
     let production_calls_issue_chained_receipts =
         check_production_calls_issue_chained_receipts(&deployment_source, &engine_impl_source);
+    let production_calls_record_no_position_map_witness =
+        check_production_calls_record_no_position_map_witness(
+            &production_source_slice(&state_source),
+            &production_source_slice(&theorem_source),
+            &production_source_slice(&oram_source),
+            &objects_production_source,
+            &production_source_slice(&core_trace_source),
+        );
+    let evidence_builds_audit_the_kept_position_map_witness =
+        check_evidence_builds_audit_the_kept_position_map_witness(
+            &production_source_slice(&state_source),
+            &fs::read_to_string(root.join("runtime/uo-evm/src/instrumentation.rs"))?,
+            &production_source_slice(&probe_source),
+            &production_source_slice(&fs::read_to_string(
+                root.join("probe/mplus-probe/src/capacity_sweep.rs"),
+            )?),
+        );
     let probe_reads_runtime_telemetry_from_diagnostic_channel = extract_metrics_source
         .contains("fn extract_metrics(result: &DiagnosticCallResult)")
         && extract_metrics_source.contains("let trace = &result.call.trace;")
@@ -46575,7 +46867,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         json!({
             "name": "TracedRuntimeCallOutcome",
             "owner": "crates/uo-core/src/trace.rs",
-            "boundary": "shared post-call handoff bundle capturing the after-call hidden witness snapshot plus RuntimeCallOutcome before final execution-trace packaging",
+            "boundary": "shared post-call handoff bundle capturing RuntimeCallOutcome before final execution-trace packaging, with the after-call hidden witness snapshot in a build that can export a call's evidence and with none in a production build",
             "checked": traced_runtime_call_outcome_nonclone
                 && traced_runtime_call_outcome_surface_restricted
                 && traced_runtime_call_outcome_api_is_explicit
@@ -46587,7 +46879,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         json!({
             "name": "FinalizedRuntimeCallTraceParts",
             "owner": "crates/uo-core/src/trace.rs",
-            "boundary": "shared final traced-call handoff bundle carrying one RuntimeCallOutcome plus one boxed hidden before/after ORAM witness carrier into theorem finalization",
+            "boundary": "shared final traced-call handoff bundle carrying one RuntimeCallOutcome into theorem finalization, plus one boxed hidden before/after ORAM witness carrier when the call recorded a snapshot at both ends and none otherwise",
             "checked": finalized_runtime_call_trace_parts_nonclone
                 && finalized_runtime_call_trace_parts_fields_private
                 && finalized_runtime_call_trace_parts_surface_restricted
@@ -46598,9 +46890,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         json!({
             "name": "TracedRuntimeCallStart",
             "owner": "crates/uo-core/src/trace.rs",
-            "boundary": "shared pre-call handoff token carrying the hidden committed-state snapshot without exposing the raw snapshot type outside the traced-call bridge",
+            "boundary": "shared pre-call handoff token carrying the hidden committed-state snapshot, or none in a production build, without exposing the raw snapshot type outside the traced-call bridge",
             "checked": traced_runtime_call_start_nonclone
                 && traced_runtime_call_start_surface_restricted
+                && production_calls_record_no_position_map_witness
                 && theorem_finalizes_execution_trace
                 && theorem_only_runtime_helper_visibility_restricted,
         }),
@@ -46634,13 +46927,15 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         json!({
             "name": "CommittedRuntimeWitnessSnapshot",
             "owner": "crates/uo-core/src/trace.rs",
-            "boundary": "shared hidden ORAM witness snapshot wrapper built only from state.rs through the shared exact-size CommittedRuntimeWitnessSnapshotBuilder, stored in boxed fixed-size buffers for the public-bounded ORAM witness set, used only to assemble traced-call start/outcome/witness handoff bundles, and wiping those hidden witness buffers on drop",
+            "boundary": "shared hidden ORAM witness snapshot wrapper built only from state.rs through the shared exact-size CommittedRuntimeWitnessSnapshotBuilder, stored in boxed fixed-size buffers for the public-bounded ORAM witness set, kept by a runtime that can export a call's evidence from one call to the next, moved there by each call's leaf transitions and compared with the decode of the store before and after every call, copied only by its duplicate method, used otherwise only to assemble traced-call start/outcome/witness handoff bundles, and wiping those hidden witness buffers on drop; a production runtime builds and keeps none",
             "checked": state_committed_runtime_witness_snapshot_is_opaque
                 && committed_runtime_witness_snapshot_nonclone
                 && committed_runtime_witness_snapshot_uses_boxed_buffers
                 && committed_runtime_witness_snapshot_uses_exact_boxed_builder
                 && committed_runtime_witness_snapshot_wipes_on_drop
                 && committed_runtime_witness_snapshot_surface_restricted
+                && production_calls_record_no_position_map_witness
+                && evidence_builds_audit_the_kept_position_map_witness
                 && theorem_only_runtime_helper_visibility_restricted
                 && theorem_finalizes_execution_trace,
         }),
@@ -46924,6 +47219,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             sealed_writes_are_classified_from_their_bytes,
         "kernel_operators_do_not_branch_on_operands": kernel_operators_do_not_branch_on_operands,
         "private_evidence_stays_inside_the_runtime": private_evidence_stays_inside_the_runtime,
+        "production_calls_record_no_position_map_witness": production_calls_record_no_position_map_witness,
+        "evidence_builds_audit_the_kept_position_map_witness": evidence_builds_audit_the_kept_position_map_witness,
         "production_calls_issue_chained_receipts": production_calls_issue_chained_receipts,
         "theorem_certificate_constructor_checks":
             theorem_certificate_constructor_checks,
@@ -47869,6 +48166,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && sealed_writes_are_classified_from_their_bytes
             && kernel_operators_do_not_branch_on_operands
             && private_evidence_stays_inside_the_runtime
+            && production_calls_record_no_position_map_witness
+            && evidence_builds_audit_the_kept_position_map_witness
             && production_calls_issue_chained_receipts
             && theorem_certificate_constructor_surface_restricted
             && runtime_public_call_trace_bundle_surface_restricted
@@ -50094,6 +50393,8 @@ fn workload_specs<'a>(suite: &'a BTreeMap<&'static str, BenchArtifacts>) -> Vec<
 }
 
 fn run_latency_memory(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<JsonValue> {
+    // Calls are timed with the audit of the kept witness off.
+    let _witness_audit_off = capacity_sweep::WitnessAuditOff::new();
     let warmups = env_usize("UO_LATENCY_WARMUPS", 30);
     let trials = env_usize("UO_LATENCY_TRIALS", 200);
     let ticks_per_second = clock_ticks_per_second();
@@ -55109,6 +55410,10 @@ multi-access and multi-object runs as well.
 `pathoram_hidden_validation.json` checks the direct Path-ORAM hidden-state
 certificate emitted from `ExecutionTrace` for the theorem-backed path-ORAM
 benchmark vehicle, again without going through the full witness extractor.
+The position maps of a certificate are the witness the runtime keeps from
+call to call and moves by each call's leaf transitions; every call of a
+scenario compared that witness with the decode of the whole store, and the
+report counts the comparisons (`kept_witness_audits`).
 The hidden-state validator now keys position-map certificates by `object_id`
 rather than list position, which removes an accidental single-order assumption
 and allows the multi-object `ERC20Lite/pathoram/transferFrom` witness to check
@@ -56180,6 +56485,232 @@ mod tests {
             assert_eq!(operator["distinct_counts"], 1, "{}", operator["operator"]);
             assert!(operator["classes"].as_u64().unwrap() >= 4);
         }
+    }
+
+    #[test]
+    fn position_map_witness_checks_reject_the_drifts_they_guard() {
+        use super::{
+            check_evidence_builds_audit_the_kept_position_map_witness,
+            check_production_calls_record_no_position_map_witness, repo_root,
+        };
+        let root = repo_root();
+        let whole = |rel: &str| std::fs::read_to_string(root.join(rel)).unwrap();
+        let read = |rel: &str| production_source_slice(&whole(rel));
+        let state = read("runtime/uo-evm/src/state.rs");
+        let theorem = read("runtime/uo-evm/src/theorem.rs");
+        let oram = read("runtime/uo-evm/src/oram.rs");
+        let objects = read("runtime/uo-evm/src/objects.rs");
+        let trace = read("crates/uo-core/src/trace.rs");
+        let instrumentation = whole("runtime/uo-evm/src/instrumentation.rs");
+        let probe = read("probe/mplus-probe/src/lib.rs");
+        let sweep = read("probe/mplus-probe/src/capacity_sweep.rs");
+        // One place of `source` changed.
+        let drift = |source: &str, from: &str, to: &str| {
+            assert_eq!(source.matches(from).count(), 1, "{from}");
+            source.replacen(from, to, 1)
+        };
+        const GATE: &str = "    #[cfg(any(test, feature = \"diagnostics\"))]\n";
+
+        // The sources pass as they are.
+        assert!(check_production_calls_record_no_position_map_witness(
+            &state, &theorem, &oram, &objects, &trace
+        ));
+        assert!(check_evidence_builds_audit_the_kept_position_map_witness(
+            &state,
+            &instrumentation,
+            &probe,
+            &sweep
+        ));
+
+        // A production call records no witness.
+        let records_none = |state: &str, theorem: &str, oram: &str, objects: &str, trace: &str| {
+            check_production_calls_record_no_position_map_witness(
+                state, theorem, oram, objects, trace,
+            )
+        };
+        // A production call that decodes the witness of its start.
+        let snapshots = drift(
+            &state,
+            "        #[cfg(not(any(test, feature = \"diagnostics\")))]\n        let call_start = TracedRuntimeCallStart::unwitnessed();",
+            "        #[cfg(not(any(test, feature = \"diagnostics\")))]\n        let call_start = TracedRuntimeCallStart::new(self.witness_before_call()?);",
+        );
+        assert!(!records_none(&snapshots, &theorem, &oram, &objects, &trace));
+        // A production call that decodes the witness of its end.
+        let snapshots = drift(
+            &state,
+            "        Ok(TracedRuntimeCallOutcome::unwitnessed(call_outcome))\n",
+            "        Ok(TracedRuntimeCallOutcome::new(\n            call_outcome,\n            self.committed.witness_snapshot()?,\n        ))\n",
+        );
+        assert!(!records_none(&snapshots, &theorem, &oram, &objects, &trace));
+        // A build that hands a production call the recorder of its witness.
+        let handed = drift(
+            &theorem,
+            "    #[cfg(any(test, feature = \"diagnostics\"))]\n    let traced_outcome = runtime.finish_traced_call(call_outcome, artifact, &context.recorder)?;\n    #[cfg(not(any(test, feature = \"diagnostics\")))]\n    let traced_outcome = runtime.finish_traced_call(call_outcome)?;",
+            "    let traced_outcome = runtime.finish_traced_call(call_outcome, artifact, &context.recorder)?;",
+        );
+        assert!(!records_none(&state, &handed, &oram, &objects, &trace));
+        // A witness that a production runtime keeps.
+        let kept = drift(
+            &state,
+            "    #[cfg(any(test, feature = \"diagnostics\"))]\n    kept_witness: Option<Arc<CommittedRuntimeWitnessSnapshot>>,\n",
+            "    kept_witness: Option<Arc<CommittedRuntimeWitnessSnapshot>>,\n",
+        );
+        assert!(!records_none(&kept, &theorem, &oram, &objects, &trace));
+        // A decoder, at each layer, that a production build has.
+        for (signature, layer) in [
+            (
+                "    fn witness_snapshot(&self) -> Result<CommittedRuntimeWitnessSnapshot> {",
+                0,
+            ),
+            ("    fn witness_before_call(&mut self)", 0),
+            ("    pub(crate) fn path_position_map_witness(", 1),
+            ("    pub(crate) fn access_counter_witness(", 1),
+            (
+                "    pub(in crate::runtime) fn path_oram_position_map_witness(",
+                2,
+            ),
+            (
+                "    pub(in crate::runtime) fn path_oram_access_counter_witness(",
+                2,
+            ),
+        ] {
+            let gated = format!("{GATE}{signature}");
+            let (state, oram, objects) = match layer {
+                0 => (
+                    drift(&state, &gated, signature),
+                    oram.clone(),
+                    objects.clone(),
+                ),
+                1 => (
+                    state.clone(),
+                    drift(&oram, &gated, signature),
+                    objects.clone(),
+                ),
+                _ => (
+                    state.clone(),
+                    oram.clone(),
+                    drift(&objects, &gated, signature),
+                ),
+            };
+            assert!(
+                !records_none(&state, &theorem, &oram, &objects, &trace),
+                "{signature}"
+            );
+        }
+        // A second caller of a decoder.
+        let called = format!(
+            "{oram}\nfn other(spec: &StateObject, state: &OramState) {{\n    let _ = tree_position_map_witness_leaves(spec, &state.parameters, &state.cipher, &state.storage);\n}}\n"
+        );
+        assert!(!records_none(&state, &theorem, &called, &objects, &trace));
+        // A trace that is finalized as if it held position maps.
+        let recorded = drift(
+            &trace,
+            "        let runtime_oram_position_maps_unrecorded = runtime_witness_state.is_none();",
+            "        let runtime_oram_position_maps_unrecorded = false;",
+        );
+        assert!(!records_none(&state, &theorem, &oram, &objects, &recorded));
+        // A snapshot of one end alone that is taken for both.
+        let one_end = drift(
+            &trace,
+            "                _ => None,\n            };\n        FinalizedRuntimeCallTraceParts::new(self.call_outcome, runtime_witness_state)",
+            "                _ => Some(TracedRuntimeCallWitnessState::default()),\n            };\n        FinalizedRuntimeCallTraceParts::new(self.call_outcome, runtime_witness_state)",
+        );
+        assert!(!records_none(&state, &theorem, &oram, &objects, &one_end));
+        // A call without position maps whose leaf schedule is not checked,
+        // and a confidential one whose kernel witness is not.
+        let unchecked = drift(
+            &trace,
+            "        validate_path_oram_leaf_schedule(\n            &self.evidence.runtime_oram_leaf_schedule,\n            &refinement_trace.logical_accesses,\n            &refinement_trace.physical_reads,\n            &physical_writes,\n            &self.evidence.runtime_oram_objects,\n        )?;\n        validate_refinement_outcome(",
+            "        validate_refinement_outcome(",
+        );
+        assert!(!records_none(&state, &theorem, &oram, &objects, &unchecked));
+        let unchecked = drift(
+            &trace,
+            "        if confidential {\n            self.check_runtime_confidential_kernel_bundles(artifact)?;\n        }\n        Ok(())",
+            "        Ok(())",
+        );
+        assert!(!records_none(&state, &theorem, &oram, &objects, &unchecked));
+
+        // Every call of a build that exports evidence audits its witness.
+        let audits = |state: &str, instrumentation: &str, probe: &str, sweep: &str| {
+            check_evidence_builds_audit_the_kept_position_map_witness(
+                state,
+                instrumentation,
+                probe,
+                sweep,
+            )
+        };
+        // No audit before a call, or after it.
+        let unaudited = drift(
+            &state,
+            "                    if crate::instrumentation::witness_audit_enabled() {\n                        self.audit_kept_witness(\"before a call\")?;\n                    }\n",
+            "",
+        );
+        assert!(!audits(&unaudited, &instrumentation, &probe, &sweep));
+        let unaudited = drift(
+            &state,
+            "            if crate::instrumentation::witness_audit_enabled() {\n                self.audit_kept_witness(\"after a call\")?;\n            }\n",
+            "",
+        );
+        assert!(!audits(&unaudited, &instrumentation, &probe, &sweep));
+        // An audit that fails no call.
+        let lenient = drift(
+            &state,
+            "        if decoded != **kept {\n            bail!(\"the kept position-map witness differs from the decoded store {context}\");\n        }\n        Ok(true)",
+            "        Ok(decoded == **kept)",
+        );
+        assert!(!audits(&lenient, &instrumentation, &probe, &sweep));
+        // An audit that is off until it is turned on.
+        let off = drift(
+            &instrumentation,
+            "    static WITNESS_AUDIT_OFF: Cell<bool> = const { Cell::new(false) };",
+            "    static WITNESS_AUDIT_OFF: Cell<bool> = const { Cell::new(true) };",
+        );
+        assert!(!audits(&state, &off, &probe, &sweep));
+        let off = drift(
+            &instrumentation,
+            "        cfg!(test) || !WITNESS_AUDIT_OFF.with(Cell::get)",
+            "        false",
+        );
+        assert!(!audits(&state, &off, &probe, &sweep));
+        // A report that builds proof objects with the audit off. The check
+        // counts the places that turn the audit off, in this file too, so
+        // these lines are written in two parts.
+        let hidden = drift(
+            &probe,
+            "fn run_pathoram_hidden_validation() -> Result<JsonValue> {\n",
+            concat!(
+                "fn run_pathoram_hidden_validation() -> Result<JsonValue> {\n    let _witness_audit_off = capacity_sweep::WitnessAudit",
+                "Off::new();\n",
+            ),
+        );
+        assert!(!audits(&state, &instrumentation, &hidden, &sweep));
+        let hidden = drift(
+            &probe,
+            "fn run_pathoram_hidden_validation() -> Result<JsonValue> {\n",
+            concat!(
+                "fn run_pathoram_hidden_validation() -> Result<JsonValue> {\n    uo_evm::set_position_map_witness",
+                "_audit(false);\n",
+            ),
+        );
+        assert!(!audits(&state, &instrumentation, &hidden, &sweep));
+        // A guard that leaves the audit off.
+        let left_off = drift(
+            &sweep,
+            concat!(
+                "        uo_evm::set_position_map_witness",
+                "_audit(self.0);\n"
+            ),
+            "",
+        );
+        assert!(!audits(&state, &instrumentation, &probe, &left_off));
+        // A sweep that audits no level.
+        let no_level = drift(
+            &sweep,
+            "            let audited = instance\n                .audit_kept_position_map_witness()\n                .context(\"auditing the kept position-map witness\")?;",
+            "            let audited = true;",
+        );
+        assert!(!audits(&state, &instrumentation, &probe, &no_level));
     }
 
     #[test]

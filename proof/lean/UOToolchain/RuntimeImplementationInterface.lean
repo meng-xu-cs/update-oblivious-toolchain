@@ -477,6 +477,14 @@ def RuntimeImplementationInterface.engineDelegatesToRuntimeBridge
       , "#[derive(Debug, PartialEq, Default)]\n#[cfg_attr(any(test, feature = \"diagnostics\"), derive(Serialize, Deserialize))]\npub struct ExecutionTrace {\n    #[cfg_attr(any(test, feature = \"diagnostics\"), serde(flatten))]\n    pub receipt: PublicReceipt,\n    #[cfg_attr(any(test, feature = \"diagnostics\"), serde(flatten))]\n    pub(crate) evidence: PrivateEvidence,\n}"
       , "impl Drop for PrivateEvidence {\n    fn drop(&mut self) {\n        self.wipe();\n    }\n}"
       , "pub fn into_receipt(self) -> PublicReceipt {\n        self.receipt\n    }"
+      -- A call that recorded no hidden ORAM state, as every production
+      -- call, builds no proof bundle, which would carry the position maps,
+      -- and runs the checks of its evidence that need none.
+      , "pub fn unwitnessed() -> Self {\n        Self {\n            runtime_state_before: None,\n        }\n    }"
+      , "let runtime_oram_position_maps_unrecorded = runtime_witness_state.is_none();"
+      , "trace.check_evidence_without_position_maps(artifact, confidential)?;\n        } else {\n            if confidential {\n                trace.runtime_confidential_proof_bundle_family(artifact)?;\n            }\n            trace.materialize_runtime_trusted_kernel_bundle()?;\n        }\n        Ok(trace)"
+      , "validate_path_oram_leaf_schedule(\n            &self.evidence.runtime_oram_leaf_schedule,\n            &refinement_trace.logical_accesses,\n            &refinement_trace.physical_reads,\n            &physical_writes,\n            &self.evidence.runtime_oram_objects,\n        )?;\n        validate_refinement_outcome("
+      , "if confidential {\n            self.check_runtime_confidential_kernel_bundles(artifact)?;\n        }\n        Ok(())"
       ] ∧
     sourceLacksAll iface.traceProductionSource
       [ "pub evidence: PrivateEvidence"
@@ -528,6 +536,14 @@ def RuntimeImplementationInterface.checkEngineDelegatesToRuntimeBridge
       , "#[derive(Debug, PartialEq, Default)]\n#[cfg_attr(any(test, feature = \"diagnostics\"), derive(Serialize, Deserialize))]\npub struct ExecutionTrace {\n    #[cfg_attr(any(test, feature = \"diagnostics\"), serde(flatten))]\n    pub receipt: PublicReceipt,\n    #[cfg_attr(any(test, feature = \"diagnostics\"), serde(flatten))]\n    pub(crate) evidence: PrivateEvidence,\n}"
       , "impl Drop for PrivateEvidence {\n    fn drop(&mut self) {\n        self.wipe();\n    }\n}"
       , "pub fn into_receipt(self) -> PublicReceipt {\n        self.receipt\n    }"
+      -- A call that recorded no hidden ORAM state, as every production
+      -- call, builds no proof bundle, which would carry the position maps,
+      -- and runs the checks of its evidence that need none.
+      , "pub fn unwitnessed() -> Self {\n        Self {\n            runtime_state_before: None,\n        }\n    }"
+      , "let runtime_oram_position_maps_unrecorded = runtime_witness_state.is_none();"
+      , "trace.check_evidence_without_position_maps(artifact, confidential)?;\n        } else {\n            if confidential {\n                trace.runtime_confidential_proof_bundle_family(artifact)?;\n            }\n            trace.materialize_runtime_trusted_kernel_bundle()?;\n        }\n        Ok(trace)"
+      , "validate_path_oram_leaf_schedule(\n            &self.evidence.runtime_oram_leaf_schedule,\n            &refinement_trace.logical_accesses,\n            &refinement_trace.physical_reads,\n            &physical_writes,\n            &self.evidence.runtime_oram_objects,\n        )?;\n        validate_refinement_outcome("
+      , "if confidential {\n            self.check_runtime_confidential_kernel_bundles(artifact)?;\n        }\n        Ok(())"
       ] &&
     checkSourceLacksAll iface.traceProductionSource
       [ "pub evidence: PrivateEvidence"
@@ -685,6 +701,20 @@ def RuntimeImplementationInterface.stateStagesConfidentialCallsInsideRuntime
     , "PublicRuntimeKernel::begin("
     , ".run_confidential_call::<ConfidentialRuntimeShadowState>("
     , "CommittedRuntimeWitnessSnapshotBuilder::new("
+    -- A production call records no witness of its hidden ORAM state: it
+    -- starts and ends with no snapshot, and the runtime keeps none. The
+    -- snapshot decoder is an item of a build that can export evidence.
+    , "#[cfg(not(any(test, feature = \"diagnostics\")))]\n        let call_start = TracedRuntimeCallStart::unwitnessed();"
+    , "#[cfg(not(any(test, feature = \"diagnostics\")))]\n    pub(in crate::runtime) fn finish_traced_call(\n        &mut self,\n        call_outcome: RuntimeCallOutcome,\n    ) -> Result<TracedRuntimeCallOutcome> {\n        Ok(TracedRuntimeCallOutcome::unwitnessed(call_outcome))\n    }"
+    , "#[cfg(any(test, feature = \"diagnostics\"))]\n    kept_witness: Option<Arc<CommittedRuntimeWitnessSnapshot>>,"
+    , "#[cfg(any(test, feature = \"diagnostics\"))]\n    fn witness_snapshot(&self) -> Result<CommittedRuntimeWitnessSnapshot> {"
+    , "#[cfg(any(test, feature = \"diagnostics\"))]\n    fn witness_before_call(&mut self) -> Result<CommittedRuntimeWitnessSnapshot> {"
+    -- A build that exports evidence keeps the witness from call to call,
+    -- and every call compares the kept one with the decode of the whole
+    -- store, before and after, and fails when they differ.
+    , "if crate::instrumentation::witness_audit_enabled() {\n                        self.audit_kept_witness(\"before a call\")?;\n                    }"
+    , "if crate::instrumentation::witness_audit_enabled() {\n                self.audit_kept_witness(\"after a call\")?;\n            }"
+    , "let decoded = self.committed.witness_snapshot()?;\n        crate::instrumentation::count_witness_audit();\n        if decoded != **kept {\n            bail!(\"the kept position-map witness differs from the decoded store {context}\");\n        }"
     , "fn object_ids(&self) -> Result<Box<[u32]>> {"
     , "let mut object_ids = FixedBoxBuilder::new(self.entries.len());"
     , "for entry in &self.entries {"
@@ -715,6 +745,20 @@ def RuntimeImplementationInterface.checkStateStagesConfidentialCallsInsideRuntim
     , "PublicRuntimeKernel::begin("
     , ".run_confidential_call::<ConfidentialRuntimeShadowState>("
     , "CommittedRuntimeWitnessSnapshotBuilder::new("
+    -- A production call records no witness of its hidden ORAM state: it
+    -- starts and ends with no snapshot, and the runtime keeps none. The
+    -- snapshot decoder is an item of a build that can export evidence.
+    , "#[cfg(not(any(test, feature = \"diagnostics\")))]\n        let call_start = TracedRuntimeCallStart::unwitnessed();"
+    , "#[cfg(not(any(test, feature = \"diagnostics\")))]\n    pub(in crate::runtime) fn finish_traced_call(\n        &mut self,\n        call_outcome: RuntimeCallOutcome,\n    ) -> Result<TracedRuntimeCallOutcome> {\n        Ok(TracedRuntimeCallOutcome::unwitnessed(call_outcome))\n    }"
+    , "#[cfg(any(test, feature = \"diagnostics\"))]\n    kept_witness: Option<Arc<CommittedRuntimeWitnessSnapshot>>,"
+    , "#[cfg(any(test, feature = \"diagnostics\"))]\n    fn witness_snapshot(&self) -> Result<CommittedRuntimeWitnessSnapshot> {"
+    , "#[cfg(any(test, feature = \"diagnostics\"))]\n    fn witness_before_call(&mut self) -> Result<CommittedRuntimeWitnessSnapshot> {"
+    -- A build that exports evidence keeps the witness from call to call,
+    -- and every call compares the kept one with the decode of the whole
+    -- store, before and after, and fails when they differ.
+    , "if crate::instrumentation::witness_audit_enabled() {\n                        self.audit_kept_witness(\"before a call\")?;\n                    }"
+    , "if crate::instrumentation::witness_audit_enabled() {\n                self.audit_kept_witness(\"after a call\")?;\n            }"
+    , "let decoded = self.committed.witness_snapshot()?;\n        crate::instrumentation::count_witness_audit();\n        if decoded != **kept {\n            bail!(\"the kept position-map witness differs from the decoded store {context}\");\n        }"
     , "fn object_ids(&self) -> Result<Box<[u32]>> {"
     , "let mut object_ids = FixedBoxBuilder::new(self.entries.len());"
     , "for entry in &self.entries {"
@@ -5291,6 +5335,11 @@ def RuntimeImplementationInterface.runtimeOramUsesLeanGeneratedBlockBucketCodecs
     , "let mut cloned = cold_clone_oram_state(spec, self)?;"
     , "cold_clone_oram_state(spec, self)"
     , "path_position_map_witness_leaves("
+    -- The functions that decode a position map or read an access counter
+    -- for a witness exist only in a build that can export a call's
+    -- evidence: a production build records no hidden ORAM state.
+    , "#[cfg(any(test, feature = \"diagnostics\"))]\n    pub(crate) fn path_position_map_witness("
+    , "#[cfg(any(test, feature = \"diagnostics\"))]\n    pub(crate) fn access_counter_witness("
     , "cold_commit_oram_state("
     , "bootstrap_surrogate_directory_pages("
     , "bootstrap_filler_buckets(spec, &parameters, &cipher, rng)?;"
@@ -6053,6 +6102,11 @@ def RuntimeImplementationInterface.checkRuntimeOramUsesLeanGeneratedBlockBucketC
     , "let mut cloned = cold_clone_oram_state(spec, self)?;"
     , "cold_clone_oram_state(spec, self)"
     , "path_position_map_witness_leaves("
+    -- The functions that decode a position map or read an access counter
+    -- for a witness exist only in a build that can export a call's
+    -- evidence: a production build records no hidden ORAM state.
+    , "#[cfg(any(test, feature = \"diagnostics\"))]\n    pub(crate) fn path_position_map_witness("
+    , "#[cfg(any(test, feature = \"diagnostics\"))]\n    pub(crate) fn access_counter_witness("
     , "cold_commit_oram_state("
     , "bootstrap_surrogate_directory_pages("
     , "bootstrap_filler_buckets(spec, &parameters, &cipher, rng)?;"
@@ -8489,6 +8543,7 @@ def RuntimeImplementationInterface.theoremFinalizerUsesSharedTraceBridge
   sourceContainsAll iface.theoremProductionSource
     [ "runtime.begin_traced_call("
     , "runtime.finish_traced_call(call_outcome)?"
+    , "#[cfg(any(test, feature = \"diagnostics\"))]\n    let traced_outcome = runtime.finish_traced_call(call_outcome, artifact, &context.recorder)?;\n    #[cfg(not(any(test, feature = \"diagnostics\")))]\n    let traced_outcome = runtime.finish_traced_call(call_outcome)?;"
     , "ExecutionTrace::from_runtime_finalization_input("
     , ".into_execution_trace_inputs()"
     ] ∧
@@ -8504,6 +8559,7 @@ def RuntimeImplementationInterface.checkTheoremFinalizerUsesSharedTraceBridge
   checkSourceContainsAll iface.theoremProductionSource
     [ "runtime.begin_traced_call("
     , "runtime.finish_traced_call(call_outcome)?"
+    , "#[cfg(any(test, feature = \"diagnostics\"))]\n    let traced_outcome = runtime.finish_traced_call(call_outcome, artifact, &context.recorder)?;\n    #[cfg(not(any(test, feature = \"diagnostics\")))]\n    let traced_outcome = runtime.finish_traced_call(call_outcome)?;"
     , "ExecutionTrace::from_runtime_finalization_input("
     , ".into_execution_trace_inputs()"
     ] &&

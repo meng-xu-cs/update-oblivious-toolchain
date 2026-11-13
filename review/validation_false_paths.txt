@@ -461,6 +461,7 @@ top_level_booleans:
   engine_uses_manifest_public_call_summary: true
   engine_uses_opaque_committed_state: true
   engine_uses_runtime_public_object_universe: true
+  evidence_builds_audit_the_kept_position_map_witness: true
   execution_trace_builder_surface_restricted: true
   execution_trace_omits_runtime_telemetry: true
   execution_trace_public_buffers_boxed: true
@@ -646,6 +647,7 @@ top_level_booleans:
   probe_enables_runtime_diagnostics_feature: true
   probe_reads_runtime_telemetry_from_diagnostic_channel: true
   production_calls_issue_chained_receipts: true
+  production_calls_record_no_position_map_witness: true
   production_errors_carry_no_runtime_freshness_value: true
   proof_grade_canonical_pair_instantiation_threads_runtime_boundary: true
   proof_grade_paper_main_bundles_discharge_minimal_runtime_boundary: true

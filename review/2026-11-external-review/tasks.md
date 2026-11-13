@@ -682,6 +682,68 @@ position-map witnesses: 447 of the 541 ms of a tree read at 16,384 entries.
    `tree_position_map_witness_leaves` as the reference of a test.
 4. Snapshot only the ORAM objects of the entrypoint.
 
+As built. A production call records no witness (step 1).
+`ContractRuntime::begin_traced_call` and `finish_traced_call` hand `uo-core`
+no snapshot in a production build, one that is neither a test build nor
+built with the `diagnostics` feature, and the functions that decode a
+position map or read an access counter for a witness are items of test and
+diagnostics builds alone. The proof bundles carry the position
+maps, so a call without them builds none.
+`ExecutionTrace::from_runtime_finalization_input` runs instead what those
+constructors check of the rest of the evidence
+(`check_evidence_without_position_maps`): the controller's certificate, the
+leaf schedule against the storage events, one leaf transition for each leaf
+access, the kernel witness, the outcome and, for a confidential call, the
+kernel witness against the artifact's kernel programs.
+
+With evidence (steps 2 and 3) the runtime keeps the witness
+(`ContractRuntime::kept_witness`). The snapshot before a call is a copy of
+the kept one. The snapshot after it is that copy moved by the call's leaf
+transitions (`CommittedRuntimeWitnessSnapshot::advance`, which applies them
+as the hidden-state check does), with the access counters the objects have
+then. This is done for both Path ORAM schemes, not for the tree alone. The
+first call of a deployment, and the first after a bulk load, decodes the
+witness from the store. A staged call that is dropped leaves the kept
+witness as it was.
+
+The audit is new. The witness after a call is now computed from the one
+before it, so the check that the transitions carry one to the other no
+longer compares the runtime's record with the store. Every call of a build
+that exports evidence therefore compares the kept witness with the full
+decode, before it runs and after, and fails if they differ
+(`audit_kept_witness`; `tree_position_map_witness_leaves` and the local
+scheme's decoder are the reference). The audit is on for every thread until
+a measurement turns it off (`set_position_map_witness_audit`). The capacity
+sweep times its calls without it and audits after every occupancy level
+(`kept_witness_matches_store_after_every_level`), and the probe's latency
+report times without it. The validation run audits every other call, so a
+call of that run decodes what it decoded before; a measured call and a
+production call do not pay for the audit.
+
+Step 4 is not done as written. The evidence still lists every Path ORAM
+object of the contract: the Rust and the Lean checkers index the position
+maps by the contract's objects, and the witnesses are the same bytes as
+before. An object a call did not touch costs a copy of its map and no
+decode.
+
+Measured in the validation run's quick profile (two rounds of each call,
+`results/capacity_sweep.json`), before and after: the witness of a tree read
+takes 0.3 ms at 16,384 entries where it took 393 ms, 0.05 ms at 4,096 where
+it took 99 ms, and 0.02 ms at 256 where it took 5.4 ms. A measured call
+opens no sealed record for its witness (`witness_scan_records` is 0 in every
+row, where a tree call at 16,384 entries opened 65,580); a fill decodes the
+witness once (`witness_decode_records`, 32,790 there). The first criterion
+is met in substance and not to the letter: the witness time still grows
+with the capacity, since a call copies the two position maps into its
+evidence, at about a thousandth of the cost it had. Taking that copy away
+means evidence that holds the changed leaves and not the maps, a change of
+the witness format that this issue does not make. The proof objects of the
+validation run are the bytes they were: no report that checks one changed.
+
+Three tamper scenarios are new (408 in all): a production call that starts
+with a decoded witness, a witness decoder that every build has, and a kept
+witness that is not compared with the store after a call.
+
 #### Acceptance criteria
 
 - `p50_witness_ns` at 16,384 entries no longer grows with the capacity.

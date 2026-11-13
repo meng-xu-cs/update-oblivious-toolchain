@@ -172,6 +172,19 @@ theorems about the model; and the validation of that binary's source, which
 the Lean checkers perform on diagnostics builds, where the same code returns
 its traces. A production build is not checked call by call.
 
+The two builds run a call differently in one place. A diagnostics build
+records the hidden ORAM state of each call, the access counters and
+position maps of the contract's Path ORAM objects before and after it, and
+builds the proof objects that carry them. A production build records no
+such state and builds no proof object: it has no function that decodes a
+position map for a witness. It runs the checks of the rest of the call's
+evidence that the proof objects' constructors run (invariant 15 of
+[`runtime/secret-state.md`](./runtime/secret-state.md)). A test runs the
+same calls from one seed both ways and sees the same return values, public
+receipts and ciphertext (`a_call_without_a_witness_is_the_same_call` in
+`runtime/uo-evm/src/engine.rs`); that the two builds agree on every call is
+tested, not proved.
+
 A receipt is not signed. Its fields are bound by the chain and by the
 runtime's check at the next call; how a caller authenticates the receipt it
 holds last belongs to the attested channel, which this repository models
@@ -522,7 +535,7 @@ appears outside that allowlist or a documented assumption stops being grounded.
 | --- | --- |
 | Lean kernel plus Lean theorem/checker development | trusted proof checker and theorem body |
 | Explicit backend/crypto/deployment assumptions | trusted assumptions |
-| Rust runtime kernel plus witness/certificate/bundle extraction and serialization | trusted implementation-side extraction surface; replay and reconstruction reduce but do not eliminate this trust |
+| Rust runtime kernel plus witness/certificate/bundle extraction and serialization | trusted implementation-side extraction surface; replay and reconstruction reduce but do not eliminate this trust. The position maps of a call's witness are not decoded from the store for each call: the runtime keeps them from call to call and moves them by each call's leaf transitions. Every call of a validation run compares the kept maps with the decode of the whole store, before it runs and after, and fails if they differ; only the calls a measurement times skip that comparison |
 | Source-backed runtime implementation boundaries | source-frozen/static-drift evidence, not full Rust semantic refinement. The runtime-to-Lean boundary obligations are classified by evidence kind in `runtime_boundary_validation.json` (`runtime_boundary_obligation_classification`): proof-critical obligations carry a Lean-theorem, generated-schema, executable-semantic-refinement, or source-frozen Rust-visibility kind, while the source-drift regression inventory is regression-only and backs no proof-critical claim. `validate_runtime_boundary_schema` rejects any proof-critical obligation backed only by source regression, so no proof-critical claim rests solely on a Rust source substring outside this source-frozen surface |
 | Rust code outside the tiny confidential kernel | not part of the confidential-work TCB when pinned to public-only or generated-helper routes |
 | Fixed-capacity Rust buffer helpers | safe `Vec`-backed wrappers; no production `unsafe` or `MaybeUninit` surface remains in `fixed_buffer` |

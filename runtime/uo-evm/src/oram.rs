@@ -9,6 +9,9 @@ use uo_core::manifest::{
 };
 use uo_core::trace::{LogicalEvent, PhysicalReadEvent, WriteClass};
 use uo_core::Value;
+// A production build decodes no position-map witness: the two functions
+// that do are compiled into test and diagnostics builds alone.
+#[cfg_attr(not(any(test, feature = "diagnostics")), allow(unused_imports))]
 use uo_core::{
     RuntimeOramAccessCounterWitness, RuntimePathOramPositionMapWitness,
     RuntimePathOramTransitionWitness,
@@ -31,6 +34,7 @@ use generated_object_helpers::{
 };
 use generated_oram_codecs::path_entries_from_storage;
 pub(crate) use generated_oram_codecs::select_pending_put_value;
+#[cfg_attr(not(any(test, feature = "diagnostics")), allow(unused_imports))]
 use generated_oram_codecs::{
     bootstrap_empty_path_buckets, bootstrap_filler_buckets, bootstrap_oram_counter_slot,
     bootstrap_surrogate_directory_pages, clone_boxed_map_entries, cold_clone_oram_state,
@@ -43,6 +47,7 @@ use generated_oram_codecs::{
     rewrite_surrogate_directory_pages_in_place, run_path_commit_put, run_path_get, run_path_put,
     run_surrogate_get, run_surrogate_put, working_stash_capacity, FixedStash, MaskedUsizeOption,
 };
+#[cfg_attr(not(any(test, feature = "diagnostics")), allow(unused_imports))]
 use generated_oram_codecs::{
     bootstrap_tree_storage, decide_pending_tree_put, refresh_tree_state_from_storage,
     reused_tree_presence, run_tree_get, run_tree_put, tree_entries_from_storage,
@@ -332,6 +337,11 @@ impl OramState {
         }
     }
 
+    /// The map's position map as a witness records it, decoded from the
+    /// whole store. The runtime keeps a call's witness from call to call, so
+    /// this runs for the first call and for an audit; a production build
+    /// has no witness and does not have this function.
+    #[cfg(any(test, feature = "diagnostics"))]
     pub(crate) fn path_position_map_witness(
         &self,
         spec: &StateObject,
@@ -359,6 +369,7 @@ impl OramState {
         })
     }
 
+    #[cfg(any(test, feature = "diagnostics"))]
     pub(crate) fn access_counter_witness(
         &self,
         spec: &StateObject,

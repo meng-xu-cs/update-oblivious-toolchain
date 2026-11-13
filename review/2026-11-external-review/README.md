@@ -105,7 +105,7 @@ its engineering part is Wave 4, its certified part is research.
 | 33 | Check each UO write's class against its bytes | 3 | S | | done | `a3eb01a` |
 | 34 | Make the confidential kernel's 256-bit arithmetic branch-free | 3 | M | | done | `35e4bb8` |
 | 35 | Match the record codec to the observer unit | 3 | M | | done | `d848180` |
-| 36 | Remove the whole-store witness snapshots from a call | 4 | M | 25 | todo | |
+| 36 | Remove the whole-store witness snapshots from a call | 4 | M | 25 | done | |
 | 37 | Stage a call without copying the store | 4 | M | | todo | |
 | 38 | Compress scan schedules in traces and proof objects | 4 | M to L | 31, 32 | todo | |
 | 39 | Admit encrypted returns in the kernel theorems | 5 | M | | todo | |

@@ -17,7 +17,7 @@ struct CallTraceContext {
 }
 
 fn begin_call_trace(
-    runtime: &ContractRuntime,
+    runtime: &mut ContractRuntime,
     entrypoint: &str,
     manifest_entry: &EntrypointManifest,
     args: &[Value],
@@ -73,7 +73,7 @@ pub(in crate::runtime) fn run_traced_call(
         .entrypoints
         .get(entrypoint)
         .ok_or_else(|| anyhow!("manifest entry missing for {entrypoint}"))?;
-    let mut context = begin_call_trace(&*runtime, entrypoint, manifest_entry, &args)?;
+    let mut context = begin_call_trace(runtime, entrypoint, manifest_entry, &args)?;
     let call_outcome = super::run_runtime_entrypoint(
         runtime,
         &artifact.contract,
@@ -84,6 +84,9 @@ pub(in crate::runtime) fn run_traced_call(
         fresh_coins,
         context.recorder_mut(),
     )?;
+    #[cfg(any(test, feature = "diagnostics"))]
+    let traced_outcome = runtime.finish_traced_call(call_outcome, artifact, &context.recorder)?;
+    #[cfg(not(any(test, feature = "diagnostics")))]
     let traced_outcome = runtime.finish_traced_call(call_outcome)?;
     finalize_call_trace(FinalizeCallTraceInput {
         context,

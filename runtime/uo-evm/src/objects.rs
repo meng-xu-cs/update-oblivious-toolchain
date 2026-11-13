@@ -14,6 +14,7 @@ use uo_allocator::AllocatorSession;
 use uo_core::ir::{BackendKind, ContainerKind, StateObject};
 use uo_core::manifest::is_path_oram_scheme;
 use uo_core::Value;
+#[cfg_attr(not(any(test, feature = "diagnostics")), allow(unused_imports))]
 use uo_core::{
     FixedBoxBuilder, RuntimeOramAccessCounterWitness, RuntimePathOramPositionMapWitness,
 };
@@ -804,6 +805,7 @@ impl RuntimeObject {
         }
     }
 
+    #[cfg(any(test, feature = "diagnostics"))]
     pub(in crate::runtime) fn path_oram_position_map_witness(
         &self,
     ) -> Result<Option<RuntimePathOramPositionMapWitness>> {
@@ -815,6 +817,7 @@ impl RuntimeObject {
         }
     }
 
+    #[cfg(any(test, feature = "diagnostics"))]
     pub(in crate::runtime) fn exposes_path_oram_witnesses(&self) -> bool {
         matches!(
             self,
@@ -843,6 +846,7 @@ impl RuntimeObject {
         }
     }
 
+    #[cfg(any(test, feature = "diagnostics"))]
     pub(in crate::runtime) fn path_oram_access_counter_witness(
         &self,
     ) -> Option<RuntimeOramAccessCounterWitness> {

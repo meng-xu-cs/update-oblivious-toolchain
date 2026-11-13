@@ -322,9 +322,17 @@ costs less than the tree on every metric.
 Beside the traced counts the report gives the work that no trace records. A
 call on a Path ORAM map reads the map's counter and metadata pages when it
 starts: 24 reads of 22,880 bytes on the tree at 16,384 entries. An
-instrumented call also opens every bucket and metadata page of the tree
-twice, for the position-map witnesses it exports: 65,580 sealed records at
-16,384 entries, where a read traces 654 operations. The report also gives
+instrumented call exports the position maps before and after it as a
+witness. It once decoded them from storage, every bucket and metadata page
+of the tree twice: 65,580 sealed records at 16,384 entries, where a read
+traces 654 operations. The runtime now keeps the witness from call to call
+and a call moves it by its own leaf transitions, so a measured call opens no
+record for it (`witness_scan_records` is 0 in every row). The decode
+happens once after each bulk load (`witness_decode_records` of a fill:
+32,790 records at 16,384 entries) and in the audit, which compares the kept
+witness with that decode. The sweep audits after every occupancy level and
+not in the calls it times; every other instrumented call audits before it
+runs and after. A production call records no witness at all. The report also gives
 the size of what a call exports: at 16,384 entries the trace of a full-scan
 read is 11.0 MB of JSON, 9.1 MB of it private evidence, and that of a tree
 read 3.0 MB.
@@ -382,6 +390,17 @@ another 13.3 ms for the full-scan read and 3.3 ms for the tree's, and Lean
 checks the witness of the call in 161 ms and 74 ms. A call on the tree
 raises the probe's resident memory from 206 MB to 373 MB at 16,384 entries.
 
+The witness snapshots are gone since this profile was run (Issue 36 of the
+review). The runtime keeps the witness, and a measured call copies it into
+its evidence and opens no record for it. In the validation run's quick
+profile, two rounds of each call, the witness of a tree read takes 0.3 ms
+at 16,384 entries where it took 393 ms, and 0.05 ms at 4,096 where it took
+99 ms. What is left is the copy of the two position maps into the call's
+evidence. It grows with the capacity as that evidence does (2.6 MB of JSON
+for a tree read at 16,384 entries), and a production call makes no such
+copy. The full profile is run again when Issues 37 and 38 are done, and the
+whole-call figures above stand until then.
+
 Against the baseline, at 16,384 entries: a full-scan read took 72.2 ms of
 its own work and 354.8 ms as a whole call, and takes 39.9 ms and 182.8 ms.
 It no longer rewrites the map, and a call opens each slot of an exact
@@ -398,9 +417,9 @@ slower one at every capacity. The full scan's saving on reads moved the
 first break-even up to 16,384 entries, and the tree's saving brought its
 write level with the full scan's there. The tree's advantage in bytes,
 physical operations and gas is as it was. What still grows with the store
-on the tree is the copy of the state, the load of the map and, in an
-instrumented call, the witness snapshots (Issues 36 to 38 of the review);
-the profile is run again when they are done.
+on the tree is the copy of the state and the load of the map (Issue 37 of
+the review); the profile is run again when that issue and Issue 38 are
+done.
 
 The sweep also found a defect, which is fixed. An aborting call opened every
 slot of an exact map again to restore it, and the allocator's budget of
@@ -433,9 +452,14 @@ whose key the program does not show equal to a preceding get's (another key
 expression, a key read from storage, or a key variable bound again in
 between) still makes its own presence get, and the tree costs more than a
 flat position map below a few thousand entries.
-The instrumented runtime decodes every bucket of a tree twice per call to
-export the position-map witnesses its checks consume, so its calls take time
-linear in the capacity even where the ORAM's own work is logarithmic.
+The instrumented runtime keeps the position-map witnesses its checks
+consume and compares them with a decode of every bucket of a tree before
+and after each call, so an audited call takes time linear in the capacity
+even where the ORAM's own work is logarithmic; a measured call and a
+production call do not pay for the audit, and a production call exports no
+witness. What still grows with the store in every call on the tree is the
+copy of the committed state and the load of the map, and in a production
+call the digest of the stored ciphertext (Issue 37 of the review).
 
 ## Current Route
 
