@@ -713,6 +713,11 @@
       "restricted": true
     },
     {
+      "file": "proof/lean/UOToolchain/ExactObjectLayout.lean",
+      "forbidden_import_hits": [],
+      "restricted": true
+    },
+    {
       "file": "proof/lean/UOToolchain/KernelExactTrace.lean",
       "forbidden_import_hits": [],
       "restricted": true

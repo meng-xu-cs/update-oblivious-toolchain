@@ -13,6 +13,7 @@ use std::collections::BTreeMap;
 use uo_allocator::AllocatorSession;
 use uo_core::ir::{BackendKind, ContainerKind, StateObject};
 use uo_core::manifest::is_path_oram_scheme;
+use uo_core::trace::{ExactObjectKind, ExactObjectSlots};
 use uo_core::Value;
 #[cfg_attr(not(any(test, feature = "diagnostics")), allow(unused_imports))]
 use uo_core::{
@@ -92,7 +93,12 @@ impl CellObject {
         trace: &mut CallRecorder,
         allocator: &mut AllocatorSession,
     ) -> Result<Self> {
-        trace.physical_read(&self.spec.name, self.spec.name.clone(), self.physical.len());
+        trace.physical_scan(
+            &self.spec.name,
+            ExactObjectKind::Cell,
+            1,
+            self.physical.len(),
+        );
         Ok(Self {
             spec: self.spec.clone(),
             value: self.decode_value_from_storage(allocator)?,
@@ -174,9 +180,12 @@ impl ArrayObject {
         trace: &mut CallRecorder,
         allocator: &mut AllocatorSession,
     ) -> Result<Self> {
-        record_load_scan(trace, &self.spec.name, &self.physical_slots, |index| {
-            format!("{}[{index}]", self.spec.name)
-        });
+        record_load_scan(
+            trace,
+            &self.spec.name,
+            ExactObjectKind::Array,
+            &self.physical_slots,
+        );
         Ok(Self {
             spec: self.spec.clone(),
             values: self.decode_values_from_storage(allocator)?,
@@ -320,9 +329,12 @@ impl SmallMapObject {
         trace: &mut CallRecorder,
         allocator: &mut AllocatorSession,
     ) -> Result<Self> {
-        record_load_scan(trace, &self.spec.name, &self.physical_slots, |index| {
-            format!("{}#{index}", self.spec.name)
-        });
+        record_load_scan(
+            trace,
+            &self.spec.name,
+            ExactObjectKind::Map,
+            &self.physical_slots,
+        );
         Ok(Self {
             spec: self.spec.clone(),
             entries: self.decode_entries_from_storage(allocator)?,
@@ -1340,6 +1352,7 @@ impl RuntimeObject {
                 let cipher = &next.cipher;
                 let rng = &mut next.rng;
                 let physical = &mut next.physical;
+                trace.begin_exact_rewrite(&spec_name, ExactObjectKind::Cell);
                 reconcile_cell_commit_value(
                     &mut next.value,
                     loaded_value,
@@ -1359,6 +1372,7 @@ impl RuntimeObject {
                         )
                     },
                 )?;
+                trace.end_exact_rewrite();
                 next.accessed = false;
                 next.written = false;
                 Ok(Self::UoCell(next))
@@ -1421,6 +1435,7 @@ impl RuntimeObject {
                 let cipher = &next.cipher;
                 let rng = &mut next.rng;
                 let physical_slots = &mut next.physical_slots;
+                trace.begin_exact_rewrite(&spec_name, ExactObjectKind::Array);
                 reconcile_array_commit_values(
                     &mut next.values,
                     loaded_values,
@@ -1448,6 +1463,7 @@ impl RuntimeObject {
                         )
                     },
                 )?;
+                trace.end_exact_rewrite();
                 next.accessed = false;
                 clear_written_slots(&mut next.written_slots);
                 Ok(Self::UoArray(next))
@@ -1487,6 +1503,7 @@ impl RuntimeObject {
                 let cipher = &next.cipher;
                 let rng = &mut next.rng;
                 let physical_slots = &mut next.physical_slots;
+                trace.begin_exact_rewrite(&spec_name, ExactObjectKind::Map);
                 reconcile_small_map_commit_entries(
                     &mut next.entries,
                     loaded_entries,
@@ -1514,6 +1531,7 @@ impl RuntimeObject {
                         )
                     },
                 )?;
+                trace.end_exact_rewrite();
                 next.accessed = false;
                 next.dirty = false;
                 Ok(Self::UoSmallMap(next))
@@ -1746,24 +1764,36 @@ fn no_written_slots(slots: &[bool]) -> bool {
 }
 
 /// The logical events of one access to a full-scan map: the access scans
-/// every opened entry. It reads no sealed record; the call read the map's
-/// slots when it loaded the map.
+/// every opened entry, one event for each, which the trace holds as one
+/// item. It reads no sealed record; the call read the map's slots when it
+/// loaded the map.
 fn record_small_map_scan(object: &SmallMapObject, trace: &mut CallRecorder) {
-    for (index, _) in object.entries.iter().enumerate() {
-        trace.logical_read("uomap_scan", &object.spec.name, format!("slot:{index}"));
-    }
+    trace.logical_scan("uomap_scan", &object.spec.name, object.entries.len());
 }
 
 /// Trace the read of every sealed slot of an exact object, in slot order: the
-/// call's one read of the object, made when the call loads it.
+/// call's one read of the object, made when the call loads it. The slots of
+/// an object have one length, so the trace holds the scan as one item.
 fn record_load_scan(
     trace: &mut CallRecorder,
     object_name: &str,
+    kind: ExactObjectKind,
     physical_slots: &[Box<[u8]>],
-    location: impl Fn(usize) -> String,
 ) {
+    let len = physical_slots.first().map_or(0, |slot| slot.len());
+    if physical_slots.iter().all(|slot| slot.len() == len) {
+        trace.physical_scan(object_name, kind, physical_slots.len(), len);
+        return;
+    }
+    // Slots of more than one length are read one event each.
+    let slots = ExactObjectSlots {
+        object: object_name.into(),
+        kind,
+        slots: physical_slots.len(),
+        len,
+    };
     for (index, slot) in physical_slots.iter().enumerate() {
-        trace.physical_read(object_name, location(index), slot.len());
+        trace.physical_read(object_name, slots.location(index), slot.len());
     }
 }
 
@@ -2875,7 +2905,11 @@ mod tests {
                         &mut commit_allocator,
                     )
                     .unwrap();
-                let events = commit_allocator.finish().unwrap().resource_events().len();
+                let events = commit_allocator
+                    .finish()
+                    .unwrap()
+                    .resource_events()
+                    .event_count();
                 let case = format!("{} aborted={aborted} may_write={may_write}", spec.name);
                 assert_eq!(recorder.metrics().physical_reads, 0, "{case}");
                 if may_write {

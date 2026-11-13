@@ -78,7 +78,11 @@ paper-main theorem modulo releases over admitted runs with the storage-trace
 premise discharged; its remaining premises are the public outcome, boundary
 schedule, controller shape, final public state, and release functions. The
 probe checks that the runtime's traces are exactly the encoding's prediction
-(`exact_encoding_matches` in `trace_equivalence.json`).
+(`exact_encoding_matches` in `trace_equivalence.json`), with a Rust mirror
+of the encoding. A runtime trace holds the scan and the rewrite of an
+object as one item each; the Lean importers expand an item with the
+encoding's own `ExactObjectLayout.scanReads` and `updateWrites`
+(`UOToolchain/ExactObjectLayout.lean`).
 
 `UOToolchain.KernelFlow` is the Lean counterpart of the compiler's policy
 analysis. Variables carry a public or secret label (parameters by

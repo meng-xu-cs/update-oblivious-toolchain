@@ -83,7 +83,7 @@ instance : FromJson ImportedRuntimeKernelMachineFinishWitness where
       , io_scratch_peak_bytes := ← jsonLookupFieldAs json "io_scratch_peak_bytes"
       , io_scratch_live_bytes_end := ← jsonLookupFieldAs json "io_scratch_live_bytes_end"
       , io_scratch_wipe_count := ← jsonLookupFieldAs json "io_scratch_wipe_count"
-      , resource_events := ← jsonLookupFieldAs json "resource_events"
+      , resource_events := ← jsonLookupResourceEvents json "resource_events"
       , expected_kernel_steps :=
           ← jsonLookupExplicitOptionFieldAs json "expected_kernel_steps"
       , expected_kernel_step_index := ← jsonLookupFieldAs json "expected_kernel_step_index"

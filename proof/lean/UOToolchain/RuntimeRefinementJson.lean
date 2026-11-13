@@ -1,5 +1,6 @@
 import Lean.Data.Json
 import UOToolchain.RuntimeRefinement
+import UOToolchain.ExactObjectLayout
 
 open Lean
 
@@ -224,6 +225,111 @@ def ImportedRefinementPhysicalWrite.toPhysicalWrite
   , len := event.len
   }
 
+/-- The slots of an exact object, as an item of a trace names them
+(`ExactObjectSlots` in `crates/uo-core/src/trace.rs`): the object, how its
+slots are named in storage, how many it has, and the length of a sealed
+record. -/
+structure ImportedExactObjectSlots where
+  object : String
+  kind : String
+  slots : Nat
+  len : Nat
+deriving Repr, DecidableEq
+
+def importedExactObjectSlotsFieldNames : List String :=
+  ["object", "kind", "slots", "len"]
+
+instance : FromJson ImportedExactObjectSlots where
+  fromJson? json := do
+    jsonRequireExactFields json importedExactObjectSlotsFieldNames
+    pure
+      { object := ← jsonLookupFieldAs json "object"
+      , kind := ← jsonLookupFieldAs json "kind"
+      , slots := ← jsonLookupFieldAs json "slots"
+      , len := ← jsonLookupFieldAs json "len"
+      }
+
+/-- The layout an item's slots are those of. A cell has one slot. -/
+def ImportedExactObjectSlots.layout (item : ImportedExactObjectSlots) :
+    Except String IR.ExactObjectLayout := do
+  let kind ←
+    match item.kind with
+    | "cell" => pure IR.ContainerKind.cell
+    | "array" => pure IR.ContainerKind.arrayKind
+    | "map" => pure IR.ContainerKind.mapKind
+    | other => throw s!"unknown exact object kind {other}"
+  if item.kind == "cell" && item.slots != 1 then
+    throw s!"the cell {item.object} has one slot, not {item.slots}"
+  pure { name := item.object, kind := kind, slots := item.slots, recordLen := item.len }
+
+/-- The events of a list of a trace. An item of the list is an event or a
+run of events, and `expand` gives the events of an item in order: the
+list is those of its items, one after the other. -/
+def jsonExpandTraceItems (json : Json) (field : String)
+    (expand : Json → Except String (List α)) : Except String (List α) := do
+  match ← jsonLookupFieldJson json field with
+  | Json.arr items => do
+      let expanded ← items.toList.mapM expand
+      pure (expanded.foldr (· ++ ·) [])
+  | _ => throw s!"object field {field} is not a list"
+
+/-- An item of a trace's physical reads: a read, or `{"scan": slots}`, the
+scan of an exact object, which is one read of each of its slots
+(`ExactObjectLayout.scanReads`). -/
+def importedPhysicalReadsOfItem (json : Json) :
+    Except String (List ImportedPhysicalReadEvent) := do
+  match json.getObjVal? "scan" with
+  | .ok scan => do
+      jsonRequireExactFields json ["scan"]
+      let slots : ImportedExactObjectSlots ← fromJson? scan
+      let layout ← slots.layout
+      pure (layout.scanReads.map fun read =>
+        { object := read.object, location := read.location, len := read.len })
+  | .error _ => do
+      let event : ImportedPhysicalReadEvent ← fromJson? json
+      pure [event]
+
+/-- An item of a trace's physical writes: a write, or `{"rewrite": slots}`,
+the rewrite of an exact object, which is one `Update` write of each of its
+slots (`ExactObjectLayout.updateWrites`). -/
+def importedPhysicalWritesOfItem (json : Json) :
+    Except String (List ImportedRefinementPhysicalWrite) := do
+  match json.getObjVal? "rewrite" with
+  | .ok rewrite => do
+      jsonRequireExactFields json ["rewrite"]
+      let slots : ImportedExactObjectSlots ← fromJson? rewrite
+      let layout ← slots.layout
+      pure (layout.updateWrites.map fun write =>
+        { object := write.object
+        , location := write.location
+        , write_class := .Update
+        , len := write.len
+        })
+  | .error _ => do
+      let event : ImportedRefinementPhysicalWrite ← fromJson? json
+      pure [event]
+
+/-- An item of a trace's logical accesses: an event, or
+`{"scan": {"kind", "object", "slots"}}`, the scan of a map, which is one
+event of that kind for each slot, with the detail `slot:i`. -/
+def importedLogicalEventsOfItem (json : Json) :
+    Except String (List ImportedLogicalEvent) := do
+  match json.getObjVal? "scan" with
+  | .ok scan => do
+      jsonRequireExactFields json ["scan"]
+      jsonRequireExactFields scan ["kind", "object", "slots"]
+      let kind : String ← jsonLookupFieldAs scan "kind"
+      let object : String ← jsonLookupFieldAs scan "object"
+      let slots : Nat ← jsonLookupFieldAs scan "slots"
+      pure ((List.range slots).map fun slot =>
+        { kind := kind, object := object, detail := "slot:" ++ toString slot })
+  | .error _ => do
+      let event : ImportedLogicalEvent ← fromJson? json
+      pure [event]
+
+/-- A trace as the checkers read it: the events of each list in order. The
+runtime writes the scan of an exact object, its rewrite and the logical
+scan of a map as one item each; the importer names their events. -/
 structure ImportedRefinementTrace where
   opcode_trace : List String
   logical_accesses : List ImportedLogicalEvent
@@ -231,7 +337,21 @@ structure ImportedRefinementTrace where
   physical_reads : List ImportedPhysicalReadEvent
   physical_writes : List ImportedRefinementPhysicalWrite
   gas_used : Nat
-deriving Repr, DecidableEq, FromJson, ToJson
+deriving Repr, DecidableEq, ToJson
+
+instance : FromJson ImportedRefinementTrace where
+  fromJson? json := do
+    pure
+      { opcode_trace := ← jsonLookupFieldAs json "opcode_trace"
+      , logical_accesses :=
+          ← jsonExpandTraceItems json "logical_accesses" importedLogicalEventsOfItem
+      , logical_writes := ← jsonLookupFieldAs json "logical_writes"
+      , physical_reads :=
+          ← jsonExpandTraceItems json "physical_reads" importedPhysicalReadsOfItem
+      , physical_writes :=
+          ← jsonExpandTraceItems json "physical_writes" importedPhysicalWritesOfItem
+      , gas_used := ← jsonLookupFieldAs json "gas_used"
+      }
 
 def ImportedRefinementTrace.toTrace (trace : ImportedRefinementTrace) : Trace :=
   { opcodeTrace := trace.opcode_trace
@@ -900,6 +1020,31 @@ instance : FromJson ImportedRuntimeKernelResourceEvent where
       , bytes := ← jsonLookupExplicitOptionFieldAs json "bytes"
       }
 
+/-- An item of a kernel's resource-event log: an event, or a block of events
+`{"repeat": n, "events": [...]}` that occurs `n` times in a row (the slots
+of an object are opened or sealed one after the other, and each logs the
+same reservation and wipe). A block repeats at least twice and holds an
+event. -/
+def importedRuntimeKernelResourceEventsOfItem (json : Json) :
+    Except String (List ImportedRuntimeKernelResourceEvent) := do
+  match json.getObjVal? "repeat" with
+  | .ok _ => do
+      jsonRequireExactFields json ["repeat", "events"]
+      let times : Nat ← jsonLookupFieldAs json "repeat"
+      let events : List ImportedRuntimeKernelResourceEvent ← jsonLookupFieldAs json "events"
+      if times < 2 || events.isEmpty then
+        throw "a repeated block of resource events repeats at least twice and holds an event"
+      pure ((List.replicate times events).foldr (· ++ ·) [])
+  | .error _ => do
+      let event : ImportedRuntimeKernelResourceEvent ← fromJson? json
+      pure [event]
+
+/-- The events of a kernel's resource-event log, in order, each block as
+often as it repeats. -/
+def jsonLookupResourceEvents (json : Json) (field : String) :
+    Except String (List ImportedRuntimeKernelResourceEvent) :=
+  jsonExpandTraceItems json field importedRuntimeKernelResourceEventsOfItem
+
 def importedRuntimeKernelWitnessFieldNames : List String :=
   [ "entrypoint_id"
   , "arena_bytes"
@@ -964,7 +1109,7 @@ instance : FromJson ImportedRuntimeKernelWitness where
       , io_scratch_peak_bytes := ← jsonLookupFieldAs json "io_scratch_peak_bytes"
       , io_scratch_live_bytes_end := ← jsonLookupFieldAs json "io_scratch_live_bytes_end"
       , io_scratch_wipe_count := ← jsonLookupFieldAs json "io_scratch_wipe_count"
-      , resource_events := ← jsonLookupFieldAs json "resource_events"
+      , resource_events := ← jsonLookupResourceEvents json "resource_events"
       , expected_kernel_steps :=
           ← jsonLookupExplicitOptionFieldAs json "expected_kernel_steps"
       , public_object_ids := ← jsonLookupFieldAs json "public_object_ids"

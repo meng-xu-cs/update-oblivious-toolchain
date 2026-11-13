@@ -4133,6 +4133,7 @@ fn run_static_checks(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<J
         "proof/lean/UOToolchain/PathOramLocalPosmapV1.lean",
         "proof/lean/UOToolchain/PaperMainReleases.lean",
         "proof/lean/UOToolchain/KernelTyping.lean",
+        "proof/lean/UOToolchain/ExactObjectLayout.lean",
         "proof/lean/UOToolchain/KernelExactTrace.lean",
         "proof/lean/UOToolchain/KernelFlow.lean",
         "proof/lean/UOToolchain/KernelPaperMain.lean",
@@ -5496,6 +5497,11 @@ fn run_tamper_validation() -> Result<JsonValue> {
     scenarios.push(runtime_confidential_public_uo_target_scenario(
         &artifact, &target,
     )?);
+
+    // The exact store's trace: a scan or a rewrite of another number of
+    // slots, of another record length or of other locations is not the
+    // encoding the artifact predicts.
+    scenarios.extend(exact_trace_run_tamper_scenarios()?);
 
     let mut tampered_controller_certificate = serde_json::to_value(&controller_certificate)?;
     let observed_access = tampered_controller_certificate
@@ -10150,6 +10156,78 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "benchmark": "SingleAccessMap/pathoram/put",
             "entrypoint": target.entrypoint,
             "mutation": "stage a call on a copy of every committed object instead of on the committed objects themselves, so the implementation interface must reject staging that takes time and memory in the size of the store",
+        }),
+    )?);
+    let mut tampered_runtime_implementation_rewrite_run_unclassified =
+        runtime_implementation_interface.clone();
+    tampered_runtime_implementation_rewrite_run_unclassified.trace_source = replace_exactly_once(
+        &tampered_runtime_implementation_rewrite_run_unclassified.trace_source,
+        "        let next = event.class == WriteClass::Update\n            && event.object == self.object\n",
+        "        let next = event.object == self.object\n",
+        "runtime implementation rewrite-run class tamper",
+    )?;
+    scenarios.push(validate_tampered_json_case(
+        "runtime_implementation_interface/rewrite_run_takes_unclassified_write_drift",
+        &tampered_runtime_implementation_rewrite_run_unclassified,
+        |interface_path| {
+            Ok(Command::new(&runtime_implementation_interface_checker)
+                .arg(interface_path)
+                .output()?)
+        },
+        json!({
+            "scenario": "runtime_implementation_interface/rewrite_run_takes_unclassified_write_drift",
+            "artifact_kind": "proofgrade_runtime_implementation_interface",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "let the rewrite of an exact object take a write of any class as the write of its next slot, so the implementation interface must reject a rewrite item that stands for Update writes the runtime did not classify as Update",
+        }),
+    )?);
+    let mut tampered_runtime_implementation_recorder_skips_fold =
+        runtime_implementation_interface.clone();
+    tampered_runtime_implementation_recorder_skips_fold.controller_source = replace_exactly_once(
+        &tampered_runtime_implementation_recorder_skips_fold.controller_source,
+        "            if run.takes_write(&event) {\n                return;\n            }\n",
+        "            if event.object == run.object {\n                run.len = event.len;\n                run.slots += 1;\n                return;\n            }\n",
+        "runtime implementation recorder rewrite-fold tamper",
+    )?;
+    scenarios.push(validate_tampered_json_case(
+        "runtime_implementation_interface/recorder_rewrite_run_skips_fold_drift",
+        &tampered_runtime_implementation_recorder_skips_fold,
+        |interface_path| {
+            Ok(Command::new(&runtime_implementation_interface_checker)
+                .arg(interface_path)
+                .output()?)
+        },
+        json!({
+            "scenario": "runtime_implementation_interface/recorder_rewrite_run_skips_fold_drift",
+            "artifact_kind": "proofgrade_runtime_implementation_interface",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "let the call recorder count any write to an object as the next slot of its open rewrite without the check of its class, slot and length, so the implementation interface must reject a rewrite item that is not the writes the recorder was handed",
+        }),
+    )?);
+    let mut tampered_runtime_implementation_trace_hash_over_items =
+        runtime_implementation_interface.clone();
+    tampered_runtime_implementation_trace_hash_over_items.trace_source = replace_exactly_once(
+        &tampered_runtime_implementation_trace_hash_over_items.trace_source,
+        "        let logical_accesses = self.logical_accesses.events().collect::<Vec<_>>();\n",
+        "        let logical_accesses = self.logical_accesses.items().to_vec();\n",
+        "runtime implementation trace-hash item tamper",
+    )?;
+    scenarios.push(validate_tampered_json_case(
+        "runtime_implementation_interface/trace_hash_over_run_items_drift",
+        &tampered_runtime_implementation_trace_hash_over_items,
+        |interface_path| {
+            Ok(Command::new(&runtime_implementation_interface_checker)
+                .arg(interface_path)
+                .output()?)
+        },
+        json!({
+            "scenario": "runtime_implementation_interface/trace_hash_over_run_items_drift",
+            "artifact_kind": "proofgrade_runtime_implementation_interface",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "hash the items of a trace's logical accesses instead of their events, so the implementation interface must reject a trace hash that depends on how the events of a trace are grouped into runs",
         }),
     )?);
     let tampered_runtime_small_confidential_kernel_generated_object_helpers_commit =
@@ -18774,7 +18852,7 @@ fn validate_kernel_finish_boundary_case(
             "public_object_universe": finish_bundle.public_object_ids(),
             "runtime_phase_prefix_event_count":
                 finish_bundle.runtime_phase_events_before_finish().len(),
-            "resource_event_count": finish_bundle.resource_events().len(),
+            "resource_event_count": finish_bundle.resource_events().event_count(),
         },
         "kernel_finish_bundle_json_bytes": kernel_finish_bundle_json_bytes,
         "lean_checker_kind": "kernel finish boundary",
@@ -20537,7 +20615,7 @@ fn validate_runtime_kernel_machine_finish_witness_case(
             "runtime_phase_prefix_event_count":
                 finish_bundle.runtime_phase_events_before_finish().len(),
             "public_object_universe": finish_bundle.public_object_ids(),
-            "resource_event_count": finish_bundle.resource_events().len(),
+            "resource_event_count": finish_bundle.resource_events().event_count(),
         },
         "machine_finish_witness_json_bytes": machine_finish_witness_json_bytes,
         "projected_finish_bundle_json_bytes": projected_finish_bundle_json_bytes,
@@ -20776,7 +20854,7 @@ fn validate_runtime_kernel_machine_finish_boundary_case(
             "runtime_phase_prefix_event_count":
                 finish_bundle.runtime_phase_events_before_finish().len(),
             "public_object_universe": finish_bundle.public_object_ids(),
-            "resource_event_count": finish_bundle.resource_events().len(),
+            "resource_event_count": finish_bundle.resource_events().event_count(),
         },
         "confidential_slot_program": {
             "entrypoint_id": confidential_slot_program.entrypoint_id.as_str(),
@@ -20944,7 +21022,7 @@ fn validate_runtime_implementation_shared_kernel_machine_refinement_boundary_cas
             "runtime_phase_event_count":
                 exact_runtime_kernel_refinement_witness.events().len(),
             "public_object_universe": finish_bundle.public_object_ids(),
-            "resource_event_count": finish_bundle.resource_events().len(),
+            "resource_event_count": finish_bundle.resource_events().event_count(),
         },
         "confidential_slot_program": {
             "entrypoint_id": confidential_slot_program.entrypoint_id.as_str(),
@@ -21131,7 +21209,7 @@ fn validate_runtime_implementation_small_confidential_kernel_machine_refinement_
             "runtime_phase_event_count":
                 exact_runtime_kernel_refinement_witness.events().len(),
             "public_object_universe": finish_bundle.public_object_ids(),
-            "resource_event_count": finish_bundle.resource_events().len(),
+            "resource_event_count": finish_bundle.resource_events().event_count(),
         },
         "confidential_slot_program": {
             "entrypoint_id": confidential_slot_program.entrypoint_id.as_str(),
@@ -21319,7 +21397,7 @@ fn validate_runtime_implementation_slot_adapter_machine_refinement_boundary_case
             "runtime_phase_event_count":
                 exact_runtime_kernel_refinement_witness.events().len(),
             "public_object_universe": finish_bundle.public_object_ids(),
-            "resource_event_count": finish_bundle.resource_events().len(),
+            "resource_event_count": finish_bundle.resource_events().event_count(),
         },
         "confidential_slot_program": {
             "entrypoint_id": confidential_slot_program.entrypoint_id.as_str(),
@@ -21515,7 +21593,7 @@ fn validate_runtime_implementation_public_bridge_observer_refinement_boundary_ca
             "runtime_phase_event_count":
                 exact_runtime_kernel_refinement_witness.events().len(),
             "public_object_universe": finish_bundle.public_object_ids(),
-            "resource_event_count": finish_bundle.resource_events().len(),
+            "resource_event_count": finish_bundle.resource_events().event_count(),
         },
         "public_bridge_observer_boundary": {
             "entrypoint_id": confidential_slot_program.entrypoint_id.as_str(),
@@ -21698,7 +21776,7 @@ fn validate_runtime_implementation_residual_helper_shell_machine_refinement_boun
             "runtime_phase_event_count":
                 exact_runtime_kernel_refinement_witness.events().len(),
             "public_object_universe": finish_bundle.public_object_ids(),
-            "resource_event_count": finish_bundle.resource_events().len(),
+            "resource_event_count": finish_bundle.resource_events().event_count(),
         },
         "confidential_slot_program": {
             "entrypoint_id": confidential_slot_program.entrypoint_id.as_str(),
@@ -21846,7 +21924,7 @@ fn validate_runtime_implementation_shared_kernel_refinement_boundary_case(
             "public_object_universe": finish_bundle.public_object_ids(),
             "runtime_phase_prefix_event_count":
                 finish_bundle.runtime_phase_events_before_finish().len(),
-            "resource_event_count": finish_bundle.resource_events().len(),
+            "resource_event_count": finish_bundle.resource_events().event_count(),
         },
         "confidential_slot_program": {
             "entrypoint_id": confidential_slot_program_entrypoint,
@@ -22154,7 +22232,7 @@ fn validate_runtime_implementation_kernel_meeting_boundary_case(
             "runtime_phase_prefix_event_count":
                 finish_bundle.runtime_phase_events_before_finish().len(),
             "public_object_universe": finish_bundle.public_object_ids(),
-            "resource_event_count": finish_bundle.resource_events().len(),
+            "resource_event_count": finish_bundle.resource_events().event_count(),
         },
         "kernel_finish_slot_bundle": {
             "entrypoint_id": confidential_slot_program_entrypoint,
@@ -22370,7 +22448,7 @@ fn validate_runtime_implementation_kernel_meeting_confinement_boundary_case(
             "runtime_phase_prefix_event_count":
                 finish_bundle.runtime_phase_events_before_finish().len(),
             "public_object_universe": finish_bundle.public_object_ids(),
-            "resource_event_count": finish_bundle.resource_events().len(),
+            "resource_event_count": finish_bundle.resource_events().event_count(),
         },
         "kernel_finish_slot_bundle": {
             "entrypoint_id": confidential_slot_program_entrypoint,
@@ -22580,7 +22658,7 @@ fn validate_runtime_implementation_kernel_machine_confinement_boundary_case(
             "runtime_phase_prefix_event_count":
                 finish_bundle.runtime_phase_events_before_finish().len(),
             "public_object_universe": finish_bundle.public_object_ids(),
-            "resource_event_count": finish_bundle.resource_events().len(),
+            "resource_event_count": finish_bundle.resource_events().event_count(),
         },
         "machine_confinement_boundary": {
             "entrypoint_id": confidential_slot_program_entrypoint,
@@ -23292,7 +23370,7 @@ fn validate_confidential_core_kernel_finish_slot_case(
             "public_object_universe": finish_bundle.public_object_ids(),
             "runtime_phase_prefix_event_count":
                 finish_bundle.runtime_phase_events_before_finish().len(),
-            "resource_event_count": finish_bundle.resource_events().len(),
+            "resource_event_count": finish_bundle.resource_events().event_count(),
         },
         "confidential_slot_program": {
             "entrypoint_id": confidential_slot_program.entrypoint_id.as_str(),
@@ -28207,7 +28285,7 @@ fn check_production_calls_record_no_position_map_witness(
             "        if !self.evidence.runtime_oram_access_counters_before.is_empty()\n            || !self.evidence.runtime_oram_access_counters_after.is_empty()\n            || !self.evidence.runtime_oram_position_map_before.is_empty()\n            || !self.evidence.runtime_oram_position_map_after.is_empty()\n            || self.evidence.runtime_oram_leaf_schedule.len()\n                != self.evidence.runtime_oram_leaf_state_transitions.len()\n        {\n            return Err(RefinementWitnessError::OramLeafStateMismatch.into());\n        }\n        let kernel_witness = self.checked_runtime_kernel_witness()?;\n        let controller_observer = self.reconstructed_runtime_controller_observer_certificate()?;",
         )
         && core_trace_source.contains(
-            "        validate_path_oram_leaf_schedule(\n            &self.evidence.runtime_oram_leaf_schedule,\n            &refinement_trace.logical_accesses,\n            &refinement_trace.physical_reads,\n            &physical_writes,\n            &self.evidence.runtime_oram_objects,\n        )?;\n        validate_refinement_outcome(\n            &refinement_trace,\n            &controller_observer.public_outcome,\n            kernel_witness.as_ref(),\n            None,\n            &controller_observer.controller_certificate,\n            &self.evidence.runtime_oram_objects,\n        )?;\n        if confidential {\n            self.check_runtime_confidential_kernel_bundles(artifact)?;\n        }\n        Ok(())",
+            "        validate_path_oram_leaf_schedule(\n            &self.evidence.runtime_oram_leaf_schedule,\n            &refinement_trace.logical_accesses,\n            &refinement_trace.physical_reads,\n            &refinement_trace.physical_writes,\n            &self.evidence.runtime_oram_objects,\n        )?;\n        validate_refinement_outcome(\n            &refinement_trace,\n            &controller_observer.public_outcome,\n            kernel_witness.as_ref(),\n            None,\n            &controller_observer.controller_certificate,\n            &self.evidence.runtime_oram_objects,\n        )?;\n        if confidential {\n            self.check_runtime_confidential_kernel_bundles(artifact)?;\n        }\n        Ok(())",
         )
 }
 
@@ -28344,6 +28422,149 @@ fn check_a_call_copies_no_committed_object(
             "        for page in &mut self.storage.directory_pages {\n            page.wipe();\n        }\n        for bucket in &mut self.storage.buckets {\n            bucket.wipe();\n        }",
         )
         && !generated_oram_codecs_source.contains("[Box<[u8]>],")
+}
+
+/// The names of the types of a run item, and of the variants that hold
+/// one. No production file of the runtime writes them: it builds a run
+/// through `uo-core` (`PhysicalReadItem::scan`, `LogicalAccessItem::scan`,
+/// `PhysicalWriteItem::rewrite`).
+const TRACE_RUN_TYPE_PATTERNS: [&str; 5] = [
+    "PhysicalRewrite",
+    "PhysicalScan",
+    "LogicalScan {",
+    "Item::Rewrite(",
+    "Item::Scan(",
+];
+
+/// The one file of the runtime whose production code builds an item of a
+/// trace: the call recorder.
+const TRACE_RUN_RECORDER_FILES: [&str; 1] = ["runtime/uo-evm/src/controller.rs"];
+
+/// Whether a run in a trace stands for the events the runtime recorded. A
+/// trace is its events in order, and an item of it may stand for a run of
+/// them: the scan or the rewrite of an exact object, or the logical scan of
+/// a map. `uo-core` names the events of a run, hashes a trace over its
+/// events, and rejects a run that could hold an event of a Path ORAM
+/// access, so nothing depends on how the events are grouped. The recorder
+/// keeps a run through `uo-core` alone. It keeps a scan from the slot count
+/// and the one length the slots of its object have. It keeps a rewrite from
+/// the writes it was handed one at a time, each the `Update` of the next
+/// slot (`ExactObjectSlots::takes_write`), so the class a rewrite stands
+/// for is that of writes classified from their bytes. `run_type_files` are
+/// the runtime's production files that name the type of a run item, and
+/// `rewrite_files` and `scan_files` those that build a rewrite or a scan.
+fn check_trace_runs_stand_for_recorded_events(
+    core_trace_source: &str,
+    controller_production_source: &str,
+    objects_production_source: &str,
+    run_type_files: &[String],
+    rewrite_files: &[String],
+    scan_files: &[String],
+) -> bool {
+    let trace = core_trace_source;
+    let recorder = controller_production_source;
+    let objects = objects_production_source;
+    // The events of a run, as `uo-core` names them.
+    trace.contains(
+        "        match self.kind {\n            ExactObjectKind::Cell => self.object.clone(),\n            ExactObjectKind::Array => format!(\"{}[{slot}]\", self.object),\n            ExactObjectKind::Map => format!(\"{}#{slot}\", self.object),\n        }",
+    ) && trace.contains(
+        "            Self::Scan(item) => (index < item.scan.slots).then(|| PhysicalReadEvent {\n                object: item.scan.object.clone(),\n                location: item.scan.location(index),\n                len: item.scan.len,\n            }),",
+    ) && trace.contains(
+        "            Self::Rewrite(item) => (index < item.rewrite.slots).then(|| PhysicalWriteEvent {\n                object: item.rewrite.object.clone(),\n                location: item.rewrite.location(index),\n                len: item.rewrite.len,\n                class: WriteClass::Update,\n            }),",
+    ) && trace.contains(
+        "            Self::Scan(item) => (index < item.scan.slots).then(|| LogicalEvent {\n                kind: item.scan.kind.clone(),\n                object: item.scan.object.clone(),\n                detail: format!(\"slot:{index}\"),\n            }),",
+    ) && trace.contains(
+        "    pub fn events(&self) -> impl Iterator<Item = I::Event> + '_ {\n        self.0\n            .iter()\n            .flat_map(|item| (0..item.event_count()).filter_map(move |index| item.event(index)))\n    }",
+    )
+        // The hashes and the transcript of a trace are of its events.
+        && trace.contains(
+            "        let normalized_physical = self\n            .physical_writes\n            .events()\n            .map(|event| (event.object, event.location, event.class, event.len))\n            .collect::<Vec<_>>();\n        let normalized_reads = self\n            .physical_reads\n            .events()\n            .map(|event| (event.object, event.location, event.len))\n            .collect::<Vec<_>>();\n        let logical_accesses = self.logical_accesses.events().collect::<Vec<_>>();",
+        )
+        && trace.contains("            logical_access_trace_hash: hash_json(&logical_accesses)?,")
+        && trace.contains("            physical_read_trace_hash: hash_json(&normalized_reads)?,")
+        && trace.contains("            physical_write_trace_hash: hash_json(&normalized_physical)?,")
+        && trace.contains("        for (index, event) in self.logical_accesses.events().enumerate() {")
+        && trace.contains("        for (index, event) in self.physical_reads.events().enumerate() {")
+        && trace.contains("        for (index, event) in self.physical_writes.events().enumerate() {")
+        // A run holds no event of a Path ORAM access.
+        && trace.contains(
+            "            Err(run) => {\n                if path_objects.contains(run.object.as_str()) || !run.is_well_formed() {\n                    return Err(RefinementWitnessError::OramLeafScheduleMismatch);\n                }\n            }",
+        )
+        && trace.contains(
+            "            LogicalAccessItem::Scan(run) => {\n                if is_oram_logical_kind(&run.scan.kind) {\n                    return Err(RefinementWitnessError::MalformedOramLogicalTrace {",
+        )
+        // A rewrite takes the `Update` of its next slot and no other write,
+        // and a recorder's item is the run, or its one event.
+        && trace.contains(
+            "    pub fn none_of(object: impl Into<String>, kind: ExactObjectKind) -> Self {\n        Self {\n            object: object.into(),\n            kind,\n            slots: 0,\n            len: 0,\n        }\n    }",
+        )
+        && trace.contains(
+            "    pub fn takes_write(&mut self, event: &PhysicalWriteEvent) -> bool {\n        let next = event.class == WriteClass::Update\n            && event.object == self.object\n            && self.is_location(self.slots, &event.location)\n            && (self.slots == 0 || event.len == self.len);\n        if next {\n            self.len = event.len;\n            self.slots += 1;\n        }\n        next\n    }",
+        )
+        && trace.contains(
+            "    fn of_run(run: Self) -> Option<Self> {\n        match run.event_count() {\n            0 => None,\n            1 => run.event(0).map(Self::from_event),\n            _ => Some(run),\n        }\n    }",
+        )
+        && trace.contains(
+            "    pub fn scan(scan: ExactObjectSlots) -> Option<Self> {\n        Self::of_run(Self::Scan(PhysicalScan { scan }))\n    }",
+        )
+        && trace.contains(
+            "    pub fn rewrite(rewrite: ExactObjectSlots) -> Option<Self> {\n        Self::of_run(Self::Rewrite(PhysicalRewrite { rewrite }))\n    }",
+        )
+        && trace.contains(
+            "    pub fn scan(scan: LogicalScanSlots) -> Option<Self> {\n        Self::of_run(Self::Scan(LogicalScan { scan }))\n    }",
+        )
+        // The recorder: a rewrite starts empty, grows by the writes it
+        // takes, and becomes an item when it ends. Nothing else touches it.
+        && recorder.contains("    open_rewrite: Option<ExactObjectSlots>,")
+        && recorder.contains(
+            "    pub(crate) fn physical_write(&mut self, event: PhysicalWriteEvent) {\n        self.metrics.physical_writes += 1;\n        if let Some(run) = self.open_rewrite.as_mut() {\n            if run.takes_write(&event) {\n                return;\n            }\n            self.end_exact_rewrite();\n        }\n        self.physical_writes.push(PhysicalWriteItem::Write(event));\n    }",
+        )
+        && recorder.contains(
+            "    pub(crate) fn begin_exact_rewrite(&mut self, object: &str, kind: ExactObjectKind) {\n        self.end_exact_rewrite();\n        self.open_rewrite = Some(ExactObjectSlots::none_of(object, kind));\n    }",
+        )
+        && recorder.contains(
+            "    pub(crate) fn end_exact_rewrite(&mut self) {\n        let rewrite = self.open_rewrite.take();\n        if let Some(item) = rewrite.and_then(PhysicalWriteItem::rewrite) {\n            self.physical_writes.push(item);\n        }\n    }",
+        )
+        && recorder.matches("open_rewrite").count() == 4
+        && recorder.matches("takes_write(").count() == 1
+        && recorder.matches("PhysicalWriteItem::rewrite").count() == 1
+        // A raw write and the end of the call end an open rewrite first.
+        && recorder.contains(
+            "        self.end_exact_rewrite();\n        self.physical_writes.push(PhysicalWriteItem::Write(event));\n    }",
+        )
+        && recorder.matches("self.end_exact_rewrite();").count() == 4
+        // Its scans count one read for each slot.
+        && recorder.contains(
+            "        let scan = ExactObjectSlots {\n            object: object.into(),\n            kind,\n            slots,\n            len,\n        };\n        if let Some(item) = PhysicalReadItem::scan(scan) {\n            self.metrics.physical_reads += slots;\n            self.physical_reads.push(item);\n        }",
+        )
+        && recorder.contains(
+            "        if let Some(item) = LogicalAccessItem::scan(scan) {\n            self.metrics.logical_reads += slots;\n            self.logical_accesses.push(item);\n        }",
+        )
+        && recorder.matches("Item::scan(").count() == 2
+        // The objects: a scan is recorded with one length only if every
+        // slot has it, and a commit's seals are inside its rewrite.
+        && objects.contains(
+            "    let len = physical_slots.first().map_or(0, |slot| slot.len());\n    if physical_slots.iter().all(|slot| slot.len() == len) {\n        trace.physical_scan(object_name, kind, physical_slots.len(), len);\n        return;\n    }",
+        )
+        && objects.contains(
+            "    for (index, slot) in physical_slots.iter().enumerate() {\n        trace.physical_read(object_name, slots.location(index), slot.len());\n    }",
+        )
+        && objects.contains(
+            "        trace.physical_scan(\n            &self.spec.name,\n            ExactObjectKind::Cell,\n            1,\n            self.physical.len(),\n        );",
+        )
+        && objects.matches("trace.physical_scan(").count() == 2
+        && objects.contains(
+            "    trace.logical_scan(\"uomap_scan\", &object.spec.name, object.entries.len());",
+        )
+        && objects.matches("trace.logical_scan(").count() == 1
+        && objects.matches("trace.begin_exact_rewrite(&spec_name, ExactObjectKind::").count() == 3
+        && objects.matches("trace.begin_exact_rewrite(").count() == 3
+        && objects.matches("                )?;\n                trace.end_exact_rewrite();").count() == 3
+        && objects.matches("end_exact_rewrite(").count() == 3
+        // No other runtime file names a run item's type or builds a run.
+        && run_type_files.is_empty()
+        && rewrite_files == TRACE_RUN_RECORDER_FILES
+        && scan_files == TRACE_RUN_RECORDER_FILES
 }
 
 fn production_source_slice(source: &str) -> String {
@@ -29708,7 +29929,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         )
         && objects_source.contains("fn record_load_scan(")
         && objects_source
-            .contains("trace.physical_read(object_name, location(index), slot.len());")
+            .contains("trace.physical_scan(object_name, kind, physical_slots.len(), len);")
         && !objects_source.contains("record_array_scan(")
         && objects_source.contains("update_small_map_entries_for_put(")
         && objects_source.contains("reconcile_cell_commit_value(")
@@ -33948,8 +34169,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && !runtime_controller_source.contains(&old_runtime_return_channel_rejection);
     // W6.4: pin the canonical hostile-host sealing / storage
     // refinement — the runtime's `RefinementTrace` keeps
-    // `physical_reads: Box<[PhysicalReadEvent]>` and
-    // `physical_writes: Box<[RefinementPhysicalWrite]>` lists in
+    // `physical_reads: PhysicalReads` and
+    // `physical_writes: RefinementPhysicalWrites` lists in
     // boxed, fixed-shape buffers, the `RuntimeRefinementWitness`
     // wraps that trace plus the controller and runtime-kernel
     // witnesses, and the public-trace projection forwards each
@@ -33960,10 +34181,10 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
     // `docs/runtime/tee-observer.md` under "Storage Refinement".
     let sgx_storage_refinement_pinned = core_trace_source.contains("pub struct RefinementTrace {")
         && core_trace_source.contains("    pub opcode_trace: Box<[String]>,")
-        && core_trace_source.contains("    pub logical_accesses: Box<[LogicalEvent]>,")
+        && core_trace_source.contains("    pub logical_accesses: LogicalAccesses,")
         && core_trace_source.contains("    pub logical_writes: Box<[LogicalEvent]>,")
-        && core_trace_source.contains("    pub physical_reads: Box<[PhysicalReadEvent]>,")
-        && core_trace_source.contains("    pub physical_writes: Box<[RefinementPhysicalWrite]>,")
+        && core_trace_source.contains("    pub physical_reads: PhysicalReads,")
+        && core_trace_source.contains("    pub physical_writes: RefinementPhysicalWrites,")
         && core_trace_source.contains("    pub gas_used: u64,")
         && core_trace_source.contains("pub struct RefinementPhysicalWrite {")
         && core_trace_source.contains("    pub object: String,")
@@ -41547,10 +41768,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         .nth(1)
         .and_then(|suffix| suffix.split("impl RuntimePublicCallTraceBundle {").next())
         .map(|struct_body| {
-            struct_body.contains("logical_accesses: Box<[LogicalEvent]>")
+            struct_body.contains("logical_accesses: LogicalAccesses")
                 && struct_body.contains("logical_writes: Box<[LogicalEvent]>")
-                && struct_body.contains("physical_reads: Box<[PhysicalReadEvent]>")
-                && struct_body.contains("physical_writes: Box<[PhysicalWriteEvent]>")
+                && struct_body.contains("physical_reads: PhysicalReads")
+                && struct_body.contains("physical_writes: PhysicalWrites")
                 && struct_body.contains("theorem_trace: TheoremTrace")
                 && struct_body
                     .contains("runtime_controller_certificate: RuntimeControllerCertificate")
@@ -41558,10 +41779,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
                 && struct_body.contains(
                     "runtime_oram_leaf_state_transitions: Box<[RuntimePathOramTransitionWitness]>",
                 )
-                && !struct_body.contains("pub logical_accesses: Box<[LogicalEvent]>")
+                && !struct_body.contains("pub logical_accesses: LogicalAccesses")
                 && !struct_body.contains("pub logical_writes: Box<[LogicalEvent]>")
-                && !struct_body.contains("pub physical_reads: Box<[PhysicalReadEvent]>")
-                && !struct_body.contains("pub physical_writes: Box<[PhysicalWriteEvent]>")
+                && !struct_body.contains("pub physical_reads: PhysicalReads")
+                && !struct_body.contains("pub physical_writes: PhysicalWrites")
                 && !struct_body.contains("pub theorem_trace: TheoremTrace")
                 && !struct_body
                     .contains("pub runtime_controller_certificate: RuntimeControllerCertificate")
@@ -43107,12 +43328,11 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !allocator_source.contains("expect(");
     let runtime_kernel_telemetry_resource_events_boxed = core_trace_source
         .contains("pub struct RuntimeKernelTelemetrySnapshot {")
-        && core_trace_source.contains("resource_events: Box<[RuntimeKernelResourceEventWitness]>,")
-        && core_trace_source
-            .contains("resource_events: impl Into<Box<[RuntimeKernelResourceEventWitness]>>,")
+        && core_trace_source.contains("resource_events: RuntimeKernelResourceEvents,")
+        && core_trace_source.contains("resource_events: impl Into<RuntimeKernelResourceEvents>,")
         && core_trace_source.contains("resource_events: resource_events.into(),")
         && core_trace_source
-            .contains("pub fn resource_events(&self) -> &[RuntimeKernelResourceEventWitness] {")
+            .contains("pub fn resource_events(&self) -> &RuntimeKernelResourceEvents {")
         && core_trace_source.contains("resource_events: self.telemetry.resource_events,")
         && !core_trace_source.contains("resource_events: Vec<RuntimeKernelResourceEventWitness>,");
     let translation_validation_uses_canonical_kernel_step_manifest = translation_validation_source
@@ -44245,7 +44465,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             "pub struct RuntimeKernelWitness {\n    entrypoint_id: String,\n    arena_bytes: usize,\n    max_stack_words: usize,\n    scratch_bytes: usize,",
         )
         && core_trace_source
-            .contains("resource_events: Box<[RuntimeKernelResourceEventWitness]>,")
+            .contains("resource_events: RuntimeKernelResourceEvents,")
         && core_trace_source
             .contains("expected_kernel_steps: Option<Box<[RuntimeKernelStepWitness]>>,")
         && core_trace_source.contains("public_object_ids: Box<[u32]>,")
@@ -44256,7 +44476,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && core_trace_source.contains("pub fn from_telemetry_and_execution_tracker(")
         && core_trace_source.contains("pub fn entrypoint_id(&self) -> &str {")
         && core_trace_source
-            .contains("pub fn resource_events(&self) -> &[RuntimeKernelResourceEventWitness] {")
+            .contains("pub fn resource_events(&self) -> &RuntimeKernelResourceEvents {")
         && core_trace_source.contains(
             "pub fn expected_kernel_steps(&self) -> Option<&[RuntimeKernelStepWitness]> {",
         )
@@ -44296,7 +44516,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !kernel_runtime_source.contains("RuntimeKernelWitness::new(")
         && !kernel_runtime_source.contains("RuntimeKernelWitness {")
         && probe_source.contains("kernel_witness.kernel_steps().len()")
-        && probe_source.contains("kernel_witness.resource_events().len()")
+        && probe_source.contains("kernel_witness.resource_events().event_count()")
         && probe_source.contains("kernel_witness.entrypoint_id()");
     let runtime_kernel_schedule_witness_builder_files = collect_production_pattern_hits(
         &core_src,
@@ -45271,17 +45491,17 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let execution_trace_public_buffers_boxed = core_trace_source
         .contains("pub struct ExecutionTrace {")
         && core_trace_source.contains("pub opcode_trace: Box<[String]>,")
-        && core_trace_source.contains("pub logical_accesses: Box<[LogicalEvent]>,")
+        && core_trace_source.contains("pub logical_accesses: LogicalAccesses,")
         && core_trace_source.contains("pub logical_writes: Box<[LogicalEvent]>,")
-        && core_trace_source.contains("pub physical_reads: Box<[PhysicalReadEvent]>,")
-        && core_trace_source.contains("pub physical_writes: Box<[PhysicalWriteEvent]>,");
+        && core_trace_source.contains("pub physical_reads: PhysicalReads,")
+        && core_trace_source.contains("pub physical_writes: PhysicalWrites,");
     let refinement_trace_public_buffers_boxed = core_trace_source
         .contains("pub struct RefinementTrace {")
         && core_trace_source.contains("pub opcode_trace: Box<[String]>,")
-        && core_trace_source.contains("pub logical_accesses: Box<[LogicalEvent]>,")
+        && core_trace_source.contains("pub logical_accesses: LogicalAccesses,")
         && core_trace_source.contains("pub logical_writes: Box<[LogicalEvent]>,")
-        && core_trace_source.contains("pub physical_reads: Box<[PhysicalReadEvent]>,")
-        && core_trace_source.contains("pub physical_writes: Box<[RefinementPhysicalWrite]>,")
+        && core_trace_source.contains("pub physical_reads: PhysicalReads,")
+        && core_trace_source.contains("pub physical_writes: RefinementPhysicalWrites,")
         && core_trace_source.contains("trace: RefinementTrace,");
     let execution_trace_runtime_fields_private = core_trace_source
         .contains("pub struct ExecutionTrace {")
@@ -45381,7 +45601,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     };
     let runtime_execution_trace_parts_fields_private = core_trace_source
         .contains(
-            "pub(crate) struct RuntimeExecutionTraceParts {\n    opcode_trace: Box<[String]>,\n    logical_accesses: Box<[LogicalEvent]>,\n    logical_writes: Box<[LogicalEvent]>,\n    physical_reads: Box<[PhysicalReadEvent]>,",
+            "pub(crate) struct RuntimeExecutionTraceParts {\n    opcode_trace: Box<[String]>,\n    logical_accesses: LogicalAccesses,\n    logical_writes: Box<[LogicalEvent]>,\n    physical_reads: PhysicalReads,",
         )
         && core_trace_source.contains("runtime_seed: Option<u64>,")
         && core_trace_source.contains("runtime_kernel_witness: Option<RuntimeKernelWitness>,")
@@ -45407,9 +45627,9 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !core_trace_source
             .contains("pub struct RuntimeExecutionTraceFinalizationInput {\n    pub ")
         && core_trace_source.contains("opcode_trace: Box<[String]>,")
-        && core_trace_source.contains("logical_accesses: Box<[LogicalEvent]>,")
+        && core_trace_source.contains("logical_accesses: LogicalAccesses,")
         && core_trace_source.contains("logical_writes: Box<[LogicalEvent]>,")
-        && core_trace_source.contains("physical_reads: Box<[PhysicalReadEvent]>,")
+        && core_trace_source.contains("physical_reads: PhysicalReads,")
         && core_trace_source.contains("runtime_seed: Option<u64>,")
         && core_trace_source.contains("runtime_kernel_finish_bundle: RuntimeKernelFinishBundle,")
         && core_trace_source
@@ -45919,6 +46139,18 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         &objects_production_source,
         &production_source_slice(&oram_source),
         &generated_oram_codecs_source,
+    );
+    let mut trace_run_type_files = Vec::new();
+    for pattern in TRACE_RUN_TYPE_PATTERNS {
+        trace_run_type_files.extend(collect_production_pattern_hits(&runtime_src, pattern)?);
+    }
+    let trace_runs_stand_for_recorded_events = check_trace_runs_stand_for_recorded_events(
+        &core_trace_source,
+        &production_source_slice(&controller_source),
+        &objects_production_source,
+        &trace_run_type_files,
+        &collect_production_pattern_hits(&runtime_src, "PhysicalWriteItem::rewrite")?,
+        &collect_production_pattern_hits(&runtime_src, "Item::scan(")?,
     );
     let evidence_builds_audit_the_kept_position_map_witness =
         check_evidence_builds_audit_the_kept_position_map_witness(
@@ -46817,13 +47049,13 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && generated_oram_codecs_source.contains("pub(super) fn run_path_get(")
             && generated_oram_codecs_source.contains("pub(super) fn run_path_put(")
             && controller_source
-                .contains("use uo_core::trace::{LogicalEvent, PhysicalReadEvent, PhysicalWriteEvent, WriteClass};")
+                .contains("PhysicalWriteEvent, PhysicalWriteItem, WriteClass,\n};")
             && controller_source.contains("pub(crate) fn raw_physical_write_from_buffers(")
             && controller_source
                 .contains("let event = PhysicalWriteEvent::from_buffers(object, location, old, new);")
             && controller_source
                 .contains("if matches!(event.class, WriteClass::Same | WriteClass::Clear) {")
-            && controller_source.contains("self.physical_writes.push(event);")
+            && controller_source.contains("self.physical_writes.push(PhysicalWriteItem::Write(event));")
             && !controller_source.contains("pub(crate) fn physical_write_from_buffers(")
             && !controller_source.contains("if new.iter().all(|byte| *byte == 0)")
             && !controller_source
@@ -47335,6 +47567,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "production_calls_record_no_position_map_witness": production_calls_record_no_position_map_witness,
         "evidence_builds_audit_the_kept_position_map_witness": evidence_builds_audit_the_kept_position_map_witness,
         "a_call_copies_no_committed_object": a_call_copies_no_committed_object,
+        "trace_runs_stand_for_recorded_events": trace_runs_stand_for_recorded_events,
         "production_calls_issue_chained_receipts": production_calls_issue_chained_receipts,
         "theorem_certificate_constructor_checks":
             theorem_certificate_constructor_checks,
@@ -48283,6 +48516,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && production_calls_record_no_position_map_witness
             && evidence_builds_audit_the_kept_position_map_witness
             && a_call_copies_no_committed_object
+            && trace_runs_stand_for_recorded_events
             && production_calls_issue_chained_receipts
             && theorem_certificate_constructor_surface_restricted
             && runtime_public_call_trace_bundle_surface_restricted
@@ -50614,10 +50848,10 @@ fn run_latency_trial(
         cpu_sys_ms: ticks_to_ms(cpu_after.1.saturating_sub(cpu_before.1), ticks_per_second),
         max_rss_kb: read_max_rss_kb().unwrap_or_default(),
         gas: trace.gas_used,
-        physical_reads: trace.physical_reads.len(),
-        physical_writes: trace.physical_writes.len(),
-        bytes_read: trace.physical_reads.iter().map(|event| event.len).sum(),
-        bytes_written: trace.physical_writes.iter().map(|event| event.len).sum(),
+        physical_reads: trace.physical_reads.event_count(),
+        physical_writes: trace.physical_writes.event_count(),
+        bytes_read: trace.physical_reads.events().map(|event| event.len).sum(),
+        bytes_written: trace.physical_writes.events().map(|event| event.len).sum(),
         trace_json_bytes: serde_json::to_vec(trace)?.len(),
     })
 }
@@ -50713,13 +50947,13 @@ fn run_storage_growth(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<
                 let bytes = result
                     .trace
                     .physical_reads
-                    .iter()
+                    .events()
                     .map(|event| event.len)
                     .sum::<usize>()
                     + result
                         .trace
                         .physical_writes
-                        .iter()
+                        .events()
                         .map(|event| event.len)
                         .sum::<usize>();
                 per_call_bytes.push(bytes as u64);
@@ -52913,7 +53147,8 @@ fn append_overhead_workload(
     let uo_row = overhead_matrix_row(benchmark, &uo_label, &artifacts.uo, target.entrypoint, &uo)?;
     variants.push(uo_row.clone());
     matrix.push(uo_row.clone());
-    let mut oram_write_comparison_baseline = ("full_scan", uo.target.trace.physical_writes.len());
+    let mut oram_write_comparison_baseline =
+        ("full_scan", uo.target.trace.physical_writes.event_count());
 
     let mut case = json!({
         "benchmark": benchmark,
@@ -52951,7 +53186,7 @@ fn append_overhead_workload(
         matrix.push(fullscan64_row);
         oram_write_comparison_baseline = (
             "full_scan_64",
-            fullscan64.target.trace.physical_writes.len(),
+            fullscan64.target.trace.physical_writes.event_count(),
         );
         cost_formula.push(scenario_cost_formula(
             &fullscan64,
@@ -52988,8 +53223,9 @@ fn append_overhead_workload(
             )?;
         }
         case["oram_improves_physical_writes_baseline"] = json!(oram_write_comparison_baseline.0);
-        case["oram_improves_physical_writes"] =
-            json!(oram.target.trace.physical_writes.len() < oram_write_comparison_baseline.1);
+        case["oram_improves_physical_writes"] = json!(
+            oram.target.trace.physical_writes.event_count() < oram_write_comparison_baseline.1
+        );
         cost_formula.push(scenario_cost_formula(
             &oram,
             oram_artifact,
@@ -53398,6 +53634,10 @@ fn run_erc20_allowance_key_experiment(artifact: &CompiledArtifact) -> Result<Exp
 struct ExactEncodingPrediction {
     reads: Vec<(String, String)>,
     writes: Vec<(String, String)>,
+    /// The length of a sealed slot of each object the program accesses: of a
+    /// sealed value for a cell or an array, of a sealed map record for a
+    /// map.
+    record_lengths: BTreeMap<String, usize>,
 }
 
 /// Objects an expression reads, in evaluation order (`IR.KernelExpr.storageReads`).
@@ -53517,7 +53757,8 @@ fn exact_encoding_prediction(
     for statement in program.body.iter() {
         exact_statement_accesses(statement, &mut accesses, &mut written);
     }
-    let slot_locations = |object_id: u32| -> Option<(String, Vec<String>)> {
+    let mut record_lengths = BTreeMap::new();
+    let mut slot_locations = |object_id: u32| -> Option<(String, Vec<String>)> {
         let object = artifact
             .contract
             .state
@@ -53526,15 +53767,23 @@ fn exact_encoding_prediction(
         if object.backend != BackendKind::FullScan {
             return None;
         }
-        let locations = match object.kind {
-            ContainerKind::Cell => vec![object.name.clone()],
-            ContainerKind::Array => (0..object.capacity?)
-                .map(|slot| format!("{}[{}]", object.name, slot))
-                .collect(),
-            ContainerKind::Map => (0..object.capacity?)
-                .map(|slot| format!("{}#{}", object.name, slot))
-                .collect(),
+        let value_len = object.value_type.canonical_len();
+        let (locations, payload_len) = match object.kind {
+            ContainerKind::Cell => (vec![object.name.clone()], value_len),
+            ContainerKind::Array => (
+                (0..object.capacity?)
+                    .map(|slot| format!("{}[{}]", object.name, slot))
+                    .collect(),
+                value_len,
+            ),
+            ContainerKind::Map => (
+                (0..object.capacity?)
+                    .map(|slot| format!("{}#{}", object.name, slot))
+                    .collect(),
+                1 + object.key_type.as_ref()?.canonical_len() + value_len,
+            ),
         };
+        record_lengths.insert(object.name.clone(), sealed_encoded_len(payload_len));
         Some((object.name.clone(), locations))
     };
     // `IR.touchedObjects`: each accessed object once, in increasing id order.
@@ -53561,45 +53810,157 @@ fn exact_encoding_prediction(
                 .map(|location| (name.clone(), location)),
         );
     }
-    Some(ExactEncodingPrediction { reads, writes })
+    Some(ExactEncodingPrediction {
+        reads,
+        writes,
+        record_lengths,
+    })
 }
 
 /// Whether a runtime trace is the predicted one: the same `(object, location)`
-/// reads and writes in order, only `Update`-class writes, and one record
-/// length per object.
+/// reads and writes in order, only `Update`-class writes, and every record
+/// of the length of its object's sealed slot. The trace holds the scan and
+/// the rewrite of an object as one item each; this compares their events,
+/// so a scan of another number of slots or of another length is not the
+/// predicted one.
 fn trace_matches_exact_encoding(
     trace: &uo_core::ExecutionTrace,
     prediction: &ExactEncodingPrediction,
 ) -> bool {
     let reads = trace
         .physical_reads
-        .iter()
+        .events()
         .map(|event| (event.object.clone(), event.location.clone()))
         .collect::<Vec<_>>();
     let writes = trace
         .physical_writes
-        .iter()
+        .events()
         .map(|event| (event.object.clone(), event.location.clone()))
         .collect::<Vec<_>>();
-    let mut record_lengths = BTreeMap::new();
-    let lengths_consistent = trace
+    let lengths_predicted = trace
         .physical_reads
-        .iter()
-        .map(|event| (&event.object, event.len))
+        .events()
+        .map(|event| (event.object, event.len))
         .chain(
             trace
                 .physical_writes
-                .iter()
-                .map(|event| (&event.object, event.len)),
+                .events()
+                .map(|event| (event.object, event.len)),
         )
-        .all(|(object, len)| *record_lengths.entry(object.clone()).or_insert(len) == len);
+        .all(|(object, len)| prediction.record_lengths.get(&object) == Some(&len));
     reads == prediction.reads
         && writes == prediction.writes
         && trace
             .physical_writes
-            .iter()
+            .events()
             .all(|event| event.class == WriteClass::Update)
-        && lengths_consistent
+        && lengths_predicted
+}
+
+/// Tamper scenarios on the trace of an exact-backend call. The trace holds
+/// the scan of a full-scan map and its rewrite as one item each, with the
+/// map's slot count and the length of a sealed record. A trace whose item
+/// names another count or another length is not the trace the exact store's
+/// encoding predicts from the artifact, and the check that compares the two
+/// rejects it.
+fn exact_trace_run_tamper_scenarios() -> Result<Vec<JsonValue>> {
+    use uo_core::{PhysicalReadItem, PhysicalWriteItem};
+    let artifact = compile_artifact(
+        "benches/raw/ConfidentialMixer.sol",
+        "benches/raw/ConfidentialMixer.uo.yaml",
+        ProgramMode::Uo,
+    )?;
+    let entrypoint = "deposit(bytes32,uint256)";
+    let prediction = exact_encoding_prediction(&artifact, entrypoint)
+        .ok_or_else(|| anyhow!("{entrypoint} is not on the exact route"))?;
+    let run = || run_target_call(&artifact, &[], entrypoint, vec![b32(7), Value::uint(5)]);
+    let honest = run()?;
+    if !trace_matches_exact_encoding(&honest, &prediction) {
+        bail!("the trace of {entrypoint} is not the exact store's encoding");
+    }
+    let scan_of = |trace: &uo_core::ExecutionTrace| {
+        trace
+            .physical_reads
+            .items()
+            .iter()
+            .position(|item| matches!(item, PhysicalReadItem::Scan(_)))
+            .ok_or_else(|| anyhow!("the trace of {entrypoint} holds no scan"))
+    };
+    let rewrite_of = |trace: &uo_core::ExecutionTrace| {
+        trace
+            .physical_writes
+            .items()
+            .iter()
+            .position(|item| matches!(item, PhysicalWriteItem::Rewrite(_)))
+            .ok_or_else(|| anyhow!("the trace of {entrypoint} holds no rewrite"))
+    };
+    type Mutation = fn(&mut uo_core::ExactObjectSlots);
+    let cases: [(&str, &str, bool, bool, Mutation); 4] = [
+        (
+            "exact_trace/scan_slot_count_drift",
+            "name one slot fewer in the scan of the full-scan map than the map has, so the check of the trace against the exact store's encoding must reject a scan that leaves a slot out",
+            true,
+            false,
+            |run| run.slots -= 1,
+        ),
+        (
+            "exact_trace/rewrite_slot_count_drift",
+            "name one slot more in the rewrite of the full-scan map than the map has, so the check of the trace against the exact store's encoding must reject a rewrite of another number of slots",
+            false,
+            true,
+            |run| run.slots += 1,
+        ),
+        (
+            "exact_trace/scan_record_length_drift",
+            "name another record length in the scan of the full-scan map and in its rewrite, the same in both, so the check of the trace against the exact store's encoding must reject records that are not of the length of the map's sealed slot",
+            true,
+            true,
+            |run| run.len -= 32,
+        ),
+        (
+            "exact_trace/scan_slot_naming_drift",
+            "name the slots of the full-scan map as those of an array in its scan, so the check of the trace against the exact store's encoding must reject a scan of other locations",
+            true,
+            false,
+            |run| run.kind = uo_core::ExactObjectKind::Array,
+        ),
+    ];
+    let mut scenarios = Vec::with_capacity(cases.len());
+    for (scenario, mutation, in_scan, in_rewrite, mutate) in cases {
+        let mut trace = run()?;
+        if in_scan {
+            let index = scan_of(&trace)?;
+            if let PhysicalReadItem::Scan(item) = &mut trace.physical_reads.items_mut()[index] {
+                mutate(&mut item.scan);
+            }
+        }
+        if in_rewrite {
+            let index = rewrite_of(&trace)?;
+            if let PhysicalWriteItem::Rewrite(item) = &mut trace.physical_writes.items_mut()[index]
+            {
+                mutate(&mut item.rewrite);
+            }
+        }
+        if trace.receipt == honest.receipt {
+            bail!("{scenario} changed nothing");
+        }
+        let accepted = trace_matches_exact_encoding(&trace, &prediction);
+        scenarios.push(json!({
+            "scenario": scenario,
+            "artifact_kind": "runtime_exact_trace",
+            "benchmark": "ConfidentialMixer/uo/deposit",
+            "entrypoint": entrypoint,
+            "mutation": mutation,
+            "accepted": accepted,
+            "rejected": !accepted,
+            "error": if accepted {
+                "unexpectedly accepted a trace that is not the exact store's encoding"
+            } else {
+                "the trace is not the exact store's encoding of the entrypoint"
+            },
+        }));
+    }
+    Ok(scenarios)
 }
 
 /// The trace route of a confidential kernel program, as `checkKernelAdmission`
@@ -54002,7 +54363,7 @@ fn kernel_witness_summary(kernel_witness: Option<&RuntimeKernelWitness>) -> Json
                 "canonical_loaded_object_schedule": kernel_witness.canonical_loaded_object_schedule(),
                 "kernel_step_public_object_schedule": kernel_witness.emitted_kernel_schedule().public_object_schedule(),
             },
-            "resource_event_count": kernel_witness.resource_events().len(),
+            "resource_event_count": kernel_witness.resource_events().event_count(),
             "resource_events": kernel_witness.resource_events(),
             "claimed_resource_state": {
                 "peak_stack_words": kernel_witness.peak_stack_words(),
@@ -54271,8 +54632,8 @@ fn imported_oram_public_view(witness: &RuntimeRefinementWitness) -> ImportedOram
         logical_accesses: witness
             .trace()
             .logical_accesses
-            .iter()
-            .map(normalize_path_oram_logical_event)
+            .events()
+            .map(|event| normalize_path_oram_logical_event(&event))
             .collect(),
         logical_writes: witness.trace().logical_writes.clone(),
         gas_used: witness.trace().gas_used,
@@ -54286,7 +54647,7 @@ fn imported_path_oram_public_location(
         read_labels: witness
             .trace()
             .physical_reads
-            .iter()
+            .events()
             .map(|event| ImportedPathOramPhysicalEventLabel {
                 object: event.object.clone(),
                 location: normalize_path_oram_location(&event.object, &event.location),
@@ -54295,7 +54656,7 @@ fn imported_path_oram_public_location(
         write_labels: witness
             .trace()
             .physical_writes
-            .iter()
+            .events()
             .map(|event| ImportedPathOramPhysicalEventLabel {
                 object: event.object.clone(),
                 location: normalize_path_oram_location(&event.object, &event.location),
@@ -54319,19 +54680,19 @@ fn imported_path_oram_storage_shape(
         read_lengths: witness
             .trace()
             .physical_reads
-            .iter()
+            .events()
             .map(|event| event.len)
             .collect(),
         write_classes: witness
             .trace()
             .physical_writes
-            .iter()
+            .events()
             .map(|event| event.write_class.clone())
             .collect(),
         write_lengths: witness
             .trace()
             .physical_writes
-            .iter()
+            .events()
             .map(|event| event.len)
             .collect(),
     }
@@ -54378,32 +54739,38 @@ fn extract_metrics(result: &DiagnosticCallResult) -> BTreeMap<String, f64> {
         "bytes_read".into(),
         trace
             .physical_reads
-            .iter()
+            .events()
             .map(|event| event.len)
             .sum::<usize>() as f64,
     );
-    metrics.insert("backend_reads".into(), trace.physical_reads.len() as f64);
+    metrics.insert(
+        "backend_reads".into(),
+        trace.physical_reads.event_count() as f64,
+    );
     metrics.insert(
         "bytes_written".into(),
         trace
             .physical_writes
-            .iter()
+            .events()
             .map(|event| event.len)
             .sum::<usize>() as f64,
     );
-    metrics.insert("backend_writes".into(), trace.physical_writes.len() as f64);
+    metrics.insert(
+        "backend_writes".into(),
+        trace.physical_writes.event_count() as f64,
+    );
     metrics.insert("zero_writes".into(), result.telemetry.zero_writes as f64);
     metrics.insert(
         "update_only_fraction".into(),
-        if trace.physical_writes.is_empty() {
+        if trace.physical_writes.has_no_event() {
             1.0
         } else {
             trace
                 .physical_writes
-                .iter()
+                .events()
                 .filter(|event| event.class == WriteClass::Update)
                 .count() as f64
-                / trace.physical_writes.len() as f64
+                / trace.physical_writes.event_count() as f64
         },
     );
     metrics.insert(
@@ -54428,7 +54795,7 @@ fn extract_metrics(result: &DiagnosticCallResult) -> BTreeMap<String, f64> {
         "same_writes".into(),
         trace
             .physical_writes
-            .iter()
+            .events()
             .filter(|event| event.class == WriteClass::Same)
             .count() as f64,
     );
@@ -54436,7 +54803,7 @@ fn extract_metrics(result: &DiagnosticCallResult) -> BTreeMap<String, f64> {
         "set_writes".into(),
         trace
             .physical_writes
-            .iter()
+            .events()
             .filter(|event| event.class == WriteClass::Set)
             .count() as f64,
     );
@@ -54444,7 +54811,7 @@ fn extract_metrics(result: &DiagnosticCallResult) -> BTreeMap<String, f64> {
         "clear_writes".into(),
         trace
             .physical_writes
-            .iter()
+            .events()
             .filter(|event| event.class == WriteClass::Clear)
             .count() as f64,
     );
@@ -54452,7 +54819,7 @@ fn extract_metrics(result: &DiagnosticCallResult) -> BTreeMap<String, f64> {
         "update_writes".into(),
         trace
             .physical_writes
-            .iter()
+            .events()
             .filter(|event| event.class == WriteClass::Update)
             .count() as f64,
     );
@@ -54561,7 +54928,7 @@ fn scenario_summary(result: &ScenarioResult) -> JsonValue {
         "return": format_value(result.target.return_value.as_ref()),
         "getters": result.getters.iter().map(|value| format_value(value.as_ref())).collect::<Vec<_>>(),
         "gas_used": result.target.trace.gas_used,
-        "physical_writes": result.target.trace.physical_writes.len(),
+        "physical_writes": result.target.trace.physical_writes.event_count(),
     })
 }
 
@@ -54581,10 +54948,10 @@ fn scenario_overhead(result: &ScenarioResult) -> JsonValue {
         "executable": true,
         "rejected": false,
         "gas_used": result.target.trace.gas_used,
-        "physical_reads": result.target.trace.physical_reads.len(),
-        "physical_writes": result.target.trace.physical_writes.len(),
-        "bytes_read": result.target.trace.physical_reads.iter().map(|event| event.len).sum::<usize>() as f64,
-        "bytes_written": result.target.trace.physical_writes.iter().map(|event| event.len).sum::<usize>() as f64,
+        "physical_reads": result.target.trace.physical_reads.event_count(),
+        "physical_writes": result.target.trace.physical_writes.event_count(),
+        "bytes_read": result.target.trace.physical_reads.events().map(|event| event.len).sum::<usize>() as f64,
+        "bytes_written": result.target.trace.physical_writes.events().map(|event| event.len).sum::<usize>() as f64,
         "trace_json_bytes": serde_json::to_vec(&result.target.trace)
             .map(|bytes| bytes.len())
             .unwrap_or_default(),
@@ -54840,7 +55207,7 @@ fn artifact_capacity_label(artifact: &CompiledArtifact) -> Option<String> {
 fn call_start_decode(
     artifact: &CompiledArtifact,
     entrypoint: &str,
-    physical_reads: &[uo_core::PhysicalReadEvent],
+    physical_reads: &uo_core::PhysicalReads,
 ) -> Result<(usize, usize)> {
     let manifest = &artifact.contract.manifest;
     let entry = manifest
@@ -54864,7 +55231,7 @@ fn call_start_decode(
         let traced_len = |unit: &str| -> Result<usize> {
             let prefix = format!("{}@{unit}", object.name);
             physical_reads
-                .iter()
+                .events()
                 .find(|event| event.object == object.name && event.location.starts_with(&prefix))
                 .map(|event| event.len)
                 .ok_or_else(|| anyhow!("no traced {unit} read for {}", object.name))
@@ -54890,12 +55257,12 @@ fn append_call_start_decode(
     if reads == 0 {
         return Ok(());
     }
-    let traced_reads = result.target.trace.physical_reads.len();
+    let traced_reads = result.target.trace.physical_reads.event_count();
     let traced_bytes = result
         .target
         .trace
         .physical_reads
-        .iter()
+        .events()
         .map(|event| event.len)
         .sum::<usize>();
     let object = row
@@ -55711,21 +56078,21 @@ mod tests {
         assert!(trace_matches_exact_encoding(&run(), &prediction));
 
         let mut reclassed = run();
-        let mut writes = std::mem::take(&mut reclassed.physical_writes).into_vec();
+        let mut writes: Vec<_> = reclassed.physical_writes.events().collect();
         writes[0].class = WriteClass::Set;
-        reclassed.physical_writes = writes.into_boxed_slice();
+        reclassed.physical_writes = writes.into();
         assert!(!trace_matches_exact_encoding(&reclassed, &prediction));
 
         let mut shortened = run();
-        let mut reads = std::mem::take(&mut shortened.physical_reads).into_vec();
+        let mut reads: Vec<_> = shortened.physical_reads.events().collect();
         reads.pop();
-        shortened.physical_reads = reads.into_boxed_slice();
+        shortened.physical_reads = reads.into();
         assert!(!trace_matches_exact_encoding(&shortened, &prediction));
 
         // A trace that reads an object once per access, as the runtime's did
         // before a call read each object once, is not the predicted one.
         let mut rescanned = run();
-        let mut reads = std::mem::take(&mut rescanned.physical_reads).into_vec();
+        let mut reads: Vec<_> = rescanned.physical_reads.events().collect();
         let balances: Vec<_> = reads
             .iter()
             .filter(|read| read.object == "balances")
@@ -55733,7 +56100,7 @@ mod tests {
             .collect();
         assert_eq!(balances.len(), 8);
         reads.extend(balances);
-        rescanned.physical_reads = reads.into_boxed_slice();
+        rescanned.physical_reads = reads.into();
         assert!(!trace_matches_exact_encoding(&rescanned, &prediction));
     }
 
@@ -56735,7 +57102,7 @@ mod tests {
         // and a confidential one whose kernel witness is not.
         let unchecked = drift(
             &trace,
-            "        validate_path_oram_leaf_schedule(\n            &self.evidence.runtime_oram_leaf_schedule,\n            &refinement_trace.logical_accesses,\n            &refinement_trace.physical_reads,\n            &physical_writes,\n            &self.evidence.runtime_oram_objects,\n        )?;\n        validate_refinement_outcome(",
+            "        validate_path_oram_leaf_schedule(\n            &self.evidence.runtime_oram_leaf_schedule,\n            &refinement_trace.logical_accesses,\n            &refinement_trace.physical_reads,\n            &refinement_trace.physical_writes,\n            &self.evidence.runtime_oram_objects,\n        )?;\n        validate_refinement_outcome(",
             "        validate_refinement_outcome(",
         );
         assert!(!records_none(&state, &theorem, &oram, &objects, &unchecked));
@@ -56826,6 +57193,155 @@ mod tests {
             "            let audited = true;",
         );
         assert!(!audits(&state, &instrumentation, &probe, &no_level));
+    }
+
+    #[test]
+    fn trace_run_check_rejects_the_drifts_it_guards() {
+        use super::{
+            check_trace_runs_stand_for_recorded_events, collect_production_pattern_hits, repo_root,
+            TRACE_RUN_RECORDER_FILES, TRACE_RUN_TYPE_PATTERNS,
+        };
+        let root = repo_root();
+        let read = |rel: &str| std::fs::read_to_string(root.join(rel)).unwrap();
+        let trace = read("crates/uo-core/src/trace.rs");
+        let recorder = production_source_slice(&read("runtime/uo-evm/src/controller.rs"));
+        let objects = production_source_slice(&read("runtime/uo-evm/src/objects.rs"));
+        let runtime = root.join("runtime");
+        let hits = |pattern: &str| collect_production_pattern_hits(&runtime, pattern).unwrap();
+        let run_types: Vec<String> = TRACE_RUN_TYPE_PATTERNS
+            .iter()
+            .flat_map(|pattern| hits(pattern))
+            .collect();
+        let rewrites = hits(concat!("PhysicalWriteItem::", "rewrite"));
+        let scans = hits(concat!("Item::", "scan("));
+        let ok = |trace: &str, recorder: &str, objects: &str| {
+            check_trace_runs_stand_for_recorded_events(
+                trace, recorder, objects, &run_types, &rewrites, &scans,
+            )
+        };
+
+        // The sources pass as they are.
+        assert!(run_types.is_empty(), "{run_types:?}");
+        assert_eq!(rewrites, TRACE_RUN_RECORDER_FILES);
+        assert_eq!(scans, TRACE_RUN_RECORDER_FILES);
+        assert!(ok(&trace, &recorder, &objects));
+
+        // A rewrite that takes a write of any class.
+        let unclassified = trace.replace(
+            "        let next = event.class == WriteClass::Update\n            && event.object == self.object\n",
+            "        let next = event.object == self.object\n",
+        );
+        assert_ne!(unclassified, trace);
+        assert!(!ok(&unclassified, &recorder, &objects));
+        // A rewrite that takes a slot of another length.
+        let any_length = trace.replace(
+            "            && (self.slots == 0 || event.len == self.len);\n",
+            ";\n",
+        );
+        assert_ne!(any_length, trace);
+        assert!(!ok(&any_length, &recorder, &objects));
+        // A rewrite item that stands for writes of another class.
+        let relabelled = trace.replace(
+            "                len: item.rewrite.len,\n                class: WriteClass::Update,\n",
+            "                len: item.rewrite.len,\n                class: WriteClass::Same,\n",
+        );
+        assert_ne!(relabelled, trace);
+        assert!(!ok(&relabelled, &recorder, &objects));
+        // Hashes over the items, which depend on the grouping.
+        let hashed_items = trace.replace(
+            "        let logical_accesses = self.logical_accesses.events().collect::<Vec<_>>();\n",
+            "        let logical_accesses = self.logical_accesses.items().to_vec();\n",
+        );
+        assert_ne!(hashed_items, trace);
+        assert!(!ok(&hashed_items, &recorder, &objects));
+        // A run that may name a Path ORAM object.
+        let hides_buckets = trace.replace(
+            "                if path_objects.contains(run.object.as_str()) || !run.is_well_formed() {\n",
+            "                if !run.is_well_formed() {\n",
+        );
+        assert_ne!(hides_buckets, trace);
+        assert!(!ok(&hides_buckets, &recorder, &objects));
+        // A recorder that keeps a run of one event as a run of two.
+        let padded = trace.replace(
+            "            1 => run.event(0).map(Self::from_event),\n            _ => Some(run),\n",
+            "            _ => Some(run),\n",
+        );
+        assert_ne!(padded, trace);
+        assert!(!ok(&padded, &recorder, &objects));
+
+        // A recorder that counts a write into the rewrite without the fold.
+        let unfolded = recorder.replace(
+            "            if run.takes_write(&event) {\n                return;\n            }\n",
+            "            if event.object == run.object {\n                run.len = event.len;\n                run.slots += 1;\n                return;\n            }\n",
+        );
+        assert_ne!(unfolded, recorder);
+        assert!(!ok(&trace, &unfolded, &objects));
+        // A rewrite that starts with slots it never took.
+        let prefilled = recorder.replace(
+            "        self.open_rewrite = Some(ExactObjectSlots::none_of(object, kind));\n",
+            "        self.open_rewrite = Some(ExactObjectSlots {\n            object: object.into(),\n            kind,\n            slots: 4,\n            len: 96,\n        });\n",
+        );
+        assert_ne!(prefilled, recorder);
+        assert!(!ok(&trace, &prefilled, &objects));
+        // A second place that grows the open rewrite.
+        let grown = recorder.replace(
+            "    pub(crate) fn add_zero_writes(&mut self, count: usize) {\n",
+            "    pub(crate) fn skip_slots(&mut self, count: usize) {\n        if let Some(run) = self.open_rewrite.as_mut() {\n            run.slots += count;\n        }\n    }\n\n    pub(crate) fn add_zero_writes(&mut self, count: usize) {\n",
+        );
+        assert_ne!(grown, recorder);
+        assert!(!ok(&trace, &grown, &objects));
+        // A raw write that lands inside an open rewrite.
+        let interleaved = recorder.replace(
+            "        self.end_exact_rewrite();\n        self.physical_writes.push(PhysicalWriteItem::Write(event));\n    }",
+            "        self.physical_writes.push(PhysicalWriteItem::Write(event));\n    }",
+        );
+        assert_ne!(interleaved, recorder);
+        assert!(!ok(&trace, &interleaved, &objects));
+        // A scan that counts one read for the whole object.
+        let undercounted = recorder.replace(
+            "            self.metrics.physical_reads += slots;\n",
+            "            self.metrics.physical_reads += 1;\n",
+        );
+        assert_ne!(undercounted, recorder);
+        assert!(!ok(&trace, &undercounted, &objects));
+
+        // An object that records a scan of one length whatever its slots.
+        let one_length = objects.replace(
+            "    if physical_slots.iter().all(|slot| slot.len() == len) {\n",
+            "    if !physical_slots.is_empty() {\n",
+        );
+        assert_ne!(one_length, objects);
+        assert!(!ok(&trace, &recorder, &one_length));
+        // A commit whose seals are recorded outside a rewrite.
+        let unbracketed = objects.replacen(
+            "                trace.begin_exact_rewrite(&spec_name, ExactObjectKind::Map);\n",
+            "",
+            1,
+        );
+        assert_ne!(unbracketed, objects);
+        assert!(!ok(&trace, &recorder, &unbracketed));
+        // A second scan of an object in one call.
+        let rescanned = objects.replace(
+            "    trace.logical_scan(\"uomap_scan\", &object.spec.name, object.entries.len());\n",
+            "    trace.logical_scan(\"uomap_scan\", &object.spec.name, object.entries.len());\n    trace.physical_scan(&object.spec.name, ExactObjectKind::Map, object.entries.len(), 0);\n",
+        );
+        assert_ne!(rescanned, objects);
+        assert!(!ok(&trace, &recorder, &rescanned));
+
+        // Another runtime file that names a run item's type, or builds a
+        // rewrite or a scan.
+        let other = vec!["runtime/uo-evm/src/objects.rs".to_owned()];
+        assert!(!check_trace_runs_stand_for_recorded_events(
+            &trace, &recorder, &objects, &other, &rewrites, &scans,
+        ));
+        let mut more = rewrites.clone();
+        more.extend(other.clone());
+        assert!(!check_trace_runs_stand_for_recorded_events(
+            &trace, &recorder, &objects, &run_types, &more, &scans,
+        ));
+        assert!(!check_trace_runs_stand_for_recorded_events(
+            &trace, &recorder, &objects, &run_types, &rewrites, &more,
+        ));
     }
 
     #[test]

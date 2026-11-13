@@ -2644,6 +2644,139 @@ bounds:
         assert_objects_are_cold(&instance);
     }
 
+    /// A call's trace holds the scan of an exact object, its rewrite and the
+    /// logical scan of a map as one item each. The trace is its events all
+    /// the same: the items stand for the events a slot at a time, and the
+    /// hashes of a trace are those of its events. So the trace of a call on
+    /// a full-scan map does not grow with the map, nor does the kernel's
+    /// log of resource events.
+    #[test]
+    fn the_trace_of_a_full_scan_call_does_not_grow_with_its_map() {
+        use uo_core::trace::{LogicalAccessItem, PhysicalReadItem, PhysicalWriteItem, WriteClass};
+        let base = include_str!(bench_raw!("SweepMap.pathoram.yaml"));
+        let run = |capacity: usize| {
+            let metadata = base
+                .replace("    capacity: 16\n", &format!("    capacity: {capacity}\n"))
+                .replace("    backend: oram\n", "    backend: full_scan\n")
+                .replace("    oram_scheme: path_oram_local_posmap_v1\n", "");
+            assert_ne!(metadata, base, "the sidecar's map lines changed");
+            let artifact = compile_bench(bench_raw!("SweepMap.sol"), &metadata, ProgramMode::Uo);
+            let mut instance = ContractInstance::deploy_with_seed(artifact, 3).unwrap();
+            let put = instance
+                .call("put(bytes32,uint256)", vec![b32(1), Value::uint(9)])
+                .unwrap();
+            let read = instance.call("read(bytes32)", vec![b32(1)]).unwrap();
+            assert_eq!(read.return_value, Some(Value::uint(9)));
+            (put, read)
+        };
+        let (small_put, small_read) = run(64);
+        let (large_put, large_read) = run(1024);
+
+        for (capacity, put, read) in [
+            (64usize, &small_put, &small_read),
+            (1024, &large_put, &large_read),
+        ] {
+            for (result, writes) in [(put, capacity), (read, 0)] {
+                let receipt = result.receipt();
+                // One scan of the map, and one rewrite by the call that
+                // writes it.
+                assert_eq!(receipt.physical_reads.items().len(), 1);
+                assert_eq!(receipt.physical_reads.event_count(), capacity);
+                assert!(matches!(
+                    &receipt.physical_reads.items()[0],
+                    PhysicalReadItem::Scan(run) if run.scan.slots == capacity && run.scan.len == 96
+                ));
+                assert_eq!(
+                    receipt.physical_writes.items().len(),
+                    usize::from(writes > 0)
+                );
+                assert_eq!(receipt.physical_writes.event_count(), writes);
+                assert!(receipt
+                    .physical_writes
+                    .items()
+                    .iter()
+                    .all(|item| matches!(item, PhysicalWriteItem::Rewrite(_))));
+                // The events are those of the slots, in order.
+                let reads: Vec<_> = receipt.physical_reads.events().collect();
+                assert_eq!(reads.len(), capacity);
+                for (slot, read) in reads.iter().enumerate() {
+                    assert_eq!(read.object, "records");
+                    assert_eq!(read.location, format!("records#{slot}"));
+                    assert_eq!(read.len, 96);
+                }
+                for (slot, write) in receipt.physical_writes.events().enumerate() {
+                    assert_eq!(write.location, format!("records#{slot}"));
+                    assert_eq!((write.len, write.class), (96, WriteClass::Update));
+                }
+                assert_eq!(receipt.physical_reads.bytes(), 96 * capacity);
+                // Each access scans the opened entries: one item.
+                let scans: Vec<_> = receipt
+                    .logical_accesses
+                    .items()
+                    .iter()
+                    .filter_map(|item| match item {
+                        LogicalAccessItem::Scan(run) => Some(run.scan.slots),
+                        LogicalAccessItem::Event(_) => None,
+                    })
+                    .collect();
+                assert!(!scans.is_empty());
+                assert!(scans.iter().all(|slots| *slots == capacity));
+                assert_eq!(
+                    receipt
+                        .logical_accesses
+                        .events()
+                        .filter(|event| event.kind == "uomap_scan")
+                        .count(),
+                    scans.len() * capacity
+                );
+                // The kernel's log folds the reservations of the slots.
+                let log = result.trace.exact_runtime_kernel_witness().unwrap();
+                let log = log.resource_events();
+                assert!(log.event_count() >= 2 * (capacity + writes));
+                assert!(log.items().len() < 40, "{}", log.items().len());
+            }
+        }
+
+        // The traces of the two maps have the same items, and their JSON
+        // differs by the digits of the slot counts and of the gas.
+        for (small, large) in [(&small_put, &large_put), (&small_read, &large_read)] {
+            let (small, large) = (&small.trace, &large.trace);
+            assert_eq!(
+                small.physical_reads.items().len(),
+                large.physical_reads.items().len()
+            );
+            assert_eq!(
+                small.physical_writes.items().len(),
+                large.physical_writes.items().len()
+            );
+            assert_eq!(
+                small.logical_accesses.items().len(),
+                large.logical_accesses.items().len()
+            );
+            let small_json = serde_json::to_vec(&small.receipt).unwrap().len();
+            let large_json = serde_json::to_vec(&large.receipt).unwrap().len();
+            assert!(
+                large_json < small_json + 64,
+                "{small_json} bytes for 64 slots, {large_json} for 1024"
+            );
+            let small_witness = serde_json::to_vec(&small.runtime_refinement_witness().unwrap())
+                .unwrap()
+                .len();
+            let large_witness = serde_json::to_vec(&large.runtime_refinement_witness().unwrap())
+                .unwrap()
+                .len();
+            assert!(
+                large_witness < small_witness + 256,
+                "{small_witness} bytes for 64 slots, {large_witness} for 1024"
+            );
+            // The hashes are of the events, which differ.
+            assert_ne!(
+                small.hashes().unwrap().physical_access_trace_hash,
+                large.hashes().unwrap().physical_access_trace_hash
+            );
+        }
+    }
+
     #[test]
     fn a_full_scan_read_writes_nothing_and_an_aborted_write_still_rewrites() {
         let base = include_str!(bench_raw!("SweepMap.pathoram.yaml"));
@@ -2673,7 +2806,10 @@ bounds:
         let mut instance = ContractInstance::deploy_with_seed(artifact.clone(), 5).unwrap();
         let counts = |result: &CallResult| {
             let receipt = result.receipt();
-            (receipt.physical_reads.len(), receipt.physical_writes.len())
+            (
+                receipt.physical_reads.event_count(),
+                receipt.physical_writes.event_count(),
+            )
         };
         let put = instance
             .call("put(bytes32,uint256)", vec![b32(1), Value::uint(9)])
@@ -2698,7 +2834,7 @@ bounds:
         assert!(guarded
             .receipt()
             .physical_writes
-            .iter()
+            .events()
             .all(|write| write.class == uo_core::WriteClass::Update));
         let read = instance.call("read(bytes32)", vec![b32(1)]).unwrap();
         assert_eq!(read.return_value, Some(Value::uint(9)));
@@ -2761,13 +2897,13 @@ bounds:
             result
                 .receipt()
                 .physical_reads
-                .iter()
+                .events()
                 .filter(|read| read.object == object)
                 .count()
         };
         let read_objects = |result: &CallResult| {
             let mut objects: Vec<String> = Vec::new();
-            for read in result.receipt().physical_reads.iter() {
+            for read in result.receipt().physical_reads.events() {
                 if objects.last() != Some(&read.object) {
                     objects.push(read.object.clone());
                 }
@@ -2784,14 +2920,15 @@ bounds:
                 .exact_runtime_kernel_witness()
                 .unwrap()
                 .resource_events()
-                .iter()
+                .events()
                 .filter(|event| {
                     event.kind() == RuntimeKernelResourceEventKindWitness::ReserveScratch
                         && event.region() == Some(RuntimeKernelScratchRegionWitness::IoScratch)
                 })
                 .count();
             let receipt = result.receipt();
-            reservations == receipt.physical_reads.len() + receipt.physical_writes.len()
+            reservations
+                == receipt.physical_reads.event_count() + receipt.physical_writes.event_count()
         };
         let mint = instance
             .call("mint(address,uint256)", vec![addr(0x11), Value::uint(50)])
@@ -2810,19 +2947,19 @@ bounds:
             .unwrap();
         assert!(!transfer.aborted);
         let receipt = transfer.receipt();
-        assert_eq!(receipt.physical_reads.len(), balances);
-        assert_eq!(receipt.physical_writes.len(), balances);
+        assert_eq!(receipt.physical_reads.event_count(), balances);
+        assert_eq!(receipt.physical_writes.event_count(), balances);
         assert_eq!(
             receipt
                 .physical_reads
-                .iter()
+                .events()
                 .map(|read| read.location.clone())
                 .collect::<Vec<_>>(),
             (0..balances)
                 .map(|slot| format!("balances#{slot}"))
                 .collect::<Vec<_>>()
         );
-        assert_eq!(receipt.logical_accesses.len(), 4 * balances);
+        assert_eq!(receipt.logical_accesses.event_count(), 4 * balances);
         assert_eq!(receipt.logical_writes.len(), 2);
         assert!(opens_what_it_traces(&transfer));
 
@@ -2844,7 +2981,7 @@ bounds:
         assert_eq!(reads_of(&transfer_from, "allowances"), allowances);
         assert_eq!(read_objects(&transfer_from), ["balances", "allowances"]);
         assert_eq!(
-            transfer_from.receipt().physical_writes.len(),
+            transfer_from.receipt().physical_writes.event_count(),
             balances + allowances
         );
         assert!(opens_what_it_traces(&transfer_from));
@@ -2858,16 +2995,16 @@ bounds:
             )
             .unwrap();
         assert!(overdrawn.aborted);
-        assert_eq!(overdrawn.receipt().physical_reads.len(), balances);
-        assert_eq!(overdrawn.receipt().physical_writes.len(), balances);
+        assert_eq!(overdrawn.receipt().physical_reads.event_count(), balances);
+        assert_eq!(overdrawn.receipt().physical_writes.event_count(), balances);
         assert!(opens_what_it_traces(&overdrawn));
         for (owner, balance) in [(0x11u8, 26u64), (0x22, 20), (0x44, 4)] {
             let query = instance
                 .call("balanceOf(address)", vec![addr(owner)])
                 .unwrap();
             assert_eq!(query.return_value, Some(Value::uint(balance)), "{owner:#x}");
-            assert_eq!(query.receipt().physical_reads.len(), balances);
-            assert!(query.receipt().physical_writes.is_empty());
+            assert_eq!(query.receipt().physical_reads.event_count(), balances);
+            assert!(query.receipt().physical_writes.has_no_event());
             assert!(opens_what_it_traces(&query));
         }
         assert_objects_are_cold(&instance);
@@ -2899,19 +3036,19 @@ bounds:
         let mut instance = ContractInstance::deploy_with_seed(artifact.clone(), 11).unwrap();
         let seeded = instance.call(seed, vec![Value::uint(1), b32(7)]).unwrap();
         let receipt = seeded.receipt();
-        assert_eq!(receipt.physical_reads.len(), tokens_slots);
+        assert_eq!(receipt.physical_reads.event_count(), tokens_slots);
         assert!(receipt
             .physical_reads
-            .iter()
+            .events()
             .all(|read| read.object == "TOKENS"));
-        assert_eq!(receipt.physical_writes.len(), tokens_slots);
+        assert_eq!(receipt.physical_writes.event_count(), tokens_slots);
         // It opens the array's slots and seals them, and nothing else.
         let io_reservations = seeded
             .trace
             .exact_runtime_kernel_witness()
             .unwrap()
             .resource_events()
-            .iter()
+            .events()
             .filter(|event| {
                 event.kind() == RuntimeKernelResourceEventKindWitness::ReserveScratch
                     && event.region() == Some(RuntimeKernelScratchRegionWitness::IoScratch)
@@ -2924,8 +3061,8 @@ bounds:
         assert_eq!(auth.return_value, Some(Value::uint(1)));
         let last = instance.call("readLast()", vec![]).unwrap();
         assert_eq!(last.return_value, Some(Value::uint(1)));
-        assert_eq!(last.receipt().physical_reads.len(), 1);
-        assert!(last.receipt().physical_writes.is_empty());
+        assert_eq!(last.receipt().physical_reads.event_count(), 1);
+        assert!(last.receipt().physical_writes.has_no_event());
 
         // What a public call reseals comes from its body. A manifest that
         // lists other objects is refused before the call runs.

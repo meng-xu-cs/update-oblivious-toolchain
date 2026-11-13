@@ -219,6 +219,26 @@ proved.
   the paper-main theorem's storage-trace premise. That the runtime store
   emits exactly this encoding is checked against runtime traces
   (`exact_encoding_matches` in `results/trace_equivalence.json`), not proved.
+  The check is the probe's: a Rust mirror of the Lean encoding gives the
+  reads and writes of a call, and the trace must hold exactly those, with
+  every record of the sealed length of its object's type and every write
+  an `Update`. No Lean checker reads the storage events of an exact object.
+  A runtime trace holds the scan and the rewrite of an exact object as one
+  item each: a run, with the object, the naming of its slots, their count
+  and their one length. The trace is the events of its items in order.
+  `uo-core` names the events of a run as the encoding names them
+  (`ExactObjectLayout.scanReads` and `updateWrites` in
+  `UOToolchain/ExactObjectLayout.lean`, with which the Lean importers
+  expand a run), computes the hashes of a trace over its events, and
+  rejects a run that names a Path ORAM object. A rewrite stands for
+  `Update` writes because the recorder builds it from the writes it is
+  handed, each classified from its bytes as below, and takes a write into
+  the rewrite only if it is the `Update` of the rewrite's next slot. A
+  source check binds this (`trace_runs_stand_for_recorded_events` in
+  `runtime_boundary_validation.json`), and seven tamper scenarios are
+  rejected: three change the sources, and four change the slot count, the
+  record length or the slot naming of a run in a trace (`exact_trace/*`),
+  which the probe's comparison rejects.
   The class `Update` of a sealed write is not a label the runtime asserts,
   and it does not rest on the ciphertext. A sealed record is a whole number
   of 32-byte units, the unit the storage observer classifies. Each unit is

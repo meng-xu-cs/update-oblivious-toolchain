@@ -10,8 +10,8 @@
     "metadata_canonicalization_sha256": "546b515536984f2a68d1f4546092449b9056586ee7d8ddacbd663879fb9eab4e",
     "compilation_mode": "uo",
     "compiler_version": "0.1.0",
-    "toolchain_manifest_sha256": "0732e9d15456a4fa9cf880197b3289a4d364d0a9eea1f3546bd5355f299e252b",
-    "package_sha256": "8f216e9d330d493f615519b49aca883ca4dea50514405c84cbfa1f939f940a79"
+    "toolchain_manifest_sha256": "bcf9141fea19b3320647c5f8f8e623fb5110d9865ad028bb1ffeca0c721f3d0a",
+    "package_sha256": "82f98b8191d0a1c318caa78281b6346508e96e4eff0b743ed34634218f425ff4"
   },
   "contract": {
     "contract": "RegistryCRUD",

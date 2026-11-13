@@ -169,12 +169,12 @@ mod tests {
         assert!(zero
             .trace
             .physical_writes
-            .iter()
+            .events()
             .all(|event| event.class == WriteClass::Update));
         assert!(one
             .trace
             .physical_writes
-            .iter()
+            .events()
             .all(|event| event.class == WriteClass::Update));
         assert_eq!(
             zero.trace.hashes().unwrap().physical_access_trace_hash,
@@ -433,7 +433,7 @@ bounds:
         assert!(result
             .trace
             .physical_writes
-            .iter()
+            .events()
             .all(|event| event.class == WriteClass::Update));
         assert_eq!(peek.return_value, Some(Value::uint(1)));
     }
@@ -608,12 +608,12 @@ bounds:
         assert!(first_trace
             .trace
             .physical_writes
-            .iter()
+            .events()
             .all(|event| event.class == WriteClass::Update));
         assert!(second_trace
             .trace
             .physical_writes
-            .iter()
+            .events()
             .all(|event| event.class == WriteClass::Update));
         assert_eq!(first_trace.trace.gas_used, expected_gas);
         assert_eq!(second_trace.trace.gas_used, expected_gas);
@@ -792,12 +792,12 @@ bounds:
         assert!(first_trace
             .trace
             .physical_writes
-            .iter()
+            .events()
             .all(|event| event.class == WriteClass::Update));
         assert!(second_trace
             .trace
             .physical_writes
-            .iter()
+            .events()
             .all(|event| event.class == WriteClass::Update));
     }
 
@@ -855,13 +855,13 @@ bounds:
         assert!(first_trace
             .trace
             .physical_writes
-            .iter()
+            .events()
             .all(|event| event.class == WriteClass::Update));
         assert_eq!(
             first_trace
                 .trace
                 .logical_accesses
-                .iter()
+                .events()
                 .filter(|event| event.kind == "uooram_counter")
                 .count(),
             2
@@ -960,7 +960,7 @@ bounds:
         let path_buckets = |trace: &uo_core::ExecutionTrace| {
             trace
                 .physical_reads
-                .iter()
+                .events()
                 .filter(|event| event.location.contains("bucket"))
                 .map(|event| event.location.clone())
                 .collect::<Vec<_>>()
@@ -1175,12 +1175,12 @@ bounds:
             (
                 trace
                     .physical_reads
-                    .iter()
+                    .events()
                     .map(|event| (event.object.clone(), event.len))
                     .collect::<Vec<_>>(),
                 trace
                     .physical_writes
-                    .iter()
+                    .events()
                     .map(|event| (event.object.clone(), event.len, event.class))
                     .collect::<Vec<_>>(),
                 trace.theorem_trace.boundary_schedule.clone(),
@@ -1267,14 +1267,14 @@ bounds:
         // 114 + 34 = 148.
         assert_eq!(uo_core::manifest::path_oram_tree_stash_bound(256), 114 + 34);
         assert_eq!(
-            first_trace.trace.physical_reads.len(),
+            first_trace.trace.physical_reads.event_count(),
             accesses * (1 + 9) + 2 * 20
         );
         assert_eq!(
             first_trace
                 .trace
                 .logical_accesses
-                .iter()
+                .events()
                 .filter(|event| event.kind == "uooram_counter")
                 .count(),
             accesses

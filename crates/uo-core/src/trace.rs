@@ -108,6 +108,413 @@ pub struct LogicalEvent {
     pub detail: String,
 }
 
+/// How the slots of an exact object are named in storage: a cell has one,
+/// named as the object; slot `i` of an array is `name[i]`; slot `i` of a
+/// full-scan map is `name#i` (`ExactObjectLayout.location` in
+/// `UOToolchain/ExactObjectLayout.lean`).
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum ExactObjectKind {
+    Cell,
+    Array,
+    Map,
+}
+
+/// Every sealed slot of an exact object, in slot order: `slots` records of
+/// `len` bytes each. As an item of a trace it stands for one event per
+/// slot: a read of each (the object's scan) or an `Update` write of each
+/// (its rewrite).
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ExactObjectSlots {
+    pub object: String,
+    pub kind: ExactObjectKind,
+    pub slots: usize,
+    pub len: usize,
+}
+
+impl ExactObjectSlots {
+    /// Where slot `slot` is in storage.
+    pub fn location(&self, slot: usize) -> String {
+        match self.kind {
+            ExactObjectKind::Cell => self.object.clone(),
+            ExactObjectKind::Array => format!("{}[{slot}]", self.object),
+            ExactObjectKind::Map => format!("{}#{slot}", self.object),
+        }
+    }
+
+    /// Whether `location` is where slot `slot` is, without building the
+    /// name.
+    pub fn is_location(&self, slot: usize, location: &str) -> bool {
+        let (open, close) = match self.kind {
+            ExactObjectKind::Cell => return slot == 0 && location == self.object,
+            ExactObjectKind::Array => ("[", "]"),
+            ExactObjectKind::Map => ("#", ""),
+        };
+        location
+            .strip_prefix(self.object.as_str())
+            .and_then(|rest| rest.strip_prefix(open))
+            .and_then(|rest| rest.strip_suffix(close))
+            .is_some_and(|index| {
+                // The decimal form of a slot is the one `location` writes.
+                !index.is_empty()
+                    && (index == "0" || !index.starts_with('0'))
+                    && index.bytes().all(|digit| digit.is_ascii_digit())
+                    && index.parse::<usize>() == Ok(slot)
+            })
+    }
+
+    /// The bytes of all the slots.
+    pub fn bytes(&self) -> usize {
+        self.slots.saturating_mul(self.len)
+    }
+
+    /// The run of an object before any of its slots. A rewrite starts here
+    /// and takes its writes one at a time (`takes_write`).
+    pub fn none_of(object: impl Into<String>, kind: ExactObjectKind) -> Self {
+        Self {
+            object: object.into(),
+            kind,
+            slots: 0,
+            len: 0,
+        }
+    }
+
+    /// Take `event` as the write of the run's next slot, if it is that
+    /// write: an `Update` of the slot after the run's last, of the length
+    /// of the slots before it. A run that grew only this way stands, as a
+    /// rewrite, for exactly the writes it took.
+    pub fn takes_write(&mut self, event: &PhysicalWriteEvent) -> bool {
+        let next = event.class == WriteClass::Update
+            && event.object == self.object
+            && self.is_location(self.slots, &event.location)
+            && (self.slots == 0 || event.len == self.len);
+        if next {
+            self.len = event.len;
+            self.slots += 1;
+        }
+        next
+    }
+
+    /// A cell has one slot.
+    fn is_well_formed(&self) -> bool {
+        self.kind != ExactObjectKind::Cell || self.slots == 1
+    }
+}
+
+/// The scan of an exact object: one read of each of its slots.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct PhysicalScan {
+    pub scan: ExactObjectSlots,
+}
+
+/// The rewrite of an exact object: one `Update` write of each of its slots.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct PhysicalRewrite {
+    pub rewrite: ExactObjectSlots,
+}
+
+/// The logical scan of a map: one event of kind `kind` per slot, with the
+/// detail `slot:i`.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct LogicalScan {
+    pub scan: LogicalScanSlots,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct LogicalScanSlots {
+    pub kind: String,
+    pub object: String,
+    pub slots: usize,
+}
+
+/// One item of a trace's physical reads: a read, or the scan of an exact
+/// object.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(untagged)]
+pub enum PhysicalReadItem {
+    Read(PhysicalReadEvent),
+    Scan(PhysicalScan),
+}
+
+/// One item of a trace's physical writes: a write, or the rewrite of an
+/// exact object.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(untagged)]
+pub enum PhysicalWriteItem {
+    Write(PhysicalWriteEvent),
+    Rewrite(PhysicalRewrite),
+}
+
+/// One item of a trace's logical accesses: an event, or the scan of a map.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(untagged)]
+pub enum LogicalAccessItem {
+    Event(LogicalEvent),
+    Scan(LogicalScan),
+}
+
+/// An item of a list of a trace that can stand for a run of events. The
+/// list is its events in order: an item that stands for a run is that run,
+/// and nothing about a call depends on how its events are grouped.
+pub trait TraceRunItem: Sized {
+    type Event;
+
+    fn from_event(event: Self::Event) -> Self;
+
+    /// How many events the item stands for.
+    fn event_count(&self) -> usize;
+
+    /// Event number `index` of the item.
+    fn event(&self, index: usize) -> Option<Self::Event>;
+
+    /// The bytes the item's events move, for an item of physical events.
+    fn bytes(&self) -> usize {
+        0
+    }
+
+    /// The item a recorder keeps for a run: nothing for a run of no event,
+    /// the event itself for a run of one, and the run otherwise.
+    fn of_run(run: Self) -> Option<Self> {
+        match run.event_count() {
+            0 => None,
+            1 => run.event(0).map(Self::from_event),
+            _ => Some(run),
+        }
+    }
+}
+
+impl PhysicalReadItem {
+    /// The scan of an exact object's slots, as a recorder keeps it.
+    pub fn scan(scan: ExactObjectSlots) -> Option<Self> {
+        Self::of_run(Self::Scan(PhysicalScan { scan }))
+    }
+}
+
+impl PhysicalWriteItem {
+    /// The rewrite of an exact object's slots, as a recorder keeps it. The
+    /// item stands for an `Update` write of each slot of the run, so the
+    /// run is one that took those writes (`ExactObjectSlots::takes_write`).
+    pub fn rewrite(rewrite: ExactObjectSlots) -> Option<Self> {
+        Self::of_run(Self::Rewrite(PhysicalRewrite { rewrite }))
+    }
+}
+
+impl LogicalAccessItem {
+    /// The logical scan of a map's slots, as a recorder keeps it.
+    pub fn scan(scan: LogicalScanSlots) -> Option<Self> {
+        Self::of_run(Self::Scan(LogicalScan { scan }))
+    }
+}
+
+impl TraceRunItem for PhysicalReadItem {
+    type Event = PhysicalReadEvent;
+
+    fn from_event(event: PhysicalReadEvent) -> Self {
+        Self::Read(event)
+    }
+
+    fn event_count(&self) -> usize {
+        match self {
+            Self::Read(_) => 1,
+            Self::Scan(item) => item.scan.slots,
+        }
+    }
+
+    fn event(&self, index: usize) -> Option<PhysicalReadEvent> {
+        match self {
+            Self::Read(event) => (index == 0).then(|| event.clone()),
+            Self::Scan(item) => (index < item.scan.slots).then(|| PhysicalReadEvent {
+                object: item.scan.object.clone(),
+                location: item.scan.location(index),
+                len: item.scan.len,
+            }),
+        }
+    }
+
+    fn bytes(&self) -> usize {
+        match self {
+            Self::Read(event) => event.len,
+            Self::Scan(item) => item.scan.bytes(),
+        }
+    }
+}
+
+impl TraceRunItem for PhysicalWriteItem {
+    type Event = PhysicalWriteEvent;
+
+    fn from_event(event: PhysicalWriteEvent) -> Self {
+        Self::Write(event)
+    }
+
+    fn event_count(&self) -> usize {
+        match self {
+            Self::Write(_) => 1,
+            Self::Rewrite(item) => item.rewrite.slots,
+        }
+    }
+
+    fn event(&self, index: usize) -> Option<PhysicalWriteEvent> {
+        match self {
+            Self::Write(event) => (index == 0).then(|| event.clone()),
+            Self::Rewrite(item) => (index < item.rewrite.slots).then(|| PhysicalWriteEvent {
+                object: item.rewrite.object.clone(),
+                location: item.rewrite.location(index),
+                len: item.rewrite.len,
+                class: WriteClass::Update,
+            }),
+        }
+    }
+
+    fn bytes(&self) -> usize {
+        match self {
+            Self::Write(event) => event.len,
+            Self::Rewrite(item) => item.rewrite.bytes(),
+        }
+    }
+}
+
+impl TraceRunItem for LogicalAccessItem {
+    type Event = LogicalEvent;
+
+    fn from_event(event: LogicalEvent) -> Self {
+        Self::Event(event)
+    }
+
+    fn event_count(&self) -> usize {
+        match self {
+            Self::Event(_) => 1,
+            Self::Scan(item) => item.scan.slots,
+        }
+    }
+
+    fn event(&self, index: usize) -> Option<LogicalEvent> {
+        match self {
+            Self::Event(event) => (index == 0).then(|| event.clone()),
+            Self::Scan(item) => (index < item.scan.slots).then(|| LogicalEvent {
+                kind: item.scan.kind.clone(),
+                object: item.scan.object.clone(),
+                detail: format!("slot:{index}"),
+            }),
+        }
+    }
+}
+
+/// A list of a trace: its events in order, with a run of events as one
+/// item where the runtime recorded it as one. The scan and the rewrite of
+/// an exact object are such runs, so a trace grows with the number of
+/// objects a call loads and commits and not with their slots.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(transparent)]
+pub struct TraceItems<I>(Box<[I]>);
+
+pub type LogicalAccesses = TraceItems<LogicalAccessItem>;
+pub type PhysicalReads = TraceItems<PhysicalReadItem>;
+pub type PhysicalWrites = TraceItems<PhysicalWriteItem>;
+
+impl<I> Default for TraceItems<I> {
+    fn default() -> Self {
+        Self(Box::default())
+    }
+}
+
+impl<I> From<Vec<I>> for TraceItems<I> {
+    fn from(items: Vec<I>) -> Self {
+        Self(items.into_boxed_slice())
+    }
+}
+
+impl<I> FromIterator<I> for TraceItems<I> {
+    fn from_iter<T: IntoIterator<Item = I>>(items: T) -> Self {
+        Self(items.into_iter().collect())
+    }
+}
+
+impl From<Vec<LogicalEvent>> for TraceItems<LogicalAccessItem> {
+    fn from(events: Vec<LogicalEvent>) -> Self {
+        Self::from_events(events)
+    }
+}
+
+impl From<Box<[LogicalEvent]>> for TraceItems<LogicalAccessItem> {
+    fn from(events: Box<[LogicalEvent]>) -> Self {
+        Self::from_events(events.into_vec())
+    }
+}
+
+impl From<Vec<PhysicalReadEvent>> for TraceItems<PhysicalReadItem> {
+    fn from(events: Vec<PhysicalReadEvent>) -> Self {
+        Self::from_events(events)
+    }
+}
+
+impl From<Box<[PhysicalReadEvent]>> for TraceItems<PhysicalReadItem> {
+    fn from(events: Box<[PhysicalReadEvent]>) -> Self {
+        Self::from_events(events.into_vec())
+    }
+}
+
+impl From<Vec<PhysicalWriteEvent>> for TraceItems<PhysicalWriteItem> {
+    fn from(events: Vec<PhysicalWriteEvent>) -> Self {
+        Self::from_events(events)
+    }
+}
+
+impl From<Box<[PhysicalWriteEvent]>> for TraceItems<PhysicalWriteItem> {
+    fn from(events: Box<[PhysicalWriteEvent]>) -> Self {
+        Self::from_events(events.into_vec())
+    }
+}
+
+impl<I> TraceItems<I> {
+    pub fn items(&self) -> &[I] {
+        &self.0
+    }
+
+    pub fn items_mut(&mut self) -> &mut [I] {
+        &mut self.0
+    }
+}
+
+impl<I: TraceRunItem> TraceItems<I> {
+    /// The list of `events`, each an item of its own.
+    pub fn from_events(events: impl IntoIterator<Item = I::Event>) -> Self {
+        events.into_iter().map(I::from_event).collect()
+    }
+
+    /// How many events the list holds.
+    pub fn event_count(&self) -> usize {
+        self.0
+            .iter()
+            .map(TraceRunItem::event_count)
+            .fold(0usize, usize::saturating_add)
+    }
+
+    pub fn has_no_event(&self) -> bool {
+        self.0.iter().all(|item| item.event_count() == 0)
+    }
+
+    /// The events of the list, in order. This names every slot of a run:
+    /// it is for a reader of a trace, not for a call.
+    pub fn events(&self) -> impl Iterator<Item = I::Event> + '_ {
+        self.0
+            .iter()
+            .flat_map(|item| (0..item.event_count()).filter_map(move |index| item.event(index)))
+    }
+
+    /// The bytes the events of the list move.
+    pub fn bytes(&self) -> usize {
+        self.0
+            .iter()
+            .map(TraceRunItem::bytes)
+            .fold(0usize, usize::saturating_add)
+    }
+}
+
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum BoundaryDirection {
     Enter,
@@ -686,6 +1093,150 @@ pub struct RuntimeKernelResourceEventWitness {
     bytes: Option<usize>,
 }
 
+/// A kernel's log of resource events. The slots of an object are opened or
+/// sealed one after the other, and each logs the same reservation and the
+/// same wipe: such a block of events that occurs several times in a row is
+/// one item, so the log grows with the number of objects a call loads and
+/// commits and not with their slots. The log stands for its events in
+/// order, each block as often as it repeats.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(transparent)]
+pub struct RuntimeKernelResourceEvents(Box<[RuntimeKernelResourceEventItem]>);
+
+/// One item of a resource-event log: an event, or a block of events that
+/// occurs `repeat` times in a row.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(untagged)]
+pub enum RuntimeKernelResourceEventItem {
+    Event(RuntimeKernelResourceEventWitness),
+    Repeat(RuntimeKernelResourceEventRepeat),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RuntimeKernelResourceEventRepeat {
+    repeat: usize,
+    events: Box<[RuntimeKernelResourceEventWitness]>,
+}
+
+impl RuntimeKernelResourceEventRepeat {
+    pub fn repeat(&self) -> usize {
+        self.repeat
+    }
+
+    pub fn events(&self) -> &[RuntimeKernelResourceEventWitness] {
+        &self.events
+    }
+
+    /// A block repeats at least twice and holds an event.
+    fn validate_shape(&self) -> Result<(), KernelWitnessError> {
+        if self.repeat < 2 || self.events.is_empty() {
+            return Err(KernelWitnessError::MalformedKernelResourceTrace {
+                witnessed: self.events.to_vec(),
+            });
+        }
+        Ok(())
+    }
+}
+
+impl RuntimeKernelResourceEvents {
+    /// The longest block a log folds: a reservation and its wipe.
+    const MAX_BLOCK: usize = 2;
+
+    /// The log of `events`. Reading the events in order, the longest run of
+    /// a repeated block of two events that starts at an event is one item,
+    /// or else the longest run of that event, or else the event itself. So
+    /// two logs of the same events are the same log.
+    pub fn from_events(events: &[RuntimeKernelResourceEventWitness]) -> Self {
+        let mut item_count = 0usize;
+        Self::for_each_run(events, |_, _, _| item_count += 1);
+        let mut items = FixedBoxBuilder::new(item_count);
+        Self::for_each_run(events, |start, block, repeat| {
+            let item = match (events.get(start..start + block), repeat) {
+                (Some([event]), 1) => RuntimeKernelResourceEventItem::Event(event.clone()),
+                (Some(block), _) => {
+                    RuntimeKernelResourceEventItem::Repeat(RuntimeKernelResourceEventRepeat {
+                        repeat,
+                        events: block.into(),
+                    })
+                }
+                (None, _) => return,
+            };
+            // The builder has room for every run, by the count above.
+            let _ = items.push(item);
+        });
+        Self(items.finish().unwrap_or_default())
+    }
+
+    /// Call `run(start, block, repeat)` for each item of the log of
+    /// `events`: the block of `block` events at `start`, `repeat` times.
+    fn for_each_run(
+        events: &[RuntimeKernelResourceEventWitness],
+        mut run: impl FnMut(usize, usize, usize),
+    ) {
+        let mut start = 0usize;
+        while start < events.len() {
+            let mut chosen = (1usize, 1usize);
+            for block in (1..=Self::MAX_BLOCK).rev() {
+                let first = events.get(start..start + block);
+                let mut repeat = 1usize;
+                while first.is_some()
+                    && events.get(start + repeat * block..start + (repeat + 1) * block) == first
+                {
+                    repeat += 1;
+                }
+                if repeat > 1 {
+                    chosen = (block, repeat);
+                    break;
+                }
+            }
+            let (block, repeat) = chosen;
+            run(start, block, repeat);
+            start += block * repeat;
+        }
+    }
+
+    pub fn items(&self) -> &[RuntimeKernelResourceEventItem] {
+        &self.0
+    }
+
+    /// How many events the log stands for.
+    pub fn event_count(&self) -> usize {
+        self.0
+            .iter()
+            .map(|item| match item {
+                RuntimeKernelResourceEventItem::Event(_) => 1,
+                RuntimeKernelResourceEventItem::Repeat(block) => {
+                    block.repeat.saturating_mul(block.events.len())
+                }
+            })
+            .fold(0usize, usize::saturating_add)
+    }
+
+    /// The events the log stands for, in order.
+    pub fn events(&self) -> impl Iterator<Item = &RuntimeKernelResourceEventWitness> + '_ {
+        self.0.iter().flat_map(|item| {
+            let (repeat, events) = match item {
+                RuntimeKernelResourceEventItem::Event(event) => (1, std::slice::from_ref(event)),
+                RuntimeKernelResourceEventItem::Repeat(block) => (block.repeat, &block.events[..]),
+            };
+            (0..repeat).flat_map(move |_| events.iter())
+        })
+    }
+}
+
+impl From<Box<[RuntimeKernelResourceEventWitness]>> for RuntimeKernelResourceEvents {
+    fn from(events: Box<[RuntimeKernelResourceEventWitness]>) -> Self {
+        Self::from_events(&events)
+    }
+}
+
+impl From<Vec<RuntimeKernelResourceEventWitness>> for RuntimeKernelResourceEvents {
+    fn from(events: Vec<RuntimeKernelResourceEventWitness>) -> Self {
+        Self::from_events(&events)
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct RuntimeKernelScheduleWitness {
@@ -879,14 +1430,59 @@ pub struct RefinementPhysicalWrite {
     pub len: usize,
 }
 
+/// One item of a refinement trace's physical writes: a write, or the
+/// rewrite of an exact object.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(untagged)]
+pub enum RefinementPhysicalWriteItem {
+    Write(RefinementPhysicalWrite),
+    Rewrite(PhysicalRewrite),
+}
+
+pub type RefinementPhysicalWrites = TraceItems<RefinementPhysicalWriteItem>;
+
+impl TraceRunItem for RefinementPhysicalWriteItem {
+    type Event = RefinementPhysicalWrite;
+
+    fn from_event(event: RefinementPhysicalWrite) -> Self {
+        Self::Write(event)
+    }
+
+    fn event_count(&self) -> usize {
+        match self {
+            Self::Write(_) => 1,
+            Self::Rewrite(item) => item.rewrite.slots,
+        }
+    }
+
+    fn event(&self, index: usize) -> Option<RefinementPhysicalWrite> {
+        match self {
+            Self::Write(event) => (index == 0).then(|| event.clone()),
+            Self::Rewrite(item) => (index < item.rewrite.slots).then(|| RefinementPhysicalWrite {
+                object: item.rewrite.object.clone(),
+                location: item.rewrite.location(index),
+                write_class: WriteClass::Update.as_refinement_label().into(),
+                len: item.rewrite.len,
+            }),
+        }
+    }
+
+    fn bytes(&self) -> usize {
+        match self {
+            Self::Write(event) => event.len,
+            Self::Rewrite(item) => item.rewrite.bytes(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(deny_unknown_fields)]
 pub struct RefinementTrace {
     pub opcode_trace: Box<[String]>,
-    pub logical_accesses: Box<[LogicalEvent]>,
+    pub logical_accesses: LogicalAccesses,
     pub logical_writes: Box<[LogicalEvent]>,
-    pub physical_reads: Box<[PhysicalReadEvent]>,
-    pub physical_writes: Box<[RefinementPhysicalWrite]>,
+    pub physical_reads: PhysicalReads,
+    pub physical_writes: RefinementPhysicalWrites,
     pub gas_used: u64,
 }
 
@@ -941,7 +1537,7 @@ pub struct RuntimeKernelWitness {
     io_scratch_peak_bytes: usize,
     io_scratch_live_bytes_end: usize,
     io_scratch_wipe_count: usize,
-    resource_events: Box<[RuntimeKernelResourceEventWitness]>,
+    resource_events: RuntimeKernelResourceEvents,
     #[serde(deserialize_with = "deserialize_explicit_option")]
     expected_kernel_steps: Option<Box<[RuntimeKernelStepWitness]>>,
     public_object_ids: Box<[u32]>,
@@ -965,7 +1561,7 @@ pub struct RuntimeKernelTelemetrySnapshot {
     io_scratch_peak_bytes: usize,
     io_scratch_live_bytes_end: usize,
     io_scratch_wipe_count: usize,
-    resource_events: Box<[RuntimeKernelResourceEventWitness]>,
+    resource_events: RuntimeKernelResourceEvents,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -995,7 +1591,7 @@ pub struct RuntimeKernelFinishBundle {
     io_scratch_peak_bytes: usize,
     io_scratch_live_bytes_end: usize,
     io_scratch_wipe_count: usize,
-    resource_events: Box<[RuntimeKernelResourceEventWitness]>,
+    resource_events: RuntimeKernelResourceEvents,
     #[serde(deserialize_with = "deserialize_explicit_option")]
     expected_kernel_steps: Option<Box<[RuntimeKernelStepWitness]>>,
     public_object_ids: Box<[u32]>,
@@ -1022,7 +1618,7 @@ pub struct RuntimeKernelMachineFinishWitness {
     io_scratch_peak_bytes: usize,
     io_scratch_live_bytes_end: usize,
     io_scratch_wipe_count: usize,
-    resource_events: Box<[RuntimeKernelResourceEventWitness]>,
+    resource_events: RuntimeKernelResourceEvents,
     #[serde(deserialize_with = "deserialize_explicit_option")]
     expected_kernel_steps: Option<Box<[RuntimeKernelStepWitness]>>,
     expected_kernel_step_index: usize,
@@ -2717,7 +3313,7 @@ impl RuntimeKernelTelemetrySnapshot {
         io_scratch_peak_bytes: usize,
         io_scratch_live_bytes_end: usize,
         io_scratch_wipe_count: usize,
-        resource_events: impl Into<Box<[RuntimeKernelResourceEventWitness]>>,
+        resource_events: impl Into<RuntimeKernelResourceEvents>,
     ) -> Self {
         Self {
             arena_bytes,
@@ -2737,7 +3333,7 @@ impl RuntimeKernelTelemetrySnapshot {
         }
     }
 
-    pub fn resource_events(&self) -> &[RuntimeKernelResourceEventWitness] {
+    pub fn resource_events(&self) -> &RuntimeKernelResourceEvents {
         &self.resource_events
     }
 }
@@ -3023,7 +3619,7 @@ impl RuntimeKernelFinishBundle {
         &self.entrypoint_id
     }
 
-    pub fn resource_events(&self) -> &[RuntimeKernelResourceEventWitness] {
+    pub fn resource_events(&self) -> &RuntimeKernelResourceEvents {
         &self.resource_events
     }
 
@@ -3192,7 +3788,7 @@ impl RuntimeKernelWitness {
         io_scratch_peak_bytes: usize,
         io_scratch_live_bytes_end: usize,
         io_scratch_wipe_count: usize,
-        resource_events: Box<[RuntimeKernelResourceEventWitness]>,
+        resource_events: RuntimeKernelResourceEvents,
         expected_kernel_steps: Option<Box<[RuntimeKernelStepWitness]>>,
         public_object_ids: Box<[u32]>,
         expected_public_object_ids: Option<Box<[u32]>>,
@@ -3279,7 +3875,7 @@ impl RuntimeKernelWitness {
         self.io_scratch_wipe_count
     }
 
-    pub fn resource_events(&self) -> &[RuntimeKernelResourceEventWitness] {
+    pub fn resource_events(&self) -> &RuntimeKernelResourceEvents {
         &self.resource_events
     }
 
@@ -3505,73 +4101,104 @@ impl RuntimeKernelWitness {
         &self,
     ) -> Result<RuntimeKernelResourceReplayState, KernelWitnessError> {
         let mut state = RuntimeKernelResourceReplayState::default();
-        for event in &self.resource_events {
-            event.validate_shape()?;
-            match event.kind {
-                RuntimeKernelResourceEventKindWitness::StackCheck => {
-                    let Some(words) = event.words else {
-                        return Err(KernelWitnessError::MalformedKernelResourceTrace {
-                            witnessed: vec![event.clone()],
-                        });
-                    };
-                    if words > self.max_stack_words {
-                        return Err(KernelWitnessError::PeakStackWordsExceeded {
-                            peak: words,
-                            budget: self.max_stack_words,
-                        });
-                    }
-                    state.peak_stack_words = state.peak_stack_words.max(words);
+        for item in self.resource_events.items() {
+            match item {
+                RuntimeKernelResourceEventItem::Event(event) => {
+                    self.replay_resource_event(&mut state, event)?;
                 }
-                RuntimeKernelResourceEventKindWitness::ReserveScratch => {
-                    let Some(bytes) = event.bytes else {
-                        return Err(KernelWitnessError::MalformedKernelResourceTrace {
-                            witnessed: vec![event.clone()],
-                        });
-                    };
-                    let Some(region) = event.region else {
-                        return Err(KernelWitnessError::MalformedKernelResourceTrace {
-                            witnessed: vec![event.clone()],
-                        });
-                    };
-                    if bytes > self.scratch_bytes {
-                        return Err(match region {
-                            RuntimeKernelScratchRegionWitness::ValueScratch => {
-                                KernelWitnessError::ValueScratchPeakExceeded {
-                                    peak: bytes,
-                                    budget: self.scratch_bytes,
-                                }
-                            }
-                            RuntimeKernelScratchRegionWitness::HashScratch => {
-                                KernelWitnessError::HashScratchPeakExceeded {
-                                    peak: bytes,
-                                    budget: self.scratch_bytes,
-                                }
-                            }
-                            RuntimeKernelScratchRegionWitness::IoScratch => {
-                                KernelWitnessError::IoScratchPeakExceeded {
-                                    peak: bytes,
-                                    budget: self.scratch_bytes,
-                                }
-                            }
-                        });
+                RuntimeKernelResourceEventItem::Repeat(block) => {
+                    block.validate_shape()?;
+                    for event in block.events() {
+                        self.replay_resource_event(&mut state, event)?;
                     }
-                    let usage = state.usage_mut(region);
-                    usage.live_bytes = bytes;
-                    usage.peak_bytes = usage.peak_bytes.max(bytes);
-                }
-                RuntimeKernelResourceEventKindWitness::WipeScratch => {
-                    let Some(region) = event.region else {
-                        return Err(KernelWitnessError::MalformedKernelResourceTrace {
-                            witnessed: vec![event.clone()],
-                        });
-                    };
-                    let usage = state.usage_mut(region);
-                    usage.live_bytes = 0;
-                    usage.wipe_count += 1;
+                    // A reservation sets the live bytes and a wipe clears
+                    // them, whatever they were, and a peak is a maximum: the
+                    // block again leaves them as they are and adds its wipes.
+                    let again = block.repeat() - 1;
+                    for event in block.events() {
+                        if let (RuntimeKernelResourceEventKindWitness::WipeScratch, Some(region)) =
+                            (event.kind, event.region)
+                        {
+                            let usage = state.usage_mut(region);
+                            usage.wipe_count = usage.wipe_count.saturating_add(again);
+                        }
+                    }
                 }
             }
         }
         Ok(state)
+    }
+
+    fn replay_resource_event(
+        &self,
+        state: &mut RuntimeKernelResourceReplayState,
+        event: &RuntimeKernelResourceEventWitness,
+    ) -> Result<(), KernelWitnessError> {
+        event.validate_shape()?;
+        match event.kind {
+            RuntimeKernelResourceEventKindWitness::StackCheck => {
+                let Some(words) = event.words else {
+                    return Err(KernelWitnessError::MalformedKernelResourceTrace {
+                        witnessed: vec![event.clone()],
+                    });
+                };
+                if words > self.max_stack_words {
+                    return Err(KernelWitnessError::PeakStackWordsExceeded {
+                        peak: words,
+                        budget: self.max_stack_words,
+                    });
+                }
+                state.peak_stack_words = state.peak_stack_words.max(words);
+            }
+            RuntimeKernelResourceEventKindWitness::ReserveScratch => {
+                let Some(bytes) = event.bytes else {
+                    return Err(KernelWitnessError::MalformedKernelResourceTrace {
+                        witnessed: vec![event.clone()],
+                    });
+                };
+                let Some(region) = event.region else {
+                    return Err(KernelWitnessError::MalformedKernelResourceTrace {
+                        witnessed: vec![event.clone()],
+                    });
+                };
+                if bytes > self.scratch_bytes {
+                    return Err(match region {
+                        RuntimeKernelScratchRegionWitness::ValueScratch => {
+                            KernelWitnessError::ValueScratchPeakExceeded {
+                                peak: bytes,
+                                budget: self.scratch_bytes,
+                            }
+                        }
+                        RuntimeKernelScratchRegionWitness::HashScratch => {
+                            KernelWitnessError::HashScratchPeakExceeded {
+                                peak: bytes,
+                                budget: self.scratch_bytes,
+                            }
+                        }
+                        RuntimeKernelScratchRegionWitness::IoScratch => {
+                            KernelWitnessError::IoScratchPeakExceeded {
+                                peak: bytes,
+                                budget: self.scratch_bytes,
+                            }
+                        }
+                    });
+                }
+                let usage = state.usage_mut(region);
+                usage.live_bytes = bytes;
+                usage.peak_bytes = usage.peak_bytes.max(bytes);
+            }
+            RuntimeKernelResourceEventKindWitness::WipeScratch => {
+                let Some(region) = event.region else {
+                    return Err(KernelWitnessError::MalformedKernelResourceTrace {
+                        witnessed: vec![event.clone()],
+                    });
+                };
+                let usage = state.usage_mut(region);
+                usage.live_bytes = 0;
+                usage.wipe_count += 1;
+            }
+        }
+        Ok(())
     }
 
     fn validate_replayed_resources(
@@ -4775,12 +5402,11 @@ impl RuntimePathOramHiddenCertificate {
         oram_position_map_after: Box<[RuntimePathOramPositionMapWitness]>,
         oram_leaf_state_transitions: Box<[RuntimePathOramTransitionWitness]>,
     ) -> Result<Self, RefinementWitnessError> {
-        let physical_writes = refinement_physical_writes_as_shape_events(&trace)?;
         let oram_leaf_public_scaffold = validate_path_oram_leaf_schedule(
             &oram_leaf_schedule,
             &trace.logical_accesses,
             &trace.physical_reads,
-            &physical_writes,
+            &trace.physical_writes,
             &oram_objects,
         )?;
         validate_path_oram_leaf_state(
@@ -4810,12 +5436,11 @@ impl RuntimePathOramHiddenCertificate {
     }
 
     pub fn validate(&self) -> Result<(), RefinementWitnessError> {
-        let physical_writes = refinement_physical_writes_as_shape_events(&self.trace)?;
         let scaffold = validate_path_oram_leaf_schedule(
             &self.oram_leaf_schedule,
             &self.trace.logical_accesses,
             &self.trace.physical_reads,
-            &physical_writes,
+            &self.trace.physical_writes,
             &self.oram_objects,
         )?;
         if scaffold.as_slice() != self.oram_leaf_public_scaffold.as_ref() {
@@ -4872,28 +5497,22 @@ fn validate_refinement_outcome(
     Ok(())
 }
 
-fn refinement_physical_writes_as_shape_events(
-    trace: &RefinementTrace,
-) -> Result<Vec<PhysicalWriteEvent>, RefinementWitnessError> {
-    trace
-        .physical_writes
-        .iter()
-        .map(|event| {
-            let class = match event.write_class.as_str() {
-                "Set" => WriteClass::Set,
-                "Clear" => WriteClass::Clear,
-                "Same" => WriteClass::Same,
-                "Update" => WriteClass::Update,
-                _ => return Err(RefinementWitnessError::OramLeafScheduleMismatch),
-            };
-            Ok(PhysicalWriteEvent::from_shape(
-                event.object.clone(),
-                event.location.clone(),
-                event.len,
-                class,
-            ))
-        })
-        .collect()
+/// Every write of a refinement trace names one of the four write classes.
+/// A rewrite is of class `Update` by what it is.
+fn validate_refinement_write_classes(
+    physical_writes: &RefinementPhysicalWrites,
+) -> Result<(), RefinementWitnessError> {
+    for item in physical_writes.items() {
+        if let RefinementPhysicalWriteItem::Write(event) = item {
+            if !matches!(
+                event.write_class.as_str(),
+                "Set" | "Clear" | "Same" | "Update"
+            ) {
+                return Err(RefinementWitnessError::OramLeafScheduleMismatch);
+            }
+        }
+    }
+    Ok(())
 }
 
 fn validate_seeded_runtime_witnesses(
@@ -5808,7 +6427,7 @@ fn runtime_oram_object_by_name<'a>(
 }
 
 fn consume_expected_oram_logical_events(
-    logical_accesses: &[LogicalEvent],
+    logical_accesses: &[&LogicalEvent],
     mut index: usize,
     object: &str,
     expected_kind: &str,
@@ -5842,7 +6461,7 @@ fn consume_expected_oram_logical_events(
 /// scheme access reads the metadata pages only as its operation's first
 /// node access, so it has all of them or none; any other access has all.
 fn consume_oram_access_metadata_events(
-    logical_accesses: &[LogicalEvent],
+    logical_accesses: &[&LogicalEvent],
     index: usize,
     object: &RuntimeOramObjectWitness,
     object_name: &str,
@@ -5868,10 +6487,36 @@ fn consume_oram_access_metadata_events(
     Ok((next, true))
 }
 
+/// The events of a logical trace that are not in a run. A run is the scan
+/// of a map, which no ORAM access is, so the ORAM accesses of a trace are
+/// among these. A run of an ORAM kind is malformed.
+fn logical_events_outside_runs(
+    logical_accesses: &LogicalAccesses,
+) -> Result<Vec<&LogicalEvent>, RefinementWitnessError> {
+    let mut events = Vec::with_capacity(logical_accesses.items().len());
+    for item in logical_accesses.items() {
+        match item {
+            LogicalAccessItem::Event(event) => events.push(event),
+            LogicalAccessItem::Scan(run) => {
+                if is_oram_logical_kind(&run.scan.kind) {
+                    return Err(RefinementWitnessError::MalformedOramLogicalTrace {
+                        object: run.scan.object.clone(),
+                        expected_kind: "uooram_counter".into(),
+                        detail_prefix: "counter".into(),
+                    });
+                }
+            }
+        }
+    }
+    Ok(events)
+}
+
 fn reconstruct_oram_accesses_from_logical_trace(
-    logical_accesses: &[LogicalEvent],
+    logical_accesses: &LogicalAccesses,
     oram_objects: &[RuntimeOramObjectWitness],
 ) -> Result<Vec<RuntimeOramAccessWitness>, RefinementWitnessError> {
+    let logical_accesses = logical_events_outside_runs(logical_accesses)?;
+    let logical_accesses = logical_accesses.as_slice();
     let mut accesses = Vec::new();
     let mut index = 0usize;
     while index < logical_accesses.len() {
@@ -5934,9 +6579,11 @@ fn runtime_oram_object_by_id(
 }
 
 fn reconstruct_path_oram_leaf_scaffold_from_logical_trace(
-    logical_accesses: &[LogicalEvent],
+    logical_accesses: &LogicalAccesses,
     oram_objects: &[RuntimeOramObjectWitness],
 ) -> Result<Vec<(u32, String, usize)>, RefinementWitnessError> {
+    let logical_accesses = logical_events_outside_runs(logical_accesses)?;
+    let logical_accesses = logical_accesses.as_slice();
     let mut scaffold = Vec::new();
     let mut index = 0usize;
     while index < logical_accesses.len() {
@@ -5979,37 +6626,83 @@ fn reconstruct_path_oram_leaf_scaffold_from_logical_trace(
     Ok(scaffold)
 }
 
-fn runtime_path_oram_bucket_trace(
-    physical_reads: &[PhysicalReadEvent],
-    physical_writes: &[PhysicalWriteEvent],
+/// An item of a list of physical events: where its event is, or the exact
+/// object its run is of.
+trait PhysicalLocationItem {
+    fn located(&self) -> Result<(&str, &str), &ExactObjectSlots>;
+}
+
+impl PhysicalLocationItem for PhysicalReadItem {
+    fn located(&self) -> Result<(&str, &str), &ExactObjectSlots> {
+        match self {
+            Self::Read(event) => Ok((&event.object, &event.location)),
+            Self::Scan(run) => Err(&run.scan),
+        }
+    }
+}
+
+impl PhysicalLocationItem for PhysicalWriteItem {
+    fn located(&self) -> Result<(&str, &str), &ExactObjectSlots> {
+        match self {
+            Self::Write(event) => Ok((&event.object, &event.location)),
+            Self::Rewrite(run) => Err(&run.rewrite),
+        }
+    }
+}
+
+impl PhysicalLocationItem for RefinementPhysicalWriteItem {
+    fn located(&self) -> Result<(&str, &str), &ExactObjectSlots> {
+        match self {
+            Self::Write(event) => Ok((&event.object, &event.location)),
+            Self::Rewrite(run) => Err(&run.rewrite),
+        }
+    }
+}
+
+/// The bucket events of the Path ORAM objects in a list of physical
+/// events. A run is the scan or the rewrite of an exact object: it holds no
+/// bucket event, and one that names a Path ORAM object or is not well
+/// formed is rejected.
+fn path_oram_bucket_events<I: PhysicalLocationItem>(
+    items: &TraceItems<I>,
+    path_objects: &BTreeSet<&str>,
+) -> Result<Vec<(String, String)>, RefinementWitnessError> {
+    let mut buckets = Vec::new();
+    for item in items.items() {
+        match item.located() {
+            Ok((object, location)) => {
+                if path_objects.contains(object)
+                    && location
+                        .strip_prefix(object)
+                        .is_some_and(|rest| rest.starts_with("@bucket"))
+                {
+                    buckets.push((object.to_owned(), location.to_owned()));
+                }
+            }
+            Err(run) => {
+                if path_objects.contains(run.object.as_str()) || !run.is_well_formed() {
+                    return Err(RefinementWitnessError::OramLeafScheduleMismatch);
+                }
+            }
+        }
+    }
+    Ok(buckets)
+}
+
+fn runtime_path_oram_bucket_trace<R: PhysicalLocationItem, W: PhysicalLocationItem>(
+    physical_reads: &TraceItems<R>,
+    physical_writes: &TraceItems<W>,
     oram_objects: &[RuntimeOramObjectWitness],
 ) -> Result<RuntimePathOramBucketTrace, RefinementWitnessError> {
     let path_objects = oram_objects
         .iter()
         .filter(|object| is_path_oram_scheme(&object.scheme))
         .map(|object| object.object_name.as_str())
-        .collect::<std::collections::BTreeSet<_>>();
-    let read_buckets = physical_reads
-        .iter()
-        .filter(|event| {
-            path_objects.contains(event.object.as_str())
-                && event
-                    .location
-                    .starts_with(&format!("{}@bucket", event.object))
-        })
-        .map(|event| (event.object.clone(), event.location.clone()))
-        .collect();
-    let write_buckets = physical_writes
-        .iter()
-        .filter(|event| {
-            path_objects.contains(event.object.as_str())
-                && event
-                    .location
-                    .starts_with(&format!("{}@bucket", event.object))
-        })
-        .map(|event| (event.object.clone(), event.location.clone()))
-        .collect();
-    Ok((read_buckets, write_buckets))
+        .collect::<BTreeSet<_>>();
+    Ok((
+        path_oram_bucket_events(physical_reads, &path_objects)?,
+        path_oram_bucket_events(physical_writes, &path_objects)?,
+    ))
 }
 
 fn runtime_path_oram_bucket_trace_of_leaf_schedule(
@@ -6287,11 +6980,12 @@ pub fn canonical_path_oram_seed_of_leaf_values(
 
 fn validate_path_oram_leaf_schedule(
     leaf_schedule: &[RuntimeOramLeafWitness],
-    logical_accesses: &[LogicalEvent],
-    physical_reads: &[PhysicalReadEvent],
-    physical_writes: &[PhysicalWriteEvent],
+    logical_accesses: &LogicalAccesses,
+    physical_reads: &PhysicalReads,
+    physical_writes: &RefinementPhysicalWrites,
     oram_objects: &[RuntimeOramObjectWitness],
 ) -> Result<Vec<RuntimeOramLeafScaffoldWitness>, RefinementWitnessError> {
+    validate_refinement_write_classes(physical_writes)?;
     let scaffold =
         reconstruct_path_oram_leaf_scaffold_from_logical_trace(logical_accesses, oram_objects)?;
     if scaffold.len() != leaf_schedule.len() {
@@ -6682,13 +7376,13 @@ pub struct PublicReceipt {
     #[serde(default)]
     pub opcode_trace: Box<[String]>,
     #[serde(default)]
-    pub logical_accesses: Box<[LogicalEvent]>,
+    pub logical_accesses: LogicalAccesses,
     #[serde(default)]
     pub logical_writes: Box<[LogicalEvent]>,
     #[serde(default)]
-    pub physical_reads: Box<[PhysicalReadEvent]>,
+    pub physical_reads: PhysicalReads,
     #[serde(default)]
-    pub physical_writes: Box<[PhysicalWriteEvent]>,
+    pub physical_writes: PhysicalWrites,
     #[serde(default)]
     pub gas_used: u64,
     #[serde(default)]
@@ -7196,10 +7890,10 @@ impl FinalizedRuntimeCallTraceParts {
 
 #[derive(Debug, PartialEq)]
 pub struct RuntimePublicCallTraceBundle {
-    logical_accesses: Box<[LogicalEvent]>,
+    logical_accesses: LogicalAccesses,
     logical_writes: Box<[LogicalEvent]>,
-    physical_reads: Box<[PhysicalReadEvent]>,
-    physical_writes: Box<[PhysicalWriteEvent]>,
+    physical_reads: PhysicalReads,
+    physical_writes: PhysicalWrites,
     theorem_trace: TheoremTrace,
     runtime_controller_certificate: RuntimeControllerCertificate,
     runtime_oram_leaf_schedule: Box<[RuntimeOramLeafWitness]>,
@@ -7209,10 +7903,10 @@ pub struct RuntimePublicCallTraceBundle {
 impl RuntimePublicCallTraceBundle {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        logical_accesses: Box<[LogicalEvent]>,
+        logical_accesses: LogicalAccesses,
         logical_writes: Box<[LogicalEvent]>,
-        physical_reads: Box<[PhysicalReadEvent]>,
-        physical_writes: Box<[PhysicalWriteEvent]>,
+        physical_reads: PhysicalReads,
+        physical_writes: PhysicalWrites,
         theorem_trace: TheoremTrace,
         runtime_controller_certificate: RuntimeControllerCertificate,
         runtime_oram_leaf_schedule: Box<[RuntimeOramLeafWitness]>,
@@ -7290,10 +7984,10 @@ impl RuntimePublicCallTraceBundle {
 #[derive(Debug, PartialEq)]
 pub struct RuntimeExecutionTraceFinalizationInput {
     opcode_trace: Box<[String]>,
-    logical_accesses: Box<[LogicalEvent]>,
+    logical_accesses: LogicalAccesses,
     logical_writes: Box<[LogicalEvent]>,
-    physical_reads: Box<[PhysicalReadEvent]>,
-    physical_writes: Box<[PhysicalWriteEvent]>,
+    physical_reads: PhysicalReads,
+    physical_writes: PhysicalWrites,
     gas_used: u64,
     theorem_trace: TheoremTrace,
     runtime_seed: Option<u64>,
@@ -7315,10 +8009,10 @@ pub struct RuntimeExecutionTraceFinalizationInput {
 #[derive(Debug, PartialEq)]
 pub(crate) struct RuntimeExecutionTraceParts {
     opcode_trace: Box<[String]>,
-    logical_accesses: Box<[LogicalEvent]>,
+    logical_accesses: LogicalAccesses,
     logical_writes: Box<[LogicalEvent]>,
-    physical_reads: Box<[PhysicalReadEvent]>,
-    physical_writes: Box<[PhysicalWriteEvent]>,
+    physical_reads: PhysicalReads,
+    physical_writes: PhysicalWrites,
     gas_used: u64,
     theorem_trace: TheoremTrace,
     runtime_seed: Option<u64>,
@@ -7398,10 +8092,10 @@ impl RuntimeExecutionTraceParts {
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         opcode_trace: Box<[String]>,
-        logical_accesses: Box<[LogicalEvent]>,
+        logical_accesses: LogicalAccesses,
         logical_writes: Box<[LogicalEvent]>,
-        physical_reads: Box<[PhysicalReadEvent]>,
-        physical_writes: Box<[PhysicalWriteEvent]>,
+        physical_reads: PhysicalReads,
+        physical_writes: PhysicalWrites,
         gas_used: u64,
         theorem_trace: TheoremTrace,
         runtime_seed: Option<u64>,
@@ -7458,10 +8152,10 @@ impl RuntimeExecutionTraceFinalizationInput {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         opcode_trace: Box<[String]>,
-        logical_accesses: Box<[LogicalEvent]>,
+        logical_accesses: LogicalAccesses,
         logical_writes: Box<[LogicalEvent]>,
-        physical_reads: Box<[PhysicalReadEvent]>,
-        physical_writes: Box<[PhysicalWriteEvent]>,
+        physical_reads: PhysicalReads,
+        physical_writes: PhysicalWrites,
         gas_used: u64,
         theorem_trace: TheoremTrace,
         runtime_seed: Option<u64>,
@@ -7756,12 +8450,11 @@ impl ExecutionTrace {
         let kernel_witness = self.checked_runtime_kernel_witness()?;
         let controller_observer = self.reconstructed_runtime_controller_observer_certificate()?;
         let refinement_trace = self.refinement_trace();
-        let physical_writes = refinement_physical_writes_as_shape_events(&refinement_trace)?;
         validate_path_oram_leaf_schedule(
             &self.evidence.runtime_oram_leaf_schedule,
             &refinement_trace.logical_accesses,
             &refinement_trace.physical_reads,
-            &physical_writes,
+            &refinement_trace.physical_writes,
             &self.evidence.runtime_oram_objects,
         )?;
         validate_refinement_outcome(
@@ -7779,23 +8472,19 @@ impl ExecutionTrace {
     }
 
     pub fn hashes(&self) -> Result<TraceHashBundle, serde_json::Error> {
+        // The hashes are of the events of the trace, whatever runs its
+        // lists hold them in.
         let normalized_physical = self
             .physical_writes
-            .iter()
-            .map(|event| {
-                (
-                    event.object.clone(),
-                    event.location.clone(),
-                    event.class,
-                    event.len,
-                )
-            })
+            .events()
+            .map(|event| (event.object, event.location, event.class, event.len))
             .collect::<Vec<_>>();
         let normalized_reads = self
             .physical_reads
-            .iter()
-            .map(|event| (event.object.clone(), event.location.clone(), event.len))
+            .events()
+            .map(|event| (event.object, event.location, event.len))
             .collect::<Vec<_>>();
+        let logical_accesses = self.logical_accesses.events().collect::<Vec<_>>();
         let primitive_event_transcript = self.primitive_event_transcript()?;
         let public_environment_projection = self
             .theorem_trace
@@ -7805,7 +8494,7 @@ impl ExecutionTrace {
             .unwrap_or_default();
         Ok(TraceHashBundle {
             opcode_trace_hash: hash_json(&self.opcode_trace)?,
-            logical_access_trace_hash: hash_json(&self.logical_accesses)?,
+            logical_access_trace_hash: hash_json(&logical_accesses)?,
             logical_write_trace_hash: hash_json(&self.logical_writes)?,
             physical_read_trace_hash: hash_json(&normalized_reads)?,
             physical_write_trace_hash: hash_json(&normalized_physical)?,
@@ -7835,13 +8524,13 @@ impl ExecutionTrace {
                 },
             )?;
         }
-        for (index, event) in self.logical_accesses.iter().enumerate() {
+        for (index, event) in self.logical_accesses.events().enumerate() {
             push_primitive_event(
                 &mut events,
                 RuntimePrimitiveEventKind::LogicalAccess,
                 &IndexedTranscriptPayload {
                     index,
-                    value: event,
+                    value: &event,
                 },
             )?;
         }
@@ -7855,23 +8544,23 @@ impl ExecutionTrace {
                 },
             )?;
         }
-        for (index, event) in self.physical_reads.iter().enumerate() {
+        for (index, event) in self.physical_reads.events().enumerate() {
             push_primitive_event(
                 &mut events,
                 RuntimePrimitiveEventKind::PhysicalRead,
                 &IndexedTranscriptPayload {
                     index,
-                    value: event,
+                    value: &event,
                 },
             )?;
         }
-        for (index, event) in self.physical_writes.iter().enumerate() {
+        for (index, event) in self.physical_writes.events().enumerate() {
             push_primitive_event(
                 &mut events,
                 RuntimePrimitiveEventKind::PhysicalWrite,
                 &IndexedTranscriptPayload {
                     index,
-                    value: event,
+                    value: &event,
                 },
             )?;
         }
@@ -8043,12 +8732,20 @@ impl ExecutionTrace {
             physical_reads: self.physical_reads.clone(),
             physical_writes: self
                 .physical_writes
+                .items()
                 .iter()
-                .map(|event| RefinementPhysicalWrite {
-                    object: event.object.clone(),
-                    location: event.location.clone(),
-                    write_class: event.class.as_refinement_label().into(),
-                    len: event.len,
+                .map(|item| match item {
+                    PhysicalWriteItem::Write(event) => {
+                        RefinementPhysicalWriteItem::Write(RefinementPhysicalWrite {
+                            object: event.object.clone(),
+                            location: event.location.clone(),
+                            write_class: event.class.as_refinement_label().into(),
+                            len: event.len,
+                        })
+                    }
+                    PhysicalWriteItem::Rewrite(run) => {
+                        RefinementPhysicalWriteItem::Rewrite(run.clone())
+                    }
                 })
                 .collect(),
             gas_used: self.gas_used,
@@ -8572,9 +9269,9 @@ mod tests {
         CanonicalFreshCoinRuntimePathOramWitnessFamily, CanonicalFreshCoinTheoremInputError,
         CanonicalFreshCoinWitnessFamilyError, CommittedRuntimeWitnessSnapshot, ExecutionTrace,
         ExitEvent, KernelWitnessError, LogicalEvent, NormalizedMicroTrace, NormalizedPageEvent,
-        OutputShape, PageEventKind, PhysicalReadEvent, PhysicalWriteEvent, PrivateEvidence,
-        PublicOutcomeTrace, PublicReceipt, RefinementWitnessError, RuntimeControllerCertificate,
-        RuntimeExecutionTraceParts, RuntimeKernelBoundaryTracker,
+        OutputShape, PageEventKind, PhysicalReadEvent, PhysicalReadItem, PhysicalWriteEvent,
+        PrivateEvidence, PublicOutcomeTrace, PublicReceipt, RefinementWitnessError,
+        RuntimeControllerCertificate, RuntimeExecutionTraceParts, RuntimeKernelBoundaryTracker,
         RuntimeKernelBoundaryTrackerError, RuntimeKernelExecutionTracker,
         RuntimeKernelFinishBundle, RuntimeKernelFinishBundleAccessError,
         RuntimeKernelFinishBundleError, RuntimeKernelFinishSnapshot,
@@ -8798,7 +9495,7 @@ mod tests {
             object: "balance".into(),
             detail: "cell".into(),
         }]
-        .into_boxed_slice();
+        .into();
 
         let before = trace.hashes().unwrap();
         let transcript = trace.primitive_event_transcript().unwrap();
@@ -9199,10 +9896,10 @@ mod tests {
         let trace = ExecutionTrace::from_runtime_trace_parts(
             RuntimeExecutionTraceParts::new(
                 vec![].into_boxed_slice(),
+                Default::default(),
                 vec![].into_boxed_slice(),
-                vec![].into_boxed_slice(),
-                vec![].into_boxed_slice(),
-                vec![].into_boxed_slice(),
+                Default::default(),
+                Default::default(),
                 0,
                 TheoremTrace::default(),
                 None,
@@ -9247,10 +9944,10 @@ mod tests {
         let trace = ExecutionTrace::from_runtime_trace_parts(
             RuntimeExecutionTraceParts::new(
                 vec![].into_boxed_slice(),
+                Default::default(),
                 vec![].into_boxed_slice(),
-                vec![].into_boxed_slice(),
-                vec![].into_boxed_slice(),
-                vec![].into_boxed_slice(),
+                Default::default(),
+                Default::default(),
                 0,
                 TheoremTrace::default(),
                 None,
@@ -9301,10 +9998,10 @@ mod tests {
         assert_eq!(
             RuntimeExecutionTraceParts::new(
                 vec![].into_boxed_slice(),
+                Default::default(),
                 vec![].into_boxed_slice(),
-                vec![].into_boxed_slice(),
-                vec![].into_boxed_slice(),
-                vec![].into_boxed_slice(),
+                Default::default(),
+                Default::default(),
                 0,
                 TheoremTrace::default(),
                 None,
@@ -9338,10 +10035,10 @@ mod tests {
         assert_eq!(
             RuntimeExecutionTraceParts::new(
                 vec![].into_boxed_slice(),
+                Default::default(),
                 vec![].into_boxed_slice(),
-                vec![].into_boxed_slice(),
-                vec![].into_boxed_slice(),
-                vec![].into_boxed_slice(),
+                Default::default(),
+                Default::default(),
                 0,
                 TheoremTrace::default(),
                 None,
@@ -9381,7 +10078,7 @@ mod tests {
             io_scratch_peak_bytes: 0,
             io_scratch_live_bytes_end: 0,
             io_scratch_wipe_count: 0,
-            resource_events: vec![].into_boxed_slice(),
+            resource_events: Default::default(),
             expected_kernel_steps: Some(
                 vec![
                     RuntimeKernelStepWitness::new(UoOpcode::Begin, None).unwrap(),
@@ -9671,7 +10368,7 @@ mod tests {
         ExecutionTrace {
             receipt: PublicReceipt {
                 opcode_trace: vec!["declare".into(), "return".into()].into_boxed_slice(),
-                logical_accesses: sample_oram_logical_accesses().into_boxed_slice(),
+                logical_accesses: sample_oram_logical_accesses().into(),
                 logical_writes: vec![].into_boxed_slice(),
                 physical_reads: path
                     .iter()
@@ -9681,7 +10378,8 @@ mod tests {
                         len: 64,
                     })
                     .collect::<Vec<_>>()
-                    .into_boxed_slice(),
+                    .into_boxed_slice()
+                    .into(),
                 physical_writes: path
                     .iter()
                     .rev()
@@ -9694,7 +10392,8 @@ mod tests {
                         )
                     })
                     .collect::<Vec<_>>()
-                    .into_boxed_slice(),
+                    .into_boxed_slice()
+                    .into(),
                 gas_used: 99,
                 theorem_trace: TheoremTrace {
                     public_outcome: Some(public_outcome.clone()),
@@ -9758,7 +10457,7 @@ mod tests {
             io_scratch_peak_bytes: 0,
             io_scratch_live_bytes_end: 0,
             io_scratch_wipe_count: 0,
-            resource_events: vec![].into_boxed_slice(),
+            resource_events: Default::default(),
             expected_kernel_steps: Some(
                 vec![
                     RuntimeKernelStepWitness {
@@ -10104,21 +10803,21 @@ mod tests {
         let trace = ExecutionTrace {
             receipt: PublicReceipt {
                 opcode_trace: vec!["declare".into(), "return".into()].into_boxed_slice(),
-                logical_accesses: sample_read_miss_logical_accesses().into_boxed_slice(),
+                logical_accesses: sample_read_miss_logical_accesses().into(),
                 logical_writes: vec![].into_boxed_slice(),
                 physical_reads: vec![PhysicalReadEvent {
                     object: "tiny_records".into(),
                     location: "tiny_records@bucket0".into(),
                     len: 64,
                 }]
-                .into_boxed_slice(),
+                .into(),
                 physical_writes: vec![PhysicalWriteEvent::from_shape(
                     "tiny_records",
                     "tiny_records@bucket0",
                     1,
                     WriteClass::Update,
                 )]
-                .into_boxed_slice(),
+                .into(),
                 gas_used: 7,
                 theorem_trace: TheoremTrace {
                     public_outcome: Some(public_outcome.clone()),
@@ -10182,8 +10881,20 @@ mod tests {
         let trace = sample_runtime_execution_trace_with_seed(0);
         let witness = trace.runtime_refinement_witness().unwrap();
         assert_eq!(witness.public_outcome.gas_used, 99);
-        assert_eq!(witness.trace.physical_writes[0].write_class, "Update");
-        assert_eq!(witness.trace.physical_writes[0].len, 2);
+        assert_eq!(
+            witness
+                .trace
+                .physical_writes
+                .events()
+                .next()
+                .unwrap()
+                .write_class,
+            "Update"
+        );
+        assert_eq!(
+            witness.trace.physical_writes.events().next().unwrap().len,
+            2
+        );
         assert_eq!(witness.controller_shape, controller_shape);
         assert_eq!(witness.normalized_micro_trace, normalized_micro_trace);
         assert_eq!(witness.controller_certificate, controller_certificate);
@@ -10571,7 +11282,7 @@ mod tests {
             io_scratch_peak_bytes: 0,
             io_scratch_live_bytes_end: 0,
             io_scratch_wipe_count: 0,
-            resource_events: vec![].into_boxed_slice(),
+            resource_events: Default::default(),
             expected_kernel_steps: None,
             public_object_ids: vec![7, 9].into_boxed_slice(),
             expected_public_object_ids: None,
@@ -10943,7 +11654,7 @@ mod tests {
         let trace = ExecutionTrace {
             receipt: PublicReceipt {
                 gas_used: 7,
-                logical_accesses: sample_oram_logical_accesses().into_boxed_slice(),
+                logical_accesses: sample_oram_logical_accesses().into(),
                 theorem_trace: TheoremTrace {
                     public_outcome: Some(public_outcome.clone()),
                     boundary_schedule: controller_certificate.boundary_schedule(&public_outcome),
@@ -10989,7 +11700,7 @@ mod tests {
         let trace = ExecutionTrace {
             receipt: PublicReceipt {
                 gas_used: 7,
-                logical_accesses: logical_accesses.into_boxed_slice(),
+                logical_accesses: logical_accesses.into(),
                 theorem_trace: TheoremTrace {
                     public_outcome: Some(public_outcome.clone()),
                     boundary_schedule: controller_certificate.boundary_schedule(&public_outcome),
@@ -11037,7 +11748,7 @@ mod tests {
         let trace = ExecutionTrace {
             receipt: PublicReceipt {
                 opcode_trace: vec!["declare".into(), "return".into()].into_boxed_slice(),
-                logical_accesses: sample_oram_logical_accesses().into_boxed_slice(),
+                logical_accesses: sample_oram_logical_accesses().into(),
                 logical_writes: vec![].into_boxed_slice(),
                 physical_reads: path
                     .iter()
@@ -11047,7 +11758,8 @@ mod tests {
                         len: 64,
                     })
                     .collect::<Vec<_>>()
-                    .into_boxed_slice(),
+                    .into_boxed_slice()
+                    .into(),
                 physical_writes: path
                     .iter()
                     .rev()
@@ -11060,7 +11772,8 @@ mod tests {
                         )
                     })
                     .collect::<Vec<_>>()
-                    .into_boxed_slice(),
+                    .into_boxed_slice()
+                    .into(),
                 gas_used: 99,
                 theorem_trace: TheoremTrace {
                     public_outcome: Some(public_outcome.clone()),
@@ -11263,7 +11976,10 @@ mod tests {
         trace.evidence.runtime_oram_leaf_state_transitions = Box::default();
         assert!(check(&trace).is_err());
         let mut trace = sample_trace_without_position_maps();
-        trace.receipt.physical_reads[4].location = "records@bucket16".into();
+        match &mut trace.receipt.physical_reads.items_mut()[4] {
+            PhysicalReadItem::Read(event) => event.location = "records@bucket16".into(),
+            PhysicalReadItem::Scan(_) => panic!("the sample trace has no scan"),
+        }
         assert!(check(&trace).is_err());
 
         // The controller's certificate and the outcome are those of the
@@ -11287,6 +12003,384 @@ mod tests {
         assert!(check(&trace).is_err());
     }
 
+    /// A log of resource events folds a block that repeats into one item,
+    /// stands for the events it was made from, and is replayed as they are.
+    #[test]
+    fn a_resource_event_log_folds_repeated_blocks_and_stands_for_its_events() {
+        use super::{
+            RuntimeKernelResourceEventItem as Item, RuntimeKernelResourceEventWitness as Event,
+            RuntimeKernelResourceEvents as Log, RuntimeKernelScratchRegionWitness as Region,
+        };
+        let reserve = |bytes| Event::reserve_scratch(Region::IoScratch, bytes);
+        let wipe = || Event::wipe_scratch(Region::IoScratch);
+        // A stack check, the slots of one object, a value reservation, the
+        // slots of another object with a longer record, and a stack check
+        // that repeats.
+        let mut events = vec![Event::stack_check(3)];
+        for _ in 0..1000 {
+            events.extend([reserve(96), wipe()]);
+        }
+        events.extend([
+            Event::reserve_scratch(Region::ValueScratch, 64),
+            Event::wipe_scratch(Region::ValueScratch),
+        ]);
+        for _ in 0..7 {
+            events.extend([reserve(128), wipe()]);
+        }
+        events.extend([
+            Event::stack_check(5),
+            Event::stack_check(5),
+            Event::stack_check(5),
+        ]);
+        events.push(reserve(96));
+
+        let log = Log::from_events(&events);
+        assert_eq!(log.event_count(), events.len());
+        assert_eq!(log.events().cloned().collect::<Vec<_>>(), events);
+        let shape: Vec<(usize, usize)> = log
+            .items()
+            .iter()
+            .map(|item| match item {
+                Item::Event(_) => (1, 1),
+                Item::Repeat(block) => (block.events().len(), block.repeat()),
+            })
+            .collect();
+        assert_eq!(
+            shape,
+            [(1, 1), (2, 1000), (1, 1), (1, 1), (2, 7), (1, 3), (1, 1)]
+        );
+        // The same events give the same log, and its JSON reads back.
+        assert_eq!(Log::from(events.clone()), log);
+        let json = serde_json::to_value(&log).unwrap();
+        assert_eq!(json.as_array().unwrap().len(), 7);
+        assert_eq!(json[1]["repeat"], 1000);
+        assert_eq!(json[1]["events"].as_array().unwrap().len(), 2);
+        assert_eq!(serde_json::from_value::<Log>(json).unwrap(), log);
+        // The log of the events one by one reads back as a log too: it is
+        // the form every log had.
+        let unfolded =
+            serde_json::from_value::<Log>(serde_json::to_value(&events).unwrap()).unwrap();
+        assert_eq!(unfolded.event_count(), events.len());
+        assert_eq!(unfolded.events().cloned().collect::<Vec<_>>(), events);
+
+        // A kernel witness replays the folded log as it replays its events.
+        let mut witness = sample_runtime_kernel_witness();
+        witness.scratch_bytes = 4096;
+        witness.max_stack_words = 64;
+        witness.resource_events = log;
+        let folded = witness.replay_resource_events().unwrap();
+        witness.resource_events = unfolded;
+        let one_by_one = witness.replay_resource_events().unwrap();
+        assert_eq!(folded.peak_stack_words, one_by_one.peak_stack_words);
+        assert_eq!(folded.peak_stack_words, 5);
+        for (folded, one_by_one) in [
+            (&folded.value_scratch, &one_by_one.value_scratch),
+            (&folded.hash_scratch, &one_by_one.hash_scratch),
+            (&folded.io_scratch, &one_by_one.io_scratch),
+        ] {
+            assert_eq!(folded.live_bytes, one_by_one.live_bytes);
+            assert_eq!(folded.peak_bytes, one_by_one.peak_bytes);
+            assert_eq!(folded.wipe_count, one_by_one.wipe_count);
+        }
+        assert_eq!(folded.io_scratch.wipe_count, 1007);
+        assert_eq!(folded.io_scratch.peak_bytes, 128);
+        assert_eq!(folded.io_scratch.live_bytes, 96);
+
+        // A block that does not repeat, or holds nothing, is malformed.
+        for malformed in [
+            serde_json::json!([{"repeat": 1, "events": [serde_json::to_value(wipe()).unwrap()]}]),
+            serde_json::json!([{"repeat": 4, "events": []}]),
+        ] {
+            witness.resource_events = serde_json::from_value(malformed).unwrap();
+            assert!(witness.replay_resource_events().is_err());
+        }
+    }
+
+    /// A trace is its events in order: an item that stands for a run of
+    /// events is that run. The hashes and the event transcript of a trace
+    /// are those of its events, so they do not depend on how the events are
+    /// grouped into items, and a run names its events as the runtime names
+    /// the slots of an exact object.
+    #[test]
+    fn a_trace_with_runs_is_the_trace_of_their_events() {
+        use super::{
+            ExactObjectKind, ExactObjectSlots, LogicalAccessItem, LogicalScan, LogicalScanSlots,
+            PhysicalRewrite, PhysicalScan, PhysicalWriteItem, TraceRunItem,
+        };
+        let slots = |object: &str, kind, slots, len| ExactObjectSlots {
+            object: object.into(),
+            kind,
+            slots,
+            len,
+        };
+        // The names of the slots.
+        let ledger = slots("ledger", ExactObjectKind::Map, 12, 96);
+        let table = slots("table", ExactObjectKind::Array, 3, 64);
+        let total = slots("total", ExactObjectKind::Cell, 1, 64);
+        assert_eq!(ledger.location(0), "ledger#0");
+        assert_eq!(ledger.location(11), "ledger#11");
+        assert_eq!(table.location(2), "table[2]");
+        assert_eq!(total.location(0), "total");
+        for (run, slot, location, is) in [
+            (&ledger, 11, "ledger#11", true),
+            (&ledger, 1, "ledger#11", false),
+            (&ledger, 11, "ledger#011", false),
+            (&ledger, 11, "ledger[11]", false),
+            (&ledger, 0, "ledger#", false),
+            (&ledger, 0, "ledger2#0", false),
+            (&table, 2, "table[2]", true),
+            (&table, 2, "table[2", false),
+            (&table, 2, "table#2", false),
+            (&total, 0, "total", true),
+            (&total, 1, "total", false),
+            (&total, 0, "total#0", false),
+        ] {
+            assert_eq!(run.is_location(slot, location), is, "{location} {slot}");
+        }
+        assert_eq!(ledger.bytes(), 12 * 96);
+
+        let mut folded = sample_runtime_execution_trace_with_seed(0);
+        let mut reads = folded.receipt.physical_reads.items().to_vec();
+        reads.push(PhysicalReadItem::Scan(PhysicalScan {
+            scan: ledger.clone(),
+        }));
+        reads.push(PhysicalReadItem::Scan(PhysicalScan {
+            scan: table.clone(),
+        }));
+        folded.receipt.physical_reads = reads.into();
+        let mut writes = folded.receipt.physical_writes.items().to_vec();
+        writes.push(PhysicalWriteItem::Rewrite(PhysicalRewrite {
+            rewrite: ledger.clone(),
+        }));
+        folded.receipt.physical_writes = writes.into();
+        let mut logical = folded.receipt.logical_accesses.items().to_vec();
+        logical.push(LogicalAccessItem::Scan(LogicalScan {
+            scan: LogicalScanSlots {
+                kind: "uomap_scan".into(),
+                object: "ledger".into(),
+                slots: 12,
+            },
+        }));
+        folded.receipt.logical_accesses = logical.into();
+
+        // The same trace with every event an item of its own.
+        let mut unfolded = sample_runtime_execution_trace_with_seed(0);
+        unfolded.receipt.physical_reads = folded
+            .receipt
+            .physical_reads
+            .events()
+            .collect::<Vec<_>>()
+            .into();
+        unfolded.receipt.physical_writes = folded
+            .receipt
+            .physical_writes
+            .events()
+            .collect::<Vec<_>>()
+            .into();
+        unfolded.receipt.logical_accesses = folded
+            .receipt
+            .logical_accesses
+            .events()
+            .collect::<Vec<_>>()
+            .into();
+        assert_ne!(folded.receipt, unfolded.receipt);
+        assert_eq!(
+            folded.receipt.physical_reads.event_count(),
+            unfolded.receipt.physical_reads.items().len()
+        );
+        assert_eq!(folded.receipt.physical_reads.event_count(), 5 + 12 + 3);
+        assert_eq!(folded.receipt.physical_writes.event_count(), 5 + 12);
+        assert_eq!(
+            folded.receipt.physical_reads.bytes(),
+            5 * 64 + 12 * 96 + 3 * 64
+        );
+        let last = unfolded.receipt.physical_reads.items().last().unwrap();
+        assert_eq!(
+            last.event(0).unwrap(),
+            PhysicalReadEvent {
+                object: "table".into(),
+                location: "table[2]".into(),
+                len: 64
+            }
+        );
+        let scanned = unfolded.receipt.logical_accesses.events().last().unwrap();
+        assert_eq!(
+            (scanned.kind.as_str(), scanned.detail.as_str()),
+            ("uomap_scan", "slot:11")
+        );
+        let rewritten = unfolded.receipt.physical_writes.events().last().unwrap();
+        assert_eq!(rewritten.location, "ledger#11");
+        assert_eq!((rewritten.len, rewritten.class), (96, WriteClass::Update));
+
+        // One trace, to its hashes and its transcript.
+        assert_eq!(folded.hashes().unwrap(), unfolded.hashes().unwrap());
+        assert_eq!(
+            folded.primitive_event_transcript().unwrap(),
+            unfolded.primitive_event_transcript().unwrap()
+        );
+        // And to the checks of its Path ORAM accesses: a run of an exact
+        // object holds none of their events.
+        assert_eq!(
+            folded.runtime_refinement_witness().unwrap().validate(),
+            Ok(())
+        );
+        let witness = folded.runtime_refinement_witness().unwrap();
+        assert_eq!(witness.trace().physical_writes.event_count(), 5 + 12);
+        let json = serde_json::to_value(&witness.trace().physical_writes).unwrap();
+        assert_eq!(json.as_array().unwrap().len(), 6);
+        assert_eq!(json[5]["rewrite"]["slots"], 12);
+        assert_eq!(json[5]["rewrite"]["kind"], "map");
+
+        // A run that names a Path ORAM object would hide its bucket events:
+        // it is rejected, as is a cell of more than one slot.
+        for run in [
+            slots("records", ExactObjectKind::Map, 16, 64),
+            slots("total", ExactObjectKind::Cell, 2, 64),
+        ] {
+            let mut hidden = sample_runtime_execution_trace_with_seed(0);
+            let mut reads = hidden.receipt.physical_reads.items().to_vec();
+            reads.push(PhysicalReadItem::Scan(PhysicalScan { scan: run }));
+            hidden.receipt.physical_reads = reads.into();
+            assert_eq!(
+                hidden.runtime_refinement_witness().unwrap_err(),
+                RefinementWitnessError::OramLeafScheduleMismatch
+            );
+        }
+        // So is a logical run of an ORAM kind.
+        let mut hidden = sample_runtime_execution_trace_with_seed(0);
+        let mut logical = hidden.receipt.logical_accesses.items().to_vec();
+        logical.push(LogicalAccessItem::Scan(LogicalScan {
+            scan: LogicalScanSlots {
+                kind: "uooram_path_read".into(),
+                object: "records".into(),
+                slots: 5,
+            },
+        }));
+        hidden.receipt.logical_accesses = logical.into();
+        assert!(hidden.runtime_refinement_witness().is_err());
+    }
+
+    /// A rewrite takes the writes a recorder hands it one at a time. It
+    /// takes the `Update` of its next slot, of the length of the slots
+    /// before it, and no other write, so the item it becomes stands for
+    /// exactly the writes it took. A recorder keeps a run of one event as
+    /// that event, and a run of none as nothing.
+    #[test]
+    fn a_rewrite_takes_the_update_of_its_next_slot_and_no_other_write() {
+        use super::{
+            ExactObjectKind, ExactObjectSlots, LogicalAccessItem, LogicalScanSlots,
+            PhysicalWriteItem, TraceRunItem,
+        };
+        let update = |location: &str, len| {
+            PhysicalWriteEvent::from_shape("ledger", location, len, WriteClass::Update)
+        };
+        let mut run = ExactObjectSlots::none_of("ledger", ExactObjectKind::Map);
+        assert_eq!((run.slots, run.len), (0, 0));
+        // Before any slot the rewrite is nothing.
+        assert_eq!(PhysicalWriteItem::rewrite(run.clone()), None);
+
+        // Not the first slot, not this object, not an `Update`.
+        assert!(!run.takes_write(&update("ledger#1", 96)));
+        assert!(!run.takes_write(&PhysicalWriteEvent::from_shape(
+            "other",
+            "ledger#0",
+            96,
+            WriteClass::Update
+        )));
+        for class in [WriteClass::Same, WriteClass::Clear, WriteClass::Set] {
+            assert!(!run.takes_write(&PhysicalWriteEvent::from_shape(
+                "ledger", "ledger#0", 96, class
+            )));
+        }
+        assert_eq!((run.slots, run.len), (0, 0));
+
+        // The first slot gives the run its length. A rewrite of one slot
+        // is the write itself.
+        let first = update("ledger#0", 96);
+        assert!(run.takes_write(&first));
+        assert_eq!((run.slots, run.len), (1, 96));
+        assert_eq!(
+            PhysicalWriteItem::rewrite(run.clone()),
+            Some(PhysicalWriteItem::Write(first.clone()))
+        );
+
+        // The same slot again, a slot of another length, a slot too far.
+        assert!(!run.takes_write(&first));
+        assert!(!run.takes_write(&update("ledger#1", 64)));
+        assert!(!run.takes_write(&update("ledger#2", 96)));
+        assert_eq!((run.slots, run.len), (1, 96));
+
+        let mut taken = vec![first];
+        for slot in 1..12 {
+            let write = update(&format!("ledger#{slot}"), 96);
+            assert!(run.takes_write(&write));
+            taken.push(write);
+        }
+        let item = PhysicalWriteItem::rewrite(run.clone()).unwrap();
+        assert_eq!(
+            serde_json::to_value(&item).unwrap(),
+            serde_json::json!({"rewrite": {"object": "ledger", "kind": "map", "slots": 12, "len": 96}})
+        );
+        // The item is the writes it took.
+        assert_eq!(item.event_count(), 12);
+        assert_eq!(
+            (0..12)
+                .map(|index| item.event(index).unwrap())
+                .collect::<Vec<_>>(),
+            taken
+        );
+        assert_eq!(item.event(12), None);
+
+        // A cell has one slot, so its rewrite takes one write.
+        let mut cell = ExactObjectSlots::none_of("total", ExactObjectKind::Cell);
+        let write = PhysicalWriteEvent::from_shape("total", "total", 64, WriteClass::Update);
+        assert!(cell.takes_write(&write));
+        assert!(!cell.takes_write(&write));
+        assert_eq!(
+            PhysicalWriteItem::rewrite(cell),
+            Some(PhysicalWriteItem::Write(write))
+        );
+
+        // Scans follow the same rule for a run of one event and of none.
+        let scan = |slots| ExactObjectSlots {
+            object: "table".into(),
+            kind: ExactObjectKind::Array,
+            slots,
+            len: 64,
+        };
+        assert_eq!(PhysicalReadItem::scan(scan(0)), None);
+        assert_eq!(
+            PhysicalReadItem::scan(scan(1)),
+            Some(PhysicalReadItem::Read(PhysicalReadEvent {
+                object: "table".into(),
+                location: "table[0]".into(),
+                len: 64
+            }))
+        );
+        assert_eq!(
+            serde_json::to_value(PhysicalReadItem::scan(scan(3)).unwrap()).unwrap(),
+            serde_json::json!({"scan": {"object": "table", "kind": "array", "slots": 3, "len": 64}})
+        );
+        let logical = |slots| LogicalScanSlots {
+            kind: "uomap_scan".into(),
+            object: "ledger".into(),
+            slots,
+        };
+        assert_eq!(LogicalAccessItem::scan(logical(0)), None);
+        assert_eq!(
+            LogicalAccessItem::scan(logical(1)),
+            Some(LogicalAccessItem::Event(LogicalEvent {
+                kind: "uomap_scan".into(),
+                object: "ledger".into(),
+                detail: "slot:0".into()
+            }))
+        );
+        assert_eq!(
+            LogicalAccessItem::scan(logical(12)).unwrap().event_count(),
+            12
+        );
+    }
+
     #[test]
     fn runtime_path_oram_hidden_certificate_rejects_path_oram_state_drift() {
         let controller_certificate = sample_controller_certificate();
@@ -11299,7 +12393,7 @@ mod tests {
         let trace = ExecutionTrace {
             receipt: PublicReceipt {
                 opcode_trace: vec!["declare".into(), "return".into()].into_boxed_slice(),
-                logical_accesses: sample_oram_logical_accesses().into_boxed_slice(),
+                logical_accesses: sample_oram_logical_accesses().into(),
                 logical_writes: vec![].into_boxed_slice(),
                 physical_reads: path
                     .iter()
@@ -11309,7 +12403,8 @@ mod tests {
                         len: 64,
                     })
                     .collect::<Vec<_>>()
-                    .into_boxed_slice(),
+                    .into_boxed_slice()
+                    .into(),
                 physical_writes: path
                     .iter()
                     .rev()
@@ -11322,7 +12417,8 @@ mod tests {
                         )
                     })
                     .collect::<Vec<_>>()
-                    .into_boxed_slice(),
+                    .into_boxed_slice()
+                    .into(),
                 gas_used: 99,
                 theorem_trace: TheoremTrace {
                     public_outcome: Some(public_outcome.clone()),

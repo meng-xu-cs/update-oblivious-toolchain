@@ -107,6 +107,7 @@ const CLAIM_ENTRIES: &[ClaimEntry] = &[
         lean_modules: &[
             "proof/lean/UOToolchain/ProofGradeRoot.lean",
             "proof/lean/UOToolchain/KernelExactTrace.lean",
+            "proof/lean/UOToolchain/ExactObjectLayout.lean",
         ],
         runtime_compiler_files: &["runtime/uo-evm/src/objects.rs"],
         benchmark_result_files: &["results/trace_equivalence.json", "results/correctness.json"],

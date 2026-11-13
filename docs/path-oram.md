@@ -334,8 +334,11 @@ witness with that decode. The sweep audits after every occupancy level and
 not in the calls it times; every other instrumented call audits before it
 runs and after. A production call records no witness at all. The report also gives
 the size of what a call exports: at 16,384 entries the trace of a full-scan
-read is 11.0 MB of JSON, 9.1 MB of it private evidence, and that of a tree
-read 3.0 MB.
+read is 9.2 KB of JSON, where that of a map of two entries is 9.1 KB, and
+that of a tree read 2.7 MB, 2.4 MB of it private evidence. A trace holds
+the scan of an exact object, its rewrite and the logical scan of a map as
+one item each, with the slot count and the length of a sealed slot, so the
+trace of a call on a full-scan map does not grow with the map.
 
 The latencies are wall-clock times of a release build on one machine. The
 validation script runs a quick profile of the sweep, whose latencies are a
@@ -396,7 +399,7 @@ its evidence and opens no record for it. In the validation run's quick
 profile, two rounds of each call, the witness of a tree read takes 0.3 ms
 at 16,384 entries where it took 393 ms, and 0.05 ms at 4,096 where it took
 99 ms. What is left is the copy of the two position maps into the call's
-evidence. It grows with the capacity as that evidence does (2.6 MB of JSON
+evidence. It grows with the capacity as that evidence does (2.4 MB of JSON
 for a tree read at 16,384 entries), and a production call makes no such
 copy.
 
@@ -406,8 +409,20 @@ it took 6.5 ms on the tree and 1.7 ms on the full scan at 16,384 entries,
 and loading the tree takes 1.4 ms there where it took 6.2 ms: the call
 takes a reference to each sealed record of the map and copies only the
 records it writes. Loading a full-scan map is still the decryption of every
-slot. The full profile is run again when Issue 38 is done, and the
-whole-call figures above stand until then.
+slot.
+
+Nor does a trace hold an event for every slot of a full-scan map any more
+(Issue 38 of the review). In the quick profile the trace of a full-scan
+read is 9.2 KB at 16,384 entries, where it was 11.0 MB, and that of a write
+10.2 KB, where it was 20.7 MB; at 64 entries they are 9.1 KB and 10.1 KB.
+Building the proof bundles of the read takes 0.3 ms where it took 184 ms,
+and those of the write 0.4 ms where it took 460 ms, and they take 0.2 ms at
+64 entries. The whole instrumented read takes 53 ms where it took 229 ms,
+and 49 ms of it load the map. The traces of the tree are smaller too, since
+the kernel's log of resource events folds a block of events that repeats:
+2.7 MB for a read at 16,384 entries, where it was 3.0 MB. The full profile
+is run again now that Issues 36 to 38 are done, and the whole-call figures
+above stand until its figures replace them.
 
 Against the baseline, at 16,384 entries: a full-scan read took 72.2 ms of
 its own work and 354.8 ms as a whole call, and takes 39.9 ms and 182.8 ms.

@@ -141,6 +141,21 @@ and the ownership boundaries that keep them auditable.
     the ciphertext store (invariant 13) reads the records of the objects
     written since the last digest and of no other.
 
+17. A run in a trace stands for the events the runtime recorded. The scan
+    and the rewrite of an exact object are one item of a trace each, with
+    the object's slot count and the length of a sealed slot, and so is the
+    logical scan of a map. A trace is the events of its items in order.
+    `uo-core` names the events of a run and computes the hashes of a trace
+    over its events, so a hash does not depend on how the events are
+    grouped. The recorder keeps a scan as one item only when every slot of
+    the object has one length. It does not label a rewrite: a rewrite takes
+    the writes the recorder is handed one at a time, each after the check
+    of invariant 14, and takes a write only if it is the `Update` of its
+    next slot, of the length of the slots before it
+    (`ExactObjectSlots::takes_write`). Any other write ends the rewrite
+    and is recorded by itself. A run that names a Path ORAM object is
+    rejected, so no run holds an event of a Path ORAM access.
+
 ### What a nonce shows
 
 A record's nonce shows how many records were sealed under its object's key
@@ -179,7 +194,7 @@ write/read evidence, direct store cipher calls outside the codec layer, and
 reintroduction of host-visible hidden-state errors that should be modeled
 confidential aborts.
 
-Invariants 9 to 16 have eleven bits in `runtime_boundary_validation.json`:
+Invariants 9 to 17 have twelve bits in `runtime_boundary_validation.json`:
 `deployment_seed_stays_out_of_call_traces`,
 `production_errors_carry_no_runtime_freshness_value`,
 `contract_instance_debug_is_opaque`,
@@ -189,8 +204,9 @@ Invariants 9 to 16 have eleven bits in `runtime_boundary_validation.json`:
 `production_calls_issue_chained_receipts`,
 `sealed_writes_are_classified_from_their_bytes`,
 `production_calls_record_no_position_map_witness`,
-`evidence_builds_audit_the_kept_position_map_witness` and
-`a_call_copies_no_committed_object`. Each is a check of source text, and a
+`evidence_builds_audit_the_kept_position_map_witness`,
+`a_call_copies_no_committed_object` and
+`trace_runs_stand_for_recorded_events`. Each is a check of source text, and a
 probe unit test shows that it rejects the drifts it guards against.
 `cargo test -p uo-evm` runs the tests behind all but the two about secrets
 and nonces in the build a production runtime uses
@@ -281,6 +297,27 @@ the digest equal to the one that reads every record again. One writes to a
 shared record and sees the other holder's record unchanged, and sees that
 wiping zeroes a record only for its last holder. The atomicity and rollback
 tests of the runtime run on the shared objects as they ran on copies.
+
+Invariant 17 is pinned in the Lean implementation interface
+(`runtimeHandwrittenConfidentialWorkLivesOnlyInGeneratedHelpers`), with
+three scenarios that the Lean checker must reject: a rewrite that takes a
+write of any class
+(`runtime_implementation_interface/rewrite_run_takes_unclassified_write_drift`),
+a recorder that counts a write into its open rewrite without that check
+(`runtime_implementation_interface/recorder_rewrite_run_skips_fold_drift`),
+and a trace hash over the items of a trace instead of its events
+(`runtime_implementation_interface/trace_hash_over_run_items_drift`). Four
+more scenarios change a run in the trace of a call (`exact_trace/*`: the
+slot count of a scan and of a rewrite, the record length of a scan, the
+naming of its slots), and the probe's comparison of the trace with the
+exact store's encoding rejects them. That comparison is Rust code; no Lean
+checker reads the storage events of an exact object. Its tests are in
+`crates/uo-core/src/trace.rs`, which shows that a trace with runs has the
+hashes, the transcript and the Path ORAM checks of the trace of their
+events, that a rewrite takes the `Update` of its next slot and no other
+write, and that a log of resource events folded into blocks replays as its
+events do; and in `runtime/uo-evm/src/engine.rs`, where the trace of a
+call on a full-scan map has as many items at 64 entries as at 1,024.
 
 Invariant 11 also has a Lean statement and tests. `sealNonceRun_nodup` and
 `sealNonceRun_disjoint_of_le` in `UOToolchain/RuntimeStoreCodecSemantics.lean`

@@ -472,7 +472,7 @@ def RuntimeImplementationInterface.engineDelegatesToRuntimeBridge
     -- the trace are written out only by a test or diagnostics build, the
     -- evidence is wiped on drop, and nothing hands it out.
     sourceContainsAll iface.traceProductionSource
-      [ "pub struct PublicReceipt {\n    #[serde(default)]\n    pub opcode_trace: Box<[String]>,\n    #[serde(default)]\n    pub logical_accesses: Box<[LogicalEvent]>,\n    #[serde(default)]\n    pub logical_writes: Box<[LogicalEvent]>,\n    #[serde(default)]\n    pub physical_reads: Box<[PhysicalReadEvent]>,\n    #[serde(default)]\n    pub physical_writes: Box<[PhysicalWriteEvent]>,\n    #[serde(default)]\n    pub gas_used: u64,\n    #[serde(default)]\n    pub theorem_trace: TheoremTrace,\n    #[serde(default, skip_serializing_if = \"Option::is_none\")]\n    pub public_state_transition: Option<RuntimePublicStateTransition>,\n}"
+      [ "pub struct PublicReceipt {\n    #[serde(default)]\n    pub opcode_trace: Box<[String]>,\n    #[serde(default)]\n    pub logical_accesses: LogicalAccesses,\n    #[serde(default)]\n    pub logical_writes: Box<[LogicalEvent]>,\n    #[serde(default)]\n    pub physical_reads: PhysicalReads,\n    #[serde(default)]\n    pub physical_writes: PhysicalWrites,\n    #[serde(default)]\n    pub gas_used: u64,\n    #[serde(default)]\n    pub theorem_trace: TheoremTrace,\n    #[serde(default, skip_serializing_if = \"Option::is_none\")]\n    pub public_state_transition: Option<RuntimePublicStateTransition>,\n}"
       , "#[derive(PartialEq, Default)]\n#[cfg_attr(\n    any(test, feature = \"diagnostics\"),\n    derive(Debug, Serialize, Deserialize)\n)]\npub struct PrivateEvidence {"
       , "#[derive(Debug, PartialEq, Default)]\n#[cfg_attr(any(test, feature = \"diagnostics\"), derive(Serialize, Deserialize))]\npub struct ExecutionTrace {\n    #[cfg_attr(any(test, feature = \"diagnostics\"), serde(flatten))]\n    pub receipt: PublicReceipt,\n    #[cfg_attr(any(test, feature = \"diagnostics\"), serde(flatten))]\n    pub(crate) evidence: PrivateEvidence,\n}"
       , "impl Drop for PrivateEvidence {\n    fn drop(&mut self) {\n        self.wipe();\n    }\n}"
@@ -483,7 +483,7 @@ def RuntimeImplementationInterface.engineDelegatesToRuntimeBridge
       , "pub fn unwitnessed() -> Self {\n        Self {\n            runtime_state_before: None,\n        }\n    }"
       , "let runtime_oram_position_maps_unrecorded = runtime_witness_state.is_none();"
       , "trace.check_evidence_without_position_maps(artifact, confidential)?;\n        } else {\n            if confidential {\n                trace.runtime_confidential_proof_bundle_family(artifact)?;\n            }\n            trace.materialize_runtime_trusted_kernel_bundle()?;\n        }\n        Ok(trace)"
-      , "validate_path_oram_leaf_schedule(\n            &self.evidence.runtime_oram_leaf_schedule,\n            &refinement_trace.logical_accesses,\n            &refinement_trace.physical_reads,\n            &physical_writes,\n            &self.evidence.runtime_oram_objects,\n        )?;\n        validate_refinement_outcome("
+      , "validate_path_oram_leaf_schedule(\n            &self.evidence.runtime_oram_leaf_schedule,\n            &refinement_trace.logical_accesses,\n            &refinement_trace.physical_reads,\n            &refinement_trace.physical_writes,\n            &self.evidence.runtime_oram_objects,\n        )?;\n        validate_refinement_outcome("
       , "if confidential {\n            self.check_runtime_confidential_kernel_bundles(artifact)?;\n        }\n        Ok(())"
       ] ∧
     sourceLacksAll iface.traceProductionSource
@@ -531,7 +531,7 @@ def RuntimeImplementationInterface.checkEngineDelegatesToRuntimeBridge
     -- the trace are written out only by a test or diagnostics build, the
     -- evidence is wiped on drop, and nothing hands it out.
     checkSourceContainsAll iface.traceProductionSource
-      [ "pub struct PublicReceipt {\n    #[serde(default)]\n    pub opcode_trace: Box<[String]>,\n    #[serde(default)]\n    pub logical_accesses: Box<[LogicalEvent]>,\n    #[serde(default)]\n    pub logical_writes: Box<[LogicalEvent]>,\n    #[serde(default)]\n    pub physical_reads: Box<[PhysicalReadEvent]>,\n    #[serde(default)]\n    pub physical_writes: Box<[PhysicalWriteEvent]>,\n    #[serde(default)]\n    pub gas_used: u64,\n    #[serde(default)]\n    pub theorem_trace: TheoremTrace,\n    #[serde(default, skip_serializing_if = \"Option::is_none\")]\n    pub public_state_transition: Option<RuntimePublicStateTransition>,\n}"
+      [ "pub struct PublicReceipt {\n    #[serde(default)]\n    pub opcode_trace: Box<[String]>,\n    #[serde(default)]\n    pub logical_accesses: LogicalAccesses,\n    #[serde(default)]\n    pub logical_writes: Box<[LogicalEvent]>,\n    #[serde(default)]\n    pub physical_reads: PhysicalReads,\n    #[serde(default)]\n    pub physical_writes: PhysicalWrites,\n    #[serde(default)]\n    pub gas_used: u64,\n    #[serde(default)]\n    pub theorem_trace: TheoremTrace,\n    #[serde(default, skip_serializing_if = \"Option::is_none\")]\n    pub public_state_transition: Option<RuntimePublicStateTransition>,\n}"
       , "#[derive(PartialEq, Default)]\n#[cfg_attr(\n    any(test, feature = \"diagnostics\"),\n    derive(Debug, Serialize, Deserialize)\n)]\npub struct PrivateEvidence {"
       , "#[derive(Debug, PartialEq, Default)]\n#[cfg_attr(any(test, feature = \"diagnostics\"), derive(Serialize, Deserialize))]\npub struct ExecutionTrace {\n    #[cfg_attr(any(test, feature = \"diagnostics\"), serde(flatten))]\n    pub receipt: PublicReceipt,\n    #[cfg_attr(any(test, feature = \"diagnostics\"), serde(flatten))]\n    pub(crate) evidence: PrivateEvidence,\n}"
       , "impl Drop for PrivateEvidence {\n    fn drop(&mut self) {\n        self.wipe();\n    }\n}"
@@ -542,7 +542,7 @@ def RuntimeImplementationInterface.checkEngineDelegatesToRuntimeBridge
       , "pub fn unwitnessed() -> Self {\n        Self {\n            runtime_state_before: None,\n        }\n    }"
       , "let runtime_oram_position_maps_unrecorded = runtime_witness_state.is_none();"
       , "trace.check_evidence_without_position_maps(artifact, confidential)?;\n        } else {\n            if confidential {\n                trace.runtime_confidential_proof_bundle_family(artifact)?;\n            }\n            trace.materialize_runtime_trusted_kernel_bundle()?;\n        }\n        Ok(trace)"
-      , "validate_path_oram_leaf_schedule(\n            &self.evidence.runtime_oram_leaf_schedule,\n            &refinement_trace.logical_accesses,\n            &refinement_trace.physical_reads,\n            &physical_writes,\n            &self.evidence.runtime_oram_objects,\n        )?;\n        validate_refinement_outcome("
+      , "validate_path_oram_leaf_schedule(\n            &self.evidence.runtime_oram_leaf_schedule,\n            &refinement_trace.logical_accesses,\n            &refinement_trace.physical_reads,\n            &refinement_trace.physical_writes,\n            &self.evidence.runtime_oram_objects,\n        )?;\n        validate_refinement_outcome("
       , "if confidential {\n            self.check_runtime_confidential_kernel_bundles(artifact)?;\n        }\n        Ok(())"
       ] &&
     checkSourceLacksAll iface.traceProductionSource
@@ -1477,10 +1477,10 @@ def RuntimeImplementationInterface.runtimeAllocatorTelemetryUsesModeledBoxedReso
     ] ∧
   sourceContainsAll iface.traceProductionSource
     [ "pub struct RuntimeKernelTelemetrySnapshot {"
-    , "resource_events: Box<[RuntimeKernelResourceEventWitness]>,"
-    , "resource_events: impl Into<Box<[RuntimeKernelResourceEventWitness]>>,"
+    , "resource_events: RuntimeKernelResourceEvents,"
+    , "resource_events: impl Into<RuntimeKernelResourceEvents>,"
     , "resource_events: resource_events.into(),"
-    , "pub fn resource_events(&self) -> &[RuntimeKernelResourceEventWitness] {"
+    , "pub fn resource_events(&self) -> &RuntimeKernelResourceEvents {"
     , "resource_events: self.telemetry.resource_events,"
     ] ∧
   sourceLacksAll iface.traceProductionSource
@@ -1497,10 +1497,10 @@ def RuntimeImplementationInterface.checkRuntimeAllocatorTelemetryUsesModeledBoxe
     ] &&
   checkSourceContainsAll iface.traceProductionSource
     [ "pub struct RuntimeKernelTelemetrySnapshot {"
-    , "resource_events: Box<[RuntimeKernelResourceEventWitness]>,"
-    , "resource_events: impl Into<Box<[RuntimeKernelResourceEventWitness]>>,"
+    , "resource_events: RuntimeKernelResourceEvents,"
+    , "resource_events: impl Into<RuntimeKernelResourceEvents>,"
     , "resource_events: resource_events.into(),"
-    , "pub fn resource_events(&self) -> &[RuntimeKernelResourceEventWitness] {"
+    , "pub fn resource_events(&self) -> &RuntimeKernelResourceEvents {"
     , "resource_events: self.telemetry.resource_events,"
     ] &&
   checkSourceLacksAll iface.traceProductionSource
@@ -7799,8 +7799,8 @@ def RuntimeImplementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyIn
     , "fn record_small_map_scan(object: &SmallMapObject, trace: &mut CallRecorder) {"
     , "fn record_load_scan("
     , "for (index, slot) in physical_slots.iter().enumerate() {"
-    , "trace.physical_read(object_name, location(index), slot.len());"
-    , "record_load_scan(trace, &self.spec.name, &self.physical_slots, |index| {"
+    , "trace.physical_scan(object_name, kind, physical_slots.len(), len);"
+    , "ExactObjectKind::Array,\n            &self.physical_slots,"
     , "keep_loaded_cell_value(&mut object.loaded_value, &object.value);"
     , "keep_loaded_array_values(&mut object.loaded_values, &object.values)?;"
     , "keep_loaded_small_map_entries(&mut object.loaded_entries, &object.entries)?;"
@@ -7869,17 +7869,46 @@ def RuntimeImplementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyIn
   iface.handwrittenRuntimeLacksDirectSecretOps ∧
   iface.handwrittenHostCoordinationLacksSecretSerialization ∧
   sourceContainsAll iface.controllerProductionSource
-    [ "use uo_core::trace::{LogicalEvent, PhysicalReadEvent, PhysicalWriteEvent, WriteClass};"
+    [ "PhysicalWriteEvent, PhysicalWriteItem, WriteClass,\n};"
     , "pub(crate) fn raw_physical_write_from_buffers("
     , "let event = PhysicalWriteEvent::from_buffers(object, location, old, new);"
     , "if matches!(event.class, WriteClass::Same | WriteClass::Clear) {"
     , "self.metrics.zero_writes += 1;"
-    , "self.physical_writes.push(event);"
+    , "self.physical_writes.push(PhysicalWriteItem::Write(event));"
     ] ∧
   sourceLacksAll iface.controllerProductionSource
     [ "pub(crate) fn physical_write_from_buffers("
     , "if new.iter().all(|byte| *byte == 0)"
     , ".push(PhysicalWriteEvent::from_buffers(object, location, old, new))"
+    ] ∧
+  -- An item of a trace may stand for a run of events: the scan or the
+  -- rewrite of an exact object. The recorder grows a rewrite only by the
+  -- writes the rewrite takes, each the `Update` of its next slot, and builds
+  -- a run through `uo-core` alone, which names the events of a run and
+  -- hashes a trace over its events.
+  sourceContainsAll iface.controllerProductionSource
+    [ "pub(crate) fn physical_write(&mut self, event: PhysicalWriteEvent) {\n        self.metrics.physical_writes += 1;\n        if let Some(run) = self.open_rewrite.as_mut() {\n            if run.takes_write(&event) {\n                return;\n            }\n            self.end_exact_rewrite();\n        }\n        self.physical_writes.push(PhysicalWriteItem::Write(event));\n    }"
+    , "pub(crate) fn begin_exact_rewrite(&mut self, object: &str, kind: ExactObjectKind) {\n        self.end_exact_rewrite();\n        self.open_rewrite = Some(ExactObjectSlots::none_of(object, kind));\n    }"
+    , "pub(crate) fn end_exact_rewrite(&mut self) {\n        let rewrite = self.open_rewrite.take();\n        if let Some(item) = rewrite.and_then(PhysicalWriteItem::rewrite) {\n            self.physical_writes.push(item);\n        }\n    }"
+    , "if let Some(item) = PhysicalReadItem::scan(scan) {\n            self.metrics.physical_reads += slots;\n            self.physical_reads.push(item);\n        }"
+    ] ∧
+  sourceLacksAll iface.controllerProductionSource
+    [ "WriteClass::Update"
+    , "from_shape("
+    , "PhysicalRewrite"
+    , "PhysicalScan"
+    , "Item::Rewrite("
+    , "Item::Scan("
+    ] ∧
+  sourceContainsAll iface.traceProductionSource
+    [ "pub fn takes_write(&mut self, event: &PhysicalWriteEvent) -> bool {\n        let next = event.class == WriteClass::Update\n            && event.object == self.object\n            && self.is_location(self.slots, &event.location)\n            && (self.slots == 0 || event.len == self.len);\n        if next {\n            self.len = event.len;\n            self.slots += 1;\n        }\n        next\n    }"
+    , "pub fn none_of(object: impl Into<String>, kind: ExactObjectKind) -> Self {\n        Self {\n            object: object.into(),\n            kind,\n            slots: 0,\n            len: 0,\n        }\n    }"
+    , "fn of_run(run: Self) -> Option<Self> {\n        match run.event_count() {\n            0 => None,\n            1 => run.event(0).map(Self::from_event),\n            _ => Some(run),\n        }\n    }"
+    , "pub fn rewrite(rewrite: ExactObjectSlots) -> Option<Self> {\n        Self::of_run(Self::Rewrite(PhysicalRewrite { rewrite }))\n    }"
+    , "Self::Rewrite(item) => (index < item.rewrite.slots).then(|| PhysicalWriteEvent {\n                object: item.rewrite.object.clone(),\n                location: item.rewrite.location(index),\n                len: item.rewrite.len,\n                class: WriteClass::Update,\n            }),"
+    , "Self::Scan(item) => (index < item.scan.slots).then(|| PhysicalReadEvent {\n                object: item.scan.object.clone(),\n                location: item.scan.location(index),\n                len: item.scan.len,\n            }),"
+    , "let normalized_physical = self\n            .physical_writes\n            .events()\n            .map(|event| (event.object, event.location, event.class, event.len))\n            .collect::<Vec<_>>();\n        let normalized_reads = self\n            .physical_reads\n            .events()\n            .map(|event| (event.object, event.location, event.len))\n            .collect::<Vec<_>>();\n        let logical_accesses = self.logical_accesses.events().collect::<Vec<_>>();"
+    , "Err(run) => {\n                if path_objects.contains(run.object.as_str()) || !run.is_well_formed() {\n                    return Err(RefinementWitnessError::OramLeafScheduleMismatch);\n                }\n            }"
     ] ∧
   sourceContainsAll iface.generatedObjectHelpersProductionSource
     [ "pub(super) fn update_masked_value(current: &mut Value, value: Value, apply: bool) -> Result<()> {"
@@ -8090,8 +8119,8 @@ def RuntimeImplementationInterface.checkRuntimeHandwrittenConfidentialWorkLivesO
     , "fn record_small_map_scan(object: &SmallMapObject, trace: &mut CallRecorder) {"
     , "fn record_load_scan("
     , "for (index, slot) in physical_slots.iter().enumerate() {"
-    , "trace.physical_read(object_name, location(index), slot.len());"
-    , "record_load_scan(trace, &self.spec.name, &self.physical_slots, |index| {"
+    , "trace.physical_scan(object_name, kind, physical_slots.len(), len);"
+    , "ExactObjectKind::Array,\n            &self.physical_slots,"
     , "keep_loaded_cell_value(&mut object.loaded_value, &object.value);"
     , "keep_loaded_array_values(&mut object.loaded_values, &object.values)?;"
     , "keep_loaded_small_map_entries(&mut object.loaded_entries, &object.entries)?;"
@@ -8160,17 +8189,46 @@ def RuntimeImplementationInterface.checkRuntimeHandwrittenConfidentialWorkLivesO
   iface.checkHandwrittenRuntimeLacksDirectSecretOps &&
   iface.checkHandwrittenHostCoordinationLacksSecretSerialization &&
   checkSourceContainsAll iface.controllerProductionSource
-    [ "use uo_core::trace::{LogicalEvent, PhysicalReadEvent, PhysicalWriteEvent, WriteClass};"
+    [ "PhysicalWriteEvent, PhysicalWriteItem, WriteClass,\n};"
     , "pub(crate) fn raw_physical_write_from_buffers("
     , "let event = PhysicalWriteEvent::from_buffers(object, location, old, new);"
     , "if matches!(event.class, WriteClass::Same | WriteClass::Clear) {"
     , "self.metrics.zero_writes += 1;"
-    , "self.physical_writes.push(event);"
+    , "self.physical_writes.push(PhysicalWriteItem::Write(event));"
     ] &&
   checkSourceLacksAll iface.controllerProductionSource
     [ "pub(crate) fn physical_write_from_buffers("
     , "if new.iter().all(|byte| *byte == 0)"
     , ".push(PhysicalWriteEvent::from_buffers(object, location, old, new))"
+    ] &&
+  -- An item of a trace may stand for a run of events: the scan or the
+  -- rewrite of an exact object. The recorder grows a rewrite only by the
+  -- writes the rewrite takes, each the `Update` of its next slot, and builds
+  -- a run through `uo-core` alone, which names the events of a run and
+  -- hashes a trace over its events.
+  checkSourceContainsAll iface.controllerProductionSource
+    [ "pub(crate) fn physical_write(&mut self, event: PhysicalWriteEvent) {\n        self.metrics.physical_writes += 1;\n        if let Some(run) = self.open_rewrite.as_mut() {\n            if run.takes_write(&event) {\n                return;\n            }\n            self.end_exact_rewrite();\n        }\n        self.physical_writes.push(PhysicalWriteItem::Write(event));\n    }"
+    , "pub(crate) fn begin_exact_rewrite(&mut self, object: &str, kind: ExactObjectKind) {\n        self.end_exact_rewrite();\n        self.open_rewrite = Some(ExactObjectSlots::none_of(object, kind));\n    }"
+    , "pub(crate) fn end_exact_rewrite(&mut self) {\n        let rewrite = self.open_rewrite.take();\n        if let Some(item) = rewrite.and_then(PhysicalWriteItem::rewrite) {\n            self.physical_writes.push(item);\n        }\n    }"
+    , "if let Some(item) = PhysicalReadItem::scan(scan) {\n            self.metrics.physical_reads += slots;\n            self.physical_reads.push(item);\n        }"
+    ] &&
+  checkSourceLacksAll iface.controllerProductionSource
+    [ "WriteClass::Update"
+    , "from_shape("
+    , "PhysicalRewrite"
+    , "PhysicalScan"
+    , "Item::Rewrite("
+    , "Item::Scan("
+    ] &&
+  checkSourceContainsAll iface.traceProductionSource
+    [ "pub fn takes_write(&mut self, event: &PhysicalWriteEvent) -> bool {\n        let next = event.class == WriteClass::Update\n            && event.object == self.object\n            && self.is_location(self.slots, &event.location)\n            && (self.slots == 0 || event.len == self.len);\n        if next {\n            self.len = event.len;\n            self.slots += 1;\n        }\n        next\n    }"
+    , "pub fn none_of(object: impl Into<String>, kind: ExactObjectKind) -> Self {\n        Self {\n            object: object.into(),\n            kind,\n            slots: 0,\n            len: 0,\n        }\n    }"
+    , "fn of_run(run: Self) -> Option<Self> {\n        match run.event_count() {\n            0 => None,\n            1 => run.event(0).map(Self::from_event),\n            _ => Some(run),\n        }\n    }"
+    , "pub fn rewrite(rewrite: ExactObjectSlots) -> Option<Self> {\n        Self::of_run(Self::Rewrite(PhysicalRewrite { rewrite }))\n    }"
+    , "Self::Rewrite(item) => (index < item.rewrite.slots).then(|| PhysicalWriteEvent {\n                object: item.rewrite.object.clone(),\n                location: item.rewrite.location(index),\n                len: item.rewrite.len,\n                class: WriteClass::Update,\n            }),"
+    , "Self::Scan(item) => (index < item.scan.slots).then(|| PhysicalReadEvent {\n                object: item.scan.object.clone(),\n                location: item.scan.location(index),\n                len: item.scan.len,\n            }),"
+    , "let normalized_physical = self\n            .physical_writes\n            .events()\n            .map(|event| (event.object, event.location, event.class, event.len))\n            .collect::<Vec<_>>();\n        let normalized_reads = self\n            .physical_reads\n            .events()\n            .map(|event| (event.object, event.location, event.len))\n            .collect::<Vec<_>>();\n        let logical_accesses = self.logical_accesses.events().collect::<Vec<_>>();"
+    , "Err(run) => {\n                if path_objects.contains(run.object.as_str()) || !run.is_well_formed() {\n                    return Err(RefinementWitnessError::OramLeafScheduleMismatch);\n                }\n            }"
     ] &&
   checkSourceContainsAll iface.generatedObjectHelpersProductionSource
     [ "pub(super) fn update_masked_value(current: &mut Value, value: Value, apply: bool) -> Result<()> {"

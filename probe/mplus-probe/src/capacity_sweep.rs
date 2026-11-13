@@ -684,10 +684,10 @@ fn run_sweep_call(
     Ok(SweepSample {
         operation,
         cost: SweepCost {
-            physical_reads: trace.physical_reads.len(),
-            physical_writes: trace.physical_writes.len(),
-            bytes_read: trace.physical_reads.iter().map(|event| event.len).sum(),
-            bytes_written: trace.physical_writes.iter().map(|event| event.len).sum(),
+            physical_reads: trace.physical_reads.event_count(),
+            physical_writes: trace.physical_writes.event_count(),
+            bytes_read: trace.physical_reads.events().map(|event| event.len).sum(),
+            bytes_written: trace.physical_writes.events().map(|event| event.len).sum(),
             gas: trace.gas_used,
         },
         call_start: call_start_decode(artifact, entrypoint, &trace.physical_reads)?,

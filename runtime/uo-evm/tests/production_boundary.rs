@@ -419,8 +419,8 @@ fn a_call_returns_its_receipt_and_no_private_evidence() {
     // The receipt is what the observer sees: the call's storage events and
     // the theorems' view of it.
     assert_eq!(result.receipt(), &result.receipt);
-    assert!(!result.receipt.physical_reads.is_empty());
-    assert!(!result.receipt.physical_writes.is_empty());
+    assert!(!result.receipt.physical_reads.has_no_event());
+    assert!(!result.receipt.physical_writes.has_no_event());
     assert!(result.receipt.theorem_trace.public_outcome.is_some());
 
     let receipt = serde_json::to_value(&result.receipt).unwrap();
@@ -555,8 +555,8 @@ fn production_calls_run_without_a_position_map_witness() {
         // The call ran its checks: its receipt carries the theorems' view
         // of it, and its storage events.
         assert!(result.receipt.theorem_trace.public_outcome.is_some());
-        assert!(!result.receipt.physical_reads.is_empty());
-        assert!(!result.receipt.physical_writes.is_empty());
+        assert!(!result.receipt.physical_reads.has_no_event());
+        assert!(!result.receipt.physical_writes.has_no_event());
     }
 
     // A call that is refused before it runs changes nothing.

@@ -2222,6 +2222,7 @@
   ],
   "theorem_trace_bridge_surface_restricted": true,
   "theorem_trace_uses_boxed_boundary_schedule": true,
+  "trace_runs_stand_for_recorded_events": true,
   "traced_runtime_call_outcome_api_is_explicit": true,
   "traced_runtime_call_outcome_constructor_surface_files": [
     "runtime/uo-evm/src/state.rs"

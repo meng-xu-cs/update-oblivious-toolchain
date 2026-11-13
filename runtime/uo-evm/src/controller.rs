@@ -1,7 +1,10 @@
 use crate::oram::OramParameters;
 use anyhow::{bail, Result};
 use uo_core::manifest::{EntrypointManifest, StateObjectManifest};
-use uo_core::trace::{LogicalEvent, PhysicalReadEvent, PhysicalWriteEvent, WriteClass};
+use uo_core::trace::{
+    ExactObjectKind, ExactObjectSlots, LogicalAccessItem, LogicalEvent, LogicalScanSlots,
+    PhysicalReadEvent, PhysicalReadItem, PhysicalWriteEvent, PhysicalWriteItem, WriteClass,
+};
 pub(crate) use uo_core::PublicCallSummary;
 use uo_core::{
     BoundaryEvent, ControllerPageBudget, ControllerPhase, EncryptedReturnPayload, FixedBoxBuilder,
@@ -93,10 +96,13 @@ impl ControllerRegionCounters {
 #[derive(Debug, Default)]
 pub(crate) struct CallRecorder {
     entrypoint: String,
-    logical_accesses: Vec<LogicalEvent>,
+    logical_accesses: Vec<LogicalAccessItem>,
     logical_writes: Vec<LogicalEvent>,
-    physical_reads: Vec<PhysicalReadEvent>,
-    physical_writes: Vec<PhysicalWriteEvent>,
+    physical_reads: Vec<PhysicalReadItem>,
+    physical_writes: Vec<PhysicalWriteItem>,
+    /// The rewrite of an exact object that a commit is making, slot after
+    /// slot: its object and kind, the slots written so far and their length.
+    open_rewrite: Option<ExactObjectSlots>,
     metrics: StoreExecutionMetrics,
     boundary_schedule: Vec<BoundaryEvent>,
     controller_phase_order: Vec<ControllerPhase>,
@@ -133,11 +139,27 @@ impl CallRecorder {
 
     pub(crate) fn logical_read(&mut self, kind: &str, object: &str, detail: impl Into<String>) {
         self.metrics.logical_reads += 1;
-        self.logical_accesses.push(LogicalEvent {
+        self.logical_accesses
+            .push(LogicalAccessItem::Event(LogicalEvent {
+                kind: kind.into(),
+                object: object.into(),
+                detail: detail.into(),
+            }));
+    }
+
+    /// Record the logical scan of a map: one event of `kind` for each of
+    /// its `slots`, as one item of the trace. A scan of one slot is the
+    /// event itself.
+    pub(crate) fn logical_scan(&mut self, kind: &str, object: &str, slots: usize) {
+        let scan = LogicalScanSlots {
             kind: kind.into(),
             object: object.into(),
-            detail: detail.into(),
-        });
+            slots,
+        };
+        if let Some(item) = LogicalAccessItem::scan(scan) {
+            self.metrics.logical_reads += slots;
+            self.logical_accesses.push(item);
+        }
     }
 
     pub(crate) fn logical_write(&mut self, kind: &str, object: &str, detail: impl Into<String>) {
@@ -151,16 +173,65 @@ impl CallRecorder {
 
     pub(crate) fn physical_read(&mut self, object: &str, location: impl Into<String>, len: usize) {
         self.metrics.physical_reads += 1;
-        self.physical_reads.push(PhysicalReadEvent {
-            object: object.into(),
-            location: location.into(),
-            len,
-        });
+        self.physical_reads
+            .push(PhysicalReadItem::Read(PhysicalReadEvent {
+                object: object.into(),
+                location: location.into(),
+                len,
+            }));
     }
 
+    /// Record the scan of an exact object: one read of each of its `slots`
+    /// sealed records of `len` bytes, in slot order, as one item of the
+    /// trace. A scan of one slot is the read itself.
+    pub(crate) fn physical_scan(
+        &mut self,
+        object: &str,
+        kind: ExactObjectKind,
+        slots: usize,
+        len: usize,
+    ) {
+        let scan = ExactObjectSlots {
+            object: object.into(),
+            kind,
+            slots,
+            len,
+        };
+        if let Some(item) = PhysicalReadItem::scan(scan) {
+            self.metrics.physical_reads += slots;
+            self.physical_reads.push(item);
+        }
+    }
+
+    /// Record a write. While the rewrite of an exact object is open, a
+    /// write that the rewrite takes as that of its next slot is part of it
+    /// (`ExactObjectSlots::takes_write`): the rewrite becomes one item of
+    /// the trace when it ends. Any other write ends it first.
     pub(crate) fn physical_write(&mut self, event: PhysicalWriteEvent) {
         self.metrics.physical_writes += 1;
-        self.physical_writes.push(event);
+        if let Some(run) = self.open_rewrite.as_mut() {
+            if run.takes_write(&event) {
+                return;
+            }
+            self.end_exact_rewrite();
+        }
+        self.physical_writes.push(PhysicalWriteItem::Write(event));
+    }
+
+    /// Open the rewrite of an exact object: the commit that follows seals
+    /// its slots in order, and each seal records its write.
+    pub(crate) fn begin_exact_rewrite(&mut self, object: &str, kind: ExactObjectKind) {
+        self.end_exact_rewrite();
+        self.open_rewrite = Some(ExactObjectSlots::none_of(object, kind));
+    }
+
+    /// End the open rewrite, if there is one: the writes it took are one
+    /// item of the trace. A rewrite of one slot is the write itself.
+    pub(crate) fn end_exact_rewrite(&mut self) {
+        let rewrite = self.open_rewrite.take();
+        if let Some(item) = rewrite.and_then(PhysicalWriteItem::rewrite) {
+            self.physical_writes.push(item);
+        }
     }
 
     pub(crate) fn raw_physical_write_from_buffers(
@@ -175,7 +246,8 @@ impl CallRecorder {
         if matches!(event.class, WriteClass::Same | WriteClass::Clear) {
             self.metrics.zero_writes += 1;
         }
-        self.physical_writes.push(event);
+        self.end_exact_rewrite();
+        self.physical_writes.push(PhysicalWriteItem::Write(event));
     }
 
     pub(crate) fn add_zero_writes(&mut self, count: usize) {
@@ -294,6 +366,7 @@ impl CallRecorder {
         aborted: bool,
         gas_used: u64,
     ) -> Result<(usize, RuntimePublicCallTraceBundle)> {
+        self.end_exact_rewrite();
         self.assert_manifest_exactness(manifest_entry)?;
         self.assert_oram_parameter_exactness(manifest_objects)?;
         self.controller_phase_order.extend([
@@ -332,10 +405,10 @@ impl CallRecorder {
         Ok((
             zero_writes,
             RuntimePublicCallTraceBundle::new(
-                self.logical_accesses.into_boxed_slice(),
+                self.logical_accesses.into(),
                 self.logical_writes.into_boxed_slice(),
-                self.physical_reads.into_boxed_slice(),
-                self.physical_writes.into_boxed_slice(),
+                self.physical_reads.into(),
+                self.physical_writes.into(),
                 controller_observer.theorem_trace(),
                 controller_observer.controller_certificate().clone(),
                 self.path_oram_leaf_schedule.into_boxed_slice(),
@@ -348,17 +421,21 @@ impl CallRecorder {
         &self.metrics
     }
 
+    /// How many writes the call has recorded, a rewrite counting one for
+    /// each slot.
     pub(crate) fn physical_write_count(&self) -> usize {
-        self.physical_writes.len()
+        self.metrics.physical_writes
     }
 
     /// The locations of the sealed records the call has read so far, in
     /// order.
     #[cfg(test)]
-    pub(crate) fn physical_read_locations(&self) -> Vec<&str> {
+    pub(crate) fn physical_read_locations(&self) -> Vec<String> {
+        use uo_core::TraceRunItem;
         self.physical_reads
             .iter()
-            .map(|event| event.location.as_str())
+            .flat_map(|item| (0..item.event_count()).filter_map(|index| item.event(index)))
+            .map(|event| event.location)
             .collect()
     }
 

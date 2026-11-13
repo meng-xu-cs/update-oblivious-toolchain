@@ -828,7 +828,7 @@ sealed object from storage, the ones the call did not load included. The
 benchmarks' large objects are confidential, so the sweep does not show it.
 Its digest is one hash over all the public objects, so keeping a snapshot
 per object would need a digest built from per-object digests, which changes
-the public-state digest of every trace.
+the public-state digest of every trace. This is Issue 55.
 
 #### Acceptance criteria
 
@@ -854,6 +854,89 @@ Record a scan or a rewrite of an exact object as one schedule event (object,
 slot count, record length). Lean expands it with
 `ExactObjectLayout.scanReads` and `updateWrites`. Hash-bind the expanded
 form. The Lean importers accept the compressed form.
+
+As built. A list of a trace is a list of items, and an item is an event,
+as before, or a run of events (`TraceItems` in
+`crates/uo-core/src/trace.rs`):
+
+- in `physical_reads`, `{"scan": {"object", "kind", "slots", "len"}}` is
+  the scan of an exact object: one read of each of its `slots` sealed
+  records of `len` bytes, in slot order;
+- in `physical_writes`, `{"rewrite": {...}}` with the same fields is one
+  `Update` write of each slot;
+- in `logical_accesses`, `{"scan": {"kind", "object", "slots"}}` is the
+  logical scan of a map: one event of that kind for each slot;
+- in a kernel witness's `resource_events`, `{"repeat": n, "events": [...]}`
+  is a block of one or two events that occurs `n` times in a row, which is
+  what opening or sealing the slots of an object logs.
+
+`kind` is `cell`, `array` or `map` and fixes the names of the slots (`name`,
+`name[i]`, `name#i`). A list stands for its events in order, and nothing
+depends on how they are grouped. The hashes and the event transcript of a
+trace are computed over its events, so they are the ones they were
+(`results/trace_equivalence.json` has not changed), and the Rust checks
+count the events and the bytes of a run without naming them. A run of one
+event is recorded as the event, so the trace of a call on cells alone is
+the bytes it was. A run cannot hide a Path ORAM access: a run that names a
+Path ORAM object, and a logical run of an ORAM kind, are rejected.
+
+The recorder (`CallRecorder` in `runtime/uo-evm/src/controller.rs`) keeps a
+scan when a call loads an object, from the slot count and the one length
+its slots have; slots of more than one length are recorded one by one. It
+does not label a rewrite. A commit opens the rewrite of an object, each
+seal hands the recorder its write as before, after the write was classified
+from its bytes (Issue 33), and the rewrite takes a write only if it is the
+`Update` of its next slot, of the length of the slots before it
+(`ExactObjectSlots::takes_write` in `uo-core`). Any other write ends the
+rewrite. So a rewrite item stands for exactly the writes the recorder was
+handed.
+
+The Lean importers expand an item into the events of the models
+(`jsonExpandTraceItems` in `UOToolchain/RuntimeRefinementJson.lean`): a
+scan with `ExactObjectLayout.scanReads`, a rewrite with `updateWrites`.
+`ExactObjectLayout` moved to a module of its own
+(`UOToolchain/ExactObjectLayout.lean`) so that the importers can use it.
+The checkers and their theorems see the lists they saw before.
+
+A source check binds the recorder and the definitions of a run
+(`trace_runs_stand_for_recorded_events` in
+`results/runtime_boundary_validation.json`), and the Lean implementation
+interface pins the same text. Seven tamper scenarios are new (417 in all).
+Three change the sources: a rewrite that takes a write of any class, a
+recorder that counts a write into a rewrite without that check, and a trace
+hash over items instead of events. Four change the trace of a
+ConfidentialMixer `deposit` (`exact_trace/*`): the slot count of a scan and
+of a rewrite, the record length of a scan, and the naming of its slots. The
+probe's comparison with the exact encoding rejects those four
+(`trace_matches_exact_encoding`); it now also compares the length of every
+record with the sealed length of its object's type.
+
+Found on the way: Lean does not reject those four. Its witness checker
+reads the storage events of Path ORAM objects and no others, and nothing in
+Lean compares the storage events of an exact object with `exactEncodeRun`.
+That comparison is the probe's, by a Rust mirror of the Lean definition, as
+it was before this issue. Issue 54 is to move it into Lean.
+
+Measured in the validation run's quick profile (two rounds of each call,
+`results/capacity_sweep.json`), before and after on one machine, at 16,384
+entries. The trace of a full-scan read is 9.2 KB of JSON where it was 11.0
+MB, and that of a write 10.2 KB where it was 20.7 MB; at 64 entries they
+are about 40 and 50 bytes smaller, the digits of the slot counts and of
+the gas. Building the proof bundles takes 0.3 ms for the read and 0.4 ms
+for the write, where it took 184 ms and 460 ms, and 0.2 ms at 64 entries.
+The whole read takes 53 ms where it took 229 ms and the whole
+write 99 ms where it took 562 ms; what is left is the decryption and the
+sealing of the slots. The traces of the tree are smaller by the folded log
+of resource events (2.70 MB for a read where it was 2.96 MB). The counts of
+the sweep have not moved; `counts_sha256` has, since it covers the sizes of
+the traces.
+
+One report changed its route. The witnesses of the fresh-coin families are
+smaller, so the family of SingleAccessMap `add`, 4,096 seeds, is 64.3 MB
+and fits the probe's budget of 67.1 MB: `fresh_coin_validation.json` now
+has Lean check the whole family, where it checked the compact theorem input
+because the family was estimated at 80.9 MB. Both routes were accepted
+before and are now.
 
 #### Acceptance criteria
 
@@ -1149,3 +1232,72 @@ deployment theorem what a verifier of the signature may conclude.
 
 Acceptance: a changed last receipt is rejected by a check the caller can
 run, without another call.
+
+### Issue 54 — Compare a runtime trace with the exact encoding in Lean
+
+Source: Issue 38. Size: M. Depends on: Issue 38.
+
+That the runtime's storage events on exact objects are the ones the exact
+store's encoding gives (`exactEncodeRun`) is checked by the probe, with a
+Rust mirror of the Lean definition (`exact_encoding_prediction` and
+`trace_matches_exact_encoding` in `probe/mplus-probe/src/lib.rs`). No Lean
+checker reads those events: the refinement-witness checker accepts a
+witness in which the slot count, the record length or the kind of an exact
+object's scan was changed. The theorem (`admittedKernel_exactUO`) and the
+runtime's trace therefore meet in Rust code that restates the encoding.
+
+Have a Lean checker take the trace of a call with its artifact and compare
+the storage events with `exactEncodeRun` of the entrypoint's kernel
+program. The admission checker already decodes the program, the manifest
+gives the layout of each object, and with runs (Issue 38) the comparison is
+one item for each object.
+
+Acceptance: the Lean checker rejects the four `exact_trace/*` tamper
+scenarios, and the probe's mirror of the encoding is deleted.
+
+### Issue 55 — Take the public-state snapshot once for each object a call changes
+
+Source: Issue 37. Size: M. Depends on: Issue 37.
+
+Every call takes the public-state snapshot three times, four in a
+production call, and a snapshot decodes every public (non-confidential)
+sealed object from storage, those the call did not load included. This is
+work in the size of the public state for every call. The benchmarks' large
+objects are confidential, so the capacity sweep does not show it.
+
+The snapshot's digest is one hash over all the public objects. Build it
+from a digest for each object, as the ciphertext digest is built (Issue
+37), keep the decoded snapshot of an object with the object, and decode
+again only the objects a call loaded. The public-state digest of every
+trace changes, and the Lean statements about the public-state record read
+the new digest.
+
+Acceptance: a call's time does not grow with the size of public objects it
+does not load, measured on a contract with a large public array; the
+public-state checks and their tamper scenarios pass.
+
+### Issue 56 — Slice production sources with a lexer
+
+Source: Issues 36 and 38. Size: S to M. Depends on: nothing.
+
+The source checks read the production part of a Rust file: the file
+without its `#[cfg(test)]` items (`production_source_slice` in the probe,
+`productionSource` in `UOToolchain/RuntimeImplementationInterface.lean`).
+Both find the end of an item by counting braces, and they count the braces
+inside string literals and comments too. Two things follow. A file whose
+test module holds unbalanced braces in strings, as the probe's own does,
+keeps most of its tests in the slice, so a check that counts a text in
+that file has to split its own needles (`concat!`). And a `#[cfg(test)]`
+attribute on a field or inside a struct literal cuts production text out of
+the slice, where a check that a text is absent can no longer see it: Issue
+36 met this and moved the attribute.
+
+The checks guard against drift, not against an author who hides text, so
+no claim rests on a wrong slice today. Slice with a lexer that knows
+strings, characters and comments, in the probe and in Lean, or move every
+test module into a file of its own so that a production file has no test
+item, and reject a `#[cfg(test)]` that is not on a module or a function.
+
+Acceptance: the slice of every pinned file is the file without its test
+items, tested on files with braces in strings; no check splits its needles
+to avoid its own text.

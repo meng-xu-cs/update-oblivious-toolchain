@@ -6,7 +6,7 @@ directory holds the response.
 | File | Content |
 | --- | --- |
 | [`validation.md`](./validation.md) | every factual claim of the review checked against the code, and a position on each recommendation |
-| [`tasks.md`](./tasks.md) | Issues 22 to 53: description, fix and acceptance criteria |
+| [`tasks.md`](./tasks.md) | Issues 22 to 56: description, fix and acceptance criteria |
 | [`capacity_sweep_baseline.json`](./capacity_sweep_baseline.json) | the capacity sweep's full profile as Issue 27 measured it, before any optimization: what Issues 30 to 38 compare their savings with |
 | this file | the positions in brief, the order of work, and the tracker |
 
@@ -81,7 +81,7 @@ Issue 22 has the options and the reasoning.
 7. **Wave 6, evidence at a storage boundary** (Issues 41 and 42).
 
 The research issues (43 to 46) start once the issues they depend on are
-done. The backlog (47 to 53) is not scheduled.
+done. The backlog (47 to 56) is not scheduled.
 
 This differs from the review's sequence in two ways. The measurement work
 comes before the optimizations, not after. And incremental state is split:
@@ -106,8 +106,8 @@ its engineering part is Wave 4, its certified part is research.
 | 34 | Make the confidential kernel's 256-bit arithmetic branch-free | 3 | M | | done | `35e4bb8` |
 | 35 | Match the record codec to the observer unit | 3 | M | | done | `d848180` |
 | 36 | Remove the whole-store witness snapshots from a call | 4 | M | 25 | done | `af5cf09` |
-| 37 | Stage a call without copying the store | 4 | M | | done | |
-| 38 | Compress scan schedules in traces and proof objects | 4 | M to L | 31, 32 | todo | |
+| 37 | Stage a call without copying the store | 4 | M | | done | `02087ca` |
+| 38 | Compress scan schedules in traces and proof objects | 4 | M to L | 31, 32 | done | |
 | 39 | Admit encrypted returns in the kernel theorems | 5 | M | | todo | |
 | 40 | Give the stash bound a lifetime budget and test deferred write-back | 5 | M | | todo | |
 | 41 | Put storage behind an adapter that keeps its own I/O log | 6 | M to L | 24, 31, 32 | todo | |
@@ -123,6 +123,9 @@ its engineering part is Wave 4, its certified part is research.
 | 51 | Remove the generator that a seal no longer reads | backlog | S to M | 24 | todo | |
 | 52 | Make the seal count of a dropped call a function of its entrypoint | backlog | M | 24 | todo | |
 | 53 | Authenticate production receipts under an attested key | backlog | M | 26 | todo | |
+| 54 | Compare a runtime trace with the exact encoding in Lean | backlog | M | 38 | todo | |
+| 55 | Take the public-state snapshot once for each object a call changes | backlog | M | 37 | todo | |
+| 56 | Slice production sources with a lexer | backlog | S to M | | todo | |
 
 Sizes are relative, not a schedule: S a day or less, M several days, L one
 to two weeks, R research with no fixed end.
