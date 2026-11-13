@@ -573,7 +573,8 @@ mod tests {
     use uo_core::PublicEnvironment;
     use uo_core::{
         canonical_runtime_public_object_ids, public_delta_digest, ContractMetadata,
-        EncryptedReturnPayload, ProgramMode, ReturnChannelPublicBinding, Value,
+        EncryptedReturnPayload, ProgramMode, ReturnChannelPublicBinding,
+        RuntimeKernelResourceEventKindWitness, RuntimeKernelScratchRegionWitness, Value,
     };
 
     fn compile_bench(source: &str, metadata: &str, mode: ProgramMode) -> uo_core::CompiledArtifact {
@@ -2077,10 +2078,11 @@ bounds:
 
     #[test]
     fn an_abort_on_a_large_full_scan_map_stays_within_the_allocator_budget() {
-        // An aborting call opens every slot of an exact map once more than a
-        // committed one, to restore it. When the allocator's event budget
-        // did not count that, the call failed, instead of aborting, on maps
-        // above about 4,600 entries.
+        // An aborting call once opened every slot of an exact map a second
+        // time, to restore it, and the allocator's event budget did not count
+        // that: the call failed, instead of aborting, on maps above about
+        // 4,600 entries. It now restores the map from the copy it loaded and
+        // opens each slot once, as a committed call does.
         let base = include_str!(bench_raw!("SweepMap.pathoram.yaml"));
         let metadata = base
             .replace("    capacity: 16\n", "    capacity: 5000\n")
@@ -2182,6 +2184,228 @@ bounds:
             .unwrap_err();
         assert!(
             format!("{error:#}").contains("are not the objects its slot program writes"),
+            "{error:#}"
+        );
+    }
+
+    #[test]
+    fn a_call_reads_each_exact_object_once_when_it_loads_it() {
+        let artifact = compile_bench(
+            bench_raw!("ERC20Lite.sol"),
+            include_str!(bench_raw!("ERC20Lite.uo.yaml")),
+            ProgramMode::Uo,
+        );
+        let entry = |signature: &str| &artifact.contract.manifest.entrypoints[signature];
+        let slots = |name: &str| {
+            artifact
+                .contract
+                .state
+                .iter()
+                .find(|object| object.name == name)
+                .and_then(|object| object.capacity)
+                .unwrap()
+        };
+        let (balances, allowances) = (slots("balances"), slots("allowances"));
+        // The load bound counts each object a body accesses once, however
+        // many statements access it.
+        assert_eq!(
+            entry("transfer(address,address,uint256)").max_load_ops,
+            balances
+        );
+        assert_eq!(
+            entry("transferFrom(address,address,address,uint256)").max_load_ops,
+            balances + allowances
+        );
+
+        let addr = |byte: u8| Value::Address([byte; 20]);
+        let mut instance = ContractInstance::deploy_with_seed(artifact.clone(), 7).unwrap();
+        let reads_of = |result: &CallResult, object: &str| {
+            result
+                .receipt()
+                .physical_reads
+                .iter()
+                .filter(|read| read.object == object)
+                .count()
+        };
+        let read_objects = |result: &CallResult| {
+            let mut objects: Vec<String> = Vec::new();
+            for read in result.receipt().physical_reads.iter() {
+                if objects.last() != Some(&read.object) {
+                    objects.push(read.object.clone());
+                }
+            }
+            objects
+        };
+        // The traced reads of a call on exact objects are the records it
+        // opens. Every opening and every seal of a sealed record reserves
+        // I/O scratch once, and the call's kernel witness lists the
+        // reservations: they number the traced reads plus the traced writes.
+        let opens_what_it_traces = |result: &CallResult| {
+            let reservations = result
+                .trace
+                .exact_runtime_kernel_witness()
+                .unwrap()
+                .resource_events()
+                .iter()
+                .filter(|event| {
+                    event.kind() == RuntimeKernelResourceEventKindWitness::ReserveScratch
+                        && event.region() == Some(RuntimeKernelScratchRegionWitness::IoScratch)
+                })
+                .count();
+            let receipt = result.receipt();
+            reservations == receipt.physical_reads.len() + receipt.physical_writes.len()
+        };
+        let mint = instance
+            .call("mint(address,uint256)", vec![addr(0x11), Value::uint(50)])
+            .unwrap();
+        assert!(opens_what_it_traces(&mint));
+
+        // A transfer accesses `balances` four times: it reads and writes the
+        // sender, then the recipient. It reads the map's slots once, when
+        // the call loads the map, and every access still scans the opened
+        // entries.
+        let transfer = instance
+            .call(
+                "transfer(address,address,uint256)",
+                vec![addr(0x11), addr(0x22), Value::uint(20)],
+            )
+            .unwrap();
+        assert!(!transfer.aborted);
+        let receipt = transfer.receipt();
+        assert_eq!(receipt.physical_reads.len(), balances);
+        assert_eq!(receipt.physical_writes.len(), balances);
+        assert_eq!(
+            receipt
+                .physical_reads
+                .iter()
+                .map(|read| read.location.clone())
+                .collect::<Vec<_>>(),
+            (0..balances)
+                .map(|slot| format!("balances#{slot}"))
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(receipt.logical_accesses.len(), 4 * balances);
+        assert_eq!(receipt.logical_writes.len(), 2);
+        assert!(opens_what_it_traces(&transfer));
+
+        // A call that touches both maps reads each once, in object-id order.
+        instance
+            .call(
+                "approve(address,address,uint256)",
+                vec![addr(0x11), addr(0x33), Value::uint(9)],
+            )
+            .unwrap();
+        let transfer_from = instance
+            .call(
+                "transferFrom(address,address,address,uint256)",
+                vec![addr(0x11), addr(0x33), addr(0x44), Value::uint(4)],
+            )
+            .unwrap();
+        assert!(!transfer_from.aborted);
+        assert_eq!(reads_of(&transfer_from, "balances"), balances);
+        assert_eq!(reads_of(&transfer_from, "allowances"), allowances);
+        assert_eq!(read_objects(&transfer_from), ["balances", "allowances"]);
+        assert_eq!(
+            transfer_from.receipt().physical_writes.len(),
+            balances + allowances
+        );
+        assert!(opens_what_it_traces(&transfer_from));
+
+        // A transfer that aborts reads what one that commits reads, rewrites
+        // the same slots, and leaves the balances as they were.
+        let overdrawn = instance
+            .call(
+                "transfer(address,address,uint256)",
+                vec![addr(0x11), addr(0x22), Value::uint(1000)],
+            )
+            .unwrap();
+        assert!(overdrawn.aborted);
+        assert_eq!(overdrawn.receipt().physical_reads.len(), balances);
+        assert_eq!(overdrawn.receipt().physical_writes.len(), balances);
+        assert!(opens_what_it_traces(&overdrawn));
+        for (owner, balance) in [(0x11u8, 26u64), (0x22, 20), (0x44, 4)] {
+            let query = instance
+                .call("balanceOf(address)", vec![addr(owner)])
+                .unwrap();
+            assert_eq!(query.return_value, Some(Value::uint(balance)), "{owner:#x}");
+            assert_eq!(query.receipt().physical_reads.len(), balances);
+            assert!(query.receipt().physical_writes.is_empty());
+            assert!(opens_what_it_traces(&query));
+        }
+        assert_objects_are_cold(&instance);
+    }
+
+    #[test]
+    fn a_public_call_loads_only_the_objects_its_body_accesses() {
+        let artifact = compile_bench(
+            bench_raw!("AuthScan.sol"),
+            include_str!(bench_raw!("AuthScan.uo.yaml")),
+            ProgramMode::Uo,
+        );
+        let seed = "seed(uint256,bytes32)";
+        let tokens = artifact
+            .contract
+            .state
+            .iter()
+            .find(|object| object.name == "TOKENS")
+            .unwrap();
+        let (tokens_id, tokens_slots) = (tokens.id, tokens.capacity.unwrap());
+        let entry = &artifact.contract.manifest.entrypoints[seed];
+        assert!(entry.confidential_program.is_none());
+        assert_eq!(entry.may_write_objects, vec![tokens_id]);
+        assert_eq!(entry.max_load_ops, tokens_slots);
+
+        // `seed` is public and writes the sealed array at a public index. It
+        // loads the array, not the cell `lastAuth` that its body never names:
+        // its reads are the array's slots, within the manifest's load bound.
+        let mut instance = ContractInstance::deploy_with_seed(artifact.clone(), 11).unwrap();
+        let seeded = instance.call(seed, vec![Value::uint(1), b32(7)]).unwrap();
+        let receipt = seeded.receipt();
+        assert_eq!(receipt.physical_reads.len(), tokens_slots);
+        assert!(receipt
+            .physical_reads
+            .iter()
+            .all(|read| read.object == "TOKENS"));
+        assert_eq!(receipt.physical_writes.len(), tokens_slots);
+        // It opens the array's slots and seals them, and nothing else.
+        let io_reservations = seeded
+            .trace
+            .exact_runtime_kernel_witness()
+            .unwrap()
+            .resource_events()
+            .iter()
+            .filter(|event| {
+                event.kind() == RuntimeKernelResourceEventKindWitness::ReserveScratch
+                    && event.region() == Some(RuntimeKernelScratchRegionWitness::IoScratch)
+            })
+            .count();
+        assert_eq!(io_reservations, 2 * tokens_slots);
+        assert_objects_are_cold(&instance);
+        // The confidential entrypoints see the write.
+        let auth = instance.call("auth(bytes32)", vec![b32(7)]).unwrap();
+        assert_eq!(auth.return_value, Some(Value::uint(1)));
+        let last = instance.call("readLast()", vec![]).unwrap();
+        assert_eq!(last.return_value, Some(Value::uint(1)));
+        assert_eq!(last.receipt().physical_reads.len(), 1);
+        assert!(last.receipt().physical_writes.is_empty());
+
+        // What a public call reseals comes from its body. A manifest that
+        // lists other objects is refused before the call runs.
+        let mut drifted = artifact;
+        drifted
+            .contract
+            .manifest
+            .entrypoints
+            .get_mut(seed)
+            .unwrap()
+            .may_write_objects
+            .clear();
+        let mut instance = ContractInstance::deploy_with_seed(drifted, 11).unwrap();
+        let error = instance
+            .call(seed, vec![Value::uint(1), b32(7)])
+            .unwrap_err();
+        assert!(
+            format!("{error:#}").contains("are not the objects its body writes"),
             "{error:#}"
         );
     }

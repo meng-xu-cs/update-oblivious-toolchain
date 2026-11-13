@@ -3,8 +3,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
 use uo_core::ir::{
-    BackendKind, BinaryOp, CompiledContract, CompiledFunction, ContainerKind, Expr, ProgramMode,
-    PublicEnvField, StateObject, Statement, UnaryOp,
+    accessed_objects, written_objects, BackendKind, BinaryOp, CompiledContract, CompiledFunction,
+    ContainerKind, Expr, ProgramMode, PublicEnvField, StateObject, Statement, UnaryOp,
 };
 use uo_core::manifest::{
     is_path_oram_scheme, EntrypointManifest, OramManifest, RuntimeManifest, StateObjectManifest,
@@ -1775,52 +1775,6 @@ fn merge_counts(target: &mut CountSummary, extra: CountSummary) {
     target.map_writes += extra.map_writes;
 }
 
-fn accessed_objects(statements: &[Statement]) -> BTreeSet<u32> {
-    let mut ids = BTreeSet::new();
-    for statement in statements {
-        collect_statement_objects(statement, &mut ids);
-    }
-    ids
-}
-
-/// The objects the statements have a write statement for, whether or not it
-/// has a predicate and whatever branch or loop holds it.
-fn written_objects(statements: &[Statement]) -> BTreeSet<u32> {
-    fn collect(statement: &Statement, ids: &mut BTreeSet<u32>) {
-        match statement {
-            Statement::CellSet { object_id, .. }
-            | Statement::ArraySet { object_id, .. }
-            | Statement::MapPut { object_id, .. } => {
-                ids.insert(*object_id);
-            }
-            Statement::If {
-                then_body,
-                else_body,
-                ..
-            } => {
-                for stmt in then_body.iter().chain(else_body) {
-                    collect(stmt, ids);
-                }
-            }
-            Statement::For { body, .. } => {
-                for stmt in body {
-                    collect(stmt, ids);
-                }
-            }
-            Statement::Declare { .. }
-            | Statement::Assign { .. }
-            | Statement::Require { .. }
-            | Statement::AbortIf { .. }
-            | Statement::Return { .. } => {}
-        }
-    }
-    let mut ids = BTreeSet::new();
-    for statement in statements {
-        collect(statement, &mut ids);
-    }
-    ids
-}
-
 /// A write to a private-scheme map that reuses the presence a preceding get
 /// of the same key found makes no presence get of its own
 /// (`uo_core::presence_reuse`): take a get's node accesses off the count for
@@ -2120,122 +2074,6 @@ fn state_object_by_id(frontend: &Frontend, object_id: u32) -> Result<&StateObjec
         .values()
         .find(|object| object.id == object_id)
         .ok_or_else(|| anyhow!("unknown object id {} in manifest counting", object_id))
-}
-
-fn collect_statement_objects(statement: &Statement, ids: &mut BTreeSet<u32>) {
-    match statement {
-        Statement::Declare { value, .. } | Statement::Assign { value, .. } => {
-            collect_expr_objects(value, ids);
-        }
-        Statement::Require { cond } | Statement::AbortIf { cond } => {
-            collect_expr_objects(cond, ids)
-        }
-        Statement::If {
-            cond,
-            then_body,
-            else_body,
-        } => {
-            collect_expr_objects(cond, ids);
-            for stmt in then_body {
-                collect_statement_objects(stmt, ids);
-            }
-            for stmt in else_body {
-                collect_statement_objects(stmt, ids);
-            }
-        }
-        Statement::For {
-            start, end, body, ..
-        } => {
-            collect_expr_objects(start, ids);
-            collect_expr_objects(end, ids);
-            for stmt in body {
-                collect_statement_objects(stmt, ids);
-            }
-        }
-        Statement::CellSet {
-            object_id,
-            value,
-            predicate,
-        } => {
-            ids.insert(*object_id);
-            collect_expr_objects(value, ids);
-            if let Some(predicate) = predicate {
-                collect_expr_objects(predicate, ids);
-            }
-        }
-        Statement::ArraySet {
-            object_id,
-            index,
-            value,
-            predicate,
-        } => {
-            ids.insert(*object_id);
-            collect_expr_objects(index, ids);
-            collect_expr_objects(value, ids);
-            if let Some(predicate) = predicate {
-                collect_expr_objects(predicate, ids);
-            }
-        }
-        Statement::MapPut {
-            object_id,
-            key,
-            value,
-            predicate,
-        } => {
-            ids.insert(*object_id);
-            collect_expr_objects(key, ids);
-            collect_expr_objects(value, ids);
-            if let Some(predicate) = predicate {
-                collect_expr_objects(predicate, ids);
-            }
-        }
-        Statement::Return { value } => {
-            if let Some(value) = value {
-                collect_expr_objects(value, ids);
-            }
-        }
-    }
-}
-
-fn collect_expr_objects(expr: &Expr, ids: &mut BTreeSet<u32>) {
-    match expr {
-        Expr::Unary { expr, .. } => collect_expr_objects(expr, ids),
-        Expr::Binary { lhs, rhs, .. } => {
-            collect_expr_objects(lhs, ids);
-            collect_expr_objects(rhs, ids);
-        }
-        Expr::Select {
-            cond,
-            when_true,
-            when_false,
-        } => {
-            collect_expr_objects(cond, ids);
-            collect_expr_objects(when_true, ids);
-            collect_expr_objects(when_false, ids);
-        }
-        Expr::CellGet { object_id } => {
-            ids.insert(*object_id);
-        }
-        Expr::ArrayGet { object_id, index } => {
-            ids.insert(*object_id);
-            collect_expr_objects(index, ids);
-        }
-        Expr::MapGet { object_id, key } => {
-            ids.insert(*object_id);
-            collect_expr_objects(key, ids);
-        }
-        Expr::StructField { base, .. } => collect_expr_objects(base, ids),
-        Expr::ArrayIndex { base, index } => {
-            collect_expr_objects(base, ids);
-            collect_expr_objects(index, ids);
-        }
-        Expr::Keccak256 { parts } => {
-            for part in parts {
-                collect_expr_objects(part, ids);
-            }
-        }
-        Expr::Literal(_) | Expr::Var(_) => {}
-    }
 }
 
 #[derive(Default)]

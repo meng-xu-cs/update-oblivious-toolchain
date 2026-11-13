@@ -304,7 +304,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "bundle_json_bytes": 8607,
+      "bundle_json_bytes": 7390,
       "confidential_slot_program": {
         "entrypoint_id": "auth(bytes32)",
         "expected_runtime_step_count": 8,
@@ -332,7 +332,7 @@
           "io_scratch": {
             "live_bytes": 0,
             "peak_bytes": 32,
-            "wipe_count": 11
+            "wipe_count": 7
           },
           "peak_stack_words": 2,
           "value_scratch": {
@@ -356,7 +356,7 @@
         "hash_scratch_peak_bytes": 0,
         "hash_scratch_wipe_count": 1,
         "io_scratch_peak_bytes": 32,
-        "io_scratch_wipe_count": 11,
+        "io_scratch_wipe_count": 7,
         "kernel_op_count": 8,
         "kernel_step_public_object_schedule": [
           1,
@@ -371,7 +371,7 @@
           1,
           2
         ],
-        "resource_event_count": 38,
+        "resource_event_count": 30,
         "resource_events": [
           {
             "bytes": 32,
@@ -521,54 +521,6 @@
             "bytes": null,
             "kind": "wipe_scratch",
             "region": "value_scratch",
-            "words": null
-          },
-          {
-            "bytes": 32,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 32,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 32,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 32,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
             "words": null
           },
           {
@@ -631,7 +583,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "bundle_json_bytes": 8607,
+      "bundle_json_bytes": 7390,
       "confidential_slot_program": {
         "entrypoint_id": "auth(bytes32)",
         "expected_runtime_step_count": 8,
@@ -659,7 +611,7 @@
           "io_scratch": {
             "live_bytes": 0,
             "peak_bytes": 32,
-            "wipe_count": 11
+            "wipe_count": 7
           },
           "peak_stack_words": 2,
           "value_scratch": {
@@ -683,7 +635,7 @@
         "hash_scratch_peak_bytes": 0,
         "hash_scratch_wipe_count": 1,
         "io_scratch_peak_bytes": 32,
-        "io_scratch_wipe_count": 11,
+        "io_scratch_wipe_count": 7,
         "kernel_op_count": 8,
         "kernel_step_public_object_schedule": [
           1,
@@ -698,7 +650,7 @@
           1,
           2
         ],
-        "resource_event_count": 38,
+        "resource_event_count": 30,
         "resource_events": [
           {
             "bytes": 32,
@@ -848,54 +800,6 @@
             "bytes": null,
             "kind": "wipe_scratch",
             "region": "value_scratch",
-            "words": null
-          },
-          {
-            "bytes": 32,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 32,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 32,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 32,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
             "words": null
           },
           {
@@ -1566,7 +1470,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "bundle_json_bytes": 9731,
+      "bundle_json_bytes": 9235,
       "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
@@ -1938,7 +1842,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "bundle_json_bytes": 9731,
+      "bundle_json_bytes": 9235,
       "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
@@ -5178,7 +5082,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "bundle_json_bytes": 43712,
+      "bundle_json_bytes": 43664,
       "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,

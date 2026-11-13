@@ -2,6 +2,7 @@ use crate::confidential_kernel::{ConfidentialKernelProgram, ConfidentialKernelSl
 use crate::manifest::RuntimeManifest;
 use crate::types::{ScalarType, Type, Value};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ProgramMode {
@@ -262,6 +263,172 @@ pub enum Statement {
     Return {
         value: Option<Expr>,
     },
+}
+
+/// The objects the statements access, by a get expression or a set
+/// statement, in any branch or loop: the objects a call that runs them
+/// loads.
+pub fn accessed_objects(statements: &[Statement]) -> BTreeSet<u32> {
+    let mut ids = BTreeSet::new();
+    for statement in statements {
+        collect_statement_objects(statement, &mut ids);
+    }
+    ids
+}
+
+/// The objects the statements have a write statement for, whether or not it
+/// has a predicate and whatever branch or loop holds it: the objects a call
+/// that runs them may write.
+pub fn written_objects(statements: &[Statement]) -> BTreeSet<u32> {
+    fn collect(statement: &Statement, ids: &mut BTreeSet<u32>) {
+        match statement {
+            Statement::CellSet { object_id, .. }
+            | Statement::ArraySet { object_id, .. }
+            | Statement::MapPut { object_id, .. } => {
+                ids.insert(*object_id);
+            }
+            Statement::If {
+                then_body,
+                else_body,
+                ..
+            } => {
+                for stmt in then_body.iter().chain(else_body) {
+                    collect(stmt, ids);
+                }
+            }
+            Statement::For { body, .. } => {
+                for stmt in body {
+                    collect(stmt, ids);
+                }
+            }
+            Statement::Declare { .. }
+            | Statement::Assign { .. }
+            | Statement::Require { .. }
+            | Statement::AbortIf { .. }
+            | Statement::Return { .. } => {}
+        }
+    }
+    let mut ids = BTreeSet::new();
+    for statement in statements {
+        collect(statement, &mut ids);
+    }
+    ids
+}
+
+fn collect_statement_objects(statement: &Statement, ids: &mut BTreeSet<u32>) {
+    match statement {
+        Statement::Declare { value, .. } | Statement::Assign { value, .. } => {
+            collect_expr_objects(value, ids);
+        }
+        Statement::Require { cond } | Statement::AbortIf { cond } => {
+            collect_expr_objects(cond, ids)
+        }
+        Statement::If {
+            cond,
+            then_body,
+            else_body,
+        } => {
+            collect_expr_objects(cond, ids);
+            for stmt in then_body {
+                collect_statement_objects(stmt, ids);
+            }
+            for stmt in else_body {
+                collect_statement_objects(stmt, ids);
+            }
+        }
+        Statement::For {
+            start, end, body, ..
+        } => {
+            collect_expr_objects(start, ids);
+            collect_expr_objects(end, ids);
+            for stmt in body {
+                collect_statement_objects(stmt, ids);
+            }
+        }
+        Statement::CellSet {
+            object_id,
+            value,
+            predicate,
+        } => {
+            ids.insert(*object_id);
+            collect_expr_objects(value, ids);
+            if let Some(predicate) = predicate {
+                collect_expr_objects(predicate, ids);
+            }
+        }
+        Statement::ArraySet {
+            object_id,
+            index,
+            value,
+            predicate,
+        } => {
+            ids.insert(*object_id);
+            collect_expr_objects(index, ids);
+            collect_expr_objects(value, ids);
+            if let Some(predicate) = predicate {
+                collect_expr_objects(predicate, ids);
+            }
+        }
+        Statement::MapPut {
+            object_id,
+            key,
+            value,
+            predicate,
+        } => {
+            ids.insert(*object_id);
+            collect_expr_objects(key, ids);
+            collect_expr_objects(value, ids);
+            if let Some(predicate) = predicate {
+                collect_expr_objects(predicate, ids);
+            }
+        }
+        Statement::Return { value } => {
+            if let Some(value) = value {
+                collect_expr_objects(value, ids);
+            }
+        }
+    }
+}
+
+fn collect_expr_objects(expr: &Expr, ids: &mut BTreeSet<u32>) {
+    match expr {
+        Expr::Unary { expr, .. } => collect_expr_objects(expr, ids),
+        Expr::Binary { lhs, rhs, .. } => {
+            collect_expr_objects(lhs, ids);
+            collect_expr_objects(rhs, ids);
+        }
+        Expr::Select {
+            cond,
+            when_true,
+            when_false,
+        } => {
+            collect_expr_objects(cond, ids);
+            collect_expr_objects(when_true, ids);
+            collect_expr_objects(when_false, ids);
+        }
+        Expr::CellGet { object_id } => {
+            ids.insert(*object_id);
+        }
+        Expr::ArrayGet { object_id, index } => {
+            ids.insert(*object_id);
+            collect_expr_objects(index, ids);
+        }
+        Expr::MapGet { object_id, key } => {
+            ids.insert(*object_id);
+            collect_expr_objects(key, ids);
+        }
+        Expr::StructField { base, .. } => collect_expr_objects(base, ids),
+        Expr::ArrayIndex { base, index } => {
+            collect_expr_objects(base, ids);
+            collect_expr_objects(index, ids);
+        }
+        Expr::Keccak256 { parts } => {
+            for part in parts {
+                collect_expr_objects(part, ids);
+            }
+        }
+        Expr::Literal(_) | Expr::Var(_) => {}
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]

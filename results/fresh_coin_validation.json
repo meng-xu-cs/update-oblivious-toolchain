@@ -95,16 +95,16 @@
       "seed_space_fully_enumerated": false,
       "setup_calls": 0,
       "size_estimate": {
-        "avg_witness_json_bytes": 43935,
-        "estimated_family_json_bytes": 11518345216,
-        "max_witness_json_bytes": 43935,
+        "avg_witness_json_bytes": 43887,
+        "estimated_family_json_bytes": 11505762304,
+        "max_witness_json_bytes": 43887,
         "public_fresh_coin_scaffold_steps": 3,
         "public_leaf_scaffold_steps": 2,
         "sampled_seed_count": 8,
         "seed_count": 262144
       },
       "symbolic_seed_space_instantiated": true,
-      "theorem_input_json_bytes": 44362,
+      "theorem_input_json_bytes": 44314,
       "validation_status": "accepted_compact_theorem_input"
     },
     {

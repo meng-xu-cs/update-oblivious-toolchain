@@ -481,6 +481,12 @@ the runtime, record the physical scan when the call loads the object
 (`clone_for_tx`), not in `record_small_map_scan`; keep the logical event of
 each access. `max_load_ops` counts each object once.
 
+An object keeps a copy of what the call loaded at the call's first write of
+it, and an aborted call reseals that copy: commit reads no storage. A
+public call loads the objects its body accesses, as a confidential call
+loads those its kernel program schedules, so that neither opens a record
+its load bound does not count.
+
 #### Acceptance criteria
 
 - ERC20Lite `transfer` on the full scan reads `balances` once, not once per
@@ -773,6 +779,13 @@ Source: F4, F8 (§5, §9). Size: M to L. Depends on: Issues 24, 31 and 32.
 Storage is process memory, and the trace is written by the code that
 performs the access. Nothing independent says what crosses a storage
 boundary.
+
+After Issue 32 the traced reads of a call on exact objects are the records
+it opens. Two kinds of read stay outside the trace and should show up as
+untraced I/O at the adapter: the counter and metadata pages a Path ORAM map
+reads when a call starts, and the public-state digest of an object that is
+not confidential but sits on a sealed backend, which opens the object three
+times a call (no benchmark declares such an object).
 
 #### How to fix
 

@@ -8,6 +8,7 @@ directory holds the response.
 | [`validation.md`](./validation.md) | every factual claim of the review checked against the code, and a position on each recommendation |
 | [`tasks.md`](./tasks.md) | Issues 22 to 53: description, fix and acceptance criteria |
 | [`capacity_sweep_baseline.json`](./capacity_sweep_baseline.json) | the capacity sweep's full profile as Issue 27 measured it, before any optimization: what Issues 30 to 38 compare their savings with |
+| [`capacity_sweep_16384_issue32.json`](./capacity_sweep_16384_issue32.json) | the sweep at 16,384 entries alone after Issues 31 and 32, 15 rounds after 3 warmup rounds: an interim measurement until the full profile is run again |
 | this file | the positions in brief, the order of work, and the tracker |
 
 The review text is not in the repository; `validation.md` restates each
@@ -98,8 +99,8 @@ its engineering part is Wave 4, its certified part is research.
 | 28 | Cover the private scheme in the leakage and abort reports | 2 | S | | done | `348da16` |
 | 29 | State what the Path ORAM theorem's cryptographic assumptions mean | 2 | S | | done | `9631ed0` |
 | 30 | Charge external reads in the modeled cost | 3 | S to M | | done | `3d8b5f6` |
-| 31 | Do not rewrite statically read-only exact objects | 3 | M | 30 | done | |
-| 32 | Load each exact object once per call | 3 | M | 30 | todo | |
+| 31 | Do not rewrite statically read-only exact objects | 3 | M | 30 | done | `1afbb01` |
+| 32 | Load each exact object once per call | 3 | M | 30 | done | |
 | 33 | Check each UO write's class against its bytes | 3 | S | | todo | |
 | 34 | Make the confidential kernel's 256-bit arithmetic branch-free | 3 | M | | todo | |
 | 35 | Match the record codec to the observer unit | 3 | M | | todo | |

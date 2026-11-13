@@ -26,13 +26,15 @@ use generated_object_helpers::{
     clone_runtime_value_for_read, cold_commit_boxed_values, cold_commit_small_map_entries,
     cold_commit_value_to_zero, cold_zero_boxed_values, cold_zero_small_map_entries,
     cold_zero_small_map_entry, cold_zero_value, decode_array_values_from_storage,
-    decode_cell_value_from_storage, decode_small_map_entries_from_storage, raw_encode_value,
-    reconcile_array_commit_values, reconcile_cell_commit_value, reconcile_raw_map_committed_entry,
-    reconcile_small_map_commit_entries, seal_canonical_value_commit_slot, seal_map_record,
-    seal_map_record_commit_slot, seal_value, select_array_value_at_index,
-    select_small_map_value_for_key, update_array_value_at_index, update_masked_value,
-    update_small_map_entries_for_put, wipe_boxed_values_and_slots,
-    wipe_small_map_entries_and_slots, wipe_value_and_physical_slot,
+    decode_cell_value_from_storage, decode_small_map_entries_from_storage,
+    keep_loaded_array_values, keep_loaded_cell_value, keep_loaded_small_map_entries,
+    raw_encode_value, reconcile_array_commit_values, reconcile_cell_commit_value,
+    reconcile_raw_map_committed_entry, reconcile_small_map_commit_entries,
+    seal_canonical_value_commit_slot, seal_map_record, seal_map_record_commit_slot, seal_value,
+    select_array_value_at_index, select_small_map_value_for_key, update_array_value_at_index,
+    update_masked_value, update_small_map_entries_for_put, wipe_boxed_values_and_slots,
+    wipe_loaded_array_values, wipe_loaded_cell_value, wipe_small_map_entries_and_slots,
+    wipe_value_and_physical_slot,
 };
 
 #[derive(Debug)]
@@ -43,6 +45,10 @@ pub(crate) struct CellObject {
     cipher: StoreCipher,
     accessed: bool,
     written: bool,
+    // The value the call loaded, kept from the call's first write of the
+    // cell until its commit: what the commit keeps if the call aborted.
+    // `None` while `value` is still the loaded one.
+    loaded_value: Option<Value>,
     rng: ChaCha20Rng,
 }
 
@@ -55,6 +61,7 @@ impl CellObject {
             cipher: self.cipher.clone_for_runtime_state(),
             accessed: false,
             written: false,
+            loaded_value: None,
             rng: self.rng.clone(),
         }
     }
@@ -67,12 +74,14 @@ impl CellObject {
             cipher: self.cipher.clone_for_runtime_state(),
             accessed: false,
             written: false,
+            loaded_value: None,
             rng: self.rng.clone(),
         }
     }
 
     fn wipe_secrets(&mut self) {
         wipe_value_and_physical_slot(&mut self.value, &mut self.physical);
+        wipe_loaded_cell_value(&mut self.loaded_value);
         self.accessed = false;
         self.written = false;
         self.rng = ChaCha20Rng::from_seed([0u8; 32]);
@@ -88,7 +97,14 @@ impl CellObject {
         )
     }
 
-    fn clone_for_tx(&self, allocator: &mut AllocatorSession) -> Result<Self> {
+    /// Load the cell for a call: read its sealed record, once for the call,
+    /// and open it. The call's accesses work on the opened value.
+    fn clone_for_tx(
+        &self,
+        trace: &mut CallRecorder,
+        allocator: &mut AllocatorSession,
+    ) -> Result<Self> {
+        trace.physical_read(&self.spec.name, self.spec.name.clone(), self.physical.len());
         Ok(Self {
             spec: self.spec.clone(),
             value: self.decode_value_from_storage(allocator)?,
@@ -96,12 +112,14 @@ impl CellObject {
             cipher: self.cipher.clone_for_runtime_state(),
             accessed: false,
             written: false,
+            loaded_value: None,
             rng: self.rng.clone(),
         })
     }
 
     fn cold_commit(&mut self) -> Result<()> {
         cold_commit_value_to_zero(&mut self.value, &self.spec.value_type);
+        wipe_loaded_cell_value(&mut self.loaded_value);
         self.accessed = false;
         self.written = false;
         Ok(())
@@ -122,6 +140,10 @@ pub(crate) struct ArrayObject {
     cipher: StoreCipher,
     accessed: bool,
     written_slots: Box<[bool]>,
+    // The values the call loaded, kept from the call's first write of the
+    // array until its commit: what the commit keeps if the call aborted.
+    // `None` while `values` are still the loaded ones.
+    loaded_values: Option<Box<[Value]>>,
     rng: ChaCha20Rng,
 }
 
@@ -134,6 +156,7 @@ impl ArrayObject {
             cipher: self.cipher.clone_for_runtime_state(),
             accessed: false,
             written_slots: boxed_false_flags(self.physical_slots.len()),
+            loaded_values: None,
             rng: self.rng.clone(),
         }
     }
@@ -146,12 +169,14 @@ impl ArrayObject {
             cipher: self.cipher.clone_for_runtime_state(),
             accessed: false,
             written_slots: boxed_false_flags(self.physical_slots.len()),
+            loaded_values: None,
             rng: self.rng.clone(),
         }
     }
 
     fn wipe_secrets(&mut self) {
         wipe_boxed_values_and_slots(&mut self.values, &mut self.physical_slots);
+        wipe_loaded_array_values(&mut self.loaded_values);
         self.accessed = false;
         clear_written_slots(&mut self.written_slots);
         self.rng = ChaCha20Rng::from_seed([0u8; 32]);
@@ -167,7 +192,16 @@ impl ArrayObject {
         )
     }
 
-    fn clone_for_tx(&self, allocator: &mut AllocatorSession) -> Result<Self> {
+    /// Load the array for a call: read every sealed slot, once for the
+    /// call, and open it. The call's accesses work on the opened values.
+    fn clone_for_tx(
+        &self,
+        trace: &mut CallRecorder,
+        allocator: &mut AllocatorSession,
+    ) -> Result<Self> {
+        record_load_scan(trace, &self.spec.name, &self.physical_slots, |index| {
+            format!("{}[{index}]", self.spec.name)
+        });
         Ok(Self {
             spec: self.spec.clone(),
             values: self.decode_values_from_storage(allocator)?,
@@ -175,12 +209,14 @@ impl ArrayObject {
             cipher: self.cipher.clone_for_runtime_state(),
             accessed: false,
             written_slots: boxed_false_flags(self.physical_slots.len()),
+            loaded_values: None,
             rng: self.rng.clone(),
         })
     }
 
     fn cold_commit(&mut self) -> Result<()> {
         cold_commit_boxed_values(&mut self.values, &self.spec.value_type);
+        wipe_loaded_array_values(&mut self.loaded_values);
         self.accessed = false;
         clear_written_slots(&mut self.written_slots);
         Ok(())
@@ -273,6 +309,11 @@ pub(crate) struct SmallMapObject {
     cipher: StoreCipher,
     accessed: bool,
     dirty: bool,
+    // The entries the call loaded, kept from the call's first write of the
+    // map until its commit: what the commit keeps if the call aborted.
+    // `None` while `entries` are still the loaded ones. An entry wipes
+    // itself when it is dropped.
+    loaded_entries: Option<Box<[MapEntry]>>,
     rng: ChaCha20Rng,
 }
 
@@ -294,12 +335,14 @@ impl SmallMapObject {
             cipher: self.cipher.clone_for_runtime_state(),
             accessed: false,
             dirty: false,
+            loaded_entries: None,
             rng: self.rng.clone(),
         })
     }
 
     fn wipe_secrets(&mut self) {
         wipe_small_map_entries_and_slots(&mut self.entries, &mut self.physical_slots);
+        self.loaded_entries = None;
         self.accessed = false;
         self.dirty = false;
         self.rng = ChaCha20Rng::from_seed([0u8; 32]);
@@ -317,7 +360,16 @@ impl SmallMapObject {
         )
     }
 
-    fn clone_for_tx(&self, allocator: &mut AllocatorSession) -> Result<Self> {
+    /// Load the map for a call: read every sealed slot, once for the call,
+    /// and open it. The call's accesses scan the opened entries.
+    fn clone_for_tx(
+        &self,
+        trace: &mut CallRecorder,
+        allocator: &mut AllocatorSession,
+    ) -> Result<Self> {
+        record_load_scan(trace, &self.spec.name, &self.physical_slots, |index| {
+            format!("{}#{index}", self.spec.name)
+        });
         Ok(Self {
             spec: self.spec.clone(),
             entries: self.decode_entries_from_storage(allocator)?,
@@ -325,6 +377,7 @@ impl SmallMapObject {
             cipher: self.cipher.clone_for_runtime_state(),
             accessed: false,
             dirty: false,
+            loaded_entries: None,
             rng: self.rng.clone(),
         })
     }
@@ -336,6 +389,7 @@ impl SmallMapObject {
             .as_ref()
             .ok_or_else(|| anyhow!("small-map object {} missing key type", self.spec.name))?;
         cold_commit_small_map_entries(&mut self.entries, key_type, &self.spec.value_type);
+        self.loaded_entries = None;
         self.accessed = false;
         self.dirty = false;
         Ok(())
@@ -487,6 +541,7 @@ impl RuntimeObject {
                     cipher: StoreCipher::from_rng(&mut rng),
                     accessed: false,
                     written: false,
+                    loaded_value: None,
                     rng,
                 }))
             }
@@ -501,6 +556,7 @@ impl RuntimeObject {
                     cipher,
                     accessed: false,
                     written: false,
+                    loaded_value: None,
                     rng,
                 }))
             }
@@ -522,6 +578,7 @@ impl RuntimeObject {
                     cipher: StoreCipher::from_rng(&mut rng),
                     accessed: false,
                     written_slots: boxed_false_flags(capacity),
+                    loaded_values: None,
                     rng,
                 }))
             }
@@ -544,6 +601,7 @@ impl RuntimeObject {
                     cipher,
                     accessed: false,
                     written_slots: boxed_false_flags(capacity),
+                    loaded_values: None,
                     rng,
                 }))
             }
@@ -575,6 +633,7 @@ impl RuntimeObject {
                     cipher,
                     accessed: false,
                     dirty: false,
+                    loaded_entries: None,
                     rng,
                 }))
             }
@@ -604,17 +663,26 @@ impl RuntimeObject {
         Self::instantiate(spec, &ObjectSecret::from_diagnostic_seed(seed))
     }
 
+    /// Load the object for a call. An exact object (a cell, an array or a
+    /// full-scan map on a sealed backend) is read here, every slot of it,
+    /// and this is the only time the call reads it: the scan is traced
+    /// once, whatever the number of the call's accesses, and the accesses
+    /// work on the opened copy. A raw object is copied and traces each
+    /// access; a Path ORAM map reads its paths as it is accessed.
     pub(in crate::runtime) fn clone_for_tx(
         &self,
+        trace: &mut CallRecorder,
         allocator: &mut AllocatorSession,
     ) -> Result<Self> {
         match self {
             Self::RawCell(object) => Ok(Self::RawCell(object.clone_committed_public())),
             Self::RawArray(object) => Ok(Self::RawArray(object.clone_committed_public())),
             Self::RawMap(object) => Ok(Self::RawMap(object.clone_committed_public())),
-            Self::UoCell(object) => Ok(Self::UoCell(object.clone_for_tx(allocator)?)),
-            Self::UoArray(object) => Ok(Self::UoArray(object.clone_for_tx(allocator)?)),
-            Self::UoSmallMap(object) => Ok(Self::UoSmallMap(object.clone_for_tx(allocator)?)),
+            Self::UoCell(object) => Ok(Self::UoCell(object.clone_for_tx(trace, allocator)?)),
+            Self::UoArray(object) => Ok(Self::UoArray(object.clone_for_tx(trace, allocator)?)),
+            Self::UoSmallMap(object) => {
+                Ok(Self::UoSmallMap(object.clone_for_tx(trace, allocator)?))
+            }
             Self::UoOramMap(object) => Ok(Self::UoOramMap(OramMapObject {
                 spec: object.spec.clone(),
                 oram: object.oram.clone_for_tx(&object.spec, allocator)?,
@@ -849,7 +917,7 @@ impl RuntimeObject {
 
     pub(in crate::runtime) fn get_cell(&mut self, trace: &mut CallRecorder) -> Result<Value> {
         match self {
-            Self::RawCell(object) | Self::UoCell(object) => {
+            Self::RawCell(object) => {
                 object.accessed = true;
                 trace.logical_read("cell_get", &object.spec.name, "");
                 trace.physical_read(
@@ -857,6 +925,12 @@ impl RuntimeObject {
                     object.spec.name.clone(),
                     object.physical.len(),
                 );
+                Ok(clone_runtime_value_for_read(&object.value))
+            }
+            Self::UoCell(object) => {
+                // The call read the cell when it loaded it.
+                object.accessed = true;
+                trace.logical_read("cell_get", &object.spec.name, "");
                 Ok(clone_runtime_value_for_read(&object.value))
             }
             _ => bail!("{} is not a cell", self.name()),
@@ -888,11 +962,7 @@ impl RuntimeObject {
             Self::UoCell(object) => {
                 object.accessed = true;
                 trace.logical_write("cell_set", &object.spec.name, "slot");
-                trace.physical_read(
-                    &object.spec.name,
-                    object.spec.name.clone(),
-                    object.physical.len(),
-                );
+                keep_loaded_cell_value(&mut object.loaded_value, &object.value);
                 update_masked_value(&mut object.value, value, apply)?;
                 object.written = true;
                 Ok(())
@@ -932,9 +1002,10 @@ impl RuntimeObject {
                 Ok(value)
             }
             Self::UoArray(object) => {
+                // The call read the array when it loaded it; the access
+                // selects among the opened values.
                 object.accessed = true;
                 trace.logical_read("array_get", &object.spec.name, "oblivious");
-                record_array_scan(object, trace);
                 select_array_value_at_index(&object.values, index, &object.spec.value_type)
             }
             _ => bail!("{} is not an array", self.name()),
@@ -995,7 +1066,7 @@ impl RuntimeObject {
             Self::UoArray(object) => {
                 object.accessed = true;
                 trace.logical_write("array_set", &object.spec.name, "oblivious");
-                record_array_scan(object, trace);
+                keep_loaded_array_values(&mut object.loaded_values, &object.values)?;
                 update_array_value_at_index(&mut object.values, index, value, apply)?;
                 Ok(())
             }
@@ -1029,8 +1100,10 @@ impl RuntimeObject {
                 Ok((value, false))
             }
             Self::UoSmallMap(object) => {
+                // The call read the map when it loaded it; the access scans
+                // the opened entries.
                 object.accessed = true;
-                record_small_map_scan(object, trace)?;
+                record_small_map_scan(object, trace);
                 let value =
                     select_small_map_value_for_key(&object.entries, key, &object.spec.value_type)?;
                 Ok((value, false))
@@ -1098,8 +1171,9 @@ impl RuntimeObject {
             }
             Self::UoSmallMap(object) => {
                 object.accessed = true;
-                record_small_map_scan(object, trace)?;
+                record_small_map_scan(object, trace);
                 trace.logical_write("uomap_put", &object.spec.name, "oblivious");
+                keep_loaded_small_map_entries(&mut object.loaded_entries, &object.entries)?;
                 let value_type = object.spec.value_type.clone();
                 let object_name = object.spec.name.clone();
                 let capacity_overflowed = update_small_map_entries_for_put(
@@ -1299,10 +1373,13 @@ impl RuntimeObject {
     /// `may_write` says whether the call's program has a write statement for
     /// the object. An exact object is resealed, slot by slot, exactly when
     /// it does, whether or not a write ran or its predicate held, and also
-    /// when the call aborted, with the committed contents. An exact object
-    /// the program only reads is restored from storage with no write. The
-    /// decision is the program's, not the object's access flags. A Path
-    /// ORAM map has written its paths as it was accessed.
+    /// when the call aborted, with the contents the call loaded. An exact
+    /// object the program only reads is left as it was loaded, with no
+    /// write. The decision is the program's, not the object's access flags.
+    /// Commit reads no storage: an aborted call's contents are the copy the
+    /// object kept at its first write, so a call that aborts opens no record
+    /// that a call that commits does not. A Path ORAM map has written its
+    /// paths as it was accessed.
     pub(in crate::runtime) fn commit(
         self,
         old: &Self,
@@ -1329,20 +1406,16 @@ impl RuntimeObject {
                 next.written = false;
                 Ok(Self::RawCell(next))
             }
-            (Self::UoCell(new), Self::UoCell(old)) => {
+            (Self::UoCell(new), Self::UoCell(_)) => {
                 let mut next = new;
-                let restored_value = if aborted || !may_write {
-                    Some(old.decode_value_from_storage(allocator)?)
-                } else {
-                    None
-                };
+                let loaded_value = next.loaded_value.take();
                 let spec_name = next.spec.name.clone();
                 let cipher = &next.cipher;
                 let rng = &mut next.rng;
                 let physical = &mut next.physical;
                 reconcile_cell_commit_value(
                     &mut next.value,
-                    restored_value,
+                    loaded_value,
                     aborted,
                     may_write,
                     |committed_value| {
@@ -1414,20 +1487,16 @@ impl RuntimeObject {
                 clear_written_slots(&mut next.written_slots);
                 Ok(Self::RawArray(next))
             }
-            (Self::UoArray(new), Self::UoArray(old)) => {
+            (Self::UoArray(new), Self::UoArray(_)) => {
                 let mut next = new;
-                let restored_values = if aborted || !may_write {
-                    Some(old.decode_values_from_storage(allocator)?)
-                } else {
-                    None
-                };
+                let loaded_values = next.loaded_values.take();
                 let spec_name = next.spec.name.clone();
                 let cipher = &next.cipher;
                 let rng = &mut next.rng;
                 let physical_slots = &mut next.physical_slots;
                 reconcile_array_commit_values(
                     &mut next.values,
-                    restored_values.as_deref(),
+                    loaded_values,
                     aborted,
                     may_write,
                     |index, value| {
@@ -1484,20 +1553,16 @@ impl RuntimeObject {
                 next.staged.clear();
                 Ok(Self::RawMap(next))
             }
-            (Self::UoSmallMap(new), Self::UoSmallMap(old)) => {
+            (Self::UoSmallMap(new), Self::UoSmallMap(_)) => {
                 let mut next = new;
-                let restored_entries = if aborted || !may_write {
-                    Some(old.decode_entries_from_storage(allocator)?)
-                } else {
-                    None
-                };
+                let loaded_entries = next.loaded_entries.take();
                 let spec_name = next.spec.name.clone();
                 let cipher = &next.cipher;
                 let rng = &mut next.rng;
                 let physical_slots = &mut next.physical_slots;
                 reconcile_small_map_commit_entries(
                     &mut next.entries,
-                    restored_entries.as_deref(),
+                    loaded_entries,
                     aborted,
                     may_write,
                     |index, entry| {
@@ -1603,10 +1668,12 @@ impl RuntimeObject {
     fn clear_transient(&mut self) {
         match self {
             Self::RawCell(object) | Self::UoCell(object) => {
+                wipe_loaded_cell_value(&mut object.loaded_value);
                 object.accessed = false;
                 object.written = false;
             }
             Self::RawArray(object) | Self::UoArray(object) => {
+                wipe_loaded_array_values(&mut object.loaded_values);
                 object.accessed = false;
                 clear_written_slots(&mut object.written_slots);
             }
@@ -1614,6 +1681,7 @@ impl RuntimeObject {
                 object.wipe_staged();
             }
             Self::UoSmallMap(object) => {
+                object.loaded_entries = None;
                 object.accessed = false;
                 object.dirty = false;
             }
@@ -1750,33 +1818,26 @@ fn no_written_slots(slots: &[bool]) -> bool {
     !slots.iter().any(|written| *written)
 }
 
-fn record_array_scan(object: &ArrayObject, trace: &mut CallRecorder) {
-    for (index, physical) in object.physical_slots.iter().enumerate() {
-        trace.physical_read(
-            &object.spec.name,
-            format!("{}[{index}]", object.spec.name),
-            physical.len(),
-        );
+/// The logical events of one access to a full-scan map: the access scans
+/// every opened entry. It reads no sealed record; the call read the map's
+/// slots when it loaded the map.
+fn record_small_map_scan(object: &SmallMapObject, trace: &mut CallRecorder) {
+    for (index, _) in object.entries.iter().enumerate() {
+        trace.logical_read("uomap_scan", &object.spec.name, format!("slot:{index}"));
     }
 }
 
-fn record_small_map_scan(object: &SmallMapObject, trace: &mut CallRecorder) -> Result<()> {
-    for (index, _) in object.entries.iter().enumerate() {
-        let physical = object.physical_slots.get(index).ok_or_else(|| {
-            anyhow!(
-                "UO small-map physical slot {} missing for {} despite entry scan schedule",
-                index,
-                object.spec.name
-            )
-        })?;
-        trace.logical_read("uomap_scan", &object.spec.name, format!("slot:{index}"));
-        trace.physical_read(
-            &object.spec.name,
-            format!("{}#{index}", object.spec.name),
-            physical.len(),
-        );
+/// Trace the read of every sealed slot of an exact object, in slot order: the
+/// call's one read of the object, made when the call loads it.
+fn record_load_scan(
+    trace: &mut CallRecorder,
+    object_name: &str,
+    physical_slots: &[Box<[u8]>],
+    location: impl Fn(usize) -> String,
+) {
+    for (index, slot) in physical_slots.iter().enumerate() {
+        trace.physical_read(object_name, location(index), slot.len());
     }
-    Ok(())
 }
 
 fn cell_slot_aad(object: &str) -> String {
@@ -1809,6 +1870,11 @@ mod tests {
             max_load_ops: 0,
         })
         .unwrap()
+    }
+
+    /// A recorder for a load whose trace the test does not read.
+    fn load_recorder() -> crate::controller::CallRecorder {
+        crate::controller::CallRecorder::begin("load_test", &[])
     }
 
     fn nested_value_type() -> Type {
@@ -1931,7 +1997,9 @@ mod tests {
         }
 
         let mut allocator = tx_allocator();
-        let cloned = object.clone_for_tx(&mut allocator).unwrap();
+        let cloned = object
+            .clone_for_tx(&mut load_recorder(), &mut allocator)
+            .unwrap();
         allocator.finish().unwrap();
 
         match cloned {
@@ -1988,7 +2056,9 @@ mod tests {
         }
 
         let mut allocator = tx_allocator();
-        let cloned = object.clone_for_tx(&mut allocator).unwrap();
+        let cloned = object
+            .clone_for_tx(&mut load_recorder(), &mut allocator)
+            .unwrap();
         allocator.finish().unwrap();
 
         match cloned {
@@ -2055,7 +2125,9 @@ mod tests {
         }
 
         let mut allocator = tx_allocator();
-        let cloned = object.clone_for_tx(&mut allocator).unwrap();
+        let cloned = object
+            .clone_for_tx(&mut load_recorder(), &mut allocator)
+            .unwrap();
         allocator.finish().unwrap();
 
         match cloned {
@@ -2077,7 +2149,7 @@ mod tests {
     }
 
     #[test]
-    fn uo_cell_commit_reads_old_state_from_storage_on_abort() {
+    fn uo_cell_commit_keeps_the_loaded_value_on_abort() {
         let spec = cell_spec();
         let zero = Value::zero_for_type(&spec.value_type);
         let mut old = RuntimeObject::instantiate_with_seed(&spec, 0xCE11).unwrap();
@@ -2089,35 +2161,43 @@ mod tests {
         }
 
         let mut shadow_allocator = tx_allocator();
-        let mut new = old.clone_for_tx(&mut shadow_allocator).unwrap();
+        let mut new = old
+            .clone_for_tx(&mut load_recorder(), &mut shadow_allocator)
+            .unwrap();
         shadow_allocator.finish().unwrap();
-        match &mut new {
-            RuntimeObject::UoCell(cell) => {
-                cell.value = Value::Struct(
-                    vec![
-                        ("flag".into(), Value::Bool(true)),
-                        (
-                            "items".into(),
-                            Value::Array(vec![Value::uint(21), Value::uint(34)].into_boxed_slice()),
-                        ),
-                    ]
-                    .into_boxed_slice(),
-                );
-                cell.accessed = true;
-                cell.written = true;
-            }
+        let mut recorder = crate::controller::CallRecorder::begin("commit_test", &[]);
+        new.set_cell(
+            Value::Struct(
+                vec![
+                    ("flag".into(), Value::Bool(true)),
+                    (
+                        "items".into(),
+                        Value::Array(vec![Value::uint(21), Value::uint(34)].into_boxed_slice()),
+                    ),
+                ]
+                .into_boxed_slice(),
+            ),
+            None,
+            &mut recorder,
+        )
+        .unwrap();
+        // The first write keeps the value the call loaded.
+        match &new {
+            RuntimeObject::UoCell(cell) => assert_eq!(cell.loaded_value, Some(zero.clone())),
             _ => unreachable!(),
         }
-        let mut recorder = crate::controller::CallRecorder::begin("commit_test", &[]);
         let mut commit_allocator = tx_allocator();
         let committed = new
             .commit(&old, true, true, &mut recorder, &mut commit_allocator)
             .unwrap();
         commit_allocator.finish().unwrap();
 
+        // The aborted call reseals the loaded value and keeps no copy.
+        assert_eq!(recorder.physical_write_count(), 1);
         match committed {
             RuntimeObject::UoCell(cell) => {
                 assert_eq!(cell.value, zero);
+                assert_eq!(cell.loaded_value, None);
                 assert!(!cell.accessed);
                 assert!(!cell.written);
             }
@@ -2131,7 +2211,9 @@ mod tests {
         let old = RuntimeObject::instantiate_with_seed(&spec, 0xC012).unwrap();
 
         let mut shadow_allocator = tx_allocator();
-        let new = old.clone_for_tx(&mut shadow_allocator).unwrap();
+        let new = old
+            .clone_for_tx(&mut load_recorder(), &mut shadow_allocator)
+            .unwrap();
         shadow_allocator.finish().unwrap();
         let physical_ptr = match &new {
             RuntimeObject::UoCell(cell) => cell.physical.as_ptr(),
@@ -2189,7 +2271,9 @@ mod tests {
                 (true, true, true),
             ] {
                 let mut shadow_allocator = tx_allocator();
-                let mut new = old.clone_for_tx(&mut shadow_allocator).unwrap();
+                let mut new = old
+                    .clone_for_tx(&mut load_recorder(), &mut shadow_allocator)
+                    .unwrap();
                 shadow_allocator.finish().unwrap();
                 if accessed {
                     mark_accessed(&mut new);
@@ -2235,7 +2319,9 @@ mod tests {
         let old = RuntimeObject::instantiate_with_seed(&spec, 0xC013).unwrap();
 
         let mut shadow_allocator = tx_allocator();
-        let mut new = old.clone_for_tx(&mut shadow_allocator).unwrap();
+        let mut new = old
+            .clone_for_tx(&mut load_recorder(), &mut shadow_allocator)
+            .unwrap();
         shadow_allocator.finish().unwrap();
         let physical_ptr = match &new {
             RuntimeObject::UoCell(cell) => cell.physical.as_ptr(),
@@ -2306,7 +2392,7 @@ mod tests {
     }
 
     #[test]
-    fn uo_array_commit_reads_old_state_from_storage_when_unaccessed() {
+    fn uo_array_commit_leaves_an_unwritten_array_as_loaded() {
         let spec = array_spec();
         let zero = Value::zero_for_type(&spec.value_type);
         let mut old = RuntimeObject::instantiate_with_seed(&spec, 0xA661).unwrap();
@@ -2341,7 +2427,9 @@ mod tests {
         }
 
         let mut shadow_allocator = tx_allocator();
-        let new = old.clone_for_tx(&mut shadow_allocator).unwrap();
+        let new = old
+            .clone_for_tx(&mut load_recorder(), &mut shadow_allocator)
+            .unwrap();
         shadow_allocator.finish().unwrap();
         let (values_ptr, physical_slots_ptr) = match &new {
             RuntimeObject::UoArray(array) => (array.values.as_ptr(), array.physical_slots.as_ptr()),
@@ -2453,7 +2541,9 @@ mod tests {
         let old = RuntimeObject::instantiate_with_seed(&spec, 0xA662).unwrap();
 
         let mut shadow_allocator = tx_allocator();
-        let mut new = old.clone_for_tx(&mut shadow_allocator).unwrap();
+        let mut new = old
+            .clone_for_tx(&mut load_recorder(), &mut shadow_allocator)
+            .unwrap();
         shadow_allocator.finish().unwrap();
         let slot_ptr = match &new {
             RuntimeObject::UoArray(array) => array.physical_slots[1].as_ptr(),
@@ -2540,7 +2630,7 @@ mod tests {
     }
 
     #[test]
-    fn uo_small_map_commit_reads_old_state_from_storage_on_abort() {
+    fn uo_small_map_commit_keeps_the_loaded_entries_on_abort() {
         let spec = small_map_spec();
         let zero_key = Value::zero_for_type(spec.key_type.as_ref().unwrap());
         let zero_value = Value::zero_for_type(&spec.value_type);
@@ -2563,49 +2653,57 @@ mod tests {
         }
 
         let mut shadow_allocator = tx_allocator();
-        let mut new = old.clone_for_tx(&mut shadow_allocator).unwrap();
+        let mut new = old
+            .clone_for_tx(&mut load_recorder(), &mut shadow_allocator)
+            .unwrap();
         shadow_allocator.finish().unwrap();
-        match &mut new {
-            RuntimeObject::UoSmallMap(map) => {
-                map.entries[0] = MapEntry::new(
-                    true,
-                    Value::Struct(
-                        vec![
-                            ("owner".into(), Value::Address([0x88; 20])),
-                            ("nonce".into(), Value::uint(5)),
-                        ]
-                        .into_boxed_slice(),
-                    ),
-                    Value::Struct(
-                        vec![
-                            ("flag".into(), Value::Bool(true)),
-                            (
-                                "items".into(),
-                                Value::Array(
-                                    vec![Value::uint(15), Value::uint(16)].into_boxed_slice(),
-                                ),
-                            ),
-                        ]
-                        .into_boxed_slice(),
-                    ),
-                );
-                map.accessed = true;
-                map.dirty = true;
-            }
-            _ => unreachable!(),
-        }
+        let mut recorder = crate::controller::CallRecorder::begin("commit_test", &[]);
+        let mut put_allocator = tx_allocator();
+        let overflowed = new
+            .put_map(
+                Value::Struct(
+                    vec![
+                        ("owner".into(), Value::Address([0x88; 20])),
+                        ("nonce".into(), Value::uint(5)),
+                    ]
+                    .into_boxed_slice(),
+                ),
+                Value::Struct(
+                    vec![
+                        ("flag".into(), Value::Bool(true)),
+                        (
+                            "items".into(),
+                            Value::Array(vec![Value::uint(15), Value::uint(16)].into_boxed_slice()),
+                        ),
+                    ]
+                    .into_boxed_slice(),
+                ),
+                None,
+                &mut recorder,
+                &mut put_allocator,
+            )
+            .unwrap();
+        put_allocator.finish().unwrap();
+        assert!(!overflowed);
         let (entries_ptr, physical_slots_ptr) = match &new {
-            RuntimeObject::UoSmallMap(map) => (map.entries.as_ptr(), map.physical_slots.as_ptr()),
+            RuntimeObject::UoSmallMap(map) => {
+                // The write took effect on the opened entries, and the first
+                // write kept the entries the call loaded.
+                assert!(map.entries[0].is_occupied());
+                assert!(map.loaded_entries.is_some());
+                (map.entries.as_ptr(), map.physical_slots.as_ptr())
+            }
             _ => unreachable!(),
         };
 
-        let mut recorder = crate::controller::CallRecorder::begin("commit_test", &[]);
         let mut commit_allocator = tx_allocator();
         let committed = new
             .commit(&old, true, true, &mut recorder, &mut commit_allocator)
             .unwrap();
         commit_allocator.finish().unwrap();
 
+        // The aborted call reseals every slot with the loaded entries.
+        assert_eq!(recorder.physical_write_count(), 2);
         match committed {
             RuntimeObject::UoSmallMap(map) => {
                 assert_eq!(
@@ -2618,10 +2716,194 @@ mod tests {
                 );
                 assert_eq!(map.entries.as_ptr(), entries_ptr);
                 assert_eq!(map.physical_slots.as_ptr(), physical_slots_ptr);
+                assert!(map.loaded_entries.is_none());
                 assert!(!map.accessed);
                 assert!(!map.dirty);
             }
             _ => unreachable!(),
+        }
+    }
+
+    #[test]
+    fn an_exact_object_is_read_once_when_the_call_loads_it() {
+        // The load reads every sealed slot and traces it. The call's
+        // accesses work on the opened copy: each keeps its logical event and
+        // reads nothing more.
+        // A cell: one record.
+        let spec = cell_spec();
+        let old = RuntimeObject::instantiate_with_seed(&spec, 0xF001).unwrap();
+        let mut recorder = crate::controller::CallRecorder::begin("load_test", &[]);
+        let mut allocator = tx_allocator();
+        let mut cell = old.clone_for_tx(&mut recorder, &mut allocator).unwrap();
+        assert_eq!(recorder.metrics().physical_reads, 1);
+        cell.get_cell(&mut recorder).unwrap();
+        cell.set_cell(nested_nonzero_value(), None, &mut recorder)
+            .unwrap();
+        cell.get_cell(&mut recorder).unwrap();
+        assert_eq!(recorder.metrics().physical_reads, 1);
+        assert_eq!(recorder.metrics().logical_reads, 2);
+        assert_eq!(recorder.metrics().logical_writes, 1);
+        assert_eq!(recorder.physical_read_locations(), ["nested_cell"]);
+
+        // An array: one record per slot, in slot order.
+        let spec = array_spec();
+        let old = RuntimeObject::instantiate_with_seed(&spec, 0xF002).unwrap();
+        let mut recorder = crate::controller::CallRecorder::begin("load_test", &[]);
+        let mut array = old.clone_for_tx(&mut recorder, &mut allocator).unwrap();
+        assert_eq!(recorder.metrics().physical_reads, 3);
+        array.get_array(1, &mut recorder).unwrap();
+        array
+            .set_array(
+                2,
+                Value::zero_for_type(&spec.value_type),
+                None,
+                &mut recorder,
+            )
+            .unwrap();
+        array.get_array(0, &mut recorder).unwrap();
+        assert_eq!(recorder.metrics().physical_reads, 3);
+        assert_eq!(recorder.metrics().logical_reads, 2);
+        assert_eq!(recorder.metrics().logical_writes, 1);
+        assert_eq!(
+            recorder.physical_read_locations(),
+            ["nested_array[0]", "nested_array[1]", "nested_array[2]"]
+        );
+
+        // A full-scan map: one record per slot, in slot order. Each access
+        // scans the two opened entries.
+        let spec = small_map_spec();
+        let key = Value::zero_for_type(spec.key_type.as_ref().unwrap());
+        let old = RuntimeObject::instantiate_with_seed(&spec, 0xF003).unwrap();
+        let mut recorder = crate::controller::CallRecorder::begin("load_test", &[]);
+        let mut map = old.clone_for_tx(&mut recorder, &mut allocator).unwrap();
+        assert_eq!(recorder.metrics().physical_reads, 2);
+        map.get_map(&key, &mut recorder, &mut allocator).unwrap();
+        map.put_map(
+            key.clone(),
+            nested_nonzero_value(),
+            None,
+            &mut recorder,
+            &mut allocator,
+        )
+        .unwrap();
+        map.get_map(&key, &mut recorder, &mut allocator).unwrap();
+        assert_eq!(recorder.metrics().physical_reads, 2);
+        assert_eq!(recorder.metrics().logical_reads, 3 * 2);
+        assert_eq!(recorder.metrics().logical_writes, 1);
+        assert_eq!(
+            recorder.physical_read_locations(),
+            ["nested_map#0", "nested_map#1"]
+        );
+        allocator.finish().unwrap();
+    }
+
+    #[test]
+    fn commit_opens_no_sealed_record() {
+        // Commit reads no storage. A call that only reads an exact object
+        // commits it with no resource event at all, and a call that aborts
+        // after a write logs what a call that commits logs: the seals.
+        fn write(object: &mut RuntimeObject, spec: &StateObject, allocator: &mut AllocatorSession) {
+            let mut recorder = crate::controller::CallRecorder::begin("write_test", &[]);
+            match object {
+                RuntimeObject::UoCell(_) => object
+                    .set_cell(nested_nonzero_value(), None, &mut recorder)
+                    .unwrap(),
+                RuntimeObject::UoArray(_) => object
+                    .set_array(
+                        1,
+                        Value::Struct(
+                            vec![
+                                ("owner".into(), Value::Address([0xD1; 20])),
+                                ("count".into(), Value::uint(41)),
+                            ]
+                            .into_boxed_slice(),
+                        ),
+                        None,
+                        &mut recorder,
+                    )
+                    .unwrap(),
+                RuntimeObject::UoSmallMap(_) => {
+                    let key = Value::Struct(
+                        vec![
+                            ("owner".into(), Value::Address([0xD2; 20])),
+                            ("nonce".into(), Value::uint(7)),
+                        ]
+                        .into_boxed_slice(),
+                    );
+                    let overflowed = object
+                        .put_map(key, nested_nonzero_value(), None, &mut recorder, allocator)
+                        .unwrap();
+                    assert!(!overflowed);
+                }
+                _ => unreachable!(),
+            }
+            let _ = spec;
+        }
+        for (spec, seed) in [
+            (cell_spec(), 0xF101u64),
+            (array_spec(), 0xF102),
+            (small_map_spec(), 0xF103),
+        ] {
+            let old = RuntimeObject::instantiate_with_seed(&spec, seed).unwrap();
+            let slots = old.sealed_storage_for_test().unwrap().1.len();
+            let mut commit_events = Vec::new();
+            for (aborted, may_write) in [(false, false), (true, false), (false, true), (true, true)]
+            {
+                let mut shadow_allocator = tx_allocator();
+                let mut new = old
+                    .clone_for_tx(&mut load_recorder(), &mut shadow_allocator)
+                    .unwrap();
+                if may_write {
+                    write(&mut new, &spec, &mut shadow_allocator);
+                }
+                shadow_allocator.finish().unwrap();
+                let mut recorder = crate::controller::CallRecorder::begin("commit_test", &[]);
+                let mut commit_allocator = tx_allocator();
+                let committed = new
+                    .commit(
+                        &old,
+                        aborted,
+                        may_write,
+                        &mut recorder,
+                        &mut commit_allocator,
+                    )
+                    .unwrap();
+                let events = commit_allocator.finish().unwrap().resource_events().len();
+                let case = format!("{} aborted={aborted} may_write={may_write}", spec.name);
+                assert_eq!(recorder.metrics().physical_reads, 0, "{case}");
+                if may_write {
+                    // One reservation of scratch, wiped, for each seal.
+                    assert_eq!(events, 2 * slots, "{case}");
+                } else {
+                    assert_eq!(events, 0, "{case}");
+                }
+                // An aborted call commits the contents it loaded.
+                if aborted || !may_write {
+                    let mut reload_allocator = tx_allocator();
+                    let reloaded_old = old
+                        .clone_for_tx(&mut load_recorder(), &mut reload_allocator)
+                        .unwrap();
+                    let reloaded_new = committed
+                        .clone_for_tx(&mut load_recorder(), &mut reload_allocator)
+                        .unwrap();
+                    reload_allocator.finish().unwrap();
+                    match (&reloaded_old, &reloaded_new) {
+                        (RuntimeObject::UoCell(old), RuntimeObject::UoCell(new)) => {
+                            assert_eq!(old.value, new.value, "{case}")
+                        }
+                        (RuntimeObject::UoArray(old), RuntimeObject::UoArray(new)) => {
+                            assert_eq!(old.values, new.values, "{case}")
+                        }
+                        (RuntimeObject::UoSmallMap(old), RuntimeObject::UoSmallMap(new)) => {
+                            assert_eq!(old.entries, new.entries, "{case}")
+                        }
+                        _ => unreachable!(),
+                    }
+                }
+                commit_events.push(events);
+            }
+            // Abort and commit do the same work on a written object.
+            assert_eq!(commit_events[2], commit_events[3], "{}", spec.name);
         }
     }
 
@@ -2631,7 +2913,9 @@ mod tests {
         let old = RuntimeObject::instantiate_with_seed(&spec, 0x5C02).unwrap();
 
         let mut shadow_allocator = tx_allocator();
-        let mut new = old.clone_for_tx(&mut shadow_allocator).unwrap();
+        let mut new = old
+            .clone_for_tx(&mut load_recorder(), &mut shadow_allocator)
+            .unwrap();
         shadow_allocator.finish().unwrap();
         let slot_ptr = match &new {
             RuntimeObject::UoSmallMap(map) => map.physical_slots[0].as_ptr(),
@@ -2710,7 +2994,9 @@ mod tests {
         }
 
         let mut shadow_allocator = tx_allocator();
-        let new = old.clone_for_tx(&mut shadow_allocator).unwrap();
+        let new = old
+            .clone_for_tx(&mut load_recorder(), &mut shadow_allocator)
+            .unwrap();
         shadow_allocator.finish().unwrap();
         let (entries_ptr, position_map_ptr, stash_ptr) = match &new {
             RuntimeObject::UoOramMap(map) => map.oram.logical_state_ptrs_for_test(),
@@ -2768,7 +3054,9 @@ mod tests {
 
         for aborted in [true, false] {
             let mut shadow_allocator = tx_allocator();
-            let mut new = old.clone_for_tx(&mut shadow_allocator).unwrap();
+            let mut new = old
+                .clone_for_tx(&mut load_recorder(), &mut shadow_allocator)
+                .unwrap();
             shadow_allocator.finish().unwrap();
             let mut recorder = crate::controller::CallRecorder::begin("commit_test", &[]);
             let mut allocator = tx_allocator();

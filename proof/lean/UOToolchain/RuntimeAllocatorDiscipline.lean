@@ -17,10 +17,9 @@ structure Plan where
   reservation of scratch, wiped, so two resource events each. -/
   maxCommitOps : Nat := 0
   /-- The entrypoint's load operations (the manifest's `max_load_ops`): the
-  slots, pages and buckets the call reads. The call opens each when it loads
-  its object or reads its path, and it opens a slot of an exact object once
-  more to restore it when the call aborts or does not write the object: two
-  reservations of scratch, each wiped, so four resource events each. -/
+  slots, pages and buckets the call reads. The call opens each once, when it
+  loads its object or reads its path: one reservation of scratch, wiped, so
+  two resource events each. Commit opens nothing. -/
   maxLoadOps : Nat := 0
 deriving Repr, DecidableEq
 
@@ -47,7 +46,7 @@ structure State where
 deriving Repr, DecidableEq
 
 def resourceEventCapacity (plan : Plan) : Nat :=
-  (plan.maxKernelOps + plan.maxStackWords) * 128 + 128 + plan.maxLoadOps * 4 +
+  (plan.maxKernelOps + plan.maxStackWords) * 128 + 128 + plan.maxLoadOps * 2 +
     plan.maxCommitOps * 2
 
 def emptyUsage : Usage :=
@@ -137,7 +136,7 @@ theorem initialState_eventLogCapacity (plan : Plan) :
 
 theorem resourceEventCapacity_public_formula (plan : Plan) :
     resourceEventCapacity plan =
-      (plan.maxKernelOps + plan.maxStackWords) * 128 + 128 + plan.maxLoadOps * 4 +
+      (plan.maxKernelOps + plan.maxStackWords) * 128 + 128 + plan.maxLoadOps * 2 +
         plan.maxCommitOps * 2 := by
   rfl
 

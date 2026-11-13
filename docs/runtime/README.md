@@ -36,6 +36,18 @@ call's whole `ExecutionTrace`, which also holds its `PrivateEvidence` and
 which a call returns only in a test or diagnostics build (see
 [`trusted-kernel.md`](./trusted-kernel.md)).
 
+A call loads the objects it runs on before its first statement: a
+confidential call the objects its kernel program schedules, a public call
+the objects its body accesses. Loading a sealed exact object (a cell, an
+array or a full-scan map) opens every slot of it and is the call's one read
+of the object; the call recorder takes the read there
+(`RuntimeObject::clone_for_tx`), and an access records its logical event
+only. Commit opens nothing: it reseals the objects the program may write,
+with the copy the object kept at its first write if the call aborted
+(`keep_loaded_*` and `reconcile_*_commit_*` in the generated object
+helpers). A Path ORAM map reads its counter and metadata pages when it is
+loaded, outside the trace, and its paths as it is accessed.
+
 Committed state changes only through a call, with one exception that a
 production build does not have: `ContractInstance::bulk_load_map_for_diagnostics`
 stores entries in one map with no trace, receipt or freshness step, so that

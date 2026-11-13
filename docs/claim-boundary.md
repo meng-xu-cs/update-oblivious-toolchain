@@ -192,12 +192,15 @@ proved.
   abstract/runtime model: `UOCell`, `UOArray`, and full-scan `UOMap`. For
   admitted kernel programs it is a Lean theorem over the exact store's
   encoding (`UOToolchain/KernelExactTrace.lean`): every admitted run executes
-  the whole kernel body, each storage access scans its whole object, and every
-  object the program has a write statement for is rewritten at commit with
-  `Update`-class writes, whether or not the write's predicate holds. An
-  object the program only reads is scanned and not written
-  (`exactEncodeRun_rewrites_only_written`). Which objects are rewritten is
-  fixed by the program, so all admitted runs of a program produce the same
+  the whole kernel body; the run reads each object the body accesses once,
+  every slot of it, when the call loads the object, in object-id order and
+  however many statements access it (`exactEncodeRun_reads_each_touched_once`);
+  and every object the program has a write statement for is rewritten at
+  commit with `Update`-class writes, whether or not the write's predicate
+  holds. An object the program only reads is read and not written
+  (`exactEncodeRun_rewrites_only_written`). Which objects are read and which
+  are rewritten is fixed by the program, so all admitted runs of a program
+  produce the same
   trace (`admittedKernel_exactUO`) and
   `paperMain_admittedKernel_exact_noninterference_moduloReleases` discharges
   the paper-main theorem's storage-trace premise. That the runtime store
@@ -341,7 +344,13 @@ and metadata pages of each access of an ORAM map. `max_load_ops` bounds
 those it reads: each slot of each exact object it loads, once; for each
 access of an ORAM map the buckets of the path and the metadata pages; and,
 for a Path ORAM map, the counter and the metadata pages the call reads when
-it starts, which no trace records. On the private scheme both count the
+it starts, which no trace records. On the exact backends the count is what
+a call does: it opens each slot of an object it accesses once, when it
+loads the object, the trace records that read there, and neither an access
+nor the commit opens a slot again. A call that aborts keeps what it loaded
+and reseals that. A confidential call loads the objects its kernel program
+schedules, and a public one the objects its body accesses. On the private
+scheme both count the
 metadata pages once per node access, where a call reads and writes them
 fewer times, so there they are bounds and not counts. Model v1 charged the
 writes alone, so a call that only read would have cost about 2,000 units

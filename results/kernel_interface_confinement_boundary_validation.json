@@ -592,7 +592,7 @@
           "summaries_match_events": true
         }
       },
-      "kernel_interface_bundle_json_bytes": 7898,
+      "kernel_interface_bundle_json_bytes": 7317,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -607,7 +607,7 @@
           "io_scratch": {
             "live_bytes": 0,
             "peak_bytes": 32,
-            "wipe_count": 11
+            "wipe_count": 7
           },
           "peak_stack_words": 2,
           "value_scratch": {
@@ -631,7 +631,7 @@
         "hash_scratch_peak_bytes": 0,
         "hash_scratch_wipe_count": 1,
         "io_scratch_peak_bytes": 32,
-        "io_scratch_wipe_count": 11,
+        "io_scratch_wipe_count": 7,
         "kernel_op_count": 8,
         "kernel_step_public_object_schedule": [
           1,
@@ -646,7 +646,7 @@
           1,
           2
         ],
-        "resource_event_count": 38,
+        "resource_event_count": 30,
         "resource_events": [
           {
             "bytes": 32,
@@ -796,54 +796,6 @@
             "bytes": null,
             "kind": "wipe_scratch",
             "region": "value_scratch",
-            "words": null
-          },
-          {
-            "bytes": 32,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 32,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 32,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 32,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
             "words": null
           },
           {
@@ -970,7 +922,7 @@
       "scenario": "AuthScan/uo/class0",
       "setup_calls": 2,
       "shared_resource_events": 3,
-      "witness_json_bytes": 7956
+      "witness_json_bytes": 6739
     },
     {
       "accepted": true,
@@ -1061,7 +1013,7 @@
           "summaries_match_events": true
         }
       },
-      "kernel_interface_bundle_json_bytes": 7898,
+      "kernel_interface_bundle_json_bytes": 7317,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -1076,7 +1028,7 @@
           "io_scratch": {
             "live_bytes": 0,
             "peak_bytes": 32,
-            "wipe_count": 11
+            "wipe_count": 7
           },
           "peak_stack_words": 2,
           "value_scratch": {
@@ -1100,7 +1052,7 @@
         "hash_scratch_peak_bytes": 0,
         "hash_scratch_wipe_count": 1,
         "io_scratch_peak_bytes": 32,
-        "io_scratch_wipe_count": 11,
+        "io_scratch_wipe_count": 7,
         "kernel_op_count": 8,
         "kernel_step_public_object_schedule": [
           1,
@@ -1115,7 +1067,7 @@
           1,
           2
         ],
-        "resource_event_count": 38,
+        "resource_event_count": 30,
         "resource_events": [
           {
             "bytes": 32,
@@ -1280,54 +1232,6 @@
             "words": null
           },
           {
-            "bytes": 32,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 32,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 32,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 32,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
             "bytes": null,
             "kind": "wipe_scratch",
             "region": "value_scratch",
@@ -1439,7 +1343,7 @@
       "scenario": "AuthScan/uo/class1",
       "setup_calls": 2,
       "shared_resource_events": 3,
-      "witness_json_bytes": 7956
+      "witness_json_bytes": 6739
     },
     {
       "accepted": true,
@@ -2757,7 +2661,7 @@
       "scenario": "ConfidentialMixer/fullscan/class0",
       "setup_calls": 0,
       "shared_resource_events": 3,
-      "witness_json_bytes": 9987
+      "witness_json_bytes": 9491
     },
     {
       "accepted": true,
@@ -3265,7 +3169,7 @@
       "scenario": "ConfidentialMixer/fullscan/class1",
       "setup_calls": 0,
       "shared_resource_events": 3,
-      "witness_json_bytes": 9987
+      "witness_json_bytes": 9491
     },
     {
       "accepted": true,
@@ -8031,7 +7935,7 @@
       "scenario": "ConfidentialMixer/pathoram/deposit",
       "setup_calls": 0,
       "shared_resource_events": 189,
-      "witness_json_bytes": 43968
+      "witness_json_bytes": 43920
     },
     {
       "accepted": true,

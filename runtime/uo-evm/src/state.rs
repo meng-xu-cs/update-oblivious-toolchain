@@ -102,8 +102,11 @@ pub(in crate::runtime) struct ConfidentialRuntimeShadowState {
 #[derive(Debug)]
 pub(in crate::runtime) struct PublicRuntimeShadowState {
     shadow: RuntimeShadowState,
+    // The public-state digest of the call's candidate state, taken when the
+    // call commits.
+    candidate_public_state_hash: Option<String>,
     // The objects the entrypoint may write, which commit reseals: set from
-    // the manifest before the entrypoint runs.
+    // the entrypoint's body before it runs.
     may_write_objects: Option<Box<[u32]>>,
 }
 
@@ -159,10 +162,6 @@ impl RuntimeObjectTable {
             }
         }
         PublicStateSnapshot::from_objects(snapshots)
-    }
-
-    fn public_state_digest(&self) -> Result<String> {
-        Ok(self.public_state_snapshot()?.digest)
     }
 
     /// A digest of every sealed record in storage, by object and by slot. It
@@ -228,9 +227,13 @@ impl RuntimeObjectTable {
         found_index.and_then(|index| self.entries.get_mut(index).map(|entry| &mut entry.object))
     }
 
+    /// Load `object_ids` for a call, in the order given. Loading a sealed
+    /// exact object reads it, and `trace` records that read: the call's one
+    /// read of the object.
     fn clone_for_shadow(
         &self,
         object_ids: &[u32],
+        trace: &mut CallRecorder,
         allocator: &mut AllocatorSession,
     ) -> Result<Self> {
         crate::instrumentation::time_load(|| {
@@ -241,7 +244,7 @@ impl RuntimeObjectTable {
                     .ok_or_else(|| anyhow!("missing committed object {}", object_id))?;
                 entries.push(RuntimeObjectEntry {
                     object_id: *object_id,
-                    object: object.clone_for_tx(allocator)?,
+                    object: object.clone_for_tx(trace, allocator)?,
                 })?;
             }
             Ok(Self::new(entries.finish()?))
@@ -343,11 +346,14 @@ impl ContractRuntime {
         // The session is dropped without `finish()`, as the public-state
         // snapshot's is, so its event log is never read.
         let mut allocator = public_state_snapshot_allocator()?;
-        let mut shadow = self.committed.shadow_load(&[object_id], &mut allocator)?;
+        // Nothing reads this recorder: the load is not a call.
+        let mut recorder = CallRecorder::begin_with_input_len("bulk load", 0);
+        let mut shadow = self
+            .committed
+            .shadow_load(&[object_id], &mut recorder, &mut allocator)?;
         shadow
             .object_mut(object_id)?
             .bulk_put_for_diagnostics(entries, &mut allocator)?;
-        let mut recorder = CallRecorder::begin_with_input_len("bulk load", 0);
         shadow.commit_against(
             &self.committed,
             false,
@@ -428,13 +434,16 @@ impl ContractRuntime {
         crate::instrumentation::time_witness(|| self.committed.witness_snapshot())
     }
 
+    /// Load the objects a public call runs on: `object_ids`, the objects
+    /// the entrypoint's body accesses.
     pub(in crate::runtime) fn prepare_public_shadow(
         &self,
         kernel: &mut PublicRuntimeKernel,
-        public_object_ids: &[u32],
+        object_ids: &[u32],
+        recorder: &mut CallRecorder,
     ) -> Result<PublicRuntimeShadowState> {
         self.committed
-            .prepare_public_shadow(kernel, public_object_ids)
+            .prepare_public_shadow(kernel, object_ids, recorder)
     }
 
     pub(in crate::runtime) fn commit_public_shadow(
@@ -685,10 +694,11 @@ impl CommittedRuntimeState {
     pub(in crate::runtime) fn prepare_public_shadow(
         &self,
         kernel: &mut PublicRuntimeKernel,
-        public_object_ids: &[u32],
+        object_ids: &[u32],
+        recorder: &mut CallRecorder,
     ) -> Result<PublicRuntimeShadowState> {
-        let shadow = kernel.shadow_load_with(public_object_ids, |allocator| {
-            self.shadow_load(public_object_ids, allocator)
+        let shadow = kernel.shadow_load_with(object_ids, |allocator| {
+            self.shadow_load(object_ids, recorder, allocator)
         })?;
         Ok(PublicRuntimeShadowState::from_shadow(shadow))
     }
@@ -771,10 +781,13 @@ impl CommittedRuntimeState {
     pub(in crate::runtime) fn shadow_load(
         &self,
         object_ids: &[u32],
+        recorder: &mut CallRecorder,
         allocator: &mut AllocatorSession,
     ) -> Result<RuntimeShadowState> {
         Ok(RuntimeShadowState {
-            objects: self.objects.clone_for_shadow(object_ids, allocator)?,
+            objects: self
+                .objects
+                .clone_for_shadow(object_ids, recorder, allocator)?,
         })
     }
 
@@ -799,17 +812,15 @@ impl CommittedRuntimeState {
         kernel: &mut PublicRuntimeKernel,
         object_ids: &[u32],
     ) -> Result<ConfidentialRuntimeShadowState> {
+        // Nothing reads this recorder: the test inspects the loaded objects.
+        let mut recorder = CallRecorder::begin_with_input_len("shadow load", 0);
         kernel.shadow_load_with(object_ids, |allocator| {
-            ConfidentialRuntimeShadowState::shadow_load(self, object_ids, allocator)
+            ConfidentialRuntimeShadowState::shadow_load(self, object_ids, &mut recorder, allocator)
         })
     }
 }
 
 impl RuntimeShadowState {
-    fn public_state_digest(&self) -> Result<String> {
-        self.objects.public_state_digest()
-    }
-
     fn public_state_snapshot(&self) -> Result<PublicStateSnapshot> {
         self.objects.public_state_snapshot()
     }
@@ -985,12 +996,13 @@ impl PublicRuntimeShadowState {
     pub(in crate::runtime) fn from_shadow(shadow: RuntimeShadowState) -> Self {
         Self {
             shadow,
+            candidate_public_state_hash: None,
             may_write_objects: None,
         }
     }
 
-    /// Name the objects the entrypoint may write, from its manifest entry:
-    /// what commit reseals.
+    /// Name the objects the entrypoint may write, the objects its body has a
+    /// write statement for: what commit reseals.
     pub(in crate::runtime) fn set_may_write_objects(&mut self, may_write_objects: &[u32]) {
         self.may_write_objects = Some(may_write_objects.into());
     }
@@ -999,10 +1011,17 @@ impl PublicRuntimeShadowState {
         self.shadow.object_mut(object_id)
     }
 
-    pub(in crate::runtime) fn public_state_digest(&self) -> Result<String> {
-        self.shadow.public_state_digest()
+    /// The public-state digest of the call's candidate state. The call has
+    /// it once it has committed.
+    pub(in crate::runtime) fn candidate_public_state_hash(&self) -> Result<String> {
+        self.candidate_public_state_hash
+            .clone()
+            .ok_or_else(|| anyhow!("public call has no candidate public state"))
     }
 
+    /// The public state the commit left: after a commit the shadow holds
+    /// every object of the contract, those the call did not load as
+    /// committed.
     pub(in crate::runtime) fn public_state_snapshot(&self) -> Result<PublicStateSnapshot> {
         self.shadow.public_state_snapshot()
     }
@@ -1014,6 +1033,14 @@ impl PublicRuntimeShadowState {
         recorder: &mut CallRecorder,
         allocator: &mut AllocatorSession,
     ) -> Result<Box<[u32]>> {
+        // The candidate public state is the committed one with the call's
+        // staged objects in place, before the commit keeps or rolls them
+        // back. The call loads only the objects its body accesses.
+        self.candidate_public_state_hash = Some(
+            self.shadow
+                .objects
+                .staged_public_state_digest(&committed.objects)?,
+        );
         let Some(may_write_objects) = self.may_write_objects.as_deref() else {
             bail!("public call committed before its may-write objects were named");
         };
@@ -1158,9 +1185,10 @@ impl RuntimeKernelConfidentialStore for ConfidentialRuntimeShadowState {
     fn shadow_load(
         committed: &Self::CommittedState,
         shadow_load_object_ids: &[u32],
+        recorder: &mut Self::Recorder,
         allocator: &mut AllocatorSession,
     ) -> Result<Self> {
-        let shadow = committed.shadow_load(shadow_load_object_ids, allocator)?;
+        let shadow = committed.shadow_load(shadow_load_object_ids, recorder, allocator)?;
         Ok(Self::from_shadow(shadow))
     }
 

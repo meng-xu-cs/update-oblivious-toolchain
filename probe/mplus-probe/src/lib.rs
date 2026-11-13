@@ -9836,8 +9836,8 @@ fn run_tamper_validation() -> Result<JsonValue> {
         tampered_runtime_implementation_generated_object_helpers_commit
             .generated_object_helpers_source
             .replace(
-                "for (current, old) in values.iter_mut().zip(old_values.iter()) {",
-                "for (current, old) in values.iter_mut().zip(old_values.iter().take(1)) {",
+                "for (current, loaded) in values.iter_mut().zip(loaded_values.iter_mut()) {",
+                "for (current, loaded) in values.iter_mut().zip(loaded_values.iter_mut().take(1)) {",
             );
     scenarios.push(validate_tampered_json_case(
         "runtime_implementation_interface/generated_object_helpers_commit_restore_drift",
@@ -28899,11 +28899,15 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && objects_source.contains("object.physical_slots.get(index).ok_or_else(|| {")
         && objects_source.contains("object.values.get_mut(index).ok_or_else(|| {")
         && objects_source.contains("object.written_slots.get_mut(index).ok_or_else(|| {")
-        && objects_source.contains("object.physical_slots.iter().enumerate()")
-        && objects_source.contains("record_small_map_scan(object, trace)?;")
+        && objects_source.contains("for (index, slot) in physical_slots.iter().enumerate() {")
+        && objects_source.contains("record_small_map_scan(object, trace);")
         && objects_source.contains(
-            "fn record_small_map_scan(object: &SmallMapObject, trace: &mut CallRecorder) -> Result<()> {",
+            "fn record_small_map_scan(object: &SmallMapObject, trace: &mut CallRecorder) {",
         )
+        && objects_source.contains("fn record_load_scan(")
+        && objects_source
+            .contains("trace.physical_read(object_name, location(index), slot.len());")
+        && !objects_source.contains("record_array_scan(")
         && objects_source.contains("update_small_map_entries_for_put(")
         && objects_source.contains("reconcile_cell_commit_value(")
         && objects_source.contains("reconcile_array_commit_values(")
@@ -29109,12 +29113,20 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             .contains("if apply & !value_is_zero & !matched_any & !inserted_any {")
         && generated_object_helpers_source.contains("pub(super) fn reconcile_cell_commit_value<F>(")
         && generated_object_helpers_source.contains("pub(super) fn reconcile_array_commit_values<F>(")
-        && generated_object_helpers_source
-            .contains("for (current, old) in values.iter_mut().zip(old_values.iter()) {")
+        && generated_object_helpers_source.contains(
+            "for (current, loaded) in values.iter_mut().zip(loaded_values.iter_mut()) {",
+        )
         && generated_object_helpers_source
             .contains("pub(super) fn reconcile_small_map_commit_entries<F>(")
+        && generated_object_helpers_source.contains(
+            "for (entry, loaded) in entries.iter_mut().zip(loaded_entries.iter_mut()) {",
+        )
+        && generated_object_helpers_source.contains("std::mem::swap(entry, loaded);")
         && generated_object_helpers_source
-            .contains("for (entry, old_entry) in entries.iter_mut().zip(old_entries.iter()) {");
+            .contains("pub(super) fn keep_loaded_small_map_entries(")
+        && !objects_source.contains("old.decode_value_from_storage(allocator)?")
+        && !objects_source.contains("old.decode_values_from_storage(allocator)?")
+        && !objects_source.contains("old.decode_entries_from_storage(allocator)?");
     let objects_runtime_uses_shared_open_decode_helper = objects_source
         .contains("decode_cell_value_from_storage(")
         && objects_source.contains("decode_array_values_from_storage(")
@@ -39619,8 +39631,13 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && shell_source.contains("let public_object_ids = runtime.public_object_ids()?;")
         && shell_source
             .contains("PublicRuntimeKernel::begin(allocator, public_object_ids.as_ref())?")
-        && shell_source
-            .contains("runtime.prepare_public_shadow(&mut kernel, public_object_ids.as_ref())?")
+        && shell_source.contains(
+            "let loaded_object_ids: Box<[u32]> = accessed_objects(&function.body).into_iter().collect();",
+        )
+        && shell_source.contains(
+            "runtime.prepare_public_shadow(&mut kernel, loaded_object_ids.as_ref(), recorder)?",
+        )
+        && !shell_source.contains("prepare_public_shadow(&mut kernel, public_object_ids.as_ref()")
         && !state_source.contains("fn object_ids(&self) -> Box<[u32]>")
         && !state_source.contains(
             ".map(|entry| entry.object_id)\n            .collect::<Vec<_>>()\n            .into_boxed_slice()",
@@ -40207,7 +40224,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && shell_source
             .contains("use uo_kernel_runtime::RuntimeKernelMachine as PublicRuntimeKernel;")
         && state_source.contains("RuntimeKernelMachine as PublicRuntimeKernel")
-        && state_source.contains("kernel.shadow_load_with(public_object_ids, |allocator| {")
+        && state_source.contains("kernel.shadow_load_with(object_ids, |allocator| {")
+        && state_source.contains("self.shadow_load(object_ids, recorder, allocator)")
         && state_source.contains("Ok(PublicRuntimeShadowState::from_shadow(shadow))")
         && state_source.contains("Ok(Self::from_shadow(shadow))")
         && !kernel_source.contains("trait RuntimeShadowView: Sized {")
@@ -42232,7 +42250,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && allocator_source.contains("saturating_add(plan.max_stack_words)")
         && allocator_source.contains("saturating_mul(128)")
         && allocator_source.contains("saturating_add(128)")
-        && allocator_source.contains("const RESOURCE_EVENTS_PER_LOAD_OP: usize = 4;")
+        && allocator_source.contains("const RESOURCE_EVENTS_PER_LOAD_OP: usize = 2;")
         && allocator_source.contains("const RESOURCE_EVENTS_PER_COMMIT_OP: usize = 2;")
         && allocator_source.contains("saturating_mul(RESOURCE_EVENTS_PER_LOAD_OP)")
         && allocator_source.contains("saturating_mul(RESOURCE_EVENTS_PER_COMMIT_OP)")
@@ -43573,7 +43591,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         resource_event_constructor_files == expected_resource_event_constructor_files;
     let state_only_runtime_helper_surface_checks = [
         (
-            "object: object.clone_for_tx(allocator)?,",
+            "object: object.clone_for_tx(trace, allocator)?,",
             vec![String::from("runtime/uo-evm/src/state.rs")],
         ),
         (
@@ -43636,7 +43654,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         });
     let kernel_only_state_helper_surface_checks = [
         (
-            "committed.shadow_load(shadow_load_object_ids, allocator)",
+            "committed.shadow_load(shadow_load_object_ids, recorder, allocator)",
             vec![String::from("runtime/uo-evm/src/state.rs")],
         ),
         (
@@ -43743,11 +43761,11 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             )],
         ),
         (
-            "old.decode_values_from_storage(allocator)?",
+            "values: self.decode_values_from_storage(allocator)?,",
             vec![String::from("runtime/uo-evm/src/objects.rs")],
         ),
         (
-            "old.decode_entries_from_storage(allocator)?",
+            "entries: self.decode_entries_from_storage(allocator)?,",
             vec![String::from("runtime/uo-evm/src/objects.rs")],
         ),
         ("next.physical = old.physical.clone();", vec![]),
@@ -43831,7 +43849,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && objects_source.contains("object.physical_slots.get(index).ok_or_else(|| {")
         && objects_source.contains("object.values.get_mut(index).ok_or_else(|| {")
         && objects_source.contains("object.written_slots.get_mut(index).ok_or_else(|| {")
-        && objects_source.contains("object.physical_slots.iter().enumerate()")
+        && objects_source.contains("for (index, slot) in physical_slots.iter().enumerate() {")
+        && !objects_source.contains("record_array_scan(")
         && !objects_source.contains(
             "trace.logical_read(\"array_get\", &object.spec.name, format!(\"[{index}]\"));\n                record_array_scan(object, trace);",
         )
@@ -44020,7 +44039,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !objects_source.contains("canonical_bytes().into_boxed_slice()");
     let state_only_kernel_helper_surface_checks = [
         (
-            "kernel.shadow_load_with(public_object_ids, |allocator| {",
+            "kernel.shadow_load_with(object_ids, |allocator| {",
             vec![String::from("runtime/uo-evm/src/state.rs")],
         ),
         (
@@ -52468,11 +52487,12 @@ fn run_erc20_allowance_key_experiment(artifact: &CompiledArtifact) -> Result<Exp
 
 /// Physical `(object, location)` trace the exact store's encoding predicts for
 /// one run of a confidential kernel program. Rust mirror of `IR.exactEncodeRun`
-/// in `proof/lean/UOToolchain/KernelExactTrace.lean`: every storage access
-/// scans all slots of its object, in evaluation order (a write scans before it
-/// writes), and at commit every object a statement writes is rewritten slot by
-/// slot, in object-id order, with `Update`-class writes. An object the program
-/// only reads is not written.
+/// in `proof/lean/UOToolchain/KernelExactTrace.lean`: the call reads every
+/// slot of each object a statement accesses once, in object-id order, when it
+/// loads the object, however many statements access it; and at commit every
+/// object a statement writes is rewritten slot by slot, in object-id order,
+/// with `Update`-class writes. An object the program only reads is not
+/// written.
 struct ExactEncodingPrediction {
     reads: Vec<(String, String)>,
     writes: Vec<(String, String)>,
@@ -52615,9 +52635,13 @@ fn exact_encoding_prediction(
         };
         Some((object.name.clone(), locations))
     };
+    // `IR.touchedObjects`: each accessed object once, in increasing id order.
+    let mut touched = accesses;
+    touched.sort_unstable();
+    touched.dedup();
     let mut reads = Vec::new();
-    for object_id in &accesses {
-        let (name, locations) = slot_locations(*object_id)?;
+    for object_id in touched {
+        let (name, locations) = slot_locations(object_id)?;
         reads.extend(
             locations
                 .into_iter()
@@ -54764,11 +54788,12 @@ mod tests {
         .unwrap();
         let entrypoint = "deposit(bytes32,uint256)";
         let prediction = exact_encoding_prediction(&artifact, entrypoint).unwrap();
-        // Capacity-8 balances map and the total cell: the balances read, the map
-        // write's scan, the total read, and the cell write's scan; then one
-        // rewrite of each touched object, in object-id order.
-        assert_eq!(prediction.reads.len(), 18);
+        // Capacity-8 balances map and the total cell. The body accesses each
+        // twice, a read and a write; the call reads each once, when it loads
+        // it, in object-id order, and rewrites each once at commit.
+        assert_eq!(prediction.reads.len(), 9);
         assert_eq!(prediction.writes.len(), 9);
+        assert_eq!(prediction.reads, prediction.writes);
         let run = || {
             let mut instance =
                 ContractInstance::deploy_with_seed(artifact.clone(), PROBE_DEPLOY_SEED).unwrap();
@@ -54790,6 +54815,20 @@ mod tests {
         reads.pop();
         shortened.physical_reads = reads.into_boxed_slice();
         assert!(!trace_matches_exact_encoding(&shortened, &prediction));
+
+        // A trace that reads an object once per access, as the runtime's did
+        // before a call read each object once, is not the predicted one.
+        let mut rescanned = run();
+        let mut reads = std::mem::take(&mut rescanned.physical_reads).into_vec();
+        let balances: Vec<_> = reads
+            .iter()
+            .filter(|read| read.object == "balances")
+            .cloned()
+            .collect();
+        assert_eq!(balances.len(), 8);
+        reads.extend(balances);
+        rescanned.physical_reads = reads.into_boxed_slice();
+        assert!(!trace_matches_exact_encoding(&rescanned, &prediction));
     }
 
     #[test]

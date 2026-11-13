@@ -105,9 +105,13 @@ pub trait RuntimeKernelObjectStore {
 pub trait RuntimeKernelConfidentialStore: RuntimeKernelObjectStore + Sized {
     type FreshCoins;
 
+    /// Load the objects the call runs on from committed storage. The load
+    /// reads storage, so it takes the call's recorder: an object whose load
+    /// opens sealed records traces those reads here, once for the call.
     fn shadow_load(
         committed: &Self::CommittedState,
         shadow_load_object_ids: &[u32],
+        recorder: &mut Self::Recorder,
         allocator: &mut AllocatorSession,
     ) -> Result<Self>;
 
@@ -387,7 +391,12 @@ impl RuntimeKernelMachine {
         self.bind_expected_kernel_program(program)?;
         let shadow_load_object_ids = self.expected_loaded_object_schedule_required()?;
         let mut shadow = self.shadow_load_with(shadow_load_object_ids.as_ref(), |allocator| {
-            S::shadow_load(committed, shadow_load_object_ids.as_ref(), allocator)
+            S::shadow_load(
+                committed,
+                shadow_load_object_ids.as_ref(),
+                recorder,
+                allocator,
+            )
         })?;
         let had_injected_fresh_coins = fresh_coins.is_some();
         shadow.install_fresh_coins(fresh_coins)?;
@@ -554,6 +563,7 @@ mod tests {
         fn shadow_load(
             _committed: &Self::CommittedState,
             shadow_load_object_ids: &[u32],
+            _recorder: &mut Self::Recorder,
             _allocator: &mut AllocatorSession,
         ) -> Result<Self> {
             assert!(shadow_load_object_ids.is_empty());

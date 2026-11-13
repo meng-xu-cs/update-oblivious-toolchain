@@ -64,10 +64,12 @@ update-obliviousness of the storage trace. `evalKernelBodyExecuted` lists the
 statements a run executes, following `evalKernelBody`'s control flow, and every
 conforming run of an admitted program executes the whole body
 (`evalKernelProgramExecuted_eq_body`). The exact store's encoding
-(`exactEncodeRun`) maps the executed statements to a physical trace: a full
-scan of the object for every storage access, in evaluation order, and at commit
-an `Update`-class rewrite of every object a statement writes, in object-id
-order; an object the statements only read is not written
+(`exactEncodeRun`) maps the executed statements to a physical trace: one full
+scan of every object a statement accesses, in object-id order, which the call
+makes when it loads the object, however many statements access it
+(`exactEncodeRun_reads_each_touched_once`, `exactEncodeRun_read_count`), and
+at commit an `Update`-class rewrite of every object a statement writes, in
+object-id order; an object the statements only read is not written
 (`exactEncodeRun_rewrites_only_written`). The
 trace of a run is therefore the same for all admitted runs
 (`admittedKernel_exactUO`), and

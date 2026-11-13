@@ -48,7 +48,7 @@
     },
     {
       "accepted": true,
-      "certificate_json_bytes": 15716,
+      "certificate_json_bytes": 15668,
       "entrypoint": "deposit(bytes32,uint256)",
       "leaf_steps": 2,
       "lean_stdout": "validated runtime path-ORAM hidden certificate with 2 leaf steps",

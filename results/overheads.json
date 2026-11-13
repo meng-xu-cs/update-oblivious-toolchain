@@ -192,14 +192,14 @@
       },
       "entrypoint": "auth(bytes32)",
       "full_scan": {
-        "bytes_read": 2108.0,
+        "bytes_read": 620.0,
         "bytes_written": 124.0,
         "executable": true,
         "gas_used": 2475,
-        "physical_reads": 17,
+        "physical_reads": 5,
         "physical_writes": 1,
         "rejected": false,
-        "trace_json_bytes": 19943
+        "trace_json_bytes": 16928
       },
       "raw": {
         "error": "raw confidential backends are rejected in proof-grade builds; this feature build emits the executable raw_insecure_eval control separately",
@@ -327,7 +327,7 @@
           "artifact_json_bytes": 13767,
           "backend": "full_scan",
           "benchmark": "AuthScan/auth",
-          "bytes_read": 2108.0,
+          "bytes_read": 620.0,
           "bytes_written": 124.0,
           "capacity": "4",
           "entrypoint": "auth(bytes32)",
@@ -339,7 +339,7 @@
           },
           "executable": true,
           "gas_used": 2475,
-          "physical_reads": 17,
+          "physical_reads": 5,
           "physical_writes": 1,
           "rejected": false,
           "state_objects": [
@@ -358,7 +358,7 @@
               "name": "lastAuth"
             }
           ],
-          "trace_json_bytes": 19943
+          "trace_json_bytes": 16928
         }
       ]
     },
@@ -414,68 +414,68 @@
       },
       "entrypoint": "deposit(bytes32,uint256)",
       "full_scan": {
-        "bytes_read": 3288.0,
+        "bytes_read": 1644.0,
         "bytes_written": 1644.0,
         "executable": true,
         "gas_used": 2632,
-        "physical_reads": 18,
+        "physical_reads": 9,
         "physical_writes": 9,
         "rejected": false,
-        "trace_json_bytes": 24504
+        "trace_json_bytes": 23512
       },
       "full_scan_64": {
-        "bytes_read": 24568.0,
+        "bytes_read": 12284.0,
         "bytes_written": 12284.0,
         "executable": true,
         "gas_used": 5880,
-        "physical_reads": 130,
+        "physical_reads": 65,
         "physical_writes": 65,
         "rejected": false,
-        "trace_json_bytes": 108263
+        "trace_json_bytes": 100891
       },
       "oram": {
-        "bytes_read": 56644.0,
-        "bytes_read_with_call_start": 78416.0,
+        "bytes_read": 56520.0,
+        "bytes_read_with_call_start": 78292.0,
         "bytes_written": 56520.0,
         "call_start_bytes": 21772.0,
         "call_start_reads": 17,
         "executable": true,
         "gas_used": 5445,
-        "physical_reads": 50,
-        "physical_reads_with_call_start": 67,
+        "physical_reads": 49,
+        "physical_reads_with_call_start": 66,
         "physical_writes": 49,
         "rejected": false,
-        "trace_json_bytes": 101434
+        "trace_json_bytes": 101338
       },
       "oram_64": {
-        "bytes_read": 56644.0,
-        "bytes_read_with_call_start": 78416.0,
+        "bytes_read": 56520.0,
+        "bytes_read_with_call_start": 78292.0,
         "bytes_written": 56520.0,
         "call_start_bytes": 21772.0,
         "call_start_reads": 17,
         "executable": true,
         "gas_used": 5445,
-        "physical_reads": 50,
-        "physical_reads_with_call_start": 67,
+        "physical_reads": 49,
+        "physical_reads_with_call_start": 66,
         "physical_writes": 49,
         "rejected": false,
-        "trace_json_bytes": 101434
+        "trace_json_bytes": 101338
       },
       "oram_improves_physical_writes": true,
       "oram_improves_physical_writes_baseline": "full_scan_64",
       "oram_private_posmap": {
-        "bytes_read": 589158.0,
-        "bytes_read_with_call_start": 627234.0,
+        "bytes_read": 589034.0,
+        "bytes_read_with_call_start": 627110.0,
         "bytes_written": 589034.0,
         "call_start_bytes": 38076.0,
         "call_start_reads": 21,
         "executable": true,
         "gas_used": 81077,
-        "physical_reads": 492,
-        "physical_reads_with_call_start": 513,
+        "physical_reads": 491,
+        "physical_reads_with_call_start": 512,
         "physical_writes": 491,
         "rejected": false,
-        "trace_json_bytes": 1755750
+        "trace_json_bytes": 1755654
       },
       "raw": {
         "error": "raw confidential backends are rejected in proof-grade builds; this feature build emits the executable raw_insecure_eval control separately",
@@ -603,7 +603,7 @@
           "artifact_json_bytes": 16432,
           "backend": "full_scan",
           "benchmark": "ConfidentialMixer/deposit",
-          "bytes_read": 3288.0,
+          "bytes_read": 1644.0,
           "bytes_written": 1644.0,
           "capacity": "8",
           "entrypoint": "deposit(bytes32,uint256)",
@@ -615,7 +615,7 @@
           },
           "executable": true,
           "gas_used": 2632,
-          "physical_reads": 18,
+          "physical_reads": 9,
           "physical_writes": 9,
           "rejected": false,
           "state_objects": [
@@ -634,13 +634,13 @@
               "name": "total"
             }
           ],
-          "trace_json_bytes": 24504
+          "trace_json_bytes": 23512
         },
         {
           "artifact_json_bytes": 16439,
           "backend": "full_scan_64",
           "benchmark": "ConfidentialMixer/deposit",
-          "bytes_read": 24568.0,
+          "bytes_read": 12284.0,
           "bytes_written": 12284.0,
           "capacity": "64",
           "entrypoint": "deposit(bytes32,uint256)",
@@ -652,7 +652,7 @@
           },
           "executable": true,
           "gas_used": 5880,
-          "physical_reads": 130,
+          "physical_reads": 65,
           "physical_writes": 65,
           "rejected": false,
           "state_objects": [
@@ -671,14 +671,14 @@
               "name": "total"
             }
           ],
-          "trace_json_bytes": 108263
+          "trace_json_bytes": 100891
         },
         {
           "artifact_json_bytes": 16701,
           "backend": "full_scan+oram",
           "benchmark": "ConfidentialMixer/deposit",
-          "bytes_read": 56644.0,
-          "bytes_read_with_call_start": 78416.0,
+          "bytes_read": 56520.0,
+          "bytes_read_with_call_start": 78292.0,
           "bytes_written": 56520.0,
           "call_start_bytes": 21772.0,
           "call_start_reads": 17,
@@ -706,8 +706,8 @@
           },
           "executable": true,
           "gas_used": 5445,
-          "physical_reads": 50,
-          "physical_reads_with_call_start": 67,
+          "physical_reads": 49,
+          "physical_reads_with_call_start": 66,
           "physical_writes": 49,
           "rejected": false,
           "state_objects": [
@@ -726,14 +726,14 @@
               "name": "total"
             }
           ],
-          "trace_json_bytes": 101434
+          "trace_json_bytes": 101338
         },
         {
           "artifact_json_bytes": 16725,
           "backend": "oram_private_posmap",
           "benchmark": "ConfidentialMixer/deposit",
-          "bytes_read": 589158.0,
-          "bytes_read_with_call_start": 627234.0,
+          "bytes_read": 589034.0,
+          "bytes_read_with_call_start": 627110.0,
           "bytes_written": 589034.0,
           "call_start_bytes": 38076.0,
           "call_start_reads": 21,
@@ -761,8 +761,8 @@
           },
           "executable": true,
           "gas_used": 81077,
-          "physical_reads": 492,
-          "physical_reads_with_call_start": 513,
+          "physical_reads": 491,
+          "physical_reads_with_call_start": 512,
           "physical_writes": 491,
           "rejected": false,
           "state_objects": [
@@ -781,7 +781,7 @@
               "name": "total"
             }
           ],
-          "trace_json_bytes": 1755750
+          "trace_json_bytes": 1755654
         }
       ]
     },
@@ -837,68 +837,68 @@
       },
       "entrypoint": "withdraw(bytes32,uint256)",
       "full_scan": {
-        "bytes_read": 3288.0,
+        "bytes_read": 1644.0,
         "bytes_written": 1644.0,
         "executable": true,
         "gas_used": 2689,
-        "physical_reads": 18,
+        "physical_reads": 9,
         "physical_writes": 9,
         "rejected": false,
-        "trace_json_bytes": 24577
+        "trace_json_bytes": 23585
       },
       "full_scan_64": {
-        "bytes_read": 24568.0,
+        "bytes_read": 12284.0,
         "bytes_written": 12284.0,
         "executable": true,
         "gas_used": 5937,
-        "physical_reads": 130,
+        "physical_reads": 65,
         "physical_writes": 65,
         "rejected": false,
-        "trace_json_bytes": 108336
+        "trace_json_bytes": 100964
       },
       "oram": {
-        "bytes_read": 56644.0,
-        "bytes_read_with_call_start": 78416.0,
+        "bytes_read": 56520.0,
+        "bytes_read_with_call_start": 78292.0,
         "bytes_written": 56520.0,
         "call_start_bytes": 21772.0,
         "call_start_reads": 17,
         "executable": true,
         "gas_used": 5502,
-        "physical_reads": 50,
-        "physical_reads_with_call_start": 67,
+        "physical_reads": 49,
+        "physical_reads_with_call_start": 66,
         "physical_writes": 49,
         "rejected": false,
-        "trace_json_bytes": 101477
+        "trace_json_bytes": 101381
       },
       "oram_64": {
-        "bytes_read": 56644.0,
-        "bytes_read_with_call_start": 78416.0,
+        "bytes_read": 56520.0,
+        "bytes_read_with_call_start": 78292.0,
         "bytes_written": 56520.0,
         "call_start_bytes": 21772.0,
         "call_start_reads": 17,
         "executable": true,
         "gas_used": 5502,
-        "physical_reads": 50,
-        "physical_reads_with_call_start": 67,
+        "physical_reads": 49,
+        "physical_reads_with_call_start": 66,
         "physical_writes": 49,
         "rejected": false,
-        "trace_json_bytes": 101477
+        "trace_json_bytes": 101381
       },
       "oram_improves_physical_writes": true,
       "oram_improves_physical_writes_baseline": "full_scan_64",
       "oram_private_posmap": {
-        "bytes_read": 589158.0,
-        "bytes_read_with_call_start": 627234.0,
+        "bytes_read": 589034.0,
+        "bytes_read_with_call_start": 627110.0,
         "bytes_written": 589034.0,
         "call_start_bytes": 38076.0,
         "call_start_reads": 21,
         "executable": true,
         "gas_used": 81134,
-        "physical_reads": 492,
-        "physical_reads_with_call_start": 513,
+        "physical_reads": 491,
+        "physical_reads_with_call_start": 512,
         "physical_writes": 491,
         "rejected": false,
-        "trace_json_bytes": 1755702
+        "trace_json_bytes": 1755606
       },
       "raw": {
         "error": "raw confidential backends are rejected in proof-grade builds; this feature build emits the executable raw_insecure_eval control separately",
@@ -1026,7 +1026,7 @@
           "artifact_json_bytes": 16432,
           "backend": "full_scan",
           "benchmark": "ConfidentialMixer/withdraw",
-          "bytes_read": 3288.0,
+          "bytes_read": 1644.0,
           "bytes_written": 1644.0,
           "capacity": "8",
           "entrypoint": "withdraw(bytes32,uint256)",
@@ -1038,7 +1038,7 @@
           },
           "executable": true,
           "gas_used": 2689,
-          "physical_reads": 18,
+          "physical_reads": 9,
           "physical_writes": 9,
           "rejected": false,
           "state_objects": [
@@ -1057,13 +1057,13 @@
               "name": "total"
             }
           ],
-          "trace_json_bytes": 24577
+          "trace_json_bytes": 23585
         },
         {
           "artifact_json_bytes": 16439,
           "backend": "full_scan_64",
           "benchmark": "ConfidentialMixer/withdraw",
-          "bytes_read": 24568.0,
+          "bytes_read": 12284.0,
           "bytes_written": 12284.0,
           "capacity": "64",
           "entrypoint": "withdraw(bytes32,uint256)",
@@ -1075,7 +1075,7 @@
           },
           "executable": true,
           "gas_used": 5937,
-          "physical_reads": 130,
+          "physical_reads": 65,
           "physical_writes": 65,
           "rejected": false,
           "state_objects": [
@@ -1094,14 +1094,14 @@
               "name": "total"
             }
           ],
-          "trace_json_bytes": 108336
+          "trace_json_bytes": 100964
         },
         {
           "artifact_json_bytes": 16701,
           "backend": "full_scan+oram",
           "benchmark": "ConfidentialMixer/withdraw",
-          "bytes_read": 56644.0,
-          "bytes_read_with_call_start": 78416.0,
+          "bytes_read": 56520.0,
+          "bytes_read_with_call_start": 78292.0,
           "bytes_written": 56520.0,
           "call_start_bytes": 21772.0,
           "call_start_reads": 17,
@@ -1129,8 +1129,8 @@
           },
           "executable": true,
           "gas_used": 5502,
-          "physical_reads": 50,
-          "physical_reads_with_call_start": 67,
+          "physical_reads": 49,
+          "physical_reads_with_call_start": 66,
           "physical_writes": 49,
           "rejected": false,
           "state_objects": [
@@ -1149,14 +1149,14 @@
               "name": "total"
             }
           ],
-          "trace_json_bytes": 101477
+          "trace_json_bytes": 101381
         },
         {
           "artifact_json_bytes": 16725,
           "backend": "oram_private_posmap",
           "benchmark": "ConfidentialMixer/withdraw",
-          "bytes_read": 589158.0,
-          "bytes_read_with_call_start": 627234.0,
+          "bytes_read": 589034.0,
+          "bytes_read_with_call_start": 627110.0,
           "bytes_written": 589034.0,
           "call_start_bytes": 38076.0,
           "call_start_reads": 21,
@@ -1184,8 +1184,8 @@
           },
           "executable": true,
           "gas_used": 81134,
-          "physical_reads": 492,
-          "physical_reads_with_call_start": 513,
+          "physical_reads": 491,
+          "physical_reads_with_call_start": 512,
           "physical_writes": 491,
           "rejected": false,
           "state_objects": [
@@ -1204,7 +1204,7 @@
               "name": "total"
             }
           ],
-          "trace_json_bytes": 1755702
+          "trace_json_bytes": 1755606
         }
       ]
     },
@@ -1269,14 +1269,14 @@
       },
       "entrypoint": "transferFrom(address,address,address,uint256)",
       "full_scan": {
-        "bytes_read": 11392.0,
+        "bytes_read": 4368.0,
         "bytes_written": 4368.0,
         "executable": true,
         "gas_used": 3715,
-        "physical_reads": 64,
+        "physical_reads": 24,
         "physical_writes": 24,
         "rejected": false,
-        "trace_json_bytes": 54975
+        "trace_json_bytes": 50355
       },
       "oram": {
         "bytes_read": 196056.0,
@@ -1462,7 +1462,7 @@
           "artifact_json_bytes": 30262,
           "backend": "full_scan",
           "benchmark": "ERC20Lite/transferFrom",
-          "bytes_read": 11392.0,
+          "bytes_read": 4368.0,
           "bytes_written": 4368.0,
           "capacity": "8+16",
           "entrypoint": "transferFrom(address,address,address,uint256)",
@@ -1474,7 +1474,7 @@
           },
           "executable": true,
           "gas_used": 3715,
-          "physical_reads": 64,
+          "physical_reads": 24,
           "physical_writes": 24,
           "rejected": false,
           "state_objects": [
@@ -1493,7 +1493,7 @@
               "name": "balances"
             }
           ],
-          "trace_json_bytes": 54975
+          "trace_json_bytes": 50355
         },
         {
           "artifact_json_bytes": 30806,
@@ -1794,14 +1794,14 @@
       },
       "entrypoint": "clearIfMatch(bytes32,uint256)",
       "full_scan": {
-        "bytes_read": 3040.0,
+        "bytes_read": 1520.0,
         "bytes_written": 1520.0,
         "executable": true,
         "gas_used": 2624,
-        "physical_reads": 16,
+        "physical_reads": 8,
         "physical_writes": 8,
         "rejected": false,
-        "trace_json_bytes": 21974
+        "trace_json_bytes": 21110
       },
       "raw": {
         "error": "raw confidential backends are rejected in proof-grade builds; this feature build emits the executable raw_insecure_eval control separately",
@@ -1908,7 +1908,7 @@
           "artifact_json_bytes": 13885,
           "backend": "full_scan",
           "benchmark": "RegistryCRUD/clearIfMatch",
-          "bytes_read": 3040.0,
+          "bytes_read": 1520.0,
           "bytes_written": 1520.0,
           "capacity": "8",
           "entrypoint": "clearIfMatch(bytes32,uint256)",
@@ -1920,7 +1920,7 @@
           },
           "executable": true,
           "gas_used": 2624,
-          "physical_reads": 16,
+          "physical_reads": 8,
           "physical_writes": 8,
           "rejected": false,
           "state_objects": [
@@ -1932,7 +1932,7 @@
               "name": "records"
             }
           ],
-          "trace_json_bytes": 21974
+          "trace_json_bytes": 21110
         }
       ]
     }
@@ -2187,7 +2187,7 @@
       "artifact_json_bytes": 13767,
       "backend": "full_scan",
       "benchmark": "AuthScan/auth",
-      "bytes_read": 2108.0,
+      "bytes_read": 620.0,
       "bytes_written": 124.0,
       "capacity": "4",
       "entrypoint": "auth(bytes32)",
@@ -2199,7 +2199,7 @@
       },
       "executable": true,
       "gas_used": 2475,
-      "physical_reads": 17,
+      "physical_reads": 5,
       "physical_writes": 1,
       "rejected": false,
       "state_objects": [
@@ -2218,7 +2218,7 @@
           "name": "lastAuth"
         }
       ],
-      "trace_json_bytes": 19943
+      "trace_json_bytes": 16928
     },
     {
       "artifact_json_bytes": 6696,
@@ -2330,7 +2330,7 @@
       "artifact_json_bytes": 16432,
       "backend": "full_scan",
       "benchmark": "ConfidentialMixer/deposit",
-      "bytes_read": 3288.0,
+      "bytes_read": 1644.0,
       "bytes_written": 1644.0,
       "capacity": "8",
       "entrypoint": "deposit(bytes32,uint256)",
@@ -2342,7 +2342,7 @@
       },
       "executable": true,
       "gas_used": 2632,
-      "physical_reads": 18,
+      "physical_reads": 9,
       "physical_writes": 9,
       "rejected": false,
       "state_objects": [
@@ -2361,13 +2361,13 @@
           "name": "total"
         }
       ],
-      "trace_json_bytes": 24504
+      "trace_json_bytes": 23512
     },
     {
       "artifact_json_bytes": 16439,
       "backend": "full_scan_64",
       "benchmark": "ConfidentialMixer/deposit",
-      "bytes_read": 24568.0,
+      "bytes_read": 12284.0,
       "bytes_written": 12284.0,
       "capacity": "64",
       "entrypoint": "deposit(bytes32,uint256)",
@@ -2379,7 +2379,7 @@
       },
       "executable": true,
       "gas_used": 5880,
-      "physical_reads": 130,
+      "physical_reads": 65,
       "physical_writes": 65,
       "rejected": false,
       "state_objects": [
@@ -2398,14 +2398,14 @@
           "name": "total"
         }
       ],
-      "trace_json_bytes": 108263
+      "trace_json_bytes": 100891
     },
     {
       "artifact_json_bytes": 16701,
       "backend": "full_scan+oram",
       "benchmark": "ConfidentialMixer/deposit",
-      "bytes_read": 56644.0,
-      "bytes_read_with_call_start": 78416.0,
+      "bytes_read": 56520.0,
+      "bytes_read_with_call_start": 78292.0,
       "bytes_written": 56520.0,
       "call_start_bytes": 21772.0,
       "call_start_reads": 17,
@@ -2433,8 +2433,8 @@
       },
       "executable": true,
       "gas_used": 5445,
-      "physical_reads": 50,
-      "physical_reads_with_call_start": 67,
+      "physical_reads": 49,
+      "physical_reads_with_call_start": 66,
       "physical_writes": 49,
       "rejected": false,
       "state_objects": [
@@ -2453,14 +2453,14 @@
           "name": "total"
         }
       ],
-      "trace_json_bytes": 101434
+      "trace_json_bytes": 101338
     },
     {
       "artifact_json_bytes": 16725,
       "backend": "oram_private_posmap",
       "benchmark": "ConfidentialMixer/deposit",
-      "bytes_read": 589158.0,
-      "bytes_read_with_call_start": 627234.0,
+      "bytes_read": 589034.0,
+      "bytes_read_with_call_start": 627110.0,
       "bytes_written": 589034.0,
       "call_start_bytes": 38076.0,
       "call_start_reads": 21,
@@ -2488,8 +2488,8 @@
       },
       "executable": true,
       "gas_used": 81077,
-      "physical_reads": 492,
-      "physical_reads_with_call_start": 513,
+      "physical_reads": 491,
+      "physical_reads_with_call_start": 512,
       "physical_writes": 491,
       "rejected": false,
       "state_objects": [
@@ -2508,7 +2508,7 @@
           "name": "total"
         }
       ],
-      "trace_json_bytes": 1755750
+      "trace_json_bytes": 1755654
     },
     {
       "artifact_json_bytes": 6696,
@@ -2620,7 +2620,7 @@
       "artifact_json_bytes": 16432,
       "backend": "full_scan",
       "benchmark": "ConfidentialMixer/withdraw",
-      "bytes_read": 3288.0,
+      "bytes_read": 1644.0,
       "bytes_written": 1644.0,
       "capacity": "8",
       "entrypoint": "withdraw(bytes32,uint256)",
@@ -2632,7 +2632,7 @@
       },
       "executable": true,
       "gas_used": 2689,
-      "physical_reads": 18,
+      "physical_reads": 9,
       "physical_writes": 9,
       "rejected": false,
       "state_objects": [
@@ -2651,13 +2651,13 @@
           "name": "total"
         }
       ],
-      "trace_json_bytes": 24577
+      "trace_json_bytes": 23585
     },
     {
       "artifact_json_bytes": 16439,
       "backend": "full_scan_64",
       "benchmark": "ConfidentialMixer/withdraw",
-      "bytes_read": 24568.0,
+      "bytes_read": 12284.0,
       "bytes_written": 12284.0,
       "capacity": "64",
       "entrypoint": "withdraw(bytes32,uint256)",
@@ -2669,7 +2669,7 @@
       },
       "executable": true,
       "gas_used": 5937,
-      "physical_reads": 130,
+      "physical_reads": 65,
       "physical_writes": 65,
       "rejected": false,
       "state_objects": [
@@ -2688,14 +2688,14 @@
           "name": "total"
         }
       ],
-      "trace_json_bytes": 108336
+      "trace_json_bytes": 100964
     },
     {
       "artifact_json_bytes": 16701,
       "backend": "full_scan+oram",
       "benchmark": "ConfidentialMixer/withdraw",
-      "bytes_read": 56644.0,
-      "bytes_read_with_call_start": 78416.0,
+      "bytes_read": 56520.0,
+      "bytes_read_with_call_start": 78292.0,
       "bytes_written": 56520.0,
       "call_start_bytes": 21772.0,
       "call_start_reads": 17,
@@ -2723,8 +2723,8 @@
       },
       "executable": true,
       "gas_used": 5502,
-      "physical_reads": 50,
-      "physical_reads_with_call_start": 67,
+      "physical_reads": 49,
+      "physical_reads_with_call_start": 66,
       "physical_writes": 49,
       "rejected": false,
       "state_objects": [
@@ -2743,14 +2743,14 @@
           "name": "total"
         }
       ],
-      "trace_json_bytes": 101477
+      "trace_json_bytes": 101381
     },
     {
       "artifact_json_bytes": 16725,
       "backend": "oram_private_posmap",
       "benchmark": "ConfidentialMixer/withdraw",
-      "bytes_read": 589158.0,
-      "bytes_read_with_call_start": 627234.0,
+      "bytes_read": 589034.0,
+      "bytes_read_with_call_start": 627110.0,
       "bytes_written": 589034.0,
       "call_start_bytes": 38076.0,
       "call_start_reads": 21,
@@ -2778,8 +2778,8 @@
       },
       "executable": true,
       "gas_used": 81134,
-      "physical_reads": 492,
-      "physical_reads_with_call_start": 513,
+      "physical_reads": 491,
+      "physical_reads_with_call_start": 512,
       "physical_writes": 491,
       "rejected": false,
       "state_objects": [
@@ -2798,7 +2798,7 @@
           "name": "total"
         }
       ],
-      "trace_json_bytes": 1755702
+      "trace_json_bytes": 1755606
     },
     {
       "artifact_json_bytes": 10797,
@@ -2910,7 +2910,7 @@
       "artifact_json_bytes": 30262,
       "backend": "full_scan",
       "benchmark": "ERC20Lite/transferFrom",
-      "bytes_read": 11392.0,
+      "bytes_read": 4368.0,
       "bytes_written": 4368.0,
       "capacity": "8+16",
       "entrypoint": "transferFrom(address,address,address,uint256)",
@@ -2922,7 +2922,7 @@
       },
       "executable": true,
       "gas_used": 3715,
-      "physical_reads": 64,
+      "physical_reads": 24,
       "physical_writes": 24,
       "rejected": false,
       "state_objects": [
@@ -2941,7 +2941,7 @@
           "name": "balances"
         }
       ],
-      "trace_json_bytes": 54975
+      "trace_json_bytes": 50355
     },
     {
       "artifact_json_bytes": 30806,
@@ -3304,7 +3304,7 @@
       "artifact_json_bytes": 13885,
       "backend": "full_scan",
       "benchmark": "RegistryCRUD/clearIfMatch",
-      "bytes_read": 3040.0,
+      "bytes_read": 1520.0,
       "bytes_written": 1520.0,
       "capacity": "8",
       "entrypoint": "clearIfMatch(bytes32,uint256)",
@@ -3316,7 +3316,7 @@
       },
       "executable": true,
       "gas_used": 2624,
-      "physical_reads": 16,
+      "physical_reads": 8,
       "physical_writes": 8,
       "rejected": false,
       "state_objects": [
@@ -3328,7 +3328,7 @@
           "name": "records"
         }
       ],
-      "trace_json_bytes": 21974
+      "trace_json_bytes": 21110
     }
   ]
 }

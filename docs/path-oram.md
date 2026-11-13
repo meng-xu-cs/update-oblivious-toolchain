@@ -323,7 +323,7 @@ instrumented call also opens every bucket and metadata page of the tree
 twice, for the position-map witnesses it exports: 65,580 sealed records at
 16,384 entries, where a read traces 654 operations. The report also gives
 the size of what a call exports: at 16,384 entries the trace of a full-scan
-read is 18.2 MB of JSON, 16.2 MB of it private evidence, and that of a tree
+read is 11.1 MB of JSON, 9.1 MB of it private evidence, and that of a tree
 read 3.0 MB.
 
 The latencies are wall-clock times of a release build on one machine. The
@@ -373,19 +373,34 @@ These figures are the baseline of the external review's optimizations:
 `review/2026-11-external-review/capacity_sweep_baseline.json` is this
 report, Issues 30 to 38 of that review compare their savings with it
 (`scripts/compare_capacity_sweep.py`), and the sweep is run again when they
-are done. One of them is in: a full-scan read no longer rewrites the map.
-Its own work has not moved, since it now decodes every slot a second time
-to restore the map where it used to seal every slot, but its trace has half
-the events, and in the quick profile's two rounds the whole call takes about
-a third less than the baseline's 354.8 ms at 16,384 entries.
+are done. Two of them are in. A full-scan read no longer rewrites the map,
+and a call opens each slot of an exact object once, when it loads the
+object: commit opens nothing, so a read does its load and its scan, and a
+write that aborts does the work of one that commits. A run of the sweep at
+16,384 entries alone, 15 rounds after 3 warmup rounds
+(`review/2026-11-external-review/capacity_sweep_16384_issue32.json`), gives
+a full-scan read 39.1 ms [38.1, 39.7] of its own work where the baseline
+has 72.2 ms, and 176.4 ms [174.7, 178.9] for the whole call where it has
+354.8 ms; a write that aborts takes 70.7 ms [69.4, 71.8] where it took
+106.3 ms, and a committed one 70.0 ms [68.6, 70.8]. The tree has not moved:
+its read takes 46.2 ms [45.2, 47.4] and its write 82.8 ms [81.2, 84.7]. So
+the comparison above no longer holds for the runtime as it is. On its own
+work the full scan is now the faster backend at 16,384 entries for reads
+and for writes, and the tree keeps its advantage in bytes, physical
+operations and gas. The latency break-evens are recomputed with the full
+profile when the tree's work that is linear in the store is gone (Issues 36
+to 38): of its read's 46.2 ms, 9.8 ms copy the state and 11.7 ms load the
+map.
 
-The sweep also found a defect, which is fixed. An aborting call opens every
-slot of an exact map a third time, to restore it, and the allocator's
-budget of resource events counted two: above about 4,600 entries such a
-call failed where it should have aborted. The budget is now six events per
-commit operation (`RESOURCE_EVENTS_PER_COMMIT_OP` in
+The sweep also found a defect, which is fixed. An aborting call opened every
+slot of an exact map again to restore it, and the allocator's budget of
+resource events did not count that: above about 4,600 entries such a call
+failed where it should have aborted. The budget now counts a call's load
+operations beside its commit operations, two events for each
+(`RESOURCE_EVENTS_PER_LOAD_OP` and `RESOURCE_EVENTS_PER_COMMIT_OP` in
 `runtime/uo-allocator/src/lib.rs`, `resourceEventCapacity` in
-`UOToolchain/RuntimeAllocatorDiscipline.lean`).
+`UOToolchain/RuntimeAllocatorDiscipline.lean`), and a call opens each slot
+once: an aborting call restores the map from the copy it loaded.
 
 A node access evicts the stash
 bucket by bucket, placing a block in the

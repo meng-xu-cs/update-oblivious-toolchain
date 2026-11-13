@@ -5,12 +5,14 @@ import UOToolchain.PaperMainReleases
 # Exact-backend storage traces of admitted kernel programs
 
 The exact backends (`UOCell`, `UOArray`, full-scan `UOMap`) make every storage
-access touch its whole object: each access scans every slot of its object, and
-at commit every object the run has a write statement for is rewritten slot by
-slot with `Update`-class writes, in object-id order, whether or not the
-write's predicate held. An object the run only reads is not written. The
-physical trace of a run is therefore a function of which statements the run
-executes, not of keys, indices, values, or predicates.
+access touch its whole object. A run reads each object it accesses once, every
+slot of it, when the call loads the object, in object-id order; its accesses
+then work on the loaded copy and read nothing more. At commit every object the
+run has a write statement for is rewritten slot by slot with `Update`-class
+writes, in object-id order, whether or not the write's predicate held. An
+object the run only reads is not written. The physical trace of a run is
+therefore a function of which statements the run executes, not of keys,
+indices, values, or predicates.
 
 This module makes that argument a theorem for admitted kernel programs:
 
@@ -176,10 +178,25 @@ def ExactAccess.objectId : ExactAccess → Nat
   | .write objectId => objectId
 
 /-- Objects the accesses touch, each once, in increasing id order: the order in
-which the runtime commits them. -/
+which the runtime loads them and commits them. -/
 def touchedObjects (accesses : List ExactAccess) : List Nat :=
   (List.range (accesses.foldl (fun bound access => max bound (access.objectId + 1)) 0)).filter
     fun objectId => accesses.any fun access => access.objectId == objectId
+
+/-- The touched objects are listed in strictly increasing id order, so each is
+listed once. -/
+theorem touchedObjects_strictly_increasing (accesses : List ExactAccess) :
+    (touchedObjects accesses).Pairwise (· < ·) :=
+  List.Pairwise.filter _ List.pairwise_lt_range
+
+/-- An object is among the touched ones only if some access is to it. -/
+theorem access_of_mem_touchedObjects {accesses : List ExactAccess} {objectId : Nat}
+    (h : objectId ∈ touchedObjects accesses) :
+    ∃ access ∈ accesses, access.objectId = objectId := by
+  unfold touchedObjects at h
+  simp only [List.mem_filter, List.any_eq_true] at h
+  obtain ⟨_, access, hIn, hEq⟩ := h
+  exact ⟨access, hIn, by simpa using hEq⟩
 
 /-- Whether an access is a write. -/
 def ExactAccess.isWrite : ExactAccess → Bool
@@ -232,17 +249,45 @@ def ExactObjectLayout.updateWrites (object : ExactObjectLayout) : List PhysicalW
     { object := object.name, location := object.location slot, writeClass := "Update",
       len := object.recordLen }
 
-/-- The exact store's physical trace of a run that executes `statements`: a
-full scan for every storage access, in evaluation order, and at commit a full
-rewrite of every object a statement writes, in object-id order. An object
-the statements only read is not written. -/
+/-- The exact store's physical trace of a run that executes `statements`: one
+full scan of every object a statement accesses, in object-id order, when the
+call loads it, and at commit a full rewrite of every object a statement
+writes, in object-id order. An object is read once however many statements
+access it, and an object the statements only read is not written. -/
 def exactEncodeRun (layout : Nat → ExactObjectLayout) (statements : List KernelStatement) :
     Trace :=
   let accesses := statements.flatMap KernelStatement.accesses
   { Trace.empty with
-    physicalReads := accesses.flatMap fun access => (layout access.objectId).scanReads
+    physicalReads :=
+      (touchedObjects accesses).flatMap fun objectId => (layout objectId).scanReads
     physicalWrites :=
       (writtenObjects accesses).flatMap fun objectId => (layout objectId).updateWrites }
+
+/-- The exact encoding reads each object once: its reads are the scans of the
+touched objects, which are listed once each in increasing id order, and an
+object no statement accesses is not one of them. -/
+theorem exactEncodeRun_reads_each_touched_once (layout : Nat → ExactObjectLayout)
+    (statements : List KernelStatement) :
+    (exactEncodeRun layout statements).physicalReads =
+        (touchedObjects (statements.flatMap KernelStatement.accesses)).flatMap
+          (fun objectId => (layout objectId).scanReads) ∧
+      (touchedObjects (statements.flatMap KernelStatement.accesses)).Pairwise (· < ·) ∧
+      ∀ objectId,
+        (∀ access ∈ statements.flatMap KernelStatement.accesses,
+            access.objectId ≠ objectId) →
+          objectId ∉ touchedObjects (statements.flatMap KernelStatement.accesses) :=
+  ⟨rfl, touchedObjects_strictly_increasing _, fun _ hNone hMem =>
+    let ⟨access, hIn, hEq⟩ := access_of_mem_touchedObjects hMem
+    hNone access hIn hEq⟩
+
+/-- The number of records the exact encoding reads: the slots of the touched
+objects, each object counted once. -/
+theorem exactEncodeRun_read_count (layout : Nat → ExactObjectLayout)
+    (statements : List KernelStatement) :
+    (exactEncodeRun layout statements).physicalReads.length =
+      ((touchedObjects (statements.flatMap KernelStatement.accesses)).map
+        fun objectId => (layout objectId).slots).sum := by
+  simp [exactEncodeRun, ExactObjectLayout.scanReads, List.length_flatMap]
 
 /-- The exact encoding reveals no write class: every write is an `Update`. -/
 theorem exactEncodeRun_writes_update (layout : Nat → ExactObjectLayout)
@@ -299,8 +344,8 @@ theorem kernelExactTrace_eq_static (encodeRun : List KernelStatement → Trace) 
 
 /-- Example: the encoding of a mixer deposit over a capacity-8 full-scan map
 (`balances`, object 1) and a cell (`total`, object 2) is the trace the runtime
-emits: the balances read and the map write's scan, the total read and the cell
-write's scan, then one rewrite of each written object in object-id order. -/
+emits: one scan of the map and one read of the cell, though the body accesses
+each twice, then one rewrite of each written object in object-id order. -/
 private def depositLayout : Nat → ExactObjectLayout
   | 1 => { name := "balances", kind := .mapKind, slots := 8, recordLen := 190 }
   | 2 => { name := "total", kind := .cell, slots := 1, recordLen := 124 }
@@ -318,8 +363,9 @@ example :
   decide
 
 example :
-    (exactEncodeRun depositLayout depositBody).physicalReads.map PhysicalRead.object =
-      List.replicate 16 "balances" ++ ["total", "total"] := by
+    (exactEncodeRun depositLayout depositBody).physicalReads.map PhysicalRead.location =
+      [ "balances#0", "balances#1", "balances#2", "balances#3", "balances#4", "balances#5",
+        "balances#6", "balances#7", "total" ] := by
   decide
 
 /-- Example: a balance query scans the map once and writes nothing, and a body

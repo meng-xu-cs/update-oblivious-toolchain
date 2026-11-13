@@ -4,7 +4,10 @@ use anyhow::{anyhow, bail, Result};
 use std::collections::BTreeMap;
 use tiny_keccak::{Hasher, Keccak};
 use uo_allocator::AllocatorPlan;
-use uo_core::ir::{BinaryOp, CompiledContract, CompiledFunction, Expr, Statement, UnaryOp};
+use uo_core::ir::{
+    accessed_objects, written_objects, BinaryOp, CompiledContract, CompiledFunction, Expr,
+    Statement, UnaryOp,
+};
 use uo_core::manifest::EntrypointManifest;
 use uo_core::{RuntimeCallOutcome, Uint256, Value};
 use uo_kernel_runtime::RuntimeKernelMachine as PublicRuntimeKernel;
@@ -39,10 +42,26 @@ pub(in crate::runtime) fn run_public_entrypoint(
         .ok_or_else(|| anyhow!("unknown public entrypoint: {entrypoint}"))?;
     let allocator = AllocatorPlan::from_manifest(manifest_entry);
     let public_object_ids = runtime.public_object_ids()?;
+    // The call loads the objects its body accesses and no other. Loading a
+    // sealed object reads it, and the manifest's load bound counts the
+    // objects the body accesses.
+    let loaded_object_ids: Box<[u32]> = accessed_objects(&function.body).into_iter().collect();
+    // Commit reseals the exact objects the body has a write statement for.
+    // The manifest lists the same objects, and its commit bound counts them.
+    let may_write_objects: Box<[u32]> = written_objects(&function.body).into_iter().collect();
+    if manifest_entry.may_write_objects != may_write_objects.as_ref() {
+        bail!(
+            "entrypoint {} manifest may_write_objects {:?} are not the objects its body writes {:?}",
+            entrypoint,
+            manifest_entry.may_write_objects,
+            may_write_objects
+        );
+    }
     let initial_public_state = runtime.public_state_snapshot()?;
     let mut kernel = PublicRuntimeKernel::begin(allocator, public_object_ids.as_ref())?;
-    let mut shadow = runtime.prepare_public_shadow(&mut kernel, public_object_ids.as_ref())?;
-    shadow.set_may_write_objects(&manifest_entry.may_write_objects);
+    let mut shadow =
+        runtime.prepare_public_shadow(&mut kernel, loaded_object_ids.as_ref(), recorder)?;
+    shadow.set_may_write_objects(&may_write_objects);
     let execution = interpret_public_entrypoint(
         contract,
         function,
@@ -51,11 +70,10 @@ pub(in crate::runtime) fn run_public_entrypoint(
         recorder,
         &mut kernel,
     )?;
-    let candidate_public_state_hash = shadow.public_state_digest()?;
     runtime.commit_public_shadow(&mut kernel, &mut shadow, execution.aborted, recorder)?;
     let public_state_transition = public_state_transition(
         &initial_public_state,
-        candidate_public_state_hash,
+        shadow.candidate_public_state_hash()?,
         &shadow.public_state_snapshot()?,
         execution.aborted,
     )?;

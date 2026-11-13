@@ -827,9 +827,61 @@ pub(super) fn update_small_map_entries_for_put(
     Ok(capacity_overflowed)
 }
 
+pub(super) fn keep_loaded_cell_value(loaded_value: &mut Option<Value>, current: &Value) {
+    if loaded_value.is_none() {
+        *loaded_value = Some(current.clone());
+    }
+}
+
+pub(super) fn keep_loaded_array_values(
+    loaded_values: &mut Option<Box<[Value]>>,
+    current: &[Value],
+) -> Result<()> {
+    if loaded_values.is_none() {
+        let mut values = FixedBoxBuilder::new(current.len());
+        for value in current.iter() {
+            values.push(value.clone())?;
+        }
+        *loaded_values = Some(values.finish()?);
+    }
+    Ok(())
+}
+
+pub(super) fn keep_loaded_small_map_entries(
+    loaded_entries: &mut Option<Box<[MapEntry]>>,
+    current: &[MapEntry],
+) -> Result<()> {
+    if loaded_entries.is_none() {
+        let mut entries = FixedBoxBuilder::new(current.len());
+        for entry in current.iter() {
+            entries.push(MapEntry::new(
+                entry.is_occupied(),
+                entry.key().clone(),
+                entry.value().clone(),
+            ))?;
+        }
+        *loaded_entries = Some(entries.finish()?);
+    }
+    Ok(())
+}
+
+pub(super) fn wipe_loaded_cell_value(loaded_value: &mut Option<Value>) {
+    if let Some(mut value) = loaded_value.take() {
+        value.wipe_secrets();
+    }
+}
+
+pub(super) fn wipe_loaded_array_values(loaded_values: &mut Option<Box<[Value]>>) {
+    if let Some(mut values) = loaded_values.take() {
+        for value in values.iter_mut() {
+            value.wipe_secrets();
+        }
+    }
+}
+
 pub(super) fn reconcile_cell_commit_value<F>(
     current: &mut Value,
-    old_value: Option<Value>,
+    loaded_value: Option<Value>,
     aborted: bool,
     may_write: bool,
     mut seal_committed: F,
@@ -837,29 +889,21 @@ pub(super) fn reconcile_cell_commit_value<F>(
 where
     F: FnMut(&Value) -> Result<()>,
 {
+    if let Some(mut loaded_value) = loaded_value {
+        if aborted || !may_write {
+            std::mem::swap(current, &mut loaded_value);
+        }
+        loaded_value.wipe_secrets();
+    }
     if may_write {
-        let committed_value = if aborted {
-            let Some(old_value) = old_value else {
-                bail!("cell commit missing restored value during aborted commit");
-            };
-            old_value
-        } else {
-            current.clone()
-        };
-        seal_committed(&committed_value)?;
-        *current = committed_value;
-    } else {
-        let Some(restored_value) = old_value else {
-            bail!("cell commit missing restored value during cold restore");
-        };
-        *current = restored_value;
+        seal_committed(current)?;
     }
     Ok(())
 }
 
 pub(super) fn reconcile_array_commit_values<F>(
     values: &mut [Value],
-    old_values: Option<&[Value]>,
+    loaded_values: Option<Box<[Value]>>,
     aborted: bool,
     may_write: bool,
     mut seal_slot: F,
@@ -867,19 +911,21 @@ pub(super) fn reconcile_array_commit_values<F>(
 where
     F: FnMut(usize, &Value) -> Result<()>,
 {
-    if aborted || !may_write {
-        let Some(old_values) = old_values else {
-            bail!("array commit missing restored values");
-        };
-        if values.len() != old_values.len() {
+    if let Some(mut loaded_values) = loaded_values {
+        if values.len() != loaded_values.len() {
             bail!(
-                "array commit value length {} mismatched restored slot count {}",
+                "array commit value length {} mismatched loaded slot count {}",
                 values.len(),
-                old_values.len()
+                loaded_values.len()
             );
         }
-        for (current, old) in values.iter_mut().zip(old_values.iter()) {
-            *current = old.clone();
+        if aborted || !may_write {
+            for (current, loaded) in values.iter_mut().zip(loaded_values.iter_mut()) {
+                std::mem::swap(current, loaded);
+            }
+        }
+        for discarded in loaded_values.iter_mut() {
+            discarded.wipe_secrets();
         }
     }
     if may_write {
@@ -892,7 +938,7 @@ where
 
 pub(super) fn reconcile_small_map_commit_entries<F>(
     entries: &mut [MapEntry],
-    old_entries: Option<&[MapEntry]>,
+    loaded_entries: Option<Box<[MapEntry]>>,
     aborted: bool,
     may_write: bool,
     mut seal_slot: F,
@@ -900,23 +946,18 @@ pub(super) fn reconcile_small_map_commit_entries<F>(
 where
     F: FnMut(usize, &MapEntry) -> Result<()>,
 {
-    if aborted || !may_write {
-        let Some(old_entries) = old_entries else {
-            bail!("small-map commit missing restored entries");
-        };
-        if entries.len() != old_entries.len() {
+    if let Some(mut loaded_entries) = loaded_entries {
+        if entries.len() != loaded_entries.len() {
             bail!(
-                "small-map commit entry length {} mismatched restored slot count {}",
+                "small-map commit entry length {} mismatched loaded slot count {}",
                 entries.len(),
-                old_entries.len()
+                loaded_entries.len()
             );
         }
-        for (entry, old_entry) in entries.iter_mut().zip(old_entries.iter()) {
-            entry.overwrite(
-                old_entry.is_occupied(),
-                old_entry.key().clone(),
-                old_entry.value().clone(),
-            );
+        if aborted || !may_write {
+            for (entry, loaded) in entries.iter_mut().zip(loaded_entries.iter_mut()) {
+                std::mem::swap(entry, loaded);
+            }
         }
     }
     if may_write {

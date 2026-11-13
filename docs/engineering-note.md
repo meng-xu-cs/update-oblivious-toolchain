@@ -15,14 +15,23 @@ with nonzero filler, encode logical zeros as marker-free records, and
 rerandomize physical rewrites. Normalized `M+` traces therefore collapse to
 public-determined update schedules after initialization.
 
-A call scans every exact object it accesses and, when it commits, rewrites
-slot by slot exactly the exact objects its program has a write statement
-for: whether or not the write's predicate held, and also when the call
-aborted, with what the object held. An object the program only reads is not
-rewritten. The rule is static: it is read off the program, which is public,
-and not off what a run did, so it shows nothing about a run. The manifest
-names the objects (`may_write_objects`), and the commit bound and the
-modeled cost count the slots of those objects only.
+A call reads every exact object it accesses once: it opens every slot when
+it loads the object, in object-id order, and its accesses, however many,
+work on the opened copy. The trace records the read at the load. When the
+call commits, it rewrites slot by slot exactly the exact objects its program
+has a write statement for: whether or not the write's predicate held, and
+also when the call aborted, with what the object held. An object the
+program only reads is not rewritten. Both rules are static: they are read
+off the program, which is public, and not off what a run did, so they show
+nothing about a run. The manifest names the written objects
+(`may_write_objects`); the load bound counts the slots of the accessed
+objects, and the commit bound and the modeled cost the slots of the written
+ones.
+
+Commit opens no sealed record. At its first write of an object a call keeps
+a copy of what it loaded, and an aborted call reseals that copy, so an
+abort does the cryptographic work of a commit: one opening of each slot at
+the load and one seal of each slot at the commit.
 
 ## Computational-UO
 

@@ -421,7 +421,7 @@
           "io_scratch": {
             "live_bytes": 0,
             "peak_bytes": 32,
-            "wipe_count": 11
+            "wipe_count": 7
           },
           "peak_stack_words": 2,
           "value_scratch": {
@@ -445,7 +445,7 @@
         "hash_scratch_peak_bytes": 0,
         "hash_scratch_wipe_count": 1,
         "io_scratch_peak_bytes": 32,
-        "io_scratch_wipe_count": 11,
+        "io_scratch_wipe_count": 7,
         "kernel_op_count": 8,
         "kernel_step_public_object_schedule": [
           1,
@@ -460,7 +460,7 @@
           1,
           2
         ],
-        "resource_event_count": 38,
+        "resource_event_count": 30,
         "resource_events": [
           {
             "bytes": 32,
@@ -625,54 +625,6 @@
             "words": null
           },
           {
-            "bytes": 32,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 32,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 32,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 32,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
             "bytes": null,
             "kind": "wipe_scratch",
             "region": "value_scratch",
@@ -714,8 +666,8 @@
       "lean_checker_input": "runtime kernel machine finish witness",
       "lean_checker_kind": "runtime kernel machine finish witness",
       "lean_stdout": "validated proof-grade runtime kernel machine finish witness for auth(bytes32)",
-      "machine_finish_witness_json_bytes": 4734,
-      "projected_finish_bundle_json_bytes": 4649,
+      "machine_finish_witness_json_bytes": 4153,
+      "projected_finish_bundle_json_bytes": 4068,
       "runtime_kernel_machine_finish_witness": {
         "emitted_kernel_step_count": 8,
         "entrypoint_id": "auth(bytes32)",
@@ -727,7 +679,7 @@
           1,
           2
         ],
-        "resource_event_count": 38,
+        "resource_event_count": 30,
         "runtime_phase_prefix_event_count": 14
       },
       "runtime_kernel_refinement_witness": {
@@ -798,7 +750,7 @@
       },
       "scenario": "AuthScan/uo/class0",
       "setup_calls": 2,
-      "witness_file_bytes": 4734
+      "witness_file_bytes": 4153
     },
     {
       "accepted": true,
@@ -819,7 +771,7 @@
           "io_scratch": {
             "live_bytes": 0,
             "peak_bytes": 32,
-            "wipe_count": 11
+            "wipe_count": 7
           },
           "peak_stack_words": 2,
           "value_scratch": {
@@ -843,7 +795,7 @@
         "hash_scratch_peak_bytes": 0,
         "hash_scratch_wipe_count": 1,
         "io_scratch_peak_bytes": 32,
-        "io_scratch_wipe_count": 11,
+        "io_scratch_wipe_count": 7,
         "kernel_op_count": 8,
         "kernel_step_public_object_schedule": [
           1,
@@ -858,7 +810,7 @@
           1,
           2
         ],
-        "resource_event_count": 38,
+        "resource_event_count": 30,
         "resource_events": [
           {
             "bytes": 32,
@@ -1023,54 +975,6 @@
             "words": null
           },
           {
-            "bytes": 32,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 32,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 32,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": 32,
-            "kind": "reserve_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
-            "bytes": null,
-            "kind": "wipe_scratch",
-            "region": "io_scratch",
-            "words": null
-          },
-          {
             "bytes": null,
             "kind": "wipe_scratch",
             "region": "value_scratch",
@@ -1112,8 +1016,8 @@
       "lean_checker_input": "runtime kernel machine finish witness",
       "lean_checker_kind": "runtime kernel machine finish witness",
       "lean_stdout": "validated proof-grade runtime kernel machine finish witness for auth(bytes32)",
-      "machine_finish_witness_json_bytes": 4734,
-      "projected_finish_bundle_json_bytes": 4649,
+      "machine_finish_witness_json_bytes": 4153,
+      "projected_finish_bundle_json_bytes": 4068,
       "runtime_kernel_machine_finish_witness": {
         "emitted_kernel_step_count": 8,
         "entrypoint_id": "auth(bytes32)",
@@ -1125,7 +1029,7 @@
           1,
           2
         ],
-        "resource_event_count": 38,
+        "resource_event_count": 30,
         "runtime_phase_prefix_event_count": 14
       },
       "runtime_kernel_refinement_witness": {
@@ -1196,7 +1100,7 @@
       },
       "scenario": "AuthScan/uo/class1",
       "setup_calls": 2,
-      "witness_file_bytes": 4734
+      "witness_file_bytes": 4153
     },
     {
       "accepted": true,

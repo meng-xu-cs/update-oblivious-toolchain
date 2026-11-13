@@ -339,6 +339,16 @@ impl CallRecorder {
         self.physical_writes.len()
     }
 
+    /// The locations of the sealed records the call has read so far, in
+    /// order.
+    #[cfg(test)]
+    pub(crate) fn physical_read_locations(&self) -> Vec<&str> {
+        self.physical_reads
+            .iter()
+            .map(|event| event.location.as_str())
+            .collect()
+    }
+
     fn assert_manifest_exactness(&self, manifest_entry: &EntrypointManifest) -> Result<()> {
         for (object_id, expected) in &manifest_entry.oram_accesses {
             let observed = self.observed_oram_access_count(*object_id);
