@@ -39,15 +39,18 @@ establish and what they do not).
   `results/capacity_sweep_full.json`: five warmup rounds and 30 measured
   rounds of each kind of call, workloads of 20 calls at each read fraction,
   and every map from 1 to 16,384 entries filled to every level. It takes
-  about an hour and a half on four cores and wants the machine to itself, so
+  about an hour on four cores and wants the machine to itself, so
   `run_validation.sh` does not run it; run it when a change claims a saving.
   `scripts/compare_capacity_sweep.py` compares two reports, and
   `review/2026-11-external-review/capacity_sweep_baseline.json` is the full
-  profile from before the optimizations that review asked for. Until a
-  change claims a saving the committed full report is that baseline, and
-  its `provenance` names the build that measured it: its latencies and
-  traced counts stand, and its gas is that of cost model v1, which charged
-  no reads.
+  profile from before the optimizations that review asked for; its gas is
+  that of cost model v1, which charged no reads. The committed full report
+  was measured when Issues 30 to 38 of that review were in, and its
+  `provenance` names the build that measured it. The latencies of two
+  reports compare only if one machine in one state measured both, so the
+  review directory also holds a control for Issues 36 to 38: the largest
+  maps measured on the code before them and on the code after them, one run
+  after the other (see [`path-oram.md`](./path-oram.md)).
 
 ## Index
 

@@ -10,8 +10,8 @@
 # 2 keys and to 25%, 50%, 90% and 100% of its capacity, and at each level 30
 # measured rounds of every kind of call after 5 warmup rounds, a workload of
 # 20 calls at each read fraction, and Lean's check of one call of each kind.
-# It takes about an hour and a half on four cores, most of it on the two
-# largest maps, and it should have the machine to itself. Run it when a
+# It takes about an hour on four cores, most of it on the two largest maps,
+# and it should have the machine to itself. Run it when a
 # change claims a saving, and compare with the baseline committed with the
 # external review:
 #

@@ -663,6 +663,54 @@ After this wave, and after Wave 3, rerun the sweep of Issue 27
 (`scripts/compare_capacity_sweep.py`), and update the break-evens and the
 latencies in `docs/path-oram.md`.
 
+Done after this wave. The full profile took 59 minutes where the one after
+Wave 3 took 84, on a machine that was about a fifth slower: the code of the
+Wave 3 profile, measured again, takes 47.1 ms for a full-scan read at
+16,384 entries where that profile has 39.9 ms. Profiles of different days
+therefore do not compare, and the wave's savings are read off a control:
+[`capacity_sweep_control_before_wave4.json`](./capacity_sweep_control_before_wave4.json)
+is the full profile's rounds on the maps of 4,096, 8,192 and 16,384 entries
+at 2 keys on the code before the wave (`cb92f8c`), and
+[`capacity_sweep_control_after_wave4.json`](./capacity_sweep_control_after_wave4.json)
+the same on the code after it (`9d93471`), run one after the other. To
+repeat it, run `--only capacity-sweep-full` at each commit with
+`UO_SWEEP_CAPACITIES=4096,8192,16384`, `UO_SWEEP_OCCUPANCY_MAX_CAPACITY=0`,
+`UO_SWEEP_WORKLOAD_CALLS=0` and `UO_SWEEP_LEAN_CAPACITIES=0`.
+
+In the control, at 16,384 entries, medians of 30 rounds:
+
+| Call | Whole call before | after | Own work before | after |
+| --- | --- | --- | --- | --- |
+| tree read | 551.4 ms | 65.4 ms | 35.8 ms | 17.4 ms |
+| tree overwrite | 729.7 ms | 233.8 ms | 83.5 ms | 62.7 ms |
+| full-scan read | 220.4 ms | 42.0 ms | 47.1 ms | 41.8 ms |
+| full-scan overwrite | 425.7 ms | 85.4 ms | 84.2 ms | 85.1 ms |
+
+The witness snapshots were 469.7 ms of the tree read (Issue 36), staging
+and loading 11.2 ms of it and now 0.7 ms (Issue 37), and the proof bundles
+170.2 ms of the full-scan read and now 0.2 ms (Issue 38). What a measured
+call on the tree still adds to its own work is the proof bundles of its
+trace, 47 ms for a read and 168 ms for a write: its trace has an event for
+each bucket of each path it reads and writes.
+
+Two costs in the size of the store are left, and neither is in these
+figures. A call on an exact object decrypts every slot of it, which is
+what a full scan is. And a production receipt's digest of the ciphertext
+reads every sealed record of a Path ORAM map that the call wrote (Issue
+37), which every call on the map does; the sweep runs the diagnostics
+build and issues no production receipt. A tree of digests over the buckets
+is part of Issue 44.
+
+In the new profile, on a call's own work, the full scan is the faster
+backend up to 4,096 entries in every kind of call at every occupancy level.
+At 8,192 entries the tree is faster in every read and the full scan in
+every write, and at 16,384 the tree is faster in every kind of call at
+every level (17.5 ms against 45.0 ms for a read, 67.4 ms against 86.9 ms
+for an overwrite). After Wave 3 the first break-even was at 16,384 entries
+for reads and the writes were level there. Whole measured calls are still
+slower on the tree at every capacity. The break-evens in bytes, physical
+operations and gas have not moved, since the counts have not.
+
 ### Issue 36 — Remove the whole-store witness snapshots from a call
 
 Source: F3 (§4). Size: M. Depends on: Issue 25.

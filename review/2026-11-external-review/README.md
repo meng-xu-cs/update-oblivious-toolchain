@@ -8,6 +8,7 @@ directory holds the response.
 | [`validation.md`](./validation.md) | every factual claim of the review checked against the code, and a position on each recommendation |
 | [`tasks.md`](./tasks.md) | Issues 22 to 56: description, fix and acceptance criteria |
 | [`capacity_sweep_baseline.json`](./capacity_sweep_baseline.json) | the capacity sweep's full profile as Issue 27 measured it, before any optimization: what Issues 30 to 38 compare their savings with |
+| [`capacity_sweep_control_before_wave4.json`](./capacity_sweep_control_before_wave4.json), [`capacity_sweep_control_after_wave4.json`](./capacity_sweep_control_after_wave4.json) | a control for Issues 36 to 38: the full profile's rounds on the maps of 4,096, 8,192 and 16,384 entries at 2 keys, on the code before those issues (`cb92f8c`) and on the code after them (`9d93471`), one run after the other on one machine |
 | this file | the positions in brief, the order of work, and the tracker |
 
 The review text is not in the repository; `validation.md` restates each
@@ -74,8 +75,11 @@ Issue 22 has the options and the reasoning.
    mechanical acceptance test. Done; the full profile of the sweep was run
    again after it (`results/capacity_sweep_full.json`), and
    `docs/path-oram.md` has its figures beside the baseline's.
-5. **Wave 4, no work linear in the store** (Issues 36 to 38). Then rerun
-   the sweep of Issue 27 and update the break-evens.
+5. **Wave 4, no work linear in the store** (Issues 36 to 38). Done; the
+   full profile was run again after it, and `docs/path-oram.md` has its
+   figures and break-evens. The machine was slower than for the earlier
+   profiles, so what the wave saved is measured by a control, the code
+   before the wave and the code after it run one after the other.
 6. **Wave 5, theorem coverage** (Issues 39 and 40). Independent of Waves 3
    and 4; it can run beside them.
 7. **Wave 6, evidence at a storage boundary** (Issues 41 and 42).
@@ -107,7 +111,7 @@ its engineering part is Wave 4, its certified part is research.
 | 35 | Match the record codec to the observer unit | 3 | M | | done | `d848180` |
 | 36 | Remove the whole-store witness snapshots from a call | 4 | M | 25 | done | `af5cf09` |
 | 37 | Stage a call without copying the store | 4 | M | | done | `02087ca` |
-| 38 | Compress scan schedules in traces and proof objects | 4 | M to L | 31, 32 | done | |
+| 38 | Compress scan schedules in traces and proof objects | 4 | M to L | 31, 32 | done | `9d93471` |
 | 39 | Admit encrypted returns in the kernel theorems | 5 | M | | todo | |
 | 40 | Give the stash bound a lifetime budget and test deferred write-back | 5 | M | | todo | |
 | 41 | Put storage behind an adapter that keeps its own I/O log | 6 | M to L | 24, 31, 32 | todo | |
