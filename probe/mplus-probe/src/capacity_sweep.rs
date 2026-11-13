@@ -818,10 +818,24 @@ fn operation_row(
     mut row: serde_json::Map<String, JsonValue>,
     operation: SweepOperation,
     samples: &[SweepSample],
-) -> Result<(JsonValue, SweepCost, bool)> {
+    artifact: &CompiledArtifact,
+) -> Result<(JsonValue, SweepCost, bool, bool)> {
     let first = samples
         .first()
         .ok_or_else(|| anyhow!("no {} was measured", operation.label()))?;
+    // The manifest's bounds on the sealed records the call reads and writes,
+    // which the modeled cost charges. The reads include those at the call's
+    // start, which no trace records.
+    let entry = artifact
+        .contract
+        .manifest
+        .entrypoints
+        .get(operation.entrypoint())
+        .ok_or_else(|| anyhow!("manifest entry missing for {}", operation.entrypoint()))?;
+    let within_manifest_bounds = samples.iter().all(|sample| {
+        sample.cost.physical_reads + sample.call_start.0 <= entry.max_load_ops
+            && sample.cost.physical_writes <= entry.max_commit_ops
+    });
     let same_for_every_trial = samples.iter().all(|sample| {
         sample.cost == first.cost
             && sample.call_start == first.call_start
@@ -919,6 +933,8 @@ fn operation_row(
     row.insert("bytes_written".into(), json!(first.cost.bytes_written));
     row.insert("bytes_moved".into(), json!(first.cost.bytes_moved()));
     row.insert("gas".into(), json!(first.cost.gas));
+    row.insert("max_load_ops".into(), json!(entry.max_load_ops));
+    row.insert("max_commit_ops".into(), json!(entry.max_commit_ops));
     row.insert("call_start_reads".into(), json!(first.call_start.0));
     row.insert("call_start_bytes".into(), json!(first.call_start.1));
     row.insert("witness_scan_records".into(), json!(first.witness_records));
@@ -929,7 +945,12 @@ fn operation_row(
         json!(trace_json_bytes.saturating_sub(receipt_json_bytes)),
     );
     row.insert("timing".into(), JsonValue::Object(timing));
-    Ok((JsonValue::Object(row), first.cost, same_for_every_trial))
+    Ok((
+        JsonValue::Object(row),
+        first.cost,
+        same_for_every_trial,
+        within_manifest_bounds,
+    ))
 }
 
 /// The kinds a workload of `calls` calls with `read_percent` reads makes, in
@@ -1040,6 +1061,8 @@ struct SweepOutput {
     /// the same in every trial.
     cell_costs: Vec<BTreeMap<SweepOperation, SweepCost>>,
     cost_same_for_every_trial: bool,
+    /// Whether every call read and wrote within its manifest's bounds.
+    within_manifest_bounds: bool,
     /// Per occupancy label: the executed workloads' mean latencies.
     workload_latencies: BTreeMap<String, SweepWorkloadLatencies>,
     toolchain_manifest_sha256: Option<String>,
@@ -1058,6 +1081,7 @@ fn sweep_backend_capacity(
 ) -> Result<SweepOutput> {
     let mut output = SweepOutput {
         cost_same_for_every_trial: true,
+        within_manifest_bounds: true,
         ..SweepOutput::default()
     };
     let compile_started = Instant::now();
@@ -1178,10 +1202,12 @@ fn sweep_backend_capacity(
                 let Some(operation_samples) = samples.get(&operation) else {
                     continue;
                 };
-                let (row, cost, same) = operation_row(cell(), operation, operation_samples)?;
+                let (row, cost, same, within_bounds) =
+                    operation_row(cell(), operation, operation_samples, &artifact)?;
                 rows.push(row);
                 costs.insert(operation, cost);
                 output.cost_same_for_every_trial &= same;
+                output.within_manifest_bounds &= within_bounds;
             }
             let mix_costs = match (
                 costs.get(&SweepOperation::ReadHit),
@@ -1278,6 +1304,7 @@ fn sweep_with_parameters(parameters: &SweepParameters) -> Result<JsonValue> {
     let mut workloads = Vec::new();
     let mut failed_cells = 0usize;
     let mut cost_same_for_every_trial = true;
+    let mut reads_and_writes_within_manifest_bounds = true;
     let mut cost_same_at_every_occupancy = true;
     let mut cost_same_for_every_kind_of_an_entrypoint = true;
     let mut costs: BTreeMap<(&'static str, usize), SweepCosts> = BTreeMap::new();
@@ -1306,6 +1333,7 @@ fn sweep_with_parameters(parameters: &SweepParameters) -> Result<JsonValue> {
             workloads.extend(output.workloads);
             failed_cells += output.failed_cells;
             cost_same_for_every_trial &= output.cost_same_for_every_trial;
+            reads_and_writes_within_manifest_bounds &= output.within_manifest_bounds;
             toolchain_manifest_sha256 =
                 toolchain_manifest_sha256.or(output.toolchain_manifest_sha256);
             if let Some(first) = output.cell_costs.first() {
@@ -1381,6 +1409,7 @@ fn sweep_with_parameters(parameters: &SweepParameters) -> Result<JsonValue> {
     let mut report = json!({
         "schema": CAPACITY_SWEEP_SCHEMA,
         "contract": "SweepMap",
+        "cost_model": super::RESOURCE_COST_MODEL,
         "profile": match parameters.profile {
             SweepProfile::Quick => "quick",
             SweepProfile::Full => "full",
@@ -1406,6 +1435,7 @@ fn sweep_with_parameters(parameters: &SweepParameters) -> Result<JsonValue> {
         "count_checks": {
             "every_cell_measured": failed_cells == 0,
             "cost_same_for_every_trial": cost_same_for_every_trial,
+            "reads_and_writes_within_manifest_bounds": reads_and_writes_within_manifest_bounds,
             "cost_same_at_every_occupancy": cost_same_at_every_occupancy,
             "cost_same_for_every_kind_of_an_entrypoint": cost_same_for_every_kind_of_an_entrypoint,
         },
@@ -1637,6 +1667,7 @@ mod tests {
         for check in [
             "every_cell_measured",
             "cost_same_for_every_trial",
+            "reads_and_writes_within_manifest_bounds",
             "cost_same_at_every_occupancy",
             "cost_same_for_every_kind_of_an_entrypoint",
         ] {
@@ -1705,6 +1736,27 @@ mod tests {
                         json!(witness),
                         "{label} {capacity}"
                     );
+                    // The manifest's load bound, which the modeled cost
+                    // charges, is what the call reads, traced and at its
+                    // start, on the full scan and the local scheme; on the
+                    // tree it is a bound, which counts the metadata pages
+                    // once per node access.
+                    let count = |field: &str| row[field].as_u64().unwrap();
+                    let reads = count("physical_reads") + count("call_start_reads");
+                    if scheme == Some("path_oram_private_posmap_v1") {
+                        assert!(reads <= count("max_load_ops"), "{label} {capacity}");
+                        assert!(
+                            count("physical_writes") <= count("max_commit_ops"),
+                            "{label} {capacity}"
+                        );
+                    } else {
+                        assert_eq!(reads, count("max_load_ops"), "{label} {capacity}");
+                        assert_eq!(
+                            count("physical_writes"),
+                            count("max_commit_ops"),
+                            "{label} {capacity}"
+                        );
+                    }
                 }
                 assert!(seen > 0, "{label} {capacity}");
                 assert_eq!(oram.is_some(), witness > 0, "{label} {capacity}");

@@ -109,10 +109,11 @@ Sidecar metadata requirements:
 - gas is not declared in the sidecar: a `public_gas_budget` entry is rejected.
   The compiler derives each entrypoint's public gas into the emitted manifest,
   and the recorded `public_gas_budget` and the runtime `gas_used` are a MODELED
-  resource cost under cost model `uo-modeled-resource-cost-v1`
+  resource cost under cost model `uo-modeled-resource-cost-v2`
   (confidential entrypoints carry the static cost of their fixed schedule,
-  `2000 + statements*11 + expressions*7 + commit_ops*29`; public entrypoints use
-  the dynamic execution-metric cost
+  `2000 + statements*11 + expressions*7 + load_ops*29 + commit_ops*29`, which
+  charges the sealed records a call reads as it charges those it writes;
+  public entrypoints use the dynamic execution-metric cost
   `logical_reads*3 + logical_writes*5 + physical_writes*17`). This is not stock
   EVM gas: there is no EVM gas schedule or bytecode backend. `results/overheads.json`
   records this cost model and cross-checks formula exactness for every benchmark

@@ -304,10 +304,13 @@ at 256 entries, 654 against 2,556 at 16,384. The full scan moves 380 bytes
 per entry per operation. The tree moves fewer bytes than the full scan from
 2,048 entries for reads alone, 4,096 for an even mix and 8,192 for writes
 alone; it makes fewer physical operations from 128, 512 and 1,024 entries,
-and costs less modeled gas from 512, 2,048 and 4,096. The local scheme makes
-fewer operations and costs less gas than the full scan from 8 entries but
-moves more bytes at every capacity it admits, and up to its 128 entries it
-costs less than the tree on every metric.
+and costs less modeled gas from 512, 2,048 and 4,096. The gas is that of
+cost model v2, which charges the sealed records a call reads, those at its
+start included, as it charges those it writes (see The Modeled Cost in
+[`claim-boundary.md`](./claim-boundary.md)). The local scheme makes fewer
+operations than the full scan from 8 entries and costs less gas from 16,
+but moves more bytes at every capacity it admits, and up to its 128 entries
+it costs less than the tree on every metric.
 
 Beside the traced counts the report gives the work that no trace records. A
 call on a Path ORAM map reads the map's counter and metadata pages when it

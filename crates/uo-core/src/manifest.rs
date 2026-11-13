@@ -160,7 +160,15 @@ pub struct EntrypointManifest {
     pub uoarray_writes: usize,
     pub uomap_reads: usize,
     pub uomap_writes: usize,
+    /// The sealed records the call may write: see `max_load_ops` for the
+    /// units.
     pub max_commit_ops: usize,
+    /// The sealed records the call may read from storage: each slot of each
+    /// exact object it loads, once; for each access of an ORAM map the
+    /// buckets of the path and the metadata pages; and, for a Path ORAM
+    /// map, the counter and the metadata pages the call reads when it
+    /// starts. The modeled cost charges them (`uo-modeled-resource-cost-v2`).
+    pub max_load_ops: usize,
     #[serde(default)]
     pub oram_accesses: BTreeMap<u32, usize>,
 }
@@ -253,12 +261,16 @@ pub struct OramResourceBounds {
     pub commit_ops_per_access: usize,
     pub accesses: usize,
     pub commit_ops_for_entrypoint: usize,
+    pub load_ops_per_access: usize,
+    pub call_start_load_ops: usize,
+    pub load_ops_for_entrypoint: usize,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct EntrypointResourceBounds {
     pub signature: String,
     pub max_commit_ops: usize,
+    pub max_load_ops: usize,
     pub oram_bounds: Vec<OramResourceBounds>,
 }
 
@@ -386,6 +398,34 @@ impl OramManifest {
         self.metadata_pages_per_access + self.buckets_per_access
     }
 
+    /// The sealed records one access may read: the units it may write.
+    pub fn total_load_ops(&self) -> usize {
+        self.total_commit_ops()
+    }
+
+    /// The sealed records a call reads from the map when it starts, outside
+    /// any access: on a Path ORAM scheme the counter and every metadata
+    /// page, which is `metadata_pages_per_access`.
+    pub fn call_start_load_ops(&self) -> usize {
+        if is_path_oram_scheme(&self.scheme) {
+            self.metadata_pages_per_access
+        } else {
+            0
+        }
+    }
+
+    /// The sealed records a call that makes `accesses` accesses may read.
+    /// The surrogate scheme makes one pass whatever the count.
+    pub fn load_ops_for_accesses(&self, accesses: usize) -> usize {
+        if is_path_oram_scheme(&self.scheme) {
+            self.total_load_ops()
+                .saturating_mul(accesses)
+                .saturating_add(self.call_start_load_ops())
+        } else {
+            self.total_load_ops()
+        }
+    }
+
     pub fn resource_bounds_for_capacity(
         &self,
         capacity: usize,
@@ -401,6 +441,9 @@ impl OramManifest {
             commit_ops_per_access,
             accesses,
             commit_ops_for_entrypoint: commit_ops_per_access.saturating_mul(accesses),
+            load_ops_per_access: self.total_load_ops(),
+            call_start_load_ops: self.call_start_load_ops(),
+            load_ops_for_entrypoint: self.load_ops_for_accesses(accesses),
         }
     }
 
@@ -522,6 +565,7 @@ impl RuntimeManifest {
         Ok(EntrypointResourceBounds {
             signature: signature.into(),
             max_commit_ops: entrypoint.max_commit_ops,
+            max_load_ops: entrypoint.max_load_ops,
             oram_bounds,
         })
     }
@@ -746,6 +790,7 @@ mod tests {
                 uomap_reads: 0,
                 uomap_writes: 1,
                 max_commit_ops: oram.total_commit_ops() * 2,
+                max_load_ops: oram.total_commit_ops() * 2,
                 oram_accesses: BTreeMap::from([(7, 2)]),
             },
         );
@@ -850,6 +895,7 @@ mod tests {
             uomap_reads: 0,
             uomap_writes: 0,
             max_commit_ops: 0,
+            max_load_ops: 0,
             oram_accesses: BTreeMap::new(),
         };
 

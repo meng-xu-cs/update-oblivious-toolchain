@@ -1,6 +1,6 @@
 {
   "accepted": true,
-  "artifact_json_bytes": 1521010,
+  "artifact_json_bytes": 1521104,
   "checker": "proof/lean/.lake/build/bin/checkProofGradeRuntimeSmallConfidentialKernelBoundary",
   "handwritten_runtime_public_only_theorem_checked": true,
   "lean_checker_input": "source-backed runtime small confidential-kernel boundary",
@@ -11,7 +11,7 @@
   "slot_adapter_boundary_theorem_checked": true,
   "small_confidential_kernel_boundary_theorem_checked": true,
   "source_bytes": {
-    "allocator": 17900,
+    "allocator": 17929,
     "confidential_kernel": 116465,
     "engine": 94171,
     "fresh_coins": 5031,

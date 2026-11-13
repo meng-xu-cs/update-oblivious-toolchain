@@ -15,12 +15,12 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1524864,
+      "boundary_json_bytes": 1524958,
       "entrypoint": "classify(uint256)",
-      "gas_used": 2086,
+      "gas_used": 2115,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "allocator": 17900,
+        "allocator": 17929,
         "confidential_core": 46817,
         "confidential_kernel": 116465,
         "controller": 21071,
@@ -48,7 +48,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6359,
-        "trace": 432225,
+        "trace": 432287,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -246,12 +246,12 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1524864,
+      "boundary_json_bytes": 1524958,
       "entrypoint": "classify(uint256)",
-      "gas_used": 2086,
+      "gas_used": 2115,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "allocator": 17900,
+        "allocator": 17929,
         "confidential_core": 46817,
         "confidential_kernel": 116465,
         "controller": 21071,
@@ -279,7 +279,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6359,
-        "trace": 432225,
+        "trace": 432287,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -477,12 +477,12 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1528935,
+      "boundary_json_bytes": 1529029,
       "entrypoint": "auth(bytes32)",
-      "gas_used": 2446,
+      "gas_used": 2591,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "allocator": 17900,
+        "allocator": 17929,
         "confidential_core": 46817,
         "confidential_kernel": 116465,
         "controller": 21071,
@@ -510,7 +510,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6359,
-        "trace": 432225,
+        "trace": 432287,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -915,12 +915,12 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1528935,
+      "boundary_json_bytes": 1529029,
       "entrypoint": "auth(bytes32)",
-      "gas_used": 2446,
+      "gas_used": 2591,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "allocator": 17900,
+        "allocator": 17929,
         "confidential_core": 46817,
         "confidential_kernel": 116465,
         "controller": 21071,
@@ -948,7 +948,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6359,
-        "trace": 432225,
+        "trace": 432287,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -1353,12 +1353,12 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1526830,
+      "boundary_json_bytes": 1526924,
       "entrypoint": "upsert(bytes32,uint256)",
-      "gas_used": 2264,
+      "gas_used": 2496,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "allocator": 17900,
+        "allocator": 17929,
         "confidential_core": 46817,
         "confidential_kernel": 116465,
         "controller": 21071,
@@ -1386,7 +1386,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6359,
-        "trace": 432225,
+        "trace": 432287,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -1746,12 +1746,12 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1526830,
+      "boundary_json_bytes": 1526924,
       "entrypoint": "upsert(bytes32,uint256)",
-      "gas_used": 2264,
+      "gas_used": 2496,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "allocator": 17900,
+        "allocator": 17929,
         "confidential_core": 46817,
         "confidential_kernel": 116465,
         "controller": 21071,
@@ -1779,7 +1779,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6359,
-        "trace": 432225,
+        "trace": 432287,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -2139,12 +2139,12 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1529146,
+      "boundary_json_bytes": 1529240,
       "entrypoint": "deposit(bytes32,uint256)",
-      "gas_used": 2371,
+      "gas_used": 2632,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "allocator": 17900,
+        "allocator": 17929,
         "confidential_core": 46817,
         "confidential_kernel": 116465,
         "controller": 21071,
@@ -2172,7 +2172,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6359,
-        "trace": 432225,
+        "trace": 432287,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -2619,12 +2619,12 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1529146,
+      "boundary_json_bytes": 1529240,
       "entrypoint": "deposit(bytes32,uint256)",
-      "gas_used": 2371,
+      "gas_used": 2632,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "allocator": 17900,
+        "allocator": 17929,
         "confidential_core": 46817,
         "confidential_kernel": 116465,
         "controller": 21071,
@@ -2652,7 +2652,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6359,
-        "trace": 432225,
+        "trace": 432287,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -3099,12 +3099,12 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1529792,
+      "boundary_json_bytes": 1529886,
       "entrypoint": "approve(address,address,uint256)",
-      "gas_used": 2528,
+      "gas_used": 2992,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "allocator": 17900,
+        "allocator": 17929,
         "confidential_core": 46817,
         "confidential_kernel": 116465,
         "controller": 21071,
@@ -3132,7 +3132,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6359,
-        "trace": 432225,
+        "trace": 432287,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -3722,12 +3722,12 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1529792,
+      "boundary_json_bytes": 1529886,
       "entrypoint": "approve(address,address,uint256)",
-      "gas_used": 2528,
+      "gas_used": 2992,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "allocator": 17900,
+        "allocator": 17929,
         "confidential_core": 46817,
         "confidential_kernel": 116465,
         "controller": 21071,
@@ -3755,7 +3755,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6359,
-        "trace": 432225,
+        "trace": 432287,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -4345,12 +4345,12 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "boundary_json_bytes": 1527424,
+      "boundary_json_bytes": 1527518,
       "entrypoint": "put(bytes32,uint256)",
-      "gas_used": 2322,
+      "gas_used": 2757,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "allocator": 17900,
+        "allocator": 17929,
         "confidential_core": 46817,
         "confidential_kernel": 116465,
         "controller": 21071,
@@ -4378,7 +4378,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6359,
-        "trace": 432225,
+        "trace": 432287,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -4786,12 +4786,12 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "boundary_json_bytes": 1527424,
+      "boundary_json_bytes": 1527518,
       "entrypoint": "put(bytes32,uint256)",
-      "gas_used": 2322,
+      "gas_used": 2757,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "allocator": 17900,
+        "allocator": 17929,
         "confidential_core": 46817,
         "confidential_kernel": 116465,
         "controller": 21071,
@@ -4819,7 +4819,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6359,
-        "trace": 432225,
+        "trace": 432287,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -5227,12 +5227,12 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 1530164,
+      "boundary_json_bytes": 1530258,
       "entrypoint": "add(bytes32,uint256)",
-      "gas_used": 2651,
+      "gas_used": 3376,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "allocator": 17900,
+        "allocator": 17929,
         "confidential_core": 46817,
         "confidential_kernel": 116465,
         "controller": 21071,
@@ -5260,7 +5260,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6359,
-        "trace": 432225,
+        "trace": 432287,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -5872,12 +5872,12 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 1530164,
+      "boundary_json_bytes": 1530258,
       "entrypoint": "add(bytes32,uint256)",
-      "gas_used": 2651,
+      "gas_used": 3376,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "allocator": 17900,
+        "allocator": 17929,
         "confidential_core": 46817,
         "confidential_kernel": 116465,
         "controller": 21071,
@@ -5905,7 +5905,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6359,
-        "trace": 432225,
+        "trace": 432287,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -6517,12 +6517,12 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 1538355,
+      "boundary_json_bytes": 1538449,
       "entrypoint": "deposit(bytes32,uint256)",
-      "gas_used": 3531,
+      "gas_used": 5445,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "allocator": 17900,
+        "allocator": 17929,
         "confidential_core": 46817,
         "confidential_kernel": 116465,
         "controller": 21071,
@@ -6550,7 +6550,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6359,
-        "trace": 432225,
+        "trace": 432287,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -7753,12 +7753,12 @@
     {
       "accepted": true,
       "boundary_events": 14,
-      "boundary_json_bytes": 1567349,
+      "boundary_json_bytes": 1567443,
       "entrypoint": "transferFrom(address,address,address,uint256)",
-      "gas_used": 7427,
+      "gas_used": 13952,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "allocator": 17900,
+        "allocator": 17929,
         "confidential_core": 46817,
         "confidential_kernel": 116465,
         "controller": 21071,
@@ -7786,7 +7786,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6359,
-        "trace": 432225,
+        "trace": 432287,
         "trusted_kernel": 4548,
         "types": 29154
       },

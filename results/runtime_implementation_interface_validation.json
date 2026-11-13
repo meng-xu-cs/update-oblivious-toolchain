@@ -1,6 +1,6 @@
 {
   "accepted": true,
-  "artifact_json_bytes": 1520981,
+  "artifact_json_bytes": 1521075,
   "checker": "proof/lean/.lake/build/bin/checkProofGradeRuntimeImplementationInterface",
   "deeper_semantics_of_rust_refinement_required": true,
   "evidence_classification": "source-frozen/static-drift checked",
@@ -15,7 +15,7 @@
   "runtime_host_visible_error_taxonomy_theorem_checked": true,
   "rust_semantic_refinement_claimed": false,
   "source_bytes": {
-    "allocator": 17900,
+    "allocator": 17929,
     "confidential_core": 46817,
     "confidential_kernel": 116465,
     "controller": 21071,
@@ -43,7 +43,7 @@
     "store_lib": 154,
     "store_store": 2898,
     "theorem": 6359,
-    "trace": 432225,
+    "trace": 432287,
     "trusted_kernel": 4548,
     "types": 29154
   },

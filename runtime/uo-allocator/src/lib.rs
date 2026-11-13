@@ -400,6 +400,7 @@ mod tests {
             uomap_reads: 4,
             uomap_writes: 5,
             max_commit_ops: 9,
+            max_load_ops: 9,
             oram_accesses: Default::default(),
         }
     }

@@ -59,7 +59,7 @@
     },
     {
       "accepted": true,
-      "certificate_json_bytes": 53135,
+      "certificate_json_bytes": 53136,
       "entrypoint": "transferFrom(address,address,address,uint256)",
       "leaf_steps": 6,
       "lean_stdout": "validated runtime path-ORAM hidden certificate with 6 leaf steps",

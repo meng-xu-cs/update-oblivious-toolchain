@@ -100,6 +100,7 @@ structure ImportedProofRelevantEntrypointView where
   uomap_reads : Nat
   uomap_writes : Nat
   max_commit_ops : Nat
+  max_load_ops : Nat
   oram_accesses : List ImportedProofRelevantOramAccessView
 deriving Repr, DecidableEq, FromJson, ToJson
 
@@ -540,6 +541,7 @@ private def parseImportedManifestEntrypointViewFromRawJson
     , uomap_reads := ← lookupFieldAs json "uomap_reads"
     , uomap_writes := ← lookupFieldAs json "uomap_writes"
     , max_commit_ops := ← lookupFieldAs json "max_commit_ops"
+    , max_load_ops := ← lookupFieldAs json "max_load_ops"
     , oram_accesses := ← parseImportedOramAccessViewsFromRawJson (← lookupFieldJson json "oram_accesses")
     }
 
@@ -2176,6 +2178,45 @@ def expectedCommitOpsForFunction
         throw s!"unsupported state object kind for object id {objectId}"
     pure (acc + addition)
 
+/-- The sealed records a call of `fn` may read: each slot of each exact
+object it loads, once; for each access of an ORAM map the path's buckets and
+the metadata pages; and, on a Path ORAM scheme, the counter and the metadata
+pages the call reads when it starts. -/
+def expectedLoadOpsForFunction
+  (view : ImportedProofRelevantContractView)
+  (fn : ImportedProofRelevantFunctionView) :
+  Except String Nat := do
+  let accessedObjects ← accessedObjectIdsInBodyStrings fn.body
+  let oramAccesses ← countFunctionOramAccesses fn view.state
+  accessedObjects.foldlM (init := 0) fun acc objectId => do
+    let stateObject ←
+      match stateObjectById? view.state objectId with
+      | some object => pure object
+      | none => throw s!"unknown object id {objectId}"
+    let addition ←
+      if stateObject.kind == "cell" then
+        pure 1
+      else if stateObject.kind == "array" || stateObject.kind == "map" then
+        if stateObject.backend == "oram" then
+          match manifestObjectById? view.manifest.objects objectId with
+          | some manifestObject =>
+              match manifestObject.oram with
+              | some oram =>
+                  let perAccess := totalCommitOps oram
+                  if translationIsPathOramScheme stateObject.oram_scheme then
+                    pure <|
+                      perAccess * lookupPairCount objectId oramAccesses +
+                        oram.metadata_pages + 1
+                  else
+                    pure perAccess
+              | none => throw s!"ORAM object {objectId} is missing ORAM manifest data"
+          | none => throw s!"manifest is missing object id {objectId}"
+        else
+          pure <| stateObject.capacity.getD 1
+      else
+        throw s!"unsupported state object kind for object id {objectId}"
+    pure (acc + addition)
+
 private def functionOramManifestReplayMessage
   (view : ImportedProofRelevantContractView)
   (fn : ImportedProofRelevantFunctionView)
@@ -2229,6 +2270,24 @@ private def functionMaxCommitOpsMatchesManifest
   match expectedCommitOpsForFunction view fn with
   | .error _ => false
   | .ok expected => entry.max_commit_ops == expected
+
+private def functionMaxLoadOpsMismatchMessage
+  (view : ImportedProofRelevantContractView)
+  (fn : ImportedProofRelevantFunctionView)
+  (entry : ImportedProofRelevantEntrypointView) : String :=
+  match expectedLoadOpsForFunction view fn with
+  | .error err =>
+      s!"{fn.signature}: failed to compute max_load_ops: {err}"
+  | .ok expected =>
+      s!"{fn.signature}: expected max_load_ops={expected}, manifest has {entry.max_load_ops}"
+
+private def functionMaxLoadOpsMatchesManifest
+  (view : ImportedProofRelevantContractView)
+  (fn : ImportedProofRelevantFunctionView)
+  (entry : ImportedProofRelevantEntrypointView) : Bool :=
+  match expectedLoadOpsForFunction view fn with
+  | .error _ => false
+  | .ok expected => entry.max_load_ops == expected
 
 private def functionCountsMatchManifest
   (fn : ImportedProofRelevantFunctionView)
@@ -2366,6 +2425,33 @@ private def manifestCommitOpMismatchMessages
             tail
           else
             functionMaxCommitOpsMismatchMessage view fn entry :: tail
+
+private def functionsMatchManifestLoadOps
+  (view : ImportedProofRelevantContractView) :
+  List ImportedProofRelevantFunctionView →
+  List ImportedProofRelevantEntrypointView → Bool
+  | [], _ => true
+  | fn :: rest, entrypoints =>
+      match lookupEntrypoint fn.signature entrypoints with
+      | none => false
+      | some entry =>
+          functionMaxLoadOpsMatchesManifest view fn entry &&
+            functionsMatchManifestLoadOps view rest entrypoints
+
+private def manifestLoadOpMismatchMessages
+  (view : ImportedProofRelevantContractView) :
+  List ImportedProofRelevantFunctionView →
+  List ImportedProofRelevantEntrypointView → List String
+  | [], _ => []
+  | fn :: rest, entrypoints =>
+      let tail := manifestLoadOpMismatchMessages view rest entrypoints
+      match lookupEntrypoint fn.signature entrypoints with
+      | none => s!"{fn.signature}: missing manifest entrypoint" :: tail
+      | some entry =>
+          if functionMaxLoadOpsMatchesManifest view fn entry then
+            tail
+          else
+            functionMaxLoadOpsMismatchMessage view fn entry :: tail
 
 private def functionMetadataMismatchMessage
   (view : ImportedProofRelevantContractView)
@@ -3795,6 +3881,7 @@ def ImportedProofRelevantContractView.checkStructuralValid
     functionsMatchManifestCounts view.functions view.manifest.entrypoints &&
     functionsMatchManifestOramAccesses view view.functions view.manifest.entrypoints &&
     functionsMatchManifestCommitOps view view.functions view.manifest.entrypoints &&
+    functionsMatchManifestLoadOps view view.functions view.manifest.entrypoints &&
     functionsMetadataWellFormed view view.functions view.manifest.entrypoints
 
 def ImportedProofRelevantContractView.StructuralValid
@@ -3883,6 +3970,12 @@ def ImportedProofRelevantContractView.validationErrors
       ["manifest max_commit_ops do not match recomputed body accesses for: " ++
         String.intercalate ", "
           (manifestCommitOpMismatchMessages view view.functions view.manifest.entrypoints)]
+    else
+      []) ++
+    (if !(functionsMatchManifestLoadOps view view.functions view.manifest.entrypoints) then
+      ["manifest max_load_ops do not match recomputed body accesses for: " ++
+        String.intercalate ", "
+          (manifestLoadOpMismatchMessages view view.functions view.manifest.entrypoints)]
     else
       []) ++
     (if !(functionsMetadataWellFormed view view.functions view.manifest.entrypoints) then
@@ -4321,6 +4414,30 @@ private theorem functionsMatchManifestCommitOps_exact_of_lookup
           simp [functionsMatchManifestCommitOps, hHd] at hMatch
         exact ih hMatch.2 hMem hLookup
 
+private theorem functionsMatchManifestLoadOps_exact_of_lookup
+  {view : ImportedProofRelevantContractView}
+  {functions : List ImportedProofRelevantFunctionView}
+  {entrypoints : List ImportedProofRelevantEntrypointView}
+  {fn : ImportedProofRelevantFunctionView}
+  {entry : ImportedProofRelevantEntrypointView}
+  (hMatch : functionsMatchManifestLoadOps view functions entrypoints = true)
+  (hMem : fn ∈ functions)
+  (hLookup : lookupEntrypoint fn.signature entrypoints = some entry) :
+  functionMaxLoadOpsMatchesManifest view fn entry = true := by
+  induction functions generalizing fn entry with
+  | nil =>
+      cases hMem
+  | cons hd tl ih =>
+      simp only [List.mem_cons] at hMem
+      rcases hMem with hEq | hMem
+      · subst hEq
+        have hHead := hMatch
+        simp [functionsMatchManifestLoadOps, hLookup] at hHead
+        exact hHead.1
+      · cases hHd : lookupEntrypoint hd.signature entrypoints <;>
+          simp [functionsMatchManifestLoadOps, hHd] at hMatch
+        exact ih hMatch.2 hMem hLookup
+
 private theorem kernelStepsTargetNonRawStateObjects_exact_of_mem
   {state : List ImportedProofRelevantStateObjectView}
   {steps : List ImportedProofRelevantKernelStepView}
@@ -4383,18 +4500,20 @@ private theorem ImportedProofRelevantContractView.structural_exactness_checks
     functionsMatchManifestBoundaryLengths view.functions view.manifest.entrypoints = true ∧
     functionsMatchManifestCounts view.functions view.manifest.entrypoints = true ∧
     functionsMatchManifestOramAccesses view view.functions view.manifest.entrypoints = true ∧
-    functionsMatchManifestCommitOps view view.functions view.manifest.entrypoints = true := by
+    functionsMatchManifestCommitOps view view.functions view.manifest.entrypoints = true ∧
+    functionsMatchManifestLoadOps view view.functions view.manifest.entrypoints = true := by
   have hChecks := hValid
   simp [ImportedProofRelevantContractView.StructuralValid,
     ImportedProofRelevantContractView.checkStructuralValid] at hChecks
-  rcases hChecks with ⟨hPrefix17, _hMetadata⟩
+  rcases hChecks with ⟨hPrefix18, _hMetadata⟩
+  rcases hPrefix18 with ⟨hPrefix17, hLoad⟩
   rcases hPrefix17 with ⟨hPrefix16, hCommit⟩
   rcases hPrefix16 with ⟨hPrefix15, hOram⟩
   rcases hPrefix15 with ⟨hPrefix14, hCounts⟩
   rcases hPrefix14 with ⟨hPrefix13, hBoundary⟩
   rcases hPrefix13 with ⟨hPrefix12, hSecrets⟩
   rcases hPrefix12 with ⟨_hPrefix11, hLowering⟩
-  exact ⟨hLowering, hSecrets, hBoundary, hCounts, hOram, hCommit⟩
+  exact ⟨hLowering, hSecrets, hBoundary, hCounts, hOram, hCommit, hLoad⟩
 
 private theorem ImportedProofRelevantContractView.structural_confidential_kernel_targets
   (view : ImportedProofRelevantContractView)
@@ -4404,7 +4523,8 @@ private theorem ImportedProofRelevantContractView.structural_confidential_kernel
   have hChecks := hValid
   simp [ImportedProofRelevantContractView.StructuralValid,
     ImportedProofRelevantContractView.checkStructuralValid] at hChecks
-  rcases hChecks with ⟨hPrefix17, _hMetadata⟩
+  rcases hChecks with ⟨hPrefix18, _hMetadata⟩
+  rcases hPrefix18 with ⟨hPrefix17, _hLoad⟩
   rcases hPrefix17 with ⟨hPrefix16, _hCommit⟩
   rcases hPrefix16 with ⟨hPrefix15, _hOram⟩
   rcases hPrefix15 with ⟨hPrefix14, _hCounts⟩
@@ -4613,7 +4733,7 @@ theorem ImportedProofRelevantContractView.manifest_commit_ops_exact_of_lookup
     entry.max_commit_ops = maxCommitOps := by
   have hMatch :=
     functionsMatchManifestCommitOps_exact_of_lookup
-      (view.structural_exactness_checks hValid).2.2.2.2.2
+      (view.structural_exactness_checks hValid).2.2.2.2.2.1
       hMem
       hLookup
   cases hCommit : expectedCommitOpsForFunction view fn with
@@ -4623,6 +4743,32 @@ theorem ImportedProofRelevantContractView.manifest_commit_ops_exact_of_lookup
       have hFact := hMatch
       simp [functionMaxCommitOpsMatchesManifest, hCommit] at hFact
       exact ⟨maxCommitOps, rfl, hFact⟩
+
+/-- A structurally valid view's manifest states, for each function, the load
+bound recomputed from the function's body: the bound the modeled cost
+charges. -/
+theorem ImportedProofRelevantContractView.manifest_load_ops_exact_of_lookup
+  (view : ImportedProofRelevantContractView)
+  {fn : ImportedProofRelevantFunctionView}
+  {entry : ImportedProofRelevantEntrypointView}
+  (hValid : view.StructuralValid)
+  (hMem : fn ∈ view.functions)
+  (hLookup : lookupEntrypoint fn.signature view.manifest.entrypoints = some entry) :
+  ∃ maxLoadOps,
+    expectedLoadOpsForFunction view fn = .ok maxLoadOps ∧
+    entry.max_load_ops = maxLoadOps := by
+  have hMatch :=
+    functionsMatchManifestLoadOps_exact_of_lookup
+      (view.structural_exactness_checks hValid).2.2.2.2.2.2
+      hMem
+      hLookup
+  cases hLoad : expectedLoadOpsForFunction view fn with
+  | error err =>
+      simp [functionMaxLoadOpsMatchesManifest, hLoad] at hMatch
+  | ok maxLoadOps =>
+      have hFact := hMatch
+      simp [functionMaxLoadOpsMatchesManifest, hLoad] at hFact
+      exact ⟨maxLoadOps, rfl, hFact⟩
 
 theorem functionStoredDslMatchesBody_confidential_exact
   {fn : ImportedProofRelevantFunctionView}

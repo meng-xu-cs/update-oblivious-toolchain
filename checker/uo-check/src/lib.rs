@@ -326,6 +326,16 @@ pub fn check_artifact(artifact: &CompiledArtifact) -> Result<Vec<String>> {
                 expected_max_commit_ops
             );
         }
+        let expected_max_load_ops =
+            expected_load_ops(&function.body, &expected_accesses, &artifact.contract.state)?;
+        if entry.max_load_ops != expected_max_load_ops {
+            bail!(
+                "manifest max_load_ops mismatch for entrypoint {}: {} != {}",
+                function.signature,
+                entry.max_load_ops,
+                expected_max_load_ops
+            );
+        }
     }
     report.push("admitted package identity/toolchain binding: ok".into());
     report.push("manifest/object exactness: ok".into());
@@ -1001,6 +1011,43 @@ fn expected_commit_ops(
                     let per_access = OramManifest::for_object(object)?.total_commit_ops();
                     if is_path_oram_scheme(&object.oram_scheme) {
                         per_access * oram_accesses.get(&object_id).copied().unwrap_or(0)
+                    } else {
+                        per_access
+                    }
+                }
+                uo_core::ContainerKind::Array | uo_core::ContainerKind::Map => {
+                    object.capacity.unwrap_or(1)
+                }
+            })
+        })
+        .collect::<Result<Vec<_>>>()
+        .map(|counts| counts.into_iter().sum())
+}
+
+/// The sealed records an entrypoint may read: each slot of each exact object
+/// it loads, once; for each access of an ORAM map the path's buckets and the
+/// metadata pages; and, on a Path ORAM scheme, the counter and the metadata
+/// pages the call reads when it starts.
+fn expected_load_ops(
+    statements: &[Statement],
+    oram_accesses: &BTreeMap<u32, usize>,
+    state: &[StateObject],
+) -> Result<usize> {
+    accessed_objects(statements)?
+        .into_iter()
+        .map(|object_id| {
+            let object = state_object_by_id(state, object_id)?;
+            Ok(match object.kind {
+                uo_core::ContainerKind::Cell => 1usize,
+                uo_core::ContainerKind::Array | uo_core::ContainerKind::Map
+                    if object.backend == BackendKind::Oram =>
+                {
+                    let oram = OramManifest::for_object(object)?;
+                    let per_access = oram.metadata_pages_per_access + oram.buckets_per_access;
+                    if is_path_oram_scheme(&object.oram_scheme) {
+                        per_access * oram_accesses.get(&object_id).copied().unwrap_or(0)
+                            + oram.metadata_pages
+                            + 1
                     } else {
                         per_access
                     }
@@ -1790,6 +1837,31 @@ bounds:
         assert!(err
             .to_string()
             .contains("manifest kernel_steps mismatch for entrypoint"));
+    }
+
+    #[test]
+    fn artifact_checker_rejects_resource_bound_drift() {
+        for bound in ["max_commit_ops", "max_load_ops"] {
+            let (_, _, mut artifact) = sample_artifact();
+            let signature = artifact.contract.functions[0].signature.clone();
+            let entry = artifact
+                .contract
+                .manifest
+                .entrypoints
+                .get_mut(&signature)
+                .unwrap();
+            if bound == "max_commit_ops" {
+                entry.max_commit_ops += 1;
+            } else {
+                entry.max_load_ops += 1;
+            }
+            let err = check_artifact(&artifact).unwrap_err();
+            assert!(
+                err.to_string()
+                    .contains(&format!("manifest {bound} mismatch for entrypoint")),
+                "{err}"
+            );
+        }
     }
 
     #[test]

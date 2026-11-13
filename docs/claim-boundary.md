@@ -295,8 +295,9 @@ The components are interpreted as follows:
   environment, termination status, declared status policy, return shape,
   return policy, any public or declassified return payload, encrypted-return
   ciphertext evidence, declassification labels, and modeled public gas (cost
-  model `uo-modeled-resource-cost-v1`: a modeled resource cost, not stock EVM
-  gas; there is no EVM gas schedule or bytecode backend).
+  model `uo-modeled-resource-cost-v2`: a modeled resource cost, not stock EVM
+  gas; there is no EVM gas schedule or bytecode backend; see The Modeled
+  Cost below).
 - `boundary_schedule` is the exact enclave boundary sequence.
 - `storage_trace` is exact for exact backends and related through the Path
   ORAM routes over admitted configurations (instances derived for runtime
@@ -312,6 +313,42 @@ The components are interpreted as follows:
 
 The concrete SGX/TEE observer pins live in
 [`runtime/tee-observer.md`](./runtime/tee-observer.md).
+
+### The Modeled Cost
+
+The public gas of a confidential entrypoint is a function of its schedule,
+fixed when it is compiled (cost model `uo-modeled-resource-cost-v2`):
+
+```text
+2000 + 11·statements + 7·expressions + 29·max_load_ops + 29·max_commit_ops
+```
+
+`max_commit_ops` bounds the sealed records a call writes, and `max_load_ops`
+those it reads: each slot of each exact object it loads, once; for each
+access of an ORAM map the buckets of the path and the metadata pages; and,
+for a Path ORAM map, the counter and the metadata pages the call reads when
+it starts, which no trace records. On the private scheme both count the
+metadata pages once per node access, where a call reads and writes them
+fewer times, so there they are bounds and not counts. Model v1 charged the
+writes alone, so a call that only read would have cost about 2,000 units
+whatever it read.
+
+A read is charged what a write is. Each moves one sealed record across the
+enclave boundary and costs the runtime one authenticated decryption or
+encryption of it, and the two take the same time: in the capacity sweep's
+baseline, loading a full-scan map of 16,384 slots, which opens every slot,
+takes 32.5 ms, and the rest of the call's own work, which scans the
+plaintext and seals every slot, 38.5 ms. The model does not price the
+host's storage, where a write may cost more than a read.
+
+The compiler computes both bounds. `uo-check` and the Lean translation
+checker recompute them from the function's body and reject a manifest that
+states another (`expectedLoadOpsForFunction` and
+`manifest_load_ops_exact_of_lookup` in
+`UOToolchain/TranslationValidationJson.lean`), and a tamper scenario raises
+the load bound in the source artifact and the artifact alike
+(`translation/max_load_ops_drift`). The statement and expression terms are
+checked by recompiling the source.
 
 ## Explicit Assumptions
 

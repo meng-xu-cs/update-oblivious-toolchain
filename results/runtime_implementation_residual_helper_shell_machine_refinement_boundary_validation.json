@@ -15,7 +15,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1523533,
+      "boundary_json_bytes": 1523627,
       "confidential_slot_program": {
         "entrypoint_id": "classify(uint256)",
         "expected_runtime_step_count": 4,
@@ -26,10 +26,10 @@
         "statement_trace_count": 2
       },
       "entrypoint": "classify(uint256)",
-      "gas_used": 2086,
+      "gas_used": 2115,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "allocator": 17900,
+        "allocator": 17929,
         "confidential_core": 46817,
         "confidential_kernel": 116465,
         "controller": 21071,
@@ -57,7 +57,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6359,
-        "trace": 432225,
+        "trace": 432287,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -261,7 +261,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1523533,
+      "boundary_json_bytes": 1523627,
       "confidential_slot_program": {
         "entrypoint_id": "classify(uint256)",
         "expected_runtime_step_count": 4,
@@ -272,10 +272,10 @@
         "statement_trace_count": 2
       },
       "entrypoint": "classify(uint256)",
-      "gas_used": 2086,
+      "gas_used": 2115,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "allocator": 17900,
+        "allocator": 17929,
         "confidential_core": 46817,
         "confidential_kernel": 116465,
         "controller": 21071,
@@ -303,7 +303,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6359,
-        "trace": 432225,
+        "trace": 432287,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -507,7 +507,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1527465,
+      "boundary_json_bytes": 1527559,
       "confidential_slot_program": {
         "entrypoint_id": "auth(bytes32)",
         "expected_runtime_step_count": 8,
@@ -518,10 +518,10 @@
         "statement_trace_count": 7
       },
       "entrypoint": "auth(bytes32)",
-      "gas_used": 2446,
+      "gas_used": 2591,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "allocator": 17900,
+        "allocator": 17929,
         "confidential_core": 46817,
         "confidential_kernel": 116465,
         "controller": 21071,
@@ -549,7 +549,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6359,
-        "trace": 432225,
+        "trace": 432287,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -956,7 +956,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1527465,
+      "boundary_json_bytes": 1527559,
       "confidential_slot_program": {
         "entrypoint_id": "auth(bytes32)",
         "expected_runtime_step_count": 8,
@@ -967,10 +967,10 @@
         "statement_trace_count": 7
       },
       "entrypoint": "auth(bytes32)",
-      "gas_used": 2446,
+      "gas_used": 2591,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "allocator": 17900,
+        "allocator": 17929,
         "confidential_core": 46817,
         "confidential_kernel": 116465,
         "controller": 21071,
@@ -998,7 +998,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6359,
-        "trace": 432225,
+        "trace": 432287,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -1405,7 +1405,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1525389,
+      "boundary_json_bytes": 1525483,
       "confidential_slot_program": {
         "entrypoint_id": "upsert(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -1416,10 +1416,10 @@
         "statement_trace_count": 1
       },
       "entrypoint": "upsert(bytes32,uint256)",
-      "gas_used": 2264,
+      "gas_used": 2496,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "allocator": 17900,
+        "allocator": 17929,
         "confidential_core": 46817,
         "confidential_kernel": 116465,
         "controller": 21071,
@@ -1447,7 +1447,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6359,
-        "trace": 432225,
+        "trace": 432287,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -1813,7 +1813,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1525389,
+      "boundary_json_bytes": 1525483,
       "confidential_slot_program": {
         "entrypoint_id": "upsert(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -1824,10 +1824,10 @@
         "statement_trace_count": 1
       },
       "entrypoint": "upsert(bytes32,uint256)",
-      "gas_used": 2264,
+      "gas_used": 2496,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "allocator": 17900,
+        "allocator": 17929,
         "confidential_core": 46817,
         "confidential_kernel": 116465,
         "controller": 21071,
@@ -1855,7 +1855,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6359,
-        "trace": 432225,
+        "trace": 432287,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -2221,7 +2221,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1526981,
+      "boundary_json_bytes": 1527075,
       "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
@@ -2232,10 +2232,10 @@
         "statement_trace_count": 3
       },
       "entrypoint": "deposit(bytes32,uint256)",
-      "gas_used": 2371,
+      "gas_used": 2632,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "allocator": 17900,
+        "allocator": 17929,
         "confidential_core": 46817,
         "confidential_kernel": 116465,
         "controller": 21071,
@@ -2263,7 +2263,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6359,
-        "trace": 432225,
+        "trace": 432287,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -2713,7 +2713,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1526981,
+      "boundary_json_bytes": 1527075,
       "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
@@ -2724,10 +2724,10 @@
         "statement_trace_count": 3
       },
       "entrypoint": "deposit(bytes32,uint256)",
-      "gas_used": 2371,
+      "gas_used": 2632,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "allocator": 17900,
+        "allocator": 17929,
         "confidential_core": 46817,
         "confidential_kernel": 116465,
         "controller": 21071,
@@ -2755,7 +2755,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6359,
-        "trace": 432225,
+        "trace": 432287,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -3205,7 +3205,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1528285,
+      "boundary_json_bytes": 1528379,
       "confidential_slot_program": {
         "entrypoint_id": "approve(address,address,uint256)",
         "expected_runtime_step_count": 4,
@@ -3216,10 +3216,10 @@
         "statement_trace_count": 2
       },
       "entrypoint": "approve(address,address,uint256)",
-      "gas_used": 2528,
+      "gas_used": 2992,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "allocator": 17900,
+        "allocator": 17929,
         "confidential_core": 46817,
         "confidential_kernel": 116465,
         "controller": 21071,
@@ -3247,7 +3247,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6359,
-        "trace": 432225,
+        "trace": 432287,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -3843,7 +3843,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1528285,
+      "boundary_json_bytes": 1528379,
       "confidential_slot_program": {
         "entrypoint_id": "approve(address,address,uint256)",
         "expected_runtime_step_count": 4,
@@ -3854,10 +3854,10 @@
         "statement_trace_count": 2
       },
       "entrypoint": "approve(address,address,uint256)",
-      "gas_used": 2528,
+      "gas_used": 2992,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "allocator": 17900,
+        "allocator": 17929,
         "confidential_core": 46817,
         "confidential_kernel": 116465,
         "controller": 21071,
@@ -3885,7 +3885,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6359,
-        "trace": 432225,
+        "trace": 432287,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -4481,7 +4481,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "boundary_json_bytes": 1525980,
+      "boundary_json_bytes": 1526074,
       "confidential_slot_program": {
         "entrypoint_id": "put(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -4492,10 +4492,10 @@
         "statement_trace_count": 1
       },
       "entrypoint": "put(bytes32,uint256)",
-      "gas_used": 2322,
+      "gas_used": 2757,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "allocator": 17900,
+        "allocator": 17929,
         "confidential_core": 46817,
         "confidential_kernel": 116465,
         "controller": 21071,
@@ -4523,7 +4523,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6359,
-        "trace": 432225,
+        "trace": 432287,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -4937,7 +4937,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "boundary_json_bytes": 1525980,
+      "boundary_json_bytes": 1526074,
       "confidential_slot_program": {
         "entrypoint_id": "put(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -4948,10 +4948,10 @@
         "statement_trace_count": 1
       },
       "entrypoint": "put(bytes32,uint256)",
-      "gas_used": 2322,
+      "gas_used": 2757,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "allocator": 17900,
+        "allocator": 17929,
         "confidential_core": 46817,
         "confidential_kernel": 116465,
         "controller": 21071,
@@ -4979,7 +4979,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6359,
-        "trace": 432225,
+        "trace": 432287,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -5393,7 +5393,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 1528679,
+      "boundary_json_bytes": 1528773,
       "confidential_slot_program": {
         "entrypoint_id": "add(bytes32,uint256)",
         "expected_runtime_step_count": 5,
@@ -5404,10 +5404,10 @@
         "statement_trace_count": 2
       },
       "entrypoint": "add(bytes32,uint256)",
-      "gas_used": 2651,
+      "gas_used": 3376,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "allocator": 17900,
+        "allocator": 17929,
         "confidential_core": 46817,
         "confidential_kernel": 116465,
         "controller": 21071,
@@ -5435,7 +5435,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6359,
-        "trace": 432225,
+        "trace": 432287,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -6052,7 +6052,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 1528679,
+      "boundary_json_bytes": 1528773,
       "confidential_slot_program": {
         "entrypoint_id": "add(bytes32,uint256)",
         "expected_runtime_step_count": 5,
@@ -6063,10 +6063,10 @@
         "statement_trace_count": 2
       },
       "entrypoint": "add(bytes32,uint256)",
-      "gas_used": 2651,
+      "gas_used": 3376,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "allocator": 17900,
+        "allocator": 17929,
         "confidential_core": 46817,
         "confidential_kernel": 116465,
         "controller": 21071,
@@ -6094,7 +6094,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6359,
-        "trace": 432225,
+        "trace": 432287,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -6711,7 +6711,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 1536190,
+      "boundary_json_bytes": 1536284,
       "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
@@ -6722,10 +6722,10 @@
         "statement_trace_count": 3
       },
       "entrypoint": "deposit(bytes32,uint256)",
-      "gas_used": 3531,
+      "gas_used": 5445,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "allocator": 17900,
+        "allocator": 17929,
         "confidential_core": 46817,
         "confidential_kernel": 116465,
         "controller": 21071,
@@ -6753,7 +6753,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6359,
-        "trace": 432225,
+        "trace": 432287,
         "trusted_kernel": 4548,
         "types": 29154
       },
@@ -7959,7 +7959,7 @@
     {
       "accepted": true,
       "boundary_events": 14,
-      "boundary_json_bytes": 1565733,
+      "boundary_json_bytes": 1565827,
       "confidential_slot_program": {
         "entrypoint_id": "transferFrom(address,address,address,uint256)",
         "expected_runtime_step_count": 9,
@@ -7970,10 +7970,10 @@
         "statement_trace_count": 9
       },
       "entrypoint": "transferFrom(address,address,address,uint256)",
-      "gas_used": 7427,
+      "gas_used": 13952,
       "handwritten_runtime_public_only_theorem_checked": true,
       "implementation_interface_source_bytes": {
-        "allocator": 17900,
+        "allocator": 17929,
         "confidential_core": 46817,
         "confidential_kernel": 116465,
         "controller": 21071,
@@ -8001,7 +8001,7 @@
         "store_lib": 154,
         "store_store": 2898,
         "theorem": 6359,
-        "trace": 432225,
+        "trace": 432287,
         "trusted_kernel": 4548,
         "types": 29154
       },

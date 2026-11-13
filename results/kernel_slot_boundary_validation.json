@@ -47,7 +47,7 @@
       "controller_phase_count": 3,
       "entrypoint": "classify(uint256)",
       "exit_events": 4,
-      "gas_used": 2086,
+      "gas_used": 2115,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 4,
         "expected_kernel_step_public_object_schedule": [
@@ -311,7 +311,7 @@
       "controller_phase_count": 3,
       "entrypoint": "classify(uint256)",
       "exit_events": 4,
-      "gas_used": 2086,
+      "gas_used": 2115,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 4,
         "expected_kernel_step_public_object_schedule": [
@@ -575,7 +575,7 @@
       "controller_phase_count": 3,
       "entrypoint": "auth(bytes32)",
       "exit_events": 4,
-      "gas_used": 2446,
+      "gas_used": 2591,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 8,
         "expected_kernel_step_public_object_schedule": [
@@ -1065,7 +1065,7 @@
       "controller_phase_count": 3,
       "entrypoint": "auth(bytes32)",
       "exit_events": 4,
-      "gas_used": 2446,
+      "gas_used": 2591,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 8,
         "expected_kernel_step_public_object_schedule": [
@@ -1555,7 +1555,7 @@
       "controller_phase_count": 3,
       "entrypoint": "upsert(bytes32,uint256)",
       "exit_events": 4,
-      "gas_used": 2264,
+      "gas_used": 2496,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 4,
         "expected_kernel_step_public_object_schedule": [
@@ -1981,7 +1981,7 @@
       "controller_phase_count": 3,
       "entrypoint": "upsert(bytes32,uint256)",
       "exit_events": 4,
-      "gas_used": 2264,
+      "gas_used": 2496,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 4,
         "expected_kernel_step_public_object_schedule": [
@@ -2407,7 +2407,7 @@
       "controller_phase_count": 3,
       "entrypoint": "deposit(bytes32,uint256)",
       "exit_events": 4,
-      "gas_used": 2371,
+      "gas_used": 2632,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 7,
         "expected_kernel_step_public_object_schedule": [
@@ -2936,7 +2936,7 @@
       "controller_phase_count": 3,
       "entrypoint": "deposit(bytes32,uint256)",
       "exit_events": 4,
-      "gas_used": 2371,
+      "gas_used": 2632,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 7,
         "expected_kernel_step_public_object_schedule": [
@@ -3465,7 +3465,7 @@
       "controller_phase_count": 3,
       "entrypoint": "approve(address,address,uint256)",
       "exit_events": 4,
-      "gas_used": 2528,
+      "gas_used": 2992,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 4,
         "expected_kernel_step_public_object_schedule": [
@@ -4124,7 +4124,7 @@
       "controller_phase_count": 3,
       "entrypoint": "approve(address,address,uint256)",
       "exit_events": 4,
-      "gas_used": 2528,
+      "gas_used": 2992,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 4,
         "expected_kernel_step_public_object_schedule": [
@@ -4783,7 +4783,7 @@
       "controller_phase_count": 8,
       "entrypoint": "put(bytes32,uint256)",
       "exit_events": 10,
-      "gas_used": 2322,
+      "gas_used": 2757,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 4,
         "expected_kernel_step_public_object_schedule": [
@@ -5257,7 +5257,7 @@
       "controller_phase_count": 8,
       "entrypoint": "put(bytes32,uint256)",
       "exit_events": 10,
-      "gas_used": 2322,
+      "gas_used": 2757,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 4,
         "expected_kernel_step_public_object_schedule": [
@@ -5731,7 +5731,7 @@
       "controller_phase_count": 13,
       "entrypoint": "add(bytes32,uint256)",
       "exit_events": 16,
-      "gas_used": 2651,
+      "gas_used": 3376,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 5,
         "expected_kernel_step_public_object_schedule": [
@@ -6412,7 +6412,7 @@
       "controller_phase_count": 13,
       "entrypoint": "add(bytes32,uint256)",
       "exit_events": 16,
-      "gas_used": 2651,
+      "gas_used": 3376,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 5,
         "expected_kernel_step_public_object_schedule": [
@@ -7093,7 +7093,7 @@
       "controller_phase_count": 13,
       "entrypoint": "deposit(bytes32,uint256)",
       "exit_events": 16,
-      "gas_used": 3531,
+      "gas_used": 5445,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 7,
         "expected_kernel_step_public_object_schedule": [
@@ -8351,7 +8351,7 @@
     {
       "accepted": true,
       "boundary_events": 14,
-      "confidential_core_kernel_interface_slot_bundle_json_bytes": 190683,
+      "confidential_core_kernel_interface_slot_bundle_json_bytes": 190685,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "ERC20Lite",
@@ -8378,7 +8378,7 @@
       "controller_phase_count": 33,
       "entrypoint": "transferFrom(address,address,address,uint256)",
       "exit_events": 40,
-      "gas_used": 7427,
+      "gas_used": 13952,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 9,
         "expected_kernel_step_public_object_schedule": [

@@ -5054,12 +5054,12 @@ fn run_tamper_validation() -> Result<JsonValue> {
     let source_path = "benches/raw/SingleAccessMap.sol";
     let metadata_path = "benches/raw/SingleAccessMap.pathoram.yaml";
     let metadata = load_metadata(metadata_path)?;
-    let source_artifact = uo_solc::compile(
-        workspace_path(source_path).to_str().unwrap(),
-        &metadata,
-        ProgramMode::Uo,
-    )?;
     let artifact = compile_artifact(source_path, metadata_path, ProgramMode::Uo)?;
+    // The artifact the compiler makes of the source, sidecar bytes included:
+    // what the translation checker compares a tampered artifact with. An
+    // artifact compiled without the sidecar's bytes names no raw-metadata
+    // digest, and the checker stops at that before it reaches any drift.
+    let source_artifact = artifact.clone();
     let target = CallSpec {
         entrypoint: "put(bytes32,uint256)",
         args: vec![b32(1), Value::uint(7)],
@@ -5238,26 +5238,70 @@ fn run_tamper_validation() -> Result<JsonValue> {
         .get_mut(target.entrypoint)
         .ok_or_else(|| anyhow!("translation tamper scenario missing manifest entrypoint"))?;
     manifest_entry.public_gas_budget = manifest_entry.public_gas_budget.saturating_add(1);
-    scenarios.push(validate_tampered_json_pair_case(
-        "translation/public_gas_budget_drift",
-        "source_artifact",
-        &source_artifact,
-        "artifact",
-        &tampered_translation_artifact,
-        |source_artifact_path, artifact_path| {
-            Ok(Command::new(&translation_checker)
-                .arg(&metadata.contract)
-                .arg(source_artifact_path)
-                .arg(artifact_path)
-                .output()?)
-        },
-        json!({
-            "scenario": "translation/public_gas_budget_drift",
-            "artifact_kind": "proofgrade_translation_artifacts",
-            "benchmark": "SingleAccessMap/pathoram/put",
-            "entrypoint": target.entrypoint,
-            "mutation": "increment manifest public_gas_budget while keeping source artifact fixed",
-        }),
+    scenarios.push(require_rejection_reason(
+        validate_tampered_json_pair_case(
+            "translation/public_gas_budget_drift",
+            "source_artifact",
+            &source_artifact,
+            "artifact",
+            &tampered_translation_artifact,
+            |source_artifact_path, artifact_path| {
+                Ok(Command::new(&translation_checker)
+                    .arg(&metadata.contract)
+                    .arg(source_artifact_path)
+                    .arg(artifact_path)
+                    .output()?)
+            },
+            json!({
+                "scenario": "translation/public_gas_budget_drift",
+                "artifact_kind": "proofgrade_translation_artifacts",
+                "benchmark": "SingleAccessMap/pathoram/put",
+                "entrypoint": target.entrypoint,
+                "mutation": "increment manifest public_gas_budget while keeping source artifact fixed",
+            }),
+        )?,
+        "source_view and artifact_view do not match exactly",
+    )?);
+
+    // Both artifacts state a load bound one above the body's: the two views
+    // agree, so only the bound the checker recomputes rejects them.
+    let mut tampered_load_ops_source = source_artifact.clone();
+    let mut tampered_load_ops_artifact = artifact.clone();
+    for tampered in [
+        &mut tampered_load_ops_source,
+        &mut tampered_load_ops_artifact,
+    ] {
+        let manifest_entry = tampered
+            .contract
+            .manifest
+            .entrypoints
+            .get_mut(target.entrypoint)
+            .ok_or_else(|| anyhow!("load-bound tamper scenario missing manifest entrypoint"))?;
+        manifest_entry.max_load_ops += 1;
+    }
+    scenarios.push(require_rejection_reason(
+        validate_tampered_json_pair_case(
+            "translation/max_load_ops_drift",
+            "source_artifact",
+            &tampered_load_ops_source,
+            "artifact",
+            &tampered_load_ops_artifact,
+            |source_artifact_path, artifact_path| {
+                Ok(Command::new(&translation_checker)
+                    .arg(&metadata.contract)
+                    .arg(source_artifact_path)
+                    .arg(artifact_path)
+                    .output()?)
+            },
+            json!({
+                "scenario": "translation/max_load_ops_drift",
+                "artifact_kind": "proofgrade_translation_artifacts",
+                "benchmark": "SingleAccessMap/pathoram/put",
+                "entrypoint": target.entrypoint,
+                "mutation": "increment manifest max_load_ops in the source artifact and the artifact alike",
+            }),
+        )?,
+        "manifest max_load_ops do not match recomputed body accesses",
     )?);
 
     let mut tampered_translation_raw_kernel_target = artifact.clone();
@@ -48468,6 +48512,24 @@ where
     Ok(summary)
 }
 
+/// Require that a tamper scenario was rejected for the reason it names: the
+/// checker's message must contain `reason`. A scenario that the checker
+/// refuses for another reason, such as an artifact it cannot parse, tests
+/// nothing. A scenario the tamper filter skipped is left alone.
+fn require_rejection_reason(scenario: JsonValue, reason: &str) -> Result<JsonValue> {
+    if scenario["skipped"] == json!(true) {
+        return Ok(scenario);
+    }
+    let stderr = scenario["lean_stderr"].as_str().unwrap_or_default();
+    if !stderr.contains(reason) {
+        bail!(
+            "tamper scenario {} was not rejected for its reason (`{reason}`): {stderr}",
+            scenario["scenario"]
+        );
+    }
+    Ok(scenario)
+}
+
 fn validate_tampered_json_pair_case<L, R, F>(
     case_name: &str,
     left_label: &str,
@@ -53532,7 +53594,7 @@ fn optional_scenario_overhead(result: &OptionalScenarioResult) -> JsonValue {
 /// Versioned identifier for the modeled resource-cost accounting reported as
 /// `gas_used`. This is a MODELED resource cost, not stock EVM gas: there is no
 /// EVM gas schedule or bytecode backend in this toolchain.
-const RESOURCE_COST_MODEL: &str = "uo-modeled-resource-cost-v1";
+const RESOURCE_COST_MODEL: &str = "uo-modeled-resource-cost-v2";
 
 /// Self-describing cost-model record embedded in `overheads.json` so the report
 /// is not ambiguous about its `gas_used` wording. The two documented formulas
@@ -53544,7 +53606,7 @@ fn cost_model_descriptor() -> JsonValue {
         "excludes_stock_evm_gas": true,
         "excludes_evm_gas_schedule": true,
         "excludes_evm_bytecode_backend": true,
-        "confidential_formula": "modeled_public_gas = 2000 + statements*11 + expressions*7 + commit_ops*29",
+        "confidential_formula": "modeled_public_gas = 2000 + statements*11 + expressions*7 + load_ops*29 + commit_ops*29",
         "public_runtime_formula": "logical_reads*3 + logical_writes*5 + physical_writes*17",
     })
 }

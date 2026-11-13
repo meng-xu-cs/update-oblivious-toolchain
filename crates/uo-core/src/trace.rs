@@ -9615,6 +9615,7 @@ mod tests {
             uomap_reads: 0,
             uomap_writes: 0,
             max_commit_ops: 0,
+            max_load_ops: 0,
             oram_accesses: BTreeMap::new(),
         }
     }
@@ -9651,6 +9652,7 @@ mod tests {
                 uomap_reads: 0,
                 uomap_writes: 0,
                 max_commit_ops: 0,
+                max_load_ops: 0,
                 oram_accesses: BTreeMap::new(),
             },
         );

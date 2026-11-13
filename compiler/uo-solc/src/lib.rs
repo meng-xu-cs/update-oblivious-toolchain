@@ -1446,11 +1446,34 @@ fn build_manifest_entry(
         .collect::<Result<Vec<_>>>()?
         .into_iter()
         .sum::<usize>();
+    // The sealed records the call may read: each slot of each exact object it
+    // loads, once, and an ORAM map's path, metadata and call-start reads.
+    let max_load_ops = accessed_objects
+        .iter()
+        .map(|object_id| {
+            let object = state_object_by_id(frontend, *object_id)?;
+            Ok(match object.kind {
+                ContainerKind::Cell => 1usize,
+                ContainerKind::Array | ContainerKind::Map
+                    if object.backend == BackendKind::Oram =>
+                {
+                    OramManifest::for_object(object)?
+                        .load_ops_for_accesses(oram_accesses.get(object_id).copied().unwrap_or(0))
+                }
+                ContainerKind::Array | ContainerKind::Map => object.capacity.unwrap_or(1),
+            })
+        })
+        .collect::<Result<Vec<_>>>()?
+        .into_iter()
+        .sum::<usize>();
     // The public gas of an entrypoint is always the modeled cost of its fixed
     // schedule; sidecars cannot override it (see validate_entrypoint_metadata).
+    // Cost model uo-modeled-resource-cost-v2 charges a sealed record the call
+    // reads what it charges one the call writes.
     let budget = 2000
         + counts.statement_count as u64 * 11
         + counts.expr_count as u64 * 7
+        + max_load_ops as u64 * 29
         + max_commit_ops as u64 * 29;
     let (confidential_program, confidential_slot_program, kernel_steps) = if function.confidential {
         let confidential_program = function.confidential_kernel_program()?;
@@ -1511,6 +1534,7 @@ fn build_manifest_entry(
         uomap_reads: counts.map_reads,
         uomap_writes: counts.map_writes,
         max_commit_ops,
+        max_load_ops,
         oram_accesses,
     })
 }
@@ -3073,7 +3097,7 @@ fn validate_entrypoint_metadata_well_formed(
     if let Some(budget) = entry_meta.public_gas_budget {
         bail!(
             "entrypoint {} declares public_gas_budget {}, which is not supported; the public gas \
-             of an entrypoint is the compiler's modeled cost (uo-modeled-resource-cost-v1) and \
+             of an entrypoint is the compiler's modeled cost (uo-modeled-resource-cost-v2) and \
              cannot be overridden",
             signature,
             budget
@@ -5036,9 +5060,10 @@ bounds:
 
     #[test]
     fn public_gas_is_the_modeled_cost() {
-        // Pins cost model uo-modeled-resource-cost-v1 on a benchmark: changing
-        // how statements, expressions, or commit ops are counted changes the
-        // reported gas and needs a cost-model version bump.
+        // Pins cost model uo-modeled-resource-cost-v2 on a benchmark: changing
+        // how statements, expressions, load ops or commit ops are counted
+        // changes the reported gas and needs a cost-model version bump. The
+        // entrypoint reads one cell and writes it: 29 units each.
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
         let metadata: ContractMetadata = serde_yaml::from_str(
             &fs::read_to_string(root.join("benches/raw/FixedSlotClassifier.uo.yaml")).unwrap(),
@@ -5053,7 +5078,56 @@ bounds:
         )
         .unwrap();
         let entry = &artifact.contract.manifest.entrypoints["classify(uint256)"];
-        assert_eq!(entry.public_gas_budget, 2086);
+        assert_eq!(entry.max_load_ops, 1);
+        assert_eq!(entry.max_commit_ops, 1);
+        assert_eq!(entry.public_gas_budget, 2115);
+    }
+
+    #[test]
+    fn load_ops_are_the_records_a_call_reads() {
+        // SingleAccessMap's `put` makes one access. On the full scan it loads
+        // every slot and seals every slot. On the local Path ORAM scheme it
+        // reads the path and the metadata pages it writes, and the counter
+        // and the metadata pages once more when the call starts.
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let source = root.join("benches/raw/SingleAccessMap.sol");
+        let sidecar =
+            fs::read_to_string(root.join("benches/raw/SingleAccessMap.pathoram.yaml")).unwrap();
+        let entry_of = |sidecar: &str| {
+            let metadata: ContractMetadata = serde_yaml::from_str(sidecar).unwrap();
+            let artifact = compile(source.to_str().unwrap(), &metadata, ProgramMode::Uo).unwrap();
+            let manifest = artifact.contract.manifest;
+            let oram = manifest.objects[0].oram.clone();
+            (manifest.entrypoints["put(bytes32,uint256)"].clone(), oram)
+        };
+
+        let (entry, oram) = entry_of(&sidecar);
+        let oram = oram.expect("the sidecar's map is on a Path ORAM scheme");
+        assert_eq!(
+            entry.max_commit_ops,
+            oram.metadata_pages_per_access + oram.buckets_per_access
+        );
+        assert_eq!(
+            entry.max_load_ops,
+            entry.max_commit_ops + oram.metadata_pages + 1
+        );
+
+        let full_scan = sidecar
+            .replace("    backend: oram\n", "    backend: full_scan\n")
+            .replace("    oram_scheme: path_oram_local_posmap_v1\n", "");
+        assert_ne!(full_scan, sidecar);
+        let (entry, oram) = entry_of(&full_scan);
+        assert!(oram.is_none());
+        assert_eq!(entry.max_commit_ops, 16);
+        assert_eq!(entry.max_load_ops, 16);
+
+        // Cost model v2 charges both, 29 units each: the two budgets differ
+        // by the records alone, since the program is the same.
+        let (path, _) = entry_of(&sidecar);
+        assert_eq!(
+            path.public_gas_budget + 29 * 32,
+            entry.public_gas_budget + 29 * (path.max_load_ops + path.max_commit_ops) as u64
+        );
     }
 
     #[test]

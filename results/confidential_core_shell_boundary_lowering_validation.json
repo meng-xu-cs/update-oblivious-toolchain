@@ -55,7 +55,7 @@
       "controller_phase_count": 3,
       "entrypoint": "classify(uint256)",
       "exit_events": 4,
-      "gas_used": 2086,
+      "gas_used": 2115,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -316,7 +316,7 @@
       "controller_phase_count": 3,
       "entrypoint": "classify(uint256)",
       "exit_events": 4,
-      "gas_used": 2086,
+      "gas_used": 2115,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -577,7 +577,7 @@
       "controller_phase_count": 3,
       "entrypoint": "auth(bytes32)",
       "exit_events": 4,
-      "gas_used": 2446,
+      "gas_used": 2591,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -1059,7 +1059,7 @@
       "controller_phase_count": 3,
       "entrypoint": "auth(bytes32)",
       "exit_events": 4,
-      "gas_used": 2446,
+      "gas_used": 2591,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -1541,7 +1541,7 @@
       "controller_phase_count": 3,
       "entrypoint": "upsert(bytes32,uint256)",
       "exit_events": 4,
-      "gas_used": 2264,
+      "gas_used": 2496,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -1964,7 +1964,7 @@
       "controller_phase_count": 3,
       "entrypoint": "upsert(bytes32,uint256)",
       "exit_events": 4,
-      "gas_used": 2264,
+      "gas_used": 2496,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -2387,7 +2387,7 @@
       "controller_phase_count": 3,
       "entrypoint": "deposit(bytes32,uint256)",
       "exit_events": 4,
-      "gas_used": 2371,
+      "gas_used": 2632,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -2909,7 +2909,7 @@
       "controller_phase_count": 3,
       "entrypoint": "deposit(bytes32,uint256)",
       "exit_events": 4,
-      "gas_used": 2371,
+      "gas_used": 2632,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -3431,7 +3431,7 @@
       "controller_phase_count": 3,
       "entrypoint": "approve(address,address,uint256)",
       "exit_events": 4,
-      "gas_used": 2528,
+      "gas_used": 2992,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           2
@@ -4086,7 +4086,7 @@
       "controller_phase_count": 3,
       "entrypoint": "approve(address,address,uint256)",
       "exit_events": 4,
-      "gas_used": 2528,
+      "gas_used": 2992,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           2
@@ -4741,7 +4741,7 @@
       "controller_phase_count": 8,
       "entrypoint": "put(bytes32,uint256)",
       "exit_events": 10,
-      "gas_used": 2322,
+      "gas_used": 2757,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -5212,7 +5212,7 @@
       "controller_phase_count": 8,
       "entrypoint": "put(bytes32,uint256)",
       "exit_events": 10,
-      "gas_used": 2322,
+      "gas_used": 2757,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -5683,7 +5683,7 @@
       "controller_phase_count": 13,
       "entrypoint": "add(bytes32,uint256)",
       "exit_events": 16,
-      "gas_used": 2651,
+      "gas_used": 3376,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -6360,7 +6360,7 @@
       "controller_phase_count": 13,
       "entrypoint": "add(bytes32,uint256)",
       "exit_events": 16,
-      "gas_used": 2651,
+      "gas_used": 3376,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -7037,7 +7037,7 @@
       "controller_phase_count": 13,
       "entrypoint": "deposit(bytes32,uint256)",
       "exit_events": 16,
-      "gas_used": 3531,
+      "gas_used": 5445,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -8280,7 +8280,7 @@
     {
       "accepted": true,
       "boundary_events": 14,
-      "confidential_core_shell_boundary_lowering_bundle_json_bytes": 191775,
+      "confidential_core_shell_boundary_lowering_bundle_json_bytes": 191777,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "ERC20Lite",
@@ -8315,7 +8315,7 @@
       "controller_phase_count": 33,
       "entrypoint": "transferFrom(address,address,address,uint256)",
       "exit_events": 40,
-      "gas_used": 7427,
+      "gas_used": 13952,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,

@@ -35,7 +35,11 @@ establish and what they do not).
   `run_validation.sh` does not run it; run it when a change claims a saving.
   `scripts/compare_capacity_sweep.py` compares two reports, and
   `review/2026-11-external-review/capacity_sweep_baseline.json` is the full
-  profile from before the optimizations that review asked for.
+  profile from before the optimizations that review asked for. Until a
+  change claims a saving the committed full report is that baseline, and
+  its `provenance` names the build that measured it: its latencies and
+  traced counts stand, and its gas is that of cost model v1, which charged
+  no reads.
 
 ## Index
 

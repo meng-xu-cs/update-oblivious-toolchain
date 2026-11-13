@@ -176,6 +176,25 @@ theorem proofGrade_source_manifest_commit_ops_exact_of_lookup
       hMem
       hLookup
 
+/-- The manifest of a proof-grade bundle states, for each function, the bound
+on the sealed records a call reads that the checker recomputes from the
+function's body. The modeled cost charges that bound. -/
+theorem proofGrade_source_manifest_load_ops_exact_of_lookup
+  (bundle : ImportedProofRelevantTranslationBundle)
+  (hValid : bundle.ProofGradeValid)
+  {fn : ImportedProofRelevantFunctionView}
+  {entry : ImportedProofRelevantEntrypointView}
+  (hMem : fn ∈ bundle.source_view.functions)
+  (hLookup : lookupEntrypoint fn.signature bundle.source_view.manifest.entrypoints = some entry) :
+  ∃ maxLoadOps,
+    expectedLoadOpsForFunction bundle.source_view fn = .ok maxLoadOps ∧
+    entry.max_load_ops = maxLoadOps := by
+  exact
+    bundle.source_view.manifest_load_ops_exact_of_lookup
+      (bundle.source_view_structural_valid hValid)
+      hMem
+      hLookup
+
 theorem proofGrade_source_manifest_witness_with_expected_of_lookup
   (bundle : ImportedProofRelevantTranslationBundle)
   (hValid : bundle.ProofGradeValid)

@@ -10,8 +10,8 @@
     "metadata_canonicalization_sha256": "d4d37982ad376dbc375a0c57e8f2f21cdfad161f1da825dd86294c72fc17f033",
     "compilation_mode": "uo",
     "compiler_version": "0.1.0",
-    "toolchain_manifest_sha256": "47c79e6c1879e8982bfa782ab2401a89ea4ac4fe9c6e2e492bf602c0a3c8eb27",
-    "package_sha256": "5ceca3aa713c7826cec0e36081c9d01b8a884e6de0d2ae55a47047b7b4c795b2"
+    "toolchain_manifest_sha256": "f51871012ebcef46dddea9d6af67dc77193dde25209fe42a2ec7ac76e917aff4",
+    "package_sha256": "44a55095631169b5143a5b495b163810cc985afdf0a0efbb229e0f39c9e6e52d"
   },
   "contract": {
     "contract": "ConfidentialMixer",
@@ -846,7 +846,7 @@
             "commitment"
           ],
           "entry_input_len": 32,
-          "public_gas_budget": 11595,
+          "public_gas_budget": 21774,
           "arena_bytes": 4096,
           "max_stack_words": 64,
           "max_hash_part_bytes": 0,
@@ -936,6 +936,7 @@
           "uomap_reads": 1,
           "uomap_writes": 0,
           "max_commit_ops": 330,
+          "max_load_ops": 351,
           "oram_accesses": {
             "1": 11
           }
@@ -950,7 +951,7 @@
             "amount"
           ],
           "entry_input_len": 64,
-          "public_gas_budget": 41289,
+          "public_gas_budget": 81077,
           "arena_bytes": 4160,
           "max_stack_words": 65,
           "max_hash_part_bytes": 0,
@@ -1160,6 +1161,7 @@
           "uomap_reads": 1,
           "uomap_writes": 1,
           "max_commit_ops": 1351,
+          "max_load_ops": 1372,
           "oram_accesses": {
             "1": 45
           }
@@ -1168,7 +1170,7 @@
           "secret_args": [],
           "param_names": [],
           "entry_input_len": 0,
-          "public_gas_budget": 2047,
+          "public_gas_budget": 2076,
           "arena_bytes": 4096,
           "max_stack_words": 64,
           "max_hash_part_bytes": 0,
@@ -1243,6 +1245,7 @@
           "uomap_reads": 0,
           "uomap_writes": 0,
           "max_commit_ops": 1,
+          "max_load_ops": 1,
           "oram_accesses": {}
         },
         "withdraw(bytes32,uint256)": {
@@ -1255,7 +1258,7 @@
             "amount"
           ],
           "entry_input_len": 64,
-          "public_gas_budget": 41346,
+          "public_gas_budget": 81134,
           "arena_bytes": 4160,
           "max_stack_words": 65,
           "max_hash_part_bytes": 0,
@@ -1527,6 +1530,7 @@
           "uomap_reads": 1,
           "uomap_writes": 1,
           "max_commit_ops": 1351,
+          "max_load_ops": 1372,
           "oram_accesses": {
             "1": 45
           }

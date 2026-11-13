@@ -10,8 +10,8 @@
     "metadata_canonicalization_sha256": "546b515536984f2a68d1f4546092449b9056586ee7d8ddacbd663879fb9eab4e",
     "compilation_mode": "uo",
     "compiler_version": "0.1.0",
-    "toolchain_manifest_sha256": "47c79e6c1879e8982bfa782ab2401a89ea4ac4fe9c6e2e492bf602c0a3c8eb27",
-    "package_sha256": "295d6cfa7b5b5e04ce734b7986c0d54089a582696d8504b4752dfce99e779365"
+    "toolchain_manifest_sha256": "f51871012ebcef46dddea9d6af67dc77193dde25209fe42a2ec7ac76e917aff4",
+    "package_sha256": "137e3cb2cc429bbaa9ef903449cb41986784e23b533e806d1d7d50d95840f3c3"
   },
   "contract": {
     "contract": "RegistryCRUD",
@@ -716,7 +716,7 @@
             "key"
           ],
           "entry_input_len": 32,
-          "public_gas_budget": 2264,
+          "public_gas_budget": 2496,
           "arena_bytes": 4096,
           "max_stack_words": 64,
           "max_hash_part_bytes": 0,
@@ -819,6 +819,7 @@
           "uomap_reads": 0,
           "uomap_writes": 1,
           "max_commit_ops": 8,
+          "max_load_ops": 8,
           "oram_accesses": {}
         },
         "clearIfMatch(bytes32,uint256)": {
@@ -831,7 +832,7 @@
             "value"
           ],
           "entry_input_len": 64,
-          "public_gas_budget": 2392,
+          "public_gas_budget": 2624,
           "arena_bytes": 4224,
           "max_stack_words": 66,
           "max_hash_part_bytes": 0,
@@ -1096,6 +1097,7 @@
           "uomap_reads": 1,
           "uomap_writes": 1,
           "max_commit_ops": 8,
+          "max_load_ops": 8,
           "oram_accesses": {}
         },
         "read(bytes32)": {
@@ -1104,7 +1106,7 @@
             "key"
           ],
           "entry_input_len": 32,
-          "public_gas_budget": 2257,
+          "public_gas_budget": 2489,
           "arena_bytes": 4096,
           "max_stack_words": 64,
           "max_hash_part_bytes": 0,
@@ -1194,6 +1196,7 @@
           "uomap_reads": 1,
           "uomap_writes": 0,
           "max_commit_ops": 8,
+          "max_load_ops": 8,
           "oram_accesses": {}
         },
         "upsert(bytes32,uint256)": {
@@ -1206,7 +1209,7 @@
             "value"
           ],
           "entry_input_len": 64,
-          "public_gas_budget": 2264,
+          "public_gas_budget": 2496,
           "arena_bytes": 4096,
           "max_stack_words": 64,
           "max_hash_part_bytes": 0,
@@ -1315,6 +1318,7 @@
           "uomap_reads": 0,
           "uomap_writes": 1,
           "max_commit_ops": 8,
+          "max_load_ops": 8,
           "oram_accesses": {}
         }
       }

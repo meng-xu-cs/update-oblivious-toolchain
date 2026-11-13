@@ -1,6 +1,6 @@
 {
   "accepted": true,
-  "artifact_json_bytes": 1521010,
+  "artifact_json_bytes": 1521104,
   "checker": "proof/lean/.lake/build/bin/checkProofGradeRuntimeSharedConfidentialKernelBoundary",
   "handwritten_runtime_public_only_theorem_checked": true,
   "lean_checker_input": "source-backed runtime shared confidential-kernel boundary",
@@ -11,7 +11,7 @@
   "shared_confidential_kernel_boundary_theorem_checked": true,
   "slot_adapter_boundary_theorem_checked": true,
   "source_bytes": {
-    "allocator": 17900,
+    "allocator": 17929,
     "confidential_core": 46817,
     "confidential_kernel": 116465,
     "engine": 94171,
@@ -32,7 +32,7 @@
     "store_codec": 11066,
     "store_lib": 154,
     "store_store": 2898,
-    "trace": 432225,
+    "trace": 432287,
     "trusted_kernel": 4548,
     "types": 29154
   },

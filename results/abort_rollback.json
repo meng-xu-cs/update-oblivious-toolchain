@@ -16,7 +16,7 @@
         "5"
       ],
       "runtime_status": "executed",
-      "target_gas_used": 2428,
+      "target_gas_used": 2689,
       "target_return": null
     },
     {
@@ -34,7 +34,7 @@
         "3"
       ],
       "runtime_status": "executed",
-      "target_gas_used": 2428,
+      "target_gas_used": 2689,
       "target_return": "2"
     },
     {
@@ -52,7 +52,7 @@
         "5"
       ],
       "runtime_status": "executed",
-      "target_gas_used": 3588,
+      "target_gas_used": 5502,
       "target_return": null
     },
     {
@@ -70,7 +70,7 @@
         "3"
       ],
       "runtime_status": "executed",
-      "target_gas_used": 3588,
+      "target_gas_used": 5502,
       "target_return": "2"
     },
     {
@@ -88,7 +88,7 @@
         "5"
       ],
       "runtime_status": "executed",
-      "target_gas_used": 41346,
+      "target_gas_used": 81134,
       "target_return": null
     },
     {
@@ -106,7 +106,7 @@
         "3"
       ],
       "runtime_status": "executed",
-      "target_gas_used": 41346,
+      "target_gas_used": 81134,
       "target_return": "2"
     },
     {
@@ -126,7 +126,7 @@
         "4"
       ],
       "runtime_status": "executed",
-      "target_gas_used": 3019,
+      "target_gas_used": 3715,
       "target_return": null
     },
     {
@@ -146,7 +146,7 @@
         "1"
       ],
       "runtime_status": "executed",
-      "target_gas_used": 3019,
+      "target_gas_used": 3715,
       "target_return": "1"
     },
     {
@@ -166,7 +166,7 @@
         "4"
       ],
       "runtime_status": "executed",
-      "target_gas_used": 7427,
+      "target_gas_used": 13952,
       "target_return": null
     },
     {
@@ -186,7 +186,7 @@
         "1"
       ],
       "runtime_status": "executed",
-      "target_gas_used": 7427,
+      "target_gas_used": 13952,
       "target_return": "1"
     },
     {
@@ -206,7 +206,7 @@
         "4"
       ],
       "runtime_status": "executed",
-      "target_gas_used": 82943,
+      "target_gas_used": 165100,
       "target_return": null
     },
     {
@@ -226,7 +226,7 @@
         "1"
       ],
       "runtime_status": "executed",
-      "target_gas_used": 82943,
+      "target_gas_used": 165100,
       "target_return": "1"
     }
   ],

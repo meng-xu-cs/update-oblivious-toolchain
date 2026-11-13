@@ -127,13 +127,13 @@
       "budget_bytes": 67108864,
       "controller_shape_equal": true,
       "entrypoint": "transferFrom(address,address,address,uint256)",
-      "estimated_certificate_json_bytes": 5020950634567827456,
+      "estimated_certificate_json_bytes": 5021021003312005120,
       "lean_stdout": "validated proof-grade canonical fresh-coin path-ORAM pair theorem input for transferFrom(address,address,address,uint256)\nderived the path_oram_local_posmap_v1 tape-family theorem for transferFrom(address,address,address,uint256): each side's run on every tape is its representative run with the tape's leaves, and the two sides are related\nchecked 4 lhs and 4 rhs runtime runs against the tape families for transferFrom(address,address,address,uint256): 4 and 4 on other tapes, 4 and 4 with other leaves for the 2 and 2 keys present before the call",
       "lean_validated": true,
       "lhs_estimate": {
-        "avg_witness_json_bytes": 142704,
-        "estimated_family_json_bytes": 2510475317283389440,
-        "max_witness_json_bytes": 142704,
+        "avg_witness_json_bytes": 142706,
+        "estimated_family_json_bytes": 2510510501655478272,
+        "max_witness_json_bytes": 142706,
         "public_fresh_coin_scaffold_steps": 7,
         "public_leaf_scaffold_steps": 6,
         "sampled_seed_count": 8,
@@ -147,9 +147,9 @@
       "public_outcome_equal": true,
       "reason": "estimated explicit canonical pair certificate exceeds safe budget 67108864; compact theorem input used instead",
       "rhs_estimate": {
-        "avg_witness_json_bytes": 142704,
-        "estimated_family_json_bytes": 2510475317283389440,
-        "max_witness_json_bytes": 142704,
+        "avg_witness_json_bytes": 142706,
+        "estimated_family_json_bytes": 2510510501655478272,
+        "max_witness_json_bytes": 142706,
         "public_fresh_coin_scaffold_steps": 7,
         "public_leaf_scaffold_steps": 6,
         "sampled_seed_count": 8,
@@ -161,7 +161,7 @@
       "tape_family_samples_checked": true,
       "tape_family_samples_per_side": 4,
       "tape_family_theorem": "derived",
-      "theorem_input_json_bytes": 368305,
+      "theorem_input_json_bytes": 368312,
       "validation_status": "accepted_compact_theorem_input"
     },
     {
@@ -174,9 +174,9 @@
       "lean_stdout": "validated proof-grade canonical fresh-coin path-ORAM pair theorem input for transferFrom(address,address,address,uint256)\nderived the path_oram_private_posmap_v1 tape-family theorem for transferFrom(address,address,address,uint256): each side's run on every tape is its representative run with the tape's leaves, and the two sides are related\nchecked 4 lhs and 4 rhs runtime runs against the tape families for transferFrom(address,address,address,uint256): 4 and 4 on other tapes, 4 and 4 with other leaves for the 257 and 257 keys present before the call",
       "lean_validated": true,
       "lhs_estimate": {
-        "avg_witness_json_bytes": 1667937,
+        "avg_witness_json_bytes": 1667939,
         "estimated_family_json_bytes": 18446744073709551615,
-        "max_witness_json_bytes": 1667937,
+        "max_witness_json_bytes": 1667939,
         "public_fresh_coin_scaffold_steps": 92,
         "public_leaf_scaffold_steps": 92,
         "sampled_seed_count": 8,
@@ -190,9 +190,9 @@
       "public_outcome_equal": true,
       "reason": "estimated explicit canonical pair certificate exceeds safe budget 67108864; compact theorem input used instead",
       "rhs_estimate": {
-        "avg_witness_json_bytes": 1667937,
+        "avg_witness_json_bytes": 1667939,
         "estimated_family_json_bytes": 18446744073709551615,
-        "max_witness_json_bytes": 1667937,
+        "max_witness_json_bytes": 1667939,
         "public_fresh_coin_scaffold_steps": 92,
         "public_leaf_scaffold_steps": 92,
         "sampled_seed_count": 8,
@@ -204,7 +204,7 @@
       "tape_family_samples_checked": true,
       "tape_family_samples_per_side": 4,
       "tape_family_theorem": "derived",
-      "theorem_input_json_bytes": 4643121,
+      "theorem_input_json_bytes": 4643128,
       "validation_status": "accepted_compact_theorem_input"
     }
   ],

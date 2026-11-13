@@ -10,8 +10,8 @@
     "metadata_canonicalization_sha256": "6c85bcbfe14c861c6b3c3d62aaa1cf2bcb813d64c7058d5319fba3706cd91c44",
     "compilation_mode": "uo",
     "compiler_version": "0.1.0",
-    "toolchain_manifest_sha256": "47c79e6c1879e8982bfa782ab2401a89ea4ac4fe9c6e2e492bf602c0a3c8eb27",
-    "package_sha256": "ff3488b6325a6bcf26f1a807f703130097ba41364818fdc8e7e10c183e1b81fe"
+    "toolchain_manifest_sha256": "f51871012ebcef46dddea9d6af67dc77193dde25209fe42a2ec7ac76e917aff4",
+    "package_sha256": "64fa44d12f0eff74b5b261f418302e73ace19befd5c5c1227959590b546c946a"
   },
   "contract": {
     "contract": "FixedSlotClassifier",
@@ -437,7 +437,7 @@
             "secret"
           ],
           "entry_input_len": 32,
-          "public_gas_budget": 2086,
+          "public_gas_budget": 2115,
           "arena_bytes": 4160,
           "max_stack_words": 65,
           "max_hash_part_bytes": 0,
@@ -569,13 +569,14 @@
           "uomap_reads": 0,
           "uomap_writes": 0,
           "max_commit_ops": 1,
+          "max_load_ops": 1,
           "oram_accesses": {}
         },
         "peek()": {
           "secret_args": [],
           "param_names": [],
           "entry_input_len": 0,
-          "public_gas_budget": 2047,
+          "public_gas_budget": 2076,
           "arena_bytes": 4096,
           "max_stack_words": 64,
           "max_hash_part_bytes": 0,
@@ -650,6 +651,7 @@
           "uomap_reads": 0,
           "uomap_writes": 0,
           "max_commit_ops": 1,
+          "max_load_ops": 1,
           "oram_accesses": {}
         },
         "sameSame(uint256)": {
@@ -660,7 +662,7 @@
             "secret"
           ],
           "entry_input_len": 32,
-          "public_gas_budget": 2086,
+          "public_gas_budget": 2115,
           "arena_bytes": 4160,
           "max_stack_words": 65,
           "max_hash_part_bytes": 0,
@@ -796,6 +798,7 @@
           "uomap_reads": 0,
           "uomap_writes": 0,
           "max_commit_ops": 1,
+          "max_load_ops": 1,
           "oram_accesses": {}
         }
       }
