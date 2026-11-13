@@ -2314,6 +2314,82 @@ mod tests {
     }
 
     #[test]
+    fn a_sealed_write_that_repeats_a_nonce_fails() {
+        // A sealed write is an Update because its nonce is new: the record
+        // differs from the one it replaces in every unit the observer
+        // classifies. The runtime checks that on the bytes. Here the seal
+        // count of an object is set back, as a rollback of the enclave's
+        // state would set it, so that the next write repeats the nonce of
+        // the last one: for the same value it would store the same record
+        // again, a write the observer sees as a Same.
+        fn written(
+            object: &RuntimeObject,
+            recorder: &mut crate::controller::CallRecorder,
+        ) -> anyhow::Result<RuntimeObject> {
+            let mut allocator = tx_allocator();
+            let mut tx = object.clone_for_tx(&mut load_recorder(), &mut allocator)?;
+            match &tx {
+                RuntimeObject::UoCell(_) => tx.set_cell(nested_nonzero_value(), None, recorder)?,
+                RuntimeObject::UoSmallMap(_) => {
+                    let key = Value::Struct(
+                        vec![
+                            ("owner".into(), Value::Address([0xE1; 20])),
+                            ("nonce".into(), Value::uint(3)),
+                        ]
+                        .into_boxed_slice(),
+                    );
+                    tx.put_map(key, nested_nonzero_value(), None, recorder, &mut allocator)?;
+                }
+                _ => unreachable!(),
+            }
+            let committed = tx.commit(object, false, true, recorder, &mut allocator)?;
+            allocator.finish()?;
+            Ok(committed)
+        }
+        fn cipher_of(object: &RuntimeObject) -> uo_store::StoreCipher {
+            match object {
+                RuntimeObject::UoCell(cell) => cell.cipher.clone_for_runtime_state(),
+                RuntimeObject::UoSmallMap(map) => map.cipher.clone_for_runtime_state(),
+                _ => unreachable!(),
+            }
+        }
+        fn set_cipher(object: &mut RuntimeObject, cipher: uo_store::StoreCipher) {
+            match object {
+                RuntimeObject::UoCell(cell) => cell.cipher = cipher,
+                RuntimeObject::UoSmallMap(map) => map.cipher = cipher,
+                _ => unreachable!(),
+            }
+        }
+        for (spec, seed) in [(cell_spec(), 0xF201u64), (small_map_spec(), 0xF202)] {
+            let deployed = RuntimeObject::instantiate_with_seed(&spec, seed).unwrap();
+            let mut recorder = crate::controller::CallRecorder::begin("first_write", &[]);
+            let first = written(&deployed, &mut recorder).unwrap();
+            let slots = first.sealed_storage_for_test().unwrap().1.len();
+            assert_eq!(recorder.physical_write_count(), slots, "{}", spec.name);
+
+            // The same write again, under new nonces, is an Update again.
+            let mut recorder = crate::controller::CallRecorder::begin("second_write", &[]);
+            written(&first, &mut recorder).unwrap();
+            assert_eq!(recorder.physical_write_count(), slots, "{}", spec.name);
+
+            // A twin of the deployment has the object's key and a seal count
+            // that stands where the object's stood before its first write.
+            let twin = RuntimeObject::instantiate_with_seed(&spec, seed).unwrap();
+            let mut rolled_back = first;
+            set_cipher(&mut rolled_back, cipher_of(&twin));
+            let mut recorder = crate::controller::CallRecorder::begin("repeated_nonce", &[]);
+            let error = written(&rolled_back, &mut recorder).unwrap_err();
+            assert!(
+                format!("{error:#}").contains("is not an Update of the record it replaces"),
+                "{}: {error:#}",
+                spec.name
+            );
+            // The write that failed left no event.
+            assert_eq!(recorder.physical_write_count(), 0, "{}", spec.name);
+        }
+    }
+
+    #[test]
     fn uo_cell_commit_reuses_ciphertext_buffer_when_written() {
         let spec = cell_spec();
         let old = RuntimeObject::instantiate_with_seed(&spec, 0xC013).unwrap();

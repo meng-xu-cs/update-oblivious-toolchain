@@ -1,23 +1,23 @@
 {
   "accepted": true,
-  "artifact_json_bytes": 1560217,
+  "artifact_json_bytes": 1569272,
   "checker": "proof/lean/.lake/build/bin/checkProofGradeRuntimeConfidentialStatementTraceBridgeBoundary",
   "confidential_statement_trace_bridge_boundary_theorem_checked": true,
   "lean_checker_input": "source-backed runtime confidential statement-trace bridge boundary",
   "lean_checker_kind": "runtime confidential statement-trace bridge boundary",
-  "lean_stdout": "validated runtime confidential statement-trace bridge boundary for source-backed uo-evm/shared-kernel runtime (432377 trace bytes)",
+  "lean_stdout": "validated runtime confidential statement-trace bridge boundary for source-backed uo-evm/shared-kernel runtime (435296 trace bytes)",
   "source_bytes": {
     "allocator": 18956,
     "confidential_core": 46817,
     "confidential_kernel": 116465,
     "generated_confidential_kernel": 25055,
     "generated_kernel_machine": 5241,
-    "generated_object_helpers": 28048,
-    "generated_oram_codecs": 206100,
+    "generated_object_helpers": 28313,
+    "generated_oram_codecs": 205894,
     "kernel_runtime": 24280,
     "kernel_slot_support": 3263,
     "state": 46694,
-    "trace": 432377,
+    "trace": 435296,
     "trusted_kernel": 4548
   },
   "source_files": [

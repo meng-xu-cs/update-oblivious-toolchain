@@ -3,10 +3,10 @@
 #![allow(dead_code)]
 
 use crate::codec::StoreCipher;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
-use uo_core::trace::{LogicalEvent, PhysicalWriteEvent, WriteClass};
+use uo_core::trace::{is_update_write, LogicalEvent, PhysicalWriteEvent, WriteClass};
 use uo_core::FixedBoxBuilder;
 use zeroize::Zeroize;
 
@@ -303,7 +303,14 @@ pub(super) fn reseal_uo_store_slot_and_trace_write(
     slot: &mut [u8],
 ) -> Result<PhysicalWriteEvent> {
     let aad = uo_store_slot_aad(object);
+    let replaced: Box<[u8]> = (&*slot).into();
     reseal_uo_store_slot_in_place(&aad, value, cipher, rng, slot)?;
+    if !is_update_write(&replaced, slot) {
+        bail!(
+            "internal error: the sealed write of {} is not an Update of the record it replaces",
+            object
+        );
+    }
     Ok(PhysicalWriteEvent::from_shape(
         object,
         object,

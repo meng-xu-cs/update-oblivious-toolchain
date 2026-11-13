@@ -826,6 +826,121 @@ theorem uoStoreUpdateWriteAccepted_publicShape
   cases hAccepted
   simp
 
+/-! ### The class of a sealed write, from its bytes
+
+A sealed write is an `Update` for the storage observer because the record it
+writes differs, in every unit the observer classifies, from the record it
+replaces, and neither has a zero unit. The label is not taken on trust: the
+runtime keeps the record a write replaces and fails the call unless
+`is_update_write` holds of the two (`crates/uo-core/src/trace.rs`,
+`reseal_payload_and_record_write` and `reseal_uo_store_slot_and_trace_write`
+in the generated helpers). This section states that check. The unit length
+is a parameter; the runtime uses 32 bytes, a storage word. That a fresh
+nonce makes every unit differ is not proved here: it holds except with
+negligible probability, and the check turns a failure into an error. -/
+
+/-- Whether every byte of a record is zero. -/
+def allZero (bytes : List Nat) : Bool :=
+  bytes.all fun byte => byte == 0
+
+/-- The class the storage observer gives a write of `new` over `old`
+(`classify_write` in `crates/uo-core/src/trace.rs`). -/
+def classifyWrite (old new : List Nat) : StoreWriteClass :=
+  if old = new then StoreWriteClass.same
+  else if allZero old && !allZero new then StoreWriteClass.set
+  else if !allZero old && allZero new then StoreWriteClass.clear
+  else StoreWriteClass.update
+
+/-- The units of a record the observer classifies: `unitLen` bytes each, the
+last one as far as the record reaches. -/
+def unitsOf (unitLen : Nat) (bytes : List Nat) : List (List Nat) :=
+  (List.range ((bytes.length + unitLen - 1) / unitLen)).map fun index =>
+    (bytes.drop (index * unitLen)).take unitLen
+
+/-- `is_update_write` in `crates/uo-core/src/trace.rs`, with the unit length
+as a parameter: the records have one length, are not empty, and every unit
+of the new record is an `Update` of the unit it replaces. -/
+def isUpdateWrite (unitLen : Nat) (old new : List Nat) : Bool :=
+  old.length == new.length && !new.isEmpty &&
+    ((unitsOf unitLen old).zip (unitsOf unitLen new)).all fun units =>
+      decide (classifyWrite units.1 units.2 = StoreWriteClass.update)
+
+theorem classifyWrite_self (record : List Nat) :
+    classifyWrite record record = StoreWriteClass.same := by
+  simp [classifyWrite]
+
+/-- A write that the check accepts is an `Update` in every unit. -/
+theorem isUpdateWrite_units {unitLen : Nat} {old new : List Nat}
+    (h : isUpdateWrite unitLen old new = true) :
+    old.length = new.length ∧
+      ∀ units ∈ (unitsOf unitLen old).zip (unitsOf unitLen new),
+        classifyWrite units.1 units.2 = StoreWriteClass.update := by
+  simp only [isUpdateWrite, Bool.and_eq_true, beq_iff_eq, List.all_eq_true,
+    decide_eq_true_eq] at h
+  exact ⟨h.1.1, h.2⟩
+
+theorem unitsOf_ne_nil {unitLen : Nat} {bytes : List Nat}
+    (hUnit : 0 < unitLen) (hBytes : bytes ≠ []) :
+    ∃ rest, unitsOf unitLen bytes = bytes.take unitLen :: rest := by
+  unfold unitsOf
+  have hLen : 0 < bytes.length := List.length_pos_iff.mpr hBytes
+  have hCount : 0 < (bytes.length + unitLen - 1) / unitLen := by
+    apply Nat.div_pos
+    · omega
+    · exact hUnit
+  obtain ⟨count, hEq⟩ : ∃ count, (bytes.length + unitLen - 1) / unitLen = count + 1 :=
+    ⟨(bytes.length + unitLen - 1) / unitLen - 1, by omega⟩
+  rw [hEq, List.range_succ_eq_map]
+  simp
+
+/-- A record written over itself is not an update: a seal that repeats the
+nonce of the record it replaces, for the same value, is refused. -/
+theorem isUpdateWrite_self_false {unitLen : Nat} (hUnit : 0 < unitLen)
+    (record : List Nat) : isUpdateWrite unitLen record record = false := by
+  cases hRecord : record with
+  | nil => simp [isUpdateWrite]
+  | cons byte bytes =>
+      obtain ⟨rest, hUnits⟩ :=
+        unitsOf_ne_nil (unitLen := unitLen) (bytes := byte :: bytes) hUnit (by simp)
+      simp [isUpdateWrite, hUnits, classifyWrite_self]
+
+theorem allZero_false_of_nonzero {bytes : List Nat}
+    (hBytes : bytes ≠ []) (hNonzero : ∀ byte ∈ bytes, 0 < byte) :
+    allZero bytes = false := by
+  cases bytes with
+  | nil => exact absurd rfl hBytes
+  | cons byte rest =>
+      have hByte : 0 < byte := hNonzero byte (by simp)
+      have hNe : (byte == 0) = false := by
+        simp
+        omega
+      simp [allZero, hNe]
+
+/-- Two units without a zero byte, as every unit of a sealed record is
+(`encodeNonzero_validEncodedNibbles`), are a `Same` if they are equal and an
+`Update` otherwise. So a write of a sealed record over a sealed record can
+fail the check only in a unit that it leaves unchanged. -/
+theorem classifyWrite_of_nonzero {old new : List Nat}
+    (hOld : old ≠ []) (hNew : new ≠ [])
+    (hOldNonzero : ∀ byte ∈ old, 0 < byte) (hNewNonzero : ∀ byte ∈ new, 0 < byte) :
+    classifyWrite old new =
+      if old = new then StoreWriteClass.same else StoreWriteClass.update := by
+  simp [classifyWrite, allZero_false_of_nonzero hOld hOldNonzero,
+    allZero_false_of_nonzero hNew hNewNonzero]
+
+/-- The unit the storage observer classifies: a 32-byte word
+(`STORAGE_OBSERVER_UNIT_BYTES`). -/
+def storageObserverUnitBytes : Nat := 32
+
+example : isUpdateWrite 2 [1, 2, 3, 4, 5] [2, 3, 4, 5, 6] = true := by decide
+-- One unit unchanged, zero before or zero after: not an update, though the
+-- record as a whole changes.
+example : isUpdateWrite 2 [1, 2, 3, 4, 5] [2, 3, 3, 4, 6] = false := by decide
+example : classifyWrite [1, 2, 3, 4, 5] [2, 3, 3, 4, 6] = StoreWriteClass.update := by decide
+example : isUpdateWrite 2 [1, 2, 0, 0, 5] [2, 3, 4, 5, 6] = false := by decide
+example : isUpdateWrite 2 [1, 2, 3, 4, 5] [2, 3, 4, 5, 0] = false := by decide
+example : isUpdateWrite 2 [1, 2, 3, 4] [2, 3, 4, 5, 6] = false := by decide
+
 /-! ### W5.5: Concrete Rust StoreCipher surface obligations
 
 The theorems below pin obligations of the concrete Rust StoreCipher surface

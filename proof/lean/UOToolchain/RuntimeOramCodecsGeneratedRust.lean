@@ -379,14 +379,6 @@ def generatedRustLines0 : List String :=
   , "}"
   , ""
   , "impl OramWrite {"
-  , "    pub(crate) fn from_shape(location: impl Into<String>, len: usize, class: WriteClass) -> Self {"
-  , "        Self {"
-  , "            location: location.into(),"
-  , "            len,"
-  , "            class,"
-  , "        }"
-  , "    }"
-  , ""
   , "    pub(crate) fn with_object(&self, object: &str) -> uo_core::trace::PhysicalWriteEvent {"
   , "        uo_core::trace::PhysicalWriteEvent::from_shape("
   , "            object,"
@@ -1506,11 +1498,7 @@ def generatedRustLines0 : List String :=
   , "/// The value of the accessed slot's block, which the path read has put in the"
   , "/// stash, or which was there already. A present slot has exactly one block,"
   , "/// on its prior leaf and with its key; otherwise the access fails."
-  ]
-
-/-- Lines 1501 to 3000 of the generated Rust. -/
-def generatedRustLines1 : List String :=
-  [ "pub(super) fn select_stash_value_for_slot("
+  , "pub(super) fn select_stash_value_for_slot("
   , "    stash: &FixedStash,"
   , "    slot: &MaskedUsizeOption,"
   , "    prior_leaf: &MaskedUsizeOption,"
@@ -1518,7 +1506,11 @@ def generatedRustLines1 : List String :=
   , "    value_type: &Type,"
   , ") -> Result<(Value, bool)> {"
   , "    let slot_present = slot.is_some();"
-  , "    let slot_index = slot.unwrap_or(0);"
+  ]
+
+/-- Lines 1501 to 3000 of the generated Rust. -/
+def generatedRustLines1 : List String :=
+  [ "    let slot_index = slot.unwrap_or(0);"
   , "    let prior_leaf_value = prior_leaf.unwrap_or(0);"
   , "    let mut selected = Value::zero_for_type(value_type);"
   , "    let mut matches = 0usize;"
@@ -3010,11 +3002,7 @@ def generatedRustLines1 : List String :=
   , "    ) -> Result<bool>,"
   , "{"
   , "    let mut writes = oram_write_log_with_capacity(oram_write_log_capacity(&state.parameters)?)?;"
-  ]
-
-/-- Lines 3001 to 4500 of the generated Rust. -/
-def generatedRustLines2 : List String :=
-  [ "    let mut working_entries = std::mem::take(&mut state.entries);"
+  , "    let mut working_entries = std::mem::take(&mut state.entries);"
   , "    let mut working_position_map = std::mem::take(&mut state.position_map);"
   , "    let mut working_stash = std::mem::replace(&mut state.stash, FixedStash::placeholder());"
   , "    let required_stash_capacity = working_stash_capacity(&state.parameters)?;"
@@ -3022,7 +3010,11 @@ def generatedRustLines2 : List String :=
   , "        bail!("
   , "            \"working stash capacity {} fell below required public bound {} for {}\","
   , "            working_stash.capacity(),"
-  , "            required_stash_capacity,"
+  ]
+
+/-- Lines 3001 to 4500 of the generated Rust. -/
+def generatedRustLines2 : List String :=
+  [ "            required_stash_capacity,"
   , "            spec.name"
   , "        );"
   , "    }"
@@ -4514,11 +4506,7 @@ def generatedRustLines2 : List String :=
   , "        let hit = update & (level == found_level);"
   , "        let node = cache"
   , "            .slots"
-  ]
-
-/-- Lines 4501 to 5879 of the generated Rust. -/
-def generatedRustLines3 : List String :=
-  [ "            .get_mut(level)"
+  , "            .get_mut(level)"
   , "            .ok_or_else(|| anyhow!(\"tree cache slot {} missing\", level))?;"
   , "        node.value = Value::confidential_select(hit, value.clone(), node.value.clone())?;"
   , "    }"
@@ -4526,7 +4514,11 @@ def generatedRustLines3 : List String :=
   , "    // A delete removes the found node, or, when it has two children, moves"
   , "    // the successor's entry into it and removes the successor."
   , "    let delete_two = delete & found_two_children;"
-  , "    let delete_one = delete & !found_two_children;"
+  ]
+
+/-- Lines 4501 to 5871 of the generated Rust. -/
+def generatedRustLines3 : List String :=
+  [ "    let delete_one = delete & !found_two_children;"
   , "    let successor_level = depth.saturating_sub(1);"
   , "    let removed_level = masked_select_usize(delete_two, successor_level, found_level);"
   , "    let mut successor_key = Value::zero_for_type(&shape.key_type);"

@@ -97,8 +97,8 @@ pub use trace::{
     canonical_path_oram_leaf_values_of_seed, canonical_path_oram_seed_of_leaf_values,
     canonical_runtime_public_object_ids, classify_write,
     extract_runtime_path_oram_fresh_coin_scaffold, extract_runtime_path_oram_fresh_coin_values,
-    max_runtime_kernel_refinement_event_count, public_delta_digest, BoundaryDirection,
-    BoundaryEvent, CanonicalFreshCoinRuntimePathOramTheoremInput,
+    is_update_write, max_runtime_kernel_refinement_event_count, public_delta_digest,
+    BoundaryDirection, BoundaryEvent, CanonicalFreshCoinRuntimePathOramTheoremInput,
     CanonicalFreshCoinRuntimePathOramWitnessFamily, CanonicalFreshCoinTheoremInputError,
     CanonicalFreshCoinWitnessFamilyError, CommittedRuntimeWitnessSnapshot,
     CommittedRuntimeWitnessSnapshotBuilder, CommittedRuntimeWitnessSnapshotBuilderError,
@@ -130,7 +130,7 @@ pub use trace::{
     SeededRuntimePaperMainSlotFamilyBundleError, SeededRuntimePathOramWitnessFamily,
     SeededRuntimeWitnessFamily, SeededRuntimeWitnessFamilyError, SgxControllerShapeTrace,
     TheoremTrace, TraceHashBundle, TracedRuntimeCallOutcome, TracedRuntimeCallStart,
-    TracedRuntimeCallWitnessState, WriteClass,
+    TracedRuntimeCallWitnessState, WriteClass, STORAGE_OBSERVER_UNIT_BYTES,
 };
 pub use translation_validation::{
     proof_relevant_view_sha256, ProofRelevantContractView, ProofRelevantEntrypointView,

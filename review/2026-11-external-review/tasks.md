@@ -513,6 +513,11 @@ classify the old and the new encoded bytes with `classify_write` and fail the
 call with an internal error unless the class is `Update`. Change the Lean
 generators, not the generated files.
 
+The check classifies each 32-byte unit, the unit D1 chose, and not the
+record as a whole (`is_update_write`): a record can change as a whole while
+one word of it stays as it was. It sits where a record is sealed in place:
+one function for the objects and the ORAM write log, one for the store.
+
 #### Acceptance criteria
 
 - A test that forces a repeated nonce sees the failure.

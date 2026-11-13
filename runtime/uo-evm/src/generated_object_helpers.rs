@@ -6,7 +6,7 @@ use anyhow::{anyhow, bail, Result};
 use rand_chacha::ChaCha20Rng;
 use uo_allocator::{AllocatorSession, ScratchRegion};
 use uo_core::ir::StateObject;
-use uo_core::trace::{PhysicalWriteEvent, WriteClass};
+use uo_core::trace::{is_update_write, PhysicalWriteEvent, WriteClass};
 use uo_core::{FixedBoxBuilder, ScalarType, Type, Value};
 use uo_store::StoreCipher;
 
@@ -166,9 +166,16 @@ where
     F: FnOnce(usize) -> Result<()>,
 {
     let _io_guard = allocator.reserve_guard(ScratchRegion::IoScratch, payload.len())?;
+    let replaced: Box<[u8]> = (&*physical).into();
     if !cipher.seal_and_wipe_into_slice(aad.as_bytes(), payload, rng, physical) {
         bail!(
             "sealed payload buffer for {} fell below required public ciphertext size",
+            location
+        );
+    }
+    if !is_update_write(&replaced, physical) {
+        bail!(
+            "internal error: the sealed write of {} is not an Update of the record it replaces",
             location
         );
     }

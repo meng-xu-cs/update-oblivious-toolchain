@@ -85,4 +85,38 @@ mod tests {
             .iter()
             .all(|event| event.class == WriteClass::Update));
     }
+
+    #[test]
+    fn uo_store_fails_a_write_that_repeats_a_nonce() {
+        use crate::codec::StoreCipher;
+        use rand::SeedableRng;
+        use rand_chacha::ChaCha20Rng;
+
+        // Two ciphers made from the same key material have one key, and
+        // each counts its seals from zero.
+        let cipher = || StoreCipher::from_rng(&mut ChaCha20Rng::seed_from_u64(0xC1F3));
+        let mut store = UoObjectStore::preinitialized([("slot".to_string(), 32)]).unwrap();
+        store.cipher = cipher();
+        store.write_cell("slot", &mut [5u8; 32]).unwrap();
+        store.write_cell("slot", &mut [5u8; 32]).unwrap();
+        assert_eq!(store.physical_writes().len(), 2);
+
+        // With the count set back the next seal repeats the first write's
+        // nonce. The same value under that nonce is the record the slot
+        // held after the first write, not the one it holds now: an Update.
+        store.cipher = cipher();
+        store.write_cell("slot", &mut [5u8; 32]).unwrap();
+        assert_eq!(store.physical_writes().len(), 3);
+        // Set back once more, the seal repeats the nonce of the record the
+        // slot holds, and the same value gives the same record: the
+        // observer would see a Same, and the store fails the write.
+        store.cipher = cipher();
+        let error = store.write_cell("slot", &mut [5u8; 32]).unwrap_err();
+        assert!(
+            format!("{error:#}").contains("is not an Update of the record it replaces"),
+            "{error:#}"
+        );
+        assert_eq!(store.physical_writes().len(), 3);
+        store.ensure_update_only().unwrap();
+    }
 }

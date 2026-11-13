@@ -80,6 +80,15 @@ and the ownership boundaries that keep them auditable.
     trace. The digest of the ciphertext store covers the sealed records a
     host holds, and nothing else.
 
+14. The class of a sealed write is read off its bytes. The two functions
+    that seal a record in place, one for the runtime's objects and ORAM
+    maps and one for the store, keep the record the write replaces and fail
+    the call unless every 32-byte unit of the new record is an `Update` of
+    the unit it replaces: not zero, not zero before, and changed
+    (`uo_core::is_update_write`). The write's event is recorded after that
+    check and nowhere else. A write that fails it, as one that repeats a
+    nonce for the same value would, never reaches a trace as an `Update`.
+
 ### What a nonce shows
 
 A record's nonce shows how many records were sealed under its object's key
@@ -110,15 +119,17 @@ write/read evidence, direct store cipher calls outside the codec layer, and
 reintroduction of host-visible hidden-state errors that should be modeled
 confidential aborts.
 
-Invariants 9 to 13 have seven bits in `runtime_boundary_validation.json`:
+Invariants 9 to 14 have eight bits in `runtime_boundary_validation.json`:
 `deployment_seed_stays_out_of_call_traces`,
 `production_errors_carry_no_runtime_freshness_value`,
 `contract_instance_debug_is_opaque`,
 `runtime_secrets_derive_from_the_master_secret`,
 `seal_nonces_come_from_the_seal_count`,
-`private_evidence_stays_inside_the_runtime` and
-`production_calls_issue_chained_receipts`. Each is a check of source text,
-and a probe unit test shows that it rejects the drifts it guards against.
+`private_evidence_stays_inside_the_runtime`,
+`production_calls_issue_chained_receipts` and
+`sealed_writes_are_classified_from_their_bytes`. Each is a check of source
+text, and a probe unit test shows that it rejects the drifts it guards
+against.
 `cargo test -p uo-evm` runs the tests behind all but the two about secrets
 and nonces in the build a production runtime uses
 (`runtime/uo-evm/tests/production_boundary.rs`, and the production tests
@@ -132,6 +143,16 @@ from the evidence into the receipt
 (`runtime_implementation_interface/receipt_position_map_drift`), and a call
 result that carries the trace in every build
 (`runtime_implementation_interface/call_result_trace_drift`).
+
+Invariant 14 is pinned there too (`runtimeObjectCommitUsesPublicSealAndWriteShell`
+and `runtimeStoreUoWritesEmitPublicUpdateShape`), with two scenarios that the
+Lean checker must reject: the check removed from the objects' and ORAM maps'
+seal (`runtime_implementation_interface/sealed_write_update_check_drift`) and
+from the store's
+(`runtime_implementation_interface/store_sealed_write_update_check_drift`).
+Tests of `runtime/uo-evm/src/objects.rs` and `runtime/uo-store/src/store.rs`
+set a seal count back, so that a write repeats the nonce of the record it
+replaces, and see the write fail.
 
 Invariant 11 also has a Lean statement and tests. `sealNonceRun_nodup` and
 `sealNonceRun_disjoint_of_le` in `UOToolchain/RuntimeStoreCodecSemantics.lean`

@@ -9855,6 +9855,70 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "mutation": "shrink the Lean-generated array commit restore loop to only replay one restored slot, so the implementation interface must reject generated object-commit helper drift beneath the shared object-store layer",
         }),
     )?);
+    // Issue 33: a sealed write is recorded only after the runtime has
+    // classified it from the record it replaces and the record it writes.
+    let mut tampered_runtime_implementation_sealed_write_update_check =
+        runtime_implementation_interface.clone();
+    tampered_runtime_implementation_sealed_write_update_check.generated_object_helpers_source =
+        tampered_runtime_implementation_sealed_write_update_check
+            .generated_object_helpers_source
+            .replace(
+                "    if !is_update_write(&replaced, physical) {\n        bail!(\n            \"internal error: the sealed write of {} is not an Update of the record it replaces\",\n            location\n        );\n    }\n    record_write(physical.len())",
+                "    record_write(physical.len())",
+            );
+    if tampered_runtime_implementation_sealed_write_update_check.generated_object_helpers_source
+        == runtime_implementation_interface.generated_object_helpers_source
+    {
+        bail!("the sealed-write tamper scenario did not change the generated object helpers");
+    }
+    scenarios.push(validate_tampered_json_case(
+        "runtime_implementation_interface/sealed_write_update_check_drift",
+        &tampered_runtime_implementation_sealed_write_update_check,
+        |interface_path| {
+            Ok(Command::new(&runtime_implementation_interface_checker)
+                .arg(interface_path)
+                .output()?)
+        },
+        json!({
+            "scenario": "runtime_implementation_interface/sealed_write_update_check_drift",
+            "artifact_kind": "proofgrade_runtime_implementation_interface",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "record the write of a sealed object or ORAM record without the check that every 32-byte unit of the new record is an Update of the unit it replaces, so the implementation interface must reject a write event that is labeled Update by assertion",
+        }),
+    )?);
+    let mut tampered_runtime_implementation_store_sealed_write_update_check =
+        runtime_implementation_interface.clone();
+    tampered_runtime_implementation_store_sealed_write_update_check
+        .generated_store_helpers_source =
+        tampered_runtime_implementation_store_sealed_write_update_check
+            .generated_store_helpers_source
+            .replace(
+                "    if !is_update_write(&replaced, slot) {\n        bail!(\n            \"internal error: the sealed write of {} is not an Update of the record it replaces\",\n            object\n        );\n    }\n    Ok(PhysicalWriteEvent::from_shape(",
+                "    Ok(PhysicalWriteEvent::from_shape(",
+            );
+    if tampered_runtime_implementation_store_sealed_write_update_check
+        .generated_store_helpers_source
+        == runtime_implementation_interface.generated_store_helpers_source
+    {
+        bail!("the sealed-write tamper scenario did not change the generated store helpers");
+    }
+    scenarios.push(validate_tampered_json_case(
+        "runtime_implementation_interface/store_sealed_write_update_check_drift",
+        &tampered_runtime_implementation_store_sealed_write_update_check,
+        |interface_path| {
+            Ok(Command::new(&runtime_implementation_interface_checker)
+                .arg(interface_path)
+                .output()?)
+        },
+        json!({
+            "scenario": "runtime_implementation_interface/store_sealed_write_update_check_drift",
+            "artifact_kind": "proofgrade_runtime_implementation_interface",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "build the store's write event without the check that every 32-byte unit of the new slot is an Update of the unit it replaces, so the implementation interface must reject a store write that is labeled Update by assertion",
+        }),
+    )?);
     let tampered_runtime_small_confidential_kernel_generated_object_helpers_commit =
         ImportedRuntimeImplementationSmallConfidentialKernelBoundary {
             implementation_interface:
@@ -27348,6 +27412,103 @@ fn check_seal_nonces_come_from_the_seal_count(
         )
 }
 
+/// The files whose production code may name the class `Update` or build a
+/// write event from a class it names: the generated helpers that seal a
+/// record in place, each behind the check of the write's bytes.
+const SEALED_WRITE_LABEL_FILES: [&str; 3] = [
+    "runtime/uo-evm/src/generated_object_helpers.rs",
+    "runtime/uo-evm/src/generated_oram_codecs.rs",
+    "runtime/uo-store/src/generated_store_helpers.rs",
+];
+
+/// Whether the event of a sealed write is recorded only after the write has
+/// been classified from its bytes. One function seals a record in place for
+/// the runtime's objects and ORAM maps, and one for the store. Each keeps
+/// the record it replaces, seals, and fails the call unless every 32-byte
+/// unit of the new record is an `Update` of the unit it replaces
+/// (`uo_core::is_update_write`). The label `Update` is written once on each
+/// path, behind that check: `update_label_files` and
+/// `shape_constructor_files` are the runtime's production files that name
+/// the class or build an event from a named class, and
+/// `write_event_brace_files` those where the event's type name opens a
+/// brace, as a literal of it would: one function signature.
+#[allow(clippy::too_many_arguments)]
+fn check_sealed_writes_are_classified_from_their_bytes(
+    core_trace_source: &str,
+    generated_object_helpers_production_source: &str,
+    generated_oram_codecs_production_source: &str,
+    oram_production_source: &str,
+    generated_store_helpers_production_source: &str,
+    update_label_files: &[String],
+    shape_constructor_files: &[String],
+    write_event_brace_files: &[String],
+) -> bool {
+    let helpers = generated_object_helpers_production_source;
+    let codecs = generated_oram_codecs_production_source;
+    let store = generated_store_helpers_production_source;
+    core_trace_source.contains("pub const STORAGE_OBSERVER_UNIT_BYTES: usize = 32;")
+        && core_trace_source.contains(
+            "pub fn is_update_write(old: &[u8], new: &[u8]) -> bool {\n    old.len() == new.len()\n        && !new.is_empty()\n        && old\n            .chunks(STORAGE_OBSERVER_UNIT_BYTES)\n            .zip(new.chunks(STORAGE_OBSERVER_UNIT_BYTES))\n            .all(|(old_unit, new_unit)| classify_write(old_unit, new_unit) == WriteClass::Update)\n}",
+        )
+        // Objects and ORAM maps: one function seals in place, and it records
+        // the write only after the check.
+        && helpers.contains(
+            "    let replaced: Box<[u8]> = (&*physical).into();\n    if !cipher.seal_and_wipe_into_slice(aad.as_bytes(), payload, rng, physical) {",
+        )
+        && helpers.contains(
+            "    if !is_update_write(&replaced, physical) {\n        bail!(\n            \"internal error: the sealed write of {} is not an Update of the record it replaces\",\n            location\n        );\n    }\n    record_write(physical.len())\n}",
+        )
+        && helpers.matches("seal_and_wipe_into_slice(").count() == 1
+        && helpers.matches("    record_write(").count() == 1
+        // The exact objects' event and the ORAM write log are fed by that
+        // function and by nothing else.
+        && helpers.matches("reseal_payload_and_record_write(").count() == 2
+        && helpers.matches("WriteClass::Update").count() == 1
+        && helpers.matches("from_shape(").count() == 1
+        && helpers.contains("|physical_len| writes.push_update(location, physical_len),")
+        && helpers.matches(".push_update(").count() == 1
+        && codecs.matches("WriteClass::Update").count() == 1
+        && codecs.contains(
+            "    *slot = Some(OramWrite {\n        location: location.into(),\n        len,\n        class: WriteClass::Update,\n    });",
+        )
+        && codecs.matches("OramWrite {").count() == 2
+        && codecs.matches("push_oram_write_update(").count() == 1
+        && codecs.matches(".push_update(").count() == 0
+        // An ORAM write keeps the class it was logged with.
+        && codecs.matches("from_shape(").count() == 1
+        && codecs.contains(
+            "        uo_core::trace::PhysicalWriteEvent::from_shape(\n            object,\n            self.location.clone(),\n            self.len,\n            self.class,\n        )",
+        )
+        && oram_production_source.matches("push_oram_write_update(").count() == 1
+        && oram_production_source.contains(
+            "    pub(crate) fn push_update(&mut self, location: impl Into<String>, len: usize) -> Result<()> {\n        push_oram_write_update(self, location, len)\n    }",
+        )
+        && oram_production_source.matches(".push_update(").count() == 0
+        && oram_production_source.matches("OramWrite {").count() == 1
+        && !oram_production_source.contains("WriteClass::")
+        // The store: its one in-place seal is checked before its event.
+        && store.contains(
+            "    let replaced: Box<[u8]> = (&*slot).into();\n    reseal_uo_store_slot_in_place(&aad, value, cipher, rng, slot)?;\n    if !is_update_write(&replaced, slot) {\n        bail!(\n            \"internal error: the sealed write of {} is not an Update of the record it replaces\",\n            object\n        );\n    }\n    Ok(PhysicalWriteEvent::from_shape(",
+        )
+        && store.matches("seal_and_wipe_into_slice(").count() == 1
+        && store.matches("reseal_uo_store_slot_in_place(").count() == 2
+        && store.matches("from_shape(").count() == 1
+        // The other mention is the store's own test that all its writes
+        // are updates.
+        && store.matches("WriteClass::Update").count() == 2
+        && store.contains(".all(|event| event.class == WriteClass::Update)")
+        // Nothing else in the runtime names the class or builds an event
+        // from a class, and none builds an event field by field: the type
+        // name opens a brace once, where a function returns the event.
+        && update_label_files == SEALED_WRITE_LABEL_FILES
+        && shape_constructor_files == SEALED_WRITE_LABEL_FILES
+        && write_event_brace_files == ["runtime/uo-evm/src/generated_oram_codecs.rs"]
+        && codecs.matches("PhysicalWriteEvent {").count() == 1
+        && codecs.contains(
+            "    pub(crate) fn with_object(&self, object: &str) -> uo_core::trace::PhysicalWriteEvent {",
+        )
+}
+
 /// The fields of a struct in a Rust source, each with whether it is `pub`
 /// (visible outside its crate). `None` if the struct is not found.
 fn rust_struct_fields(source: &str, struct_name: &str) -> Option<Vec<(String, bool)>> {
@@ -29089,7 +29250,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && generated_object_helpers_source.contains("ok_or_else(|| anyhow!(\"map {} missing key type\", spec.name))?;")
         && generated_object_helpers_source.contains("|payload| decode_map_record(spec, payload),")
         && generated_object_helpers_source
-            .contains("use uo_core::trace::{PhysicalWriteEvent, WriteClass};")
+            .contains("use uo_core::trace::{is_update_write, PhysicalWriteEvent, WriteClass};")
         && source_contains_compact(
             &generated_object_helpers_source,
             "trace.physical_write(PhysicalWriteEvent::from_shape(object_name, slot_label, physical_len, WriteClass::Update,));",
@@ -30244,8 +30405,9 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && generated_store_helpers_source
             .contains("use super::{ObjectStore, RawObjectStore, StoreExecutionMetrics, UoObjectStore};")
         && generated_store_helpers_source.contains("use uo_core::FixedBoxBuilder;")
-        && generated_store_helpers_source
-            .contains("use uo_core::trace::{LogicalEvent, PhysicalWriteEvent, WriteClass};")
+        && generated_store_helpers_source.contains(
+            "use uo_core::trace::{is_update_write, LogicalEvent, PhysicalWriteEvent, WriteClass};",
+        )
         && generated_store_helpers_source.contains("use zeroize::Zeroize;")
         && generated_store_helpers_source
             .contains("pub(super) fn zeroed_boxed_raw_store_slot(len: usize) -> Result<Box<[u8]>> {")
@@ -45035,6 +45197,18 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         &production_source_slice(&generated_store_surface_source),
         &generated_store_codec_source,
     );
+    let runtime_src = root.join("runtime");
+    let sealed_writes_are_classified_from_their_bytes =
+        check_sealed_writes_are_classified_from_their_bytes(
+            &core_trace_source,
+            &production_source_slice(&generated_object_helpers_source),
+            &production_source_slice(&generated_oram_codecs_source),
+            &production_source_slice(&oram_source),
+            &production_source_slice(&generated_store_helpers_source),
+            &collect_production_pattern_hits(&runtime_src, "WriteClass::Update")?,
+            &collect_production_pattern_hits(&runtime_src, "from_shape(")?,
+            &collect_production_pattern_hits(&runtime_src, "PhysicalWriteEvent {")?,
+        );
     let private_evidence_stays_inside_the_runtime = check_private_evidence_stays_inside_the_runtime(
         &core_trace_source,
         &engine_impl_source,
@@ -45075,16 +45249,13 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !oram_source.contains("pub len: usize,")
         && !oram_source.contains("pub class: WriteClass,");
     let oram_write_trace_projects_to_public_shape = generated_oram_codecs_source.contains(
-        "pub(crate) fn from_shape(location: impl Into<String>, len: usize, class: WriteClass) -> Self",
-    ) && generated_oram_codecs_source.contains(
         "pub(crate) fn with_object(&self, object: &str) -> uo_core::trace::PhysicalWriteEvent {",
-    ) && generated_oram_codecs_source.contains(
-        "uo_core::trace::PhysicalWriteEvent::from_shape(",
-    ) && !oram_source.contains(
-        "pub(crate) fn from_shape(location: impl Into<String>, len: usize, class: WriteClass) -> Self",
-    ) && !oram_source.contains(
-        "pub(crate) fn with_object(&self, object: &str) -> PhysicalWriteEvent {",
-    );
+    ) && generated_oram_codecs_source
+        .contains("uo_core::trace::PhysicalWriteEvent::from_shape(")
+        && !generated_oram_codecs_source.contains("fn from_shape(")
+        && !oram_source.contains("fn from_shape(")
+        && !oram_source
+            .contains("pub(crate) fn with_object(&self, object: &str) -> PhysicalWriteEvent {");
     let oram_write_log_is_public_exact_batch = oram_source
         .contains("pub(crate) struct OramWriteBatch {")
         && oram_source.contains("writes: Box<[Option<OramWrite>]>,")
@@ -45616,8 +45787,9 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             "use super::{ObjectStore, RawObjectStore, StoreExecutionMetrics, UoObjectStore};",
         )
         && generated_store_helpers_source.contains("use uo_core::FixedBoxBuilder;")
-        && generated_store_helpers_source
-            .contains("use uo_core::trace::{LogicalEvent, PhysicalWriteEvent, WriteClass};")
+        && generated_store_helpers_source.contains(
+            "use uo_core::trace::{is_update_write, LogicalEvent, PhysicalWriteEvent, WriteClass};",
+        )
         && generated_store_helpers_source.contains("use zeroize::Zeroize;")
         && generated_store_helpers_source.contains(
             "pub(super) fn zeroed_boxed_raw_store_slot(len: usize) -> Result<Box<[u8]>> {",
@@ -46441,6 +46613,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "runtime_secrets_derive_from_the_master_secret":
             runtime_secrets_derive_from_the_master_secret,
         "seal_nonces_come_from_the_seal_count": seal_nonces_come_from_the_seal_count,
+        "sealed_writes_are_classified_from_their_bytes":
+            sealed_writes_are_classified_from_their_bytes,
         "private_evidence_stays_inside_the_runtime": private_evidence_stays_inside_the_runtime,
         "production_calls_issue_chained_receipts": production_calls_issue_chained_receipts,
         "theorem_certificate_constructor_checks":
@@ -47384,6 +47558,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && contract_instance_debug_is_opaque
             && runtime_secrets_derive_from_the_master_secret
             && seal_nonces_come_from_the_seal_count
+            && sealed_writes_are_classified_from_their_bytes
             && private_evidence_stays_inside_the_runtime
             && production_calls_issue_chained_receipts
             && theorem_certificate_constructor_surface_restricted
@@ -55384,6 +55559,154 @@ mod tests {
         assert!(!check_seal_nonces_come_from_the_seal_count(
             &surface, &truncated
         ));
+    }
+
+    #[test]
+    fn sealed_write_check_rejects_the_drifts_it_guards() {
+        use super::{
+            check_sealed_writes_are_classified_from_their_bytes, collect_production_pattern_hits,
+            repo_root, SEALED_WRITE_LABEL_FILES,
+        };
+        let root = repo_root();
+        let read = |rel: &str| std::fs::read_to_string(root.join(rel)).unwrap();
+        let trace = read("crates/uo-core/src/trace.rs");
+        let helpers =
+            production_source_slice(&read("runtime/uo-evm/src/generated_object_helpers.rs"));
+        let codecs = production_source_slice(&read("runtime/uo-evm/src/generated_oram_codecs.rs"));
+        let oram = production_source_slice(&read("runtime/uo-evm/src/oram.rs"));
+        let store =
+            production_source_slice(&read("runtime/uo-store/src/generated_store_helpers.rs"));
+        let runtime = root.join("runtime");
+        let hits = |pattern: &str| collect_production_pattern_hits(&runtime, pattern).unwrap();
+        let labels = hits("WriteClass::Update");
+        let shapes = hits("from_shape(");
+        let literals = hits("PhysicalWriteEvent {");
+        let ok = |trace: &str, helpers: &str, codecs: &str, oram: &str, store: &str| {
+            check_sealed_writes_are_classified_from_their_bytes(
+                trace, helpers, codecs, oram, store, &labels, &shapes, &literals,
+            )
+        };
+
+        // The sources pass as they are.
+        assert_eq!(labels, SEALED_WRITE_LABEL_FILES);
+        assert_eq!(shapes, SEALED_WRITE_LABEL_FILES);
+        assert_eq!(literals, ["runtime/uo-evm/src/generated_oram_codecs.rs"]);
+        assert!(ok(&trace, &helpers, &codecs, &oram, &store));
+
+        // A seal that records its write without the check.
+        let unchecked = helpers.replace(
+            "    if !is_update_write(&replaced, physical) {\n        bail!(\n            \"internal error: the sealed write of {} is not an Update of the record it replaces\",\n            location\n        );\n    }\n",
+            "",
+        );
+        assert_ne!(unchecked, helpers);
+        assert!(!ok(&trace, &unchecked, &codecs, &oram, &store));
+        // A check against the record after the seal, which always differs
+        // from nothing.
+        let late = helpers.replace(
+            "    let replaced: Box<[u8]> = (&*physical).into();\n    if !cipher.seal_and_wipe_into_slice(aad.as_bytes(), payload, rng, physical) {",
+            "    if !cipher.seal_and_wipe_into_slice(aad.as_bytes(), payload, rng, physical) {",
+        );
+        assert_ne!(late, helpers);
+        assert!(!ok(&trace, &late, &codecs, &oram, &store));
+        // A second seal in place beside the checked one.
+        let second_seal = helpers.replace(
+            "pub(super) fn with_opened_object_payload<T, F>(",
+            "fn reseal_unchecked(aad: &str, payload: &mut [u8], physical: &mut [u8], cipher: &StoreCipher, rng: &mut ChaCha20Rng) -> bool {\n    cipher.seal_and_wipe_into_slice(aad.as_bytes(), payload, rng, physical)\n}\n\npub(super) fn with_opened_object_payload<T, F>(",
+        );
+        assert_ne!(second_seal, helpers);
+        assert!(!ok(&trace, &second_seal, &codecs, &oram, &store));
+        // A helper that labels a write Update on its own.
+        let labelled = helpers.replace(
+            "pub(super) fn with_opened_object_payload<T, F>(",
+            "fn label(trace: &mut CallRecorder, len: usize) {\n    trace.physical_write(PhysicalWriteEvent::from_shape(\"o\", \"o\", len, WriteClass::Update));\n}\n\npub(super) fn with_opened_object_payload<T, F>(",
+        );
+        assert_ne!(labelled, helpers);
+        assert!(!ok(&trace, &labelled, &codecs, &oram, &store));
+        // An ORAM write pushed to the log from outside the checked seal.
+        let pushed = codecs.replace(
+            "pub(super) fn finish_oram_write_log(log: OramWriteLog) -> Result<OramWriteBatch> {",
+            "pub(super) fn log_unchecked(log: &mut OramWriteLog, len: usize) -> Result<()> {\n    log.push_update(\"o\", len)\n}\n\npub(super) fn finish_oram_write_log(log: OramWriteLog) -> Result<OramWriteBatch> {",
+        );
+        assert_ne!(pushed, codecs);
+        assert!(!ok(&trace, &helpers, &pushed, &oram, &store));
+        // An ORAM write record built with a class of the caller's choice.
+        let chosen = codecs.replace(
+            "impl OramWrite {\n",
+            "impl OramWrite {\n    pub(crate) fn from_shape(location: impl Into<String>, len: usize, class: WriteClass) -> Self {\n        Self { location: location.into(), len, class }\n    }\n\n",
+        );
+        assert_ne!(chosen, codecs);
+        assert!(!ok(&trace, &helpers, &chosen, &oram, &store));
+        let direct = oram.replace(
+            "    pub(crate) fn push_update(&mut self, location: impl Into<String>, len: usize) -> Result<()> {",
+            "    pub(crate) fn push_same(&mut self, location: impl Into<String>, len: usize) -> Result<()> {\n        push_oram_write_update(self, location, len)\n    }\n\n    pub(crate) fn push_update(&mut self, location: impl Into<String>, len: usize) -> Result<()> {",
+        );
+        assert_ne!(direct, oram);
+        assert!(!ok(&trace, &helpers, &codecs, &direct, &store));
+        // A store write whose event does not wait for the check.
+        let store_unchecked = store.replace(
+            "    if !is_update_write(&replaced, slot) {\n        bail!(\n            \"internal error: the sealed write of {} is not an Update of the record it replaces\",\n            object\n        );\n    }\n",
+            "",
+        );
+        assert_ne!(store_unchecked, store);
+        assert!(!ok(&trace, &helpers, &codecs, &oram, &store_unchecked));
+        // A check that looks at the record as a whole, or at larger units.
+        let whole = trace.replace(
+            "            .all(|(old_unit, new_unit)| classify_write(old_unit, new_unit) == WriteClass::Update)\n}",
+            "            .all(|(_old_unit, _new_unit)| classify_write(old, new) == WriteClass::Update)\n}",
+        );
+        assert_ne!(whole, trace);
+        assert!(!ok(&whole, &helpers, &codecs, &oram, &store));
+        let wide = trace.replace(
+            "pub const STORAGE_OBSERVER_UNIT_BYTES: usize = 32;",
+            "pub const STORAGE_OBSERVER_UNIT_BYTES: usize = 4096;",
+        );
+        assert_ne!(wide, trace);
+        assert!(!ok(&wide, &helpers, &codecs, &oram, &store));
+        // Another runtime file that names the class, or builds an event
+        // field by field.
+        let mut more_labels = labels.clone();
+        more_labels.push("runtime/uo-evm/src/objects.rs".into());
+        more_labels.sort();
+        assert!(!check_sealed_writes_are_classified_from_their_bytes(
+            &trace,
+            &helpers,
+            &codecs,
+            &oram,
+            &store,
+            &more_labels,
+            &shapes,
+            &literals,
+        ));
+        assert!(!check_sealed_writes_are_classified_from_their_bytes(
+            &trace,
+            &helpers,
+            &codecs,
+            &oram,
+            &store,
+            &labels,
+            &more_labels,
+            &literals,
+        ));
+        let mut more_literals = literals.clone();
+        more_literals.push("runtime/uo-evm/src/objects.rs".into());
+        assert!(!check_sealed_writes_are_classified_from_their_bytes(
+            &trace,
+            &helpers,
+            &codecs,
+            &oram,
+            &store,
+            &labels,
+            &shapes,
+            &more_literals,
+        ));
+        // An event built field by field beside the function that returns
+        // one.
+        let literal = codecs.replace(
+            "pub(super) fn finish_oram_write_log(log: OramWriteLog) -> Result<OramWriteBatch> {",
+            "fn event(len: usize) -> uo_core::trace::PhysicalWriteEvent {\n    uo_core::trace::PhysicalWriteEvent { object: String::new(), location: String::new(), len, class: uo_core::trace::WriteClass::Same }\n}\n\npub(super) fn finish_oram_write_log(log: OramWriteLog) -> Result<OramWriteBatch> {",
+        );
+        assert_ne!(literal, codecs);
+        assert!(!ok(&trace, &helpers, &literal, &oram, &store));
     }
 
     #[test]

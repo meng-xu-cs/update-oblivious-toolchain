@@ -371,14 +371,6 @@ fn clone_oram_storage(storage: &super::OramStorage) -> super::OramStorage {
 }
 
 impl OramWrite {
-    pub(crate) fn from_shape(location: impl Into<String>, len: usize, class: WriteClass) -> Self {
-        Self {
-            location: location.into(),
-            len,
-            class,
-        }
-    }
-
     pub(crate) fn with_object(&self, object: &str) -> uo_core::trace::PhysicalWriteEvent {
         uo_core::trace::PhysicalWriteEvent::from_shape(
             object,

@@ -206,6 +206,18 @@ proved.
   the paper-main theorem's storage-trace premise. That the runtime store
   emits exactly this encoding is checked against runtime traces
   (`exact_encoding_matches` in `results/trace_equivalence.json`), not proved.
+  The class `Update` of a sealed write is not a label the runtime asserts:
+  where it seals a record in place it keeps the record the write replaces
+  and fails the call unless every 32-byte unit of the new record is an
+  `Update` of the unit it replaces (`is_update_write`; the Lean statement of
+  the check, with the unit length as a parameter, is `isUpdateWrite` in
+  `UOToolchain/RuntimeStoreCodecSemantics.lean`). That a fresh nonce makes
+  every unit differ holds except with negligible probability and is not
+  proved; the check turns the exception into a failed call, a source check
+  keeps every sealed write behind it
+  (`sealed_writes_are_classified_from_their_bytes` in
+  `runtime_boundary_validation.json`), and two tamper scenarios remove it
+  and are rejected.
   The manifest lists the objects an entrypoint may write
   (`may_write_objects`). The compiler derives the list; `uo-check` and the
   Lean translation checker recompute it from the function's body

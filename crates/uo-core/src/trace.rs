@@ -8318,6 +8318,26 @@ pub fn classify_write(old: &[u8], new: &[u8]) -> WriteClass {
     }
 }
 
+/// The unit the storage observer classifies: a 32-byte word, as an EVM
+/// `SSTORE` classifies one.
+pub const STORAGE_OBSERVER_UNIT_BYTES: usize = 32;
+
+/// Whether the storage observer sees a write of the record `new` over the
+/// record `old` as an `Update` in every unit. The records have one length,
+/// and each 32-byte word of the new record, the last one as far as the
+/// record reaches, is classified on its own: it is not zero, the word it
+/// replaces is not zero, and the two differ. Every write of a sealed record
+/// must pass: one that does not shows a repeated nonce or a broken encoding,
+/// and its class would tell the observer about the call.
+pub fn is_update_write(old: &[u8], new: &[u8]) -> bool {
+    old.len() == new.len()
+        && !new.is_empty()
+        && old
+            .chunks(STORAGE_OBSERVER_UNIT_BYTES)
+            .zip(new.chunks(STORAGE_OBSERVER_UNIT_BYTES))
+            .all(|(old_unit, new_unit)| classify_write(old_unit, new_unit) == WriteClass::Update)
+}
+
 #[derive(Serialize)]
 struct IndexedTranscriptPayload<'a, T: ?Sized> {
     index: usize,
@@ -8367,9 +8387,9 @@ mod tests {
         canonical_path_oram_leaf_seed_space_size, canonical_path_oram_seed_of_leaf_values,
         classify_write, collect_kernel_steps_from_expr,
         extract_runtime_path_oram_fresh_coin_scaffold, extract_runtime_path_oram_fresh_coin_values,
-        max_runtime_kernel_refinement_event_count, runtime_path_oram_fresh_coin_scaffold_of_step,
-        runtime_path_oram_fresh_coin_values_of_step, BoundaryEvent,
-        CanonicalFreshCoinRuntimePathOramTheoremInput,
+        is_update_write, max_runtime_kernel_refinement_event_count,
+        runtime_path_oram_fresh_coin_scaffold_of_step, runtime_path_oram_fresh_coin_values_of_step,
+        BoundaryEvent, CanonicalFreshCoinRuntimePathOramTheoremInput,
         CanonicalFreshCoinRuntimePathOramWitnessFamily, CanonicalFreshCoinTheoremInputError,
         CanonicalFreshCoinWitnessFamilyError, ExecutionTrace, ExitEvent, KernelWitnessError,
         LogicalEvent, NormalizedMicroTrace, NormalizedPageEvent, OutputShape, PageEventKind,
@@ -8390,7 +8410,7 @@ mod tests {
         SeededRuntimePaperMainFamilyBundle, SeededRuntimePaperMainFamilyBundleError,
         SeededRuntimePaperMainSlotFamilyBundle, SeededRuntimePaperMainSlotFamilyBundleError,
         SeededRuntimePathOramWitnessFamily, SeededRuntimeWitnessFamilyError, TheoremTrace,
-        WriteClass,
+        WriteClass, STORAGE_OBSERVER_UNIT_BYTES,
     };
     use crate::{
         CompiledArtifact, CompiledContract, CompiledFunction, ConfidentialKernelSlotExpr,
@@ -8444,6 +8464,43 @@ mod tests {
         assert_eq!(classify_write(&[0, 0], &[1, 2]), WriteClass::Set);
         assert_eq!(classify_write(&[1, 2], &[0, 0]), WriteClass::Clear);
         assert_eq!(classify_write(&[1, 2], &[2, 3]), WriteClass::Update);
+    }
+
+    #[test]
+    fn an_update_write_changes_every_observer_unit() {
+        // A record of two words and six bytes of a third.
+        let old: Vec<u8> = (0..70).map(|index| 1 + (index % 7) as u8).collect();
+        let fresh: Vec<u8> = old.iter().map(|byte| byte + 1).collect();
+        assert!(is_update_write(&old, &fresh));
+        // The whole record changes and is not zero, and still one unit of
+        // it is not an update: unchanged, zero before or zero after.
+        for unit in [0..32, 32..64, 64..70] {
+            assert_eq!(classify_write(&old, &fresh), WriteClass::Update);
+            let mut same = fresh.clone();
+            same[unit.clone()].copy_from_slice(&old[unit.clone()]);
+            assert_eq!(classify_write(&old, &same), WriteClass::Update);
+            assert!(!is_update_write(&old, &same), "{unit:?} unchanged");
+            let mut cleared = fresh.clone();
+            cleared[unit.clone()].fill(0);
+            assert_eq!(classify_write(&old, &cleared), WriteClass::Update);
+            assert!(!is_update_write(&old, &cleared), "{unit:?} cleared");
+            let mut unset = old.clone();
+            unset[unit.clone()].fill(0);
+            assert_eq!(classify_write(&unset, &fresh), WriteClass::Update);
+            assert!(!is_update_write(&unset, &fresh), "{unit:?} set");
+        }
+        // A record written over itself, a record of another length and an
+        // empty record are not updates.
+        assert!(!is_update_write(&fresh, &fresh));
+        assert!(!is_update_write(&old[..64], &fresh));
+        assert!(!is_update_write(&[], &[]));
+        // One byte that differs in each unit is enough.
+        let mut nearly = old.clone();
+        for index in [31, 63, 69] {
+            nearly[index] += 1;
+        }
+        assert!(is_update_write(&old, &nearly));
+        assert_eq!(STORAGE_OBSERVER_UNIT_BYTES, 32);
     }
 
     /// The keys of a JSON object's own fields, in the order they are written.

@@ -100,8 +100,8 @@ its engineering part is Wave 4, its certified part is research.
 | 29 | State what the Path ORAM theorem's cryptographic assumptions mean | 2 | S | | done | `9631ed0` |
 | 30 | Charge external reads in the modeled cost | 3 | S to M | | done | `3d8b5f6` |
 | 31 | Do not rewrite statically read-only exact objects | 3 | M | 30 | done | `1afbb01` |
-| 32 | Load each exact object once per call | 3 | M | 30 | done | |
-| 33 | Check each UO write's class against its bytes | 3 | S | | todo | |
+| 32 | Load each exact object once per call | 3 | M | 30 | done | `551a528` |
+| 33 | Check each UO write's class against its bytes | 3 | S | | done | |
 | 34 | Make the confidential kernel's 256-bit arithmetic branch-free | 3 | M | | todo | |
 | 35 | Match the record codec to the observer unit | 3 | M | | todo | |
 | 36 | Remove the whole-store witness snapshots from a call | 4 | M | 25 | todo | |
