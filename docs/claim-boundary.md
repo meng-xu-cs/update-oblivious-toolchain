@@ -193,12 +193,24 @@ proved.
   admitted kernel programs it is a Lean theorem over the exact store's
   encoding (`UOToolchain/KernelExactTrace.lean`): every admitted run executes
   the whole kernel body, each storage access scans its whole object, and every
-  touched object is rewritten at commit with `Update`-class writes, so all
-  admitted runs of a program produce the same trace (`admittedKernel_exactUO`)
-  and `paperMain_admittedKernel_exact_noninterference_moduloReleases`
-  discharges the paper-main theorem's storage-trace premise. That the runtime
-  store emits exactly this encoding is checked against runtime traces
+  object the program has a write statement for is rewritten at commit with
+  `Update`-class writes, whether or not the write's predicate holds. An
+  object the program only reads is scanned and not written
+  (`exactEncodeRun_rewrites_only_written`). Which objects are rewritten is
+  fixed by the program, so all admitted runs of a program produce the same
+  trace (`admittedKernel_exactUO`) and
+  `paperMain_admittedKernel_exact_noninterference_moduloReleases` discharges
+  the paper-main theorem's storage-trace premise. That the runtime store
+  emits exactly this encoding is checked against runtime traces
   (`exact_encoding_matches` in `results/trace_equivalence.json`), not proved.
+  The manifest lists the objects an entrypoint may write
+  (`may_write_objects`). The compiler derives the list; `uo-check` and the
+  Lean translation checker recompute it from the function's body
+  (`manifest_may_write_objects_exact_of_lookup`); and the runtime takes it
+  from the slot program it runs, refuses a manifest that says otherwise, and
+  reseals those objects, also when the call aborts, and no other. Two tamper
+  scenarios change the list, one to omit a written object and one to add an
+  object that is only read, and the checker rejects both.
 - Computational UO on `path_oram_local_posmap_v1` is a theorem over admitted
   configurations, given bundle evidence for them
   (`UOToolchain/PathOramAdmitted.lean`): every pair of admitted
@@ -323,7 +335,9 @@ fixed when it is compiled (cost model `uo-modeled-resource-cost-v2`):
 2000 + 11·statements + 7·expressions + 29·max_load_ops + 29·max_commit_ops
 ```
 
-`max_commit_ops` bounds the sealed records a call writes, and `max_load_ops`
+`max_commit_ops` bounds the sealed records a call writes: each slot of each
+exact object the entrypoint may write (`may_write_objects`), and the path
+and metadata pages of each access of an ORAM map. `max_load_ops` bounds
 those it reads: each slot of each exact object it loads, once; for each
 access of an ORAM map the buckets of the path and the metadata pages; and,
 for a Path ORAM map, the counter and the metadata pages the call reads when

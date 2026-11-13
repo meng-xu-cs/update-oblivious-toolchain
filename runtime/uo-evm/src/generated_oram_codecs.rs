@@ -3238,6 +3238,7 @@ pub(super) fn path_entries_from_storage(
         scratch_bytes: scratch,
         max_kernel_ops: parameters.metadata_pages + parameters.bucket_count,
         max_commit_ops: 0,
+        max_load_ops: 0,
     })?;
     let mut position_map =
         repeat_boxed_masked_usize_options(parameters.capacity, &MaskedUsizeOption::none())?;
@@ -3304,6 +3305,7 @@ pub(super) fn path_position_map_from_storage(
         scratch_bytes: scratch,
         max_kernel_ops: parameters.metadata_pages,
         max_commit_ops: 0,
+        max_load_ops: 0,
     })?;
     let position_map =
         decode_path_position_map_pages(spec, parameters, cipher, directory_pages, &mut allocator)?;
@@ -5751,6 +5753,7 @@ pub(super) fn tree_position_map_witness_leaves(
         scratch_bytes: scratch,
         max_kernel_ops: parameters.bucket_count + parameters.metadata_pages,
         max_commit_ops: 0,
+        max_load_ops: 0,
     })?;
     let mut leaves = FixedBoxBuilder::new(shape.capacity);
     for _ in 0..shape.capacity {
@@ -5830,6 +5833,7 @@ pub(super) fn tree_entries_from_storage(
         scratch_bytes: scratch,
         max_kernel_ops: parameters.bucket_count + parameters.metadata_pages,
         max_commit_ops: 0,
+        max_load_ops: 0,
     })?;
     let mut entries = repeat_boxed_map_entries(shape.capacity, empty_entry)?;
     let empty = TreeNode::empty(&shape.key_type, &shape.value_type);

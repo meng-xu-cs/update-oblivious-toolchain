@@ -1,4 +1,6 @@
-use crate::confidential_kernel::{ConfidentialKernelProgram, ConfidentialKernelSlotProgram};
+use crate::confidential_kernel::{
+    ConfidentialKernelProgram, ConfidentialKernelSlotProgram, ConfidentialKernelSlotStatement,
+};
 use crate::ir::{BackendKind, ContainerKind, PublicEnvField, StateObject};
 use crate::metadata::{DeclassificationKind, ReturnPolicy, StatusPolicy};
 use crate::types::{ScalarType, Type};
@@ -160,8 +162,9 @@ pub struct EntrypointManifest {
     pub uoarray_writes: usize,
     pub uomap_reads: usize,
     pub uomap_writes: usize,
-    /// The sealed records the call may write: see `max_load_ops` for the
-    /// units.
+    /// The sealed records the call may write: each slot of each exact object
+    /// in `may_write_objects`, and for each access of an ORAM map the units
+    /// `max_load_ops` counts for it.
     pub max_commit_ops: usize,
     /// The sealed records the call may read from storage: each slot of each
     /// exact object it loads, once; for each access of an ORAM map the
@@ -169,6 +172,12 @@ pub struct EntrypointManifest {
     /// map, the counter and the metadata pages the call reads when it
     /// starts. The modeled cost charges them (`uo-modeled-resource-cost-v2`).
     pub max_load_ops: usize,
+    /// The objects the entrypoint may write, in increasing id order: every
+    /// object with a write statement in its body, whether or not the
+    /// statement has a predicate. At commit the runtime reseals these exact
+    /// objects, also when the call aborts, and no other: an exact object the
+    /// entrypoint only reads is restored with no write.
+    pub may_write_objects: Vec<u32>,
     #[serde(default)]
     pub oram_accesses: BTreeMap<u32, usize>,
 }
@@ -182,8 +191,31 @@ pub struct RuntimeConfidentialEntrypointPlan {
     public_object_ids: Box<[u32]>,
     max_kernel_ops: usize,
     max_commit_ops: usize,
+    max_load_ops: usize,
+    may_write_objects: Box<[u32]>,
     confidential_slot_program: ConfidentialKernelSlotProgram,
     max_hash_part_bytes: usize,
+}
+
+/// The objects a slot program has a write statement for, in increasing id
+/// order, whether or not the statement has a predicate.
+pub fn slot_program_written_objects(program: &ConfidentialKernelSlotProgram) -> Vec<u32> {
+    let mut written = std::collections::BTreeSet::new();
+    for statement in program.body.iter() {
+        match statement {
+            ConfidentialKernelSlotStatement::CellSet { object_id, .. }
+            | ConfidentialKernelSlotStatement::ArraySet { object_id, .. }
+            | ConfidentialKernelSlotStatement::MapPut { object_id, .. } => {
+                written.insert(*object_id);
+            }
+            ConfidentialKernelSlotStatement::Declare { .. }
+            | ConfidentialKernelSlotStatement::Assign { .. }
+            | ConfidentialKernelSlotStatement::Require { .. }
+            | ConfidentialKernelSlotStatement::AbortIf { .. }
+            | ConfidentialKernelSlotStatement::Return { .. } => {}
+        }
+    }
+    written.into_iter().collect()
 }
 
 impl EntrypointManifest {
@@ -203,10 +235,22 @@ impl EntrypointManifest {
         let max_kernel_ops = confidential_slot_program
             .expected_runtime_step_witnesses()
             .len();
+        // What commit reseals is decided by the program the kernel runs. The
+        // manifest's list must say the same.
+        let may_write_objects = slot_program_written_objects(&confidential_slot_program);
+        if may_write_objects != self.may_write_objects {
+            bail!(
+                "entrypoint {entrypoint} manifest may_write_objects {:?} are not the objects its slot program writes {:?}",
+                self.may_write_objects,
+                may_write_objects
+            );
+        }
         Ok(RuntimeConfidentialEntrypointPlan {
             public_object_ids,
             max_kernel_ops,
             max_commit_ops: self.max_commit_ops,
+            max_load_ops: self.max_load_ops,
+            may_write_objects: may_write_objects.into_boxed_slice(),
             confidential_slot_program,
             max_hash_part_bytes: self.max_hash_part_bytes,
         })
@@ -224,6 +268,16 @@ impl RuntimeConfidentialEntrypointPlan {
 
     pub fn max_commit_ops(&self) -> usize {
         self.max_commit_ops
+    }
+
+    pub fn max_load_ops(&self) -> usize {
+        self.max_load_ops
+    }
+
+    /// The objects the program may write, in increasing id order: what
+    /// commit reseals.
+    pub fn may_write_objects(&self) -> &[u32] {
+        &self.may_write_objects
     }
 
     pub fn confidential_slot_program(&self) -> &ConfidentialKernelSlotProgram {
@@ -791,6 +845,7 @@ mod tests {
                 uomap_writes: 1,
                 max_commit_ops: oram.total_commit_ops() * 2,
                 max_load_ops: oram.total_commit_ops() * 2,
+                may_write_objects: Vec::new(),
                 oram_accesses: BTreeMap::from([(7, 2)]),
             },
         );
@@ -896,6 +951,7 @@ mod tests {
             uomap_writes: 0,
             max_commit_ops: 0,
             max_load_ops: 0,
+            may_write_objects: Vec::new(),
             oram_accesses: BTreeMap::new(),
         };
 

@@ -432,7 +432,7 @@
         "statement_trace_count": 7
       },
       "entrypoint": "auth(bytes32)",
-      "gas_used": 2591,
+      "gas_used": 2475,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -838,7 +838,7 @@
         "statement_trace_count": 7
       },
       "entrypoint": "auth(bytes32)",
-      "gas_used": 2591,
+      "gas_used": 2475,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,

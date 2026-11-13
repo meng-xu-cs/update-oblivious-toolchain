@@ -42,6 +42,7 @@ pub(in crate::runtime) fn run_public_entrypoint(
     let initial_public_state = runtime.public_state_snapshot()?;
     let mut kernel = PublicRuntimeKernel::begin(allocator, public_object_ids.as_ref())?;
     let mut shadow = runtime.prepare_public_shadow(&mut kernel, public_object_ids.as_ref())?;
+    shadow.set_may_write_objects(&manifest_entry.may_write_objects);
     let execution = interpret_public_entrypoint(
         contract,
         function,

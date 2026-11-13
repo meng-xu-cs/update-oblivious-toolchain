@@ -6,10 +6,11 @@ import UOToolchain.PaperMainReleases
 
 The exact backends (`UOCell`, `UOArray`, full-scan `UOMap`) make every storage
 access touch its whole object: each access scans every slot of its object, and
-at commit every object the call touched is rewritten slot by slot with
-`Update`-class writes, in object-id order, whether the call wrote it or only
-read it. The physical trace of a run is therefore a function of which
-statements the run executes, not of keys, indices, values, or predicates.
+at commit every object the run has a write statement for is rewritten slot by
+slot with `Update`-class writes, in object-id order, whether or not the
+write's predicate held. An object the run only reads is not written. The
+physical trace of a run is therefore a function of which statements the run
+executes, not of keys, indices, values, or predicates.
 
 This module makes that argument a theorem for admitted kernel programs:
 
@@ -180,6 +181,30 @@ def touchedObjects (accesses : List ExactAccess) : List Nat :=
   (List.range (accesses.foldl (fun bound access => max bound (access.objectId + 1)) 0)).filter
     fun objectId => accesses.any fun access => access.objectId == objectId
 
+/-- Whether an access is a write. -/
+def ExactAccess.isWrite : ExactAccess → Bool
+  | .read _ => false
+  | .write _ => true
+
+/-- Objects the accesses write, each once, in increasing id order: the objects
+the runtime rewrites at commit. An object that is only read is not among
+them. -/
+def writtenObjects (accesses : List ExactAccess) : List Nat :=
+  touchedObjects (accesses.filter ExactAccess.isWrite)
+
+/-- An object is among the written ones only if some access writes it. -/
+theorem write_mem_of_mem_writtenObjects {accesses : List ExactAccess} {objectId : Nat}
+    (h : objectId ∈ writtenObjects accesses) : ExactAccess.write objectId ∈ accesses := by
+  unfold writtenObjects touchedObjects at h
+  simp only [List.mem_filter, List.any_eq_true] at h
+  obtain ⟨_, access, ⟨hIn, hWrite⟩, hEq⟩ := h
+  cases access with
+  | read id => simp [ExactAccess.isWrite] at hWrite
+  | write id =>
+      have hId : id = objectId := by simpa [ExactAccess.objectId] using hEq
+      subst hId
+      exact hIn
+
 /-- Public layout of an exact-backend object: its name, kind, number of slots
 (one for a cell, the capacity for an array or map), and sealed record length. -/
 structure ExactObjectLayout where
@@ -209,14 +234,15 @@ def ExactObjectLayout.updateWrites (object : ExactObjectLayout) : List PhysicalW
 
 /-- The exact store's physical trace of a run that executes `statements`: a
 full scan for every storage access, in evaluation order, and at commit a full
-rewrite of every touched object, in object-id order. -/
+rewrite of every object a statement writes, in object-id order. An object
+the statements only read is not written. -/
 def exactEncodeRun (layout : Nat → ExactObjectLayout) (statements : List KernelStatement) :
     Trace :=
   let accesses := statements.flatMap KernelStatement.accesses
   { Trace.empty with
     physicalReads := accesses.flatMap fun access => (layout access.objectId).scanReads
     physicalWrites :=
-      (touchedObjects accesses).flatMap fun objectId => (layout objectId).updateWrites }
+      (writtenObjects accesses).flatMap fun objectId => (layout objectId).updateWrites }
 
 /-- The exact encoding reveals no write class: every write is an `Update`. -/
 theorem exactEncodeRun_writes_update (layout : Nat → ExactObjectLayout)
@@ -227,6 +253,31 @@ theorem exactEncodeRun_writes_update (layout : Nat → ExactObjectLayout)
     List.mem_map] at hw
   obtain ⟨_, _, _, _, rfl⟩ := hw
   rfl
+
+/-- The exact encoding rewrites an object only if a statement writes it: its
+writes are the rewrites of the written objects, and an object with no write
+access is not one of them. -/
+theorem exactEncodeRun_rewrites_only_written (layout : Nat → ExactObjectLayout)
+    (statements : List KernelStatement) :
+    (exactEncodeRun layout statements).physicalWrites =
+        (writtenObjects (statements.flatMap KernelStatement.accesses)).flatMap
+          (fun objectId => (layout objectId).updateWrites) ∧
+      ∀ objectId,
+        ExactAccess.write objectId ∉ statements.flatMap KernelStatement.accesses →
+          objectId ∉ writtenObjects (statements.flatMap KernelStatement.accesses) :=
+  ⟨rfl, fun _ hNoWrite hMem => hNoWrite (write_mem_of_mem_writtenObjects hMem)⟩
+
+/-- A run that only reads writes nothing. -/
+theorem exactEncodeRun_no_writes_of_readOnly (layout : Nat → ExactObjectLayout)
+    (statements : List KernelStatement)
+    (hRead : ∀ access ∈ statements.flatMap KernelStatement.accesses, access.isWrite = false) :
+    (exactEncodeRun layout statements).physicalWrites = [] := by
+  have hNone :
+      (statements.flatMap KernelStatement.accesses).filter ExactAccess.isWrite = [] := by
+    rw [List.filter_eq_nil_iff]
+    intro access hMem
+    simp [hRead access hMem]
+  simp [exactEncodeRun, writtenObjects, touchedObjects, hNone]
 
 /-- The M+ trace of a run: the encoding of the statements it executes, with the
 entrypoint's modeled gas. -/
@@ -249,7 +300,7 @@ theorem kernelExactTrace_eq_static (encodeRun : List KernelStatement → Trace) 
 /-- Example: the encoding of a mixer deposit over a capacity-8 full-scan map
 (`balances`, object 1) and a cell (`total`, object 2) is the trace the runtime
 emits: the balances read and the map write's scan, the total read and the cell
-write's scan, then one rewrite of each touched object in object-id order. -/
+write's scan, then one rewrite of each written object in object-id order. -/
 private def depositLayout : Nat → ExactObjectLayout
   | 1 => { name := "balances", kind := .mapKind, slots := 8, recordLen := 190 }
   | 2 => { name := "total", kind := .cell, slots := 1, recordLen := 124 }
@@ -269,6 +320,24 @@ example :
 example :
     (exactEncodeRun depositLayout depositBody).physicalReads.map PhysicalRead.object =
       List.replicate 16 "balances" ++ ["total", "total"] := by
+  decide
+
+/-- Example: a balance query scans the map once and writes nothing, and a body
+that reads the map and writes the cell rewrites the cell alone. -/
+private def balanceQueryBody : List KernelStatement :=
+  [ .retStmt (some (.mapGet 1 (.var "commitment"))) ]
+
+private def totalFromBalanceBody : List KernelStatement :=
+  [ .cellSet 2 (.mapGet 1 (.var "commitment")) none ]
+
+example :
+    (exactEncodeRun depositLayout balanceQueryBody).physicalReads.length = 8 ∧
+      (exactEncodeRun depositLayout balanceQueryBody).physicalWrites.length = 0 := by
+  decide
+
+example :
+    (exactEncodeRun depositLayout totalFromBalanceBody).physicalWrites.map
+        PhysicalWrite.location = ["total"] := by
   decide
 
 /-- A run of an admitted kernel program: a configuration over which the program

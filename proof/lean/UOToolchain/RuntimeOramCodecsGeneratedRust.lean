@@ -3254,6 +3254,7 @@ def generatedRustLines2 : List String :=
   , "        scratch_bytes: scratch,"
   , "        max_kernel_ops: parameters.metadata_pages + parameters.bucket_count,"
   , "        max_commit_ops: 0,"
+  , "        max_load_ops: 0,"
   , "    })?;"
   , "    let mut position_map ="
   , "        repeat_boxed_masked_usize_options(parameters.capacity, &MaskedUsizeOption::none())?;"
@@ -3320,6 +3321,7 @@ def generatedRustLines2 : List String :=
   , "        scratch_bytes: scratch,"
   , "        max_kernel_ops: parameters.metadata_pages,"
   , "        max_commit_ops: 0,"
+  , "        max_load_ops: 0,"
   , "    })?;"
   , "    let position_map ="
   , "        decode_path_position_map_pages(spec, parameters, cipher, directory_pages, &mut allocator)?;"
@@ -4512,13 +4514,13 @@ def generatedRustLines2 : List String :=
   , "        let hit = update & (level == found_level);"
   , "        let node = cache"
   , "            .slots"
-  , "            .get_mut(level)"
-  , "            .ok_or_else(|| anyhow!(\"tree cache slot {} missing\", level))?;"
   ]
 
-/-- Lines 4501 to 5875 of the generated Rust. -/
+/-- Lines 4501 to 5879 of the generated Rust. -/
 def generatedRustLines3 : List String :=
-  [ "        node.value = Value::confidential_select(hit, value.clone(), node.value.clone())?;"
+  [ "            .get_mut(level)"
+  , "            .ok_or_else(|| anyhow!(\"tree cache slot {} missing\", level))?;"
+  , "        node.value = Value::confidential_select(hit, value.clone(), node.value.clone())?;"
   , "    }"
   , ""
   , "    // A delete removes the found node, or, when it has two children, moves"
@@ -5771,6 +5773,7 @@ def generatedRustLines3 : List String :=
   , "        scratch_bytes: scratch,"
   , "        max_kernel_ops: parameters.bucket_count + parameters.metadata_pages,"
   , "        max_commit_ops: 0,"
+  , "        max_load_ops: 0,"
   , "    })?;"
   , "    let mut leaves = FixedBoxBuilder::new(shape.capacity);"
   , "    for _ in 0..shape.capacity {"
@@ -5850,6 +5853,7 @@ def generatedRustLines3 : List String :=
   , "        scratch_bytes: scratch,"
   , "        max_kernel_ops: parameters.bucket_count + parameters.metadata_pages,"
   , "        max_commit_ops: 0,"
+  , "        max_load_ops: 0,"
   , "    })?;"
   , "    let mut entries = repeat_boxed_map_entries(shape.capacity, empty_entry)?;"
   , "    let empty = TreeNode::empty(&shape.key_type, &shape.value_type);"

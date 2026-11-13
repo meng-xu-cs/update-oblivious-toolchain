@@ -10,8 +10,8 @@
     "metadata_canonicalization_sha256": "5a1c871cc1633a670095791d6295926e0b93fef06b992e2e2ba863cdc1cb7517",
     "compilation_mode": "uo",
     "compiler_version": "0.1.0",
-    "toolchain_manifest_sha256": "f51871012ebcef46dddea9d6af67dc77193dde25209fe42a2ec7ac76e917aff4",
-    "package_sha256": "1733c7dc41b2ed556da712b6c42c846ad4d044c6758dc170e84d3c95c0185201"
+    "toolchain_manifest_sha256": "c277bbb944b4d9d8b9e0cc74fc7b7e94e952bce2e9279251548e5984ab46e47c",
+    "package_sha256": "a344d9334b25aa92cdfca0cddd490f4b84965073b591ff328e97fd95f0fc69e9"
   },
   "contract": {
     "contract": "AuthScan",
@@ -760,7 +760,7 @@
             "token"
           ],
           "entry_input_len": 32,
-          "public_gas_budget": 2591,
+          "public_gas_budget": 2475,
           "arena_bytes": 4160,
           "max_stack_words": 65,
           "max_hash_part_bytes": 0,
@@ -1194,15 +1194,18 @@
           "uoarray_writes": 0,
           "uomap_reads": 0,
           "uomap_writes": 0,
-          "max_commit_ops": 5,
+          "max_commit_ops": 1,
           "max_load_ops": 5,
+          "may_write_objects": [
+            2
+          ],
           "oram_accesses": {}
         },
         "readLast()": {
           "secret_args": [],
           "param_names": [],
           "entry_input_len": 0,
-          "public_gas_budget": 2076,
+          "public_gas_budget": 2047,
           "arena_bytes": 4096,
           "max_stack_words": 64,
           "max_hash_part_bytes": 0,
@@ -1276,8 +1279,9 @@
           "uoarray_writes": 0,
           "uomap_reads": 0,
           "uomap_writes": 0,
-          "max_commit_ops": 1,
+          "max_commit_ops": 0,
           "max_load_ops": 1,
+          "may_write_objects": [],
           "oram_accesses": {}
         },
         "seed(uint256,bytes32)": {
@@ -1304,6 +1308,9 @@
           "uomap_writes": 0,
           "max_commit_ops": 4,
           "max_load_ops": 4,
+          "may_write_objects": [
+            1
+          ],
           "oram_accesses": {}
         }
       }

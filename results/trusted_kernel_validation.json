@@ -304,7 +304,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "bundle_json_bytes": 8911,
+      "bundle_json_bytes": 8607,
       "confidential_slot_program": {
         "entrypoint_id": "auth(bytes32)",
         "expected_runtime_step_count": 8,
@@ -317,7 +317,7 @@
       "controller_accesses": 0,
       "controller_phase_count": 3,
       "entrypoint": "auth(bytes32)",
-      "gas_used": 2591,
+      "gas_used": 2475,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -631,7 +631,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "bundle_json_bytes": 8911,
+      "bundle_json_bytes": 8607,
       "confidential_slot_program": {
         "entrypoint_id": "auth(bytes32)",
         "expected_runtime_step_count": 8,
@@ -644,7 +644,7 @@
       "controller_accesses": 0,
       "controller_phase_count": 3,
       "entrypoint": "auth(bytes32)",
-      "gas_used": 2591,
+      "gas_used": 2475,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,

@@ -5304,6 +5304,76 @@ fn run_tamper_validation() -> Result<JsonValue> {
         "manifest max_load_ops do not match recomputed body accesses",
     )?);
 
+    // The may-write list decides what commit reseals. One manifest leaves the
+    // map `put` writes off the list, and one lists the map for `read`, which
+    // only reads it. Both artifacts say the same, so only the list the
+    // checker recomputes from the body rejects them.
+    let records_id = artifact
+        .contract
+        .state
+        .iter()
+        .find(|object| object.name == "records")
+        .map(|object| object.id)
+        .ok_or_else(|| anyhow!("may-write tamper scenario missing the records map"))?;
+    for (scenario, entrypoint, mutation, tamper) in [
+        (
+            "translation/may_write_omits_written_object",
+            target.entrypoint,
+            "remove the written map from manifest may_write_objects in the source artifact and the artifact alike",
+            (|may_write: &mut Vec<u32>, id: u32| may_write.retain(|object| *object != id))
+                as fn(&mut Vec<u32>, u32),
+        ),
+        (
+            "translation/may_write_lists_read_only_object",
+            "read(bytes32)",
+            "add the map a read only reads to manifest may_write_objects in the source artifact and the artifact alike",
+            (|may_write: &mut Vec<u32>, id: u32| {
+                may_write.push(id);
+                may_write.sort_unstable();
+            }) as fn(&mut Vec<u32>, u32),
+        ),
+    ] {
+        let mut tampered_source = source_artifact.clone();
+        let mut tampered_artifact = artifact.clone();
+        for tampered in [&mut tampered_source, &mut tampered_artifact] {
+            let manifest_entry = tampered
+                .contract
+                .manifest
+                .entrypoints
+                .get_mut(entrypoint)
+                .ok_or_else(|| anyhow!("may-write tamper scenario missing {entrypoint}"))?;
+            let before = manifest_entry.may_write_objects.clone();
+            tamper(&mut manifest_entry.may_write_objects, records_id);
+            if manifest_entry.may_write_objects == before {
+                bail!("may-write tamper scenario {scenario} changed nothing");
+            }
+        }
+        scenarios.push(require_rejection_reason(
+            validate_tampered_json_pair_case(
+                scenario,
+                "source_artifact",
+                &tampered_source,
+                "artifact",
+                &tampered_artifact,
+                |source_artifact_path, artifact_path| {
+                    Ok(Command::new(&translation_checker)
+                        .arg(&metadata.contract)
+                        .arg(source_artifact_path)
+                        .arg(artifact_path)
+                        .output()?)
+                },
+                json!({
+                    "scenario": scenario,
+                    "artifact_kind": "proofgrade_translation_artifacts",
+                    "benchmark": "SingleAccessMap/pathoram",
+                    "entrypoint": entrypoint,
+                    "mutation": mutation,
+                }),
+            )?,
+            "manifest may_write_objects are not the objects the body writes",
+        )?);
+    }
+
     let mut tampered_translation_raw_kernel_target = artifact.clone();
     let raw_target_object_id = tampered_translation_raw_kernel_target
         .contract
@@ -42162,7 +42232,9 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && allocator_source.contains("saturating_add(plan.max_stack_words)")
         && allocator_source.contains("saturating_mul(128)")
         && allocator_source.contains("saturating_add(128)")
-        && allocator_source.contains("const RESOURCE_EVENTS_PER_COMMIT_OP: usize = 6;")
+        && allocator_source.contains("const RESOURCE_EVENTS_PER_LOAD_OP: usize = 4;")
+        && allocator_source.contains("const RESOURCE_EVENTS_PER_COMMIT_OP: usize = 2;")
+        && allocator_source.contains("saturating_mul(RESOURCE_EVENTS_PER_LOAD_OP)")
         && allocator_source.contains("saturating_mul(RESOURCE_EVENTS_PER_COMMIT_OP)")
         && allocator_source.contains("let resource_events = self.resource_events.into_events()?;")
         && allocator_source.contains("resource_events: ResourceEventLog,")
@@ -43520,7 +43592,11 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             vec![String::from("runtime/uo-evm/src/state.rs")],
         ),
         (
-            "entry.object.commit(old, aborted, recorder, allocator)?;",
+            "let may_write = may_write_objects.contains(&id);",
+            vec![String::from("runtime/uo-evm/src/state.rs")],
+        ),
+        (
+            ".commit(old, aborted, may_write, recorder, allocator)?;",
             vec![String::from("runtime/uo-evm/src/state.rs")],
         ),
         (
@@ -52394,8 +52470,9 @@ fn run_erc20_allowance_key_experiment(artifact: &CompiledArtifact) -> Result<Exp
 /// one run of a confidential kernel program. Rust mirror of `IR.exactEncodeRun`
 /// in `proof/lean/UOToolchain/KernelExactTrace.lean`: every storage access
 /// scans all slots of its object, in evaluation order (a write scans before it
-/// writes), and at commit every touched object is rewritten slot by slot, in
-/// object-id order, with `Update`-class writes.
+/// writes), and at commit every object a statement writes is rewritten slot by
+/// slot, in object-id order, with `Update`-class writes. An object the program
+/// only reads is not written.
 struct ExactEncodingPrediction {
     reads: Vec<(String, String)>,
     writes: Vec<(String, String)>,
@@ -52435,8 +52512,13 @@ fn exact_expr_storage_reads(expr: &ConfidentialKernelExpr, reads: &mut Vec<u32>)
 }
 
 /// Objects a statement accesses (`IR.KernelStatement.accesses`): the reads of
-/// its expressions, then its write target.
-fn exact_statement_accesses(statement: &ConfidentialKernelStatement, accesses: &mut Vec<u32>) {
+/// its expressions, then its write target, which also goes to `written`
+/// (`IR.writtenObjects`), whatever the write's predicate.
+fn exact_statement_accesses(
+    statement: &ConfidentialKernelStatement,
+    accesses: &mut Vec<u32>,
+    written: &mut Vec<u32>,
+) {
     match statement {
         ConfidentialKernelStatement::Declare { value, .. }
         | ConfidentialKernelStatement::Assign { value, .. } => {
@@ -52454,6 +52536,7 @@ fn exact_statement_accesses(statement: &ConfidentialKernelStatement, accesses: &
                 exact_expr_storage_reads(predicate, accesses);
             }
             accesses.push(*object_id);
+            written.push(*object_id);
         }
         ConfidentialKernelStatement::ArraySet {
             object_id,
@@ -52467,6 +52550,7 @@ fn exact_statement_accesses(statement: &ConfidentialKernelStatement, accesses: &
                 exact_expr_storage_reads(predicate, accesses);
             }
             accesses.push(*object_id);
+            written.push(*object_id);
         }
         ConfidentialKernelStatement::MapPut {
             object_id,
@@ -52480,6 +52564,7 @@ fn exact_statement_accesses(statement: &ConfidentialKernelStatement, accesses: &
                 exact_expr_storage_reads(predicate, accesses);
             }
             accesses.push(*object_id);
+            written.push(*object_id);
         }
         ConfidentialKernelStatement::Return { value } => {
             if let Some(value) = value {
@@ -52506,8 +52591,9 @@ fn exact_encoding_prediction(
         .find(|function| function.signature == entrypoint)?;
     let program = function.confidential_program.as_ref()?;
     let mut accesses = Vec::new();
+    let mut written = Vec::new();
     for statement in program.body.iter() {
-        exact_statement_accesses(statement, &mut accesses);
+        exact_statement_accesses(statement, &mut accesses, &mut written);
     }
     let slot_locations = |object_id: u32| -> Option<(String, Vec<String>)> {
         let object = artifact
@@ -52538,11 +52624,10 @@ fn exact_encoding_prediction(
                 .map(|location| (name.clone(), location)),
         );
     }
-    let mut touched = accesses.clone();
-    touched.sort_unstable();
-    touched.dedup();
+    written.sort_unstable();
+    written.dedup();
     let mut writes = Vec::new();
-    for object_id in touched {
+    for object_id in written {
         let (name, locations) = slot_locations(object_id)?;
         writes.extend(
             locations
@@ -52618,7 +52703,7 @@ fn kernel_trace_route(artifact: &CompiledArtifact, entrypoint: &str) -> Option<K
     let program = function.confidential_program.as_ref()?;
     let mut accesses = Vec::new();
     for statement in program.body.iter() {
-        exact_statement_accesses(statement, &mut accesses);
+        exact_statement_accesses(statement, &mut accesses, &mut Vec::new());
     }
     let mut route = KernelTraceRoute::Exact;
     for object_id in accesses {

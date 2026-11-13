@@ -97,8 +97,8 @@ its engineering part is Wave 4, its certified part is research.
 | 27 | Measure occupancy, executed workloads and every cost | 2 | M | | done | `35f4c4e` |
 | 28 | Cover the private scheme in the leakage and abort reports | 2 | S | | done | `348da16` |
 | 29 | State what the Path ORAM theorem's cryptographic assumptions mean | 2 | S | | done | `9631ed0` |
-| 30 | Charge external reads in the modeled cost | 3 | S to M | | done | |
-| 31 | Do not rewrite statically read-only exact objects | 3 | M | 30 | todo | |
+| 30 | Charge external reads in the modeled cost | 3 | S to M | | done | `3d8b5f6` |
+| 31 | Do not rewrite statically read-only exact objects | 3 | M | 30 | done | |
 | 32 | Load each exact object once per call | 3 | M | 30 | todo | |
 | 33 | Check each UO write's class against its bytes | 3 | S | | todo | |
 | 34 | Make the confidential kernel's 256-bit arithmetic branch-free | 3 | M | | todo | |

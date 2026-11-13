@@ -1,15 +1,15 @@
 {
   "accepted": true,
-  "artifact_json_bytes": 1521104,
+  "artifact_json_bytes": 1532489,
   "checker": "proof/lean/.lake/build/bin/checkProofGradeRuntimeSlotAdapterBoundary",
   "lean_checker_input": "source-backed runtime slot-adapter boundary",
   "lean_checker_kind": "runtime slot-adapter boundary",
-  "lean_stdout": "validated runtime slot-adapter boundary for source-backed uo-kernel adapter (168571 slot-adapter bytes)",
+  "lean_stdout": "validated runtime slot-adapter boundary for source-backed uo-kernel adapter (168666 slot-adapter bytes)",
   "slot_adapter_boundary_theorem_checked": true,
   "source_bytes": {
     "confidential_kernel": 116465,
     "generated_confidential_kernel": 25055,
-    "kernel_runtime": 23788,
+    "kernel_runtime": 23883,
     "kernel_slot_support": 3263
   },
   "source_files": [

@@ -831,13 +831,13 @@ pub(super) fn reconcile_cell_commit_value<F>(
     current: &mut Value,
     old_value: Option<Value>,
     aborted: bool,
-    accessed: bool,
+    may_write: bool,
     mut seal_committed: F,
 ) -> Result<()>
 where
     F: FnMut(&Value) -> Result<()>,
 {
-    if accessed {
+    if may_write {
         let committed_value = if aborted {
             let Some(old_value) = old_value else {
                 bail!("cell commit missing restored value during aborted commit");
@@ -861,13 +861,13 @@ pub(super) fn reconcile_array_commit_values<F>(
     values: &mut [Value],
     old_values: Option<&[Value]>,
     aborted: bool,
-    accessed: bool,
+    may_write: bool,
     mut seal_slot: F,
 ) -> Result<()>
 where
     F: FnMut(usize, &Value) -> Result<()>,
 {
-    if aborted || !accessed {
+    if aborted || !may_write {
         let Some(old_values) = old_values else {
             bail!("array commit missing restored values");
         };
@@ -882,7 +882,7 @@ where
             *current = old.clone();
         }
     }
-    if accessed {
+    if may_write {
         for (index, value) in values.iter().enumerate() {
             seal_slot(index, value)?;
         }
@@ -894,13 +894,13 @@ pub(super) fn reconcile_small_map_commit_entries<F>(
     entries: &mut [MapEntry],
     old_entries: Option<&[MapEntry]>,
     aborted: bool,
-    accessed: bool,
+    may_write: bool,
     mut seal_slot: F,
 ) -> Result<()>
 where
     F: FnMut(usize, &MapEntry) -> Result<()>,
 {
-    if aborted || !accessed {
+    if aborted || !may_write {
         let Some(old_entries) = old_entries else {
             bail!("small-map commit missing restored entries");
         };
@@ -919,7 +919,7 @@ where
             );
         }
     }
-    if accessed {
+    if may_write {
         for (index, entry) in entries.iter().enumerate() {
             seal_slot(index, entry)?;
         }

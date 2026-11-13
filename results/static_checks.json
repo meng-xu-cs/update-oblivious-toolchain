@@ -750,7 +750,7 @@
       "private_posmap_kernel_admission": null,
       "raw_artifact": {
         "accepted": false,
-        "artifact_json_bytes": 4785,
+        "artifact_json_bytes": 4856,
         "contract": "AuthScan",
         "function_count": 3,
         "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: imported proof-grade translation artifacts do not satisfy Lean validity checks: source_view: confidential state objects use raw backends: confidential state object TOKENS uses raw backend, confidential state object lastAuth uses raw backend; metadata policy checks failed for: auth(bytes32): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[TOKENS]), readLast(): metadata policy failed (secret policy=true, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[lastAuth]); artifact_view: confidential state objects use raw backends: confidential state object TOKENS uses raw backend, confidential state object lastAuth uses raw backend; metadata policy checks failed for: auth(bytes32): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[TOKENS]), readLast(): metadata policy failed (secret policy=true, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[lastAuth])",
@@ -759,7 +759,7 @@
         "manifest_object_count": 2,
         "metadata_contract": "AuthScan",
         "mode": "raw",
-        "source_artifact_json_bytes": 4785,
+        "source_artifact_json_bytes": 4856,
         "state_object_count": 2
       },
       "source_raw": [
@@ -774,7 +774,7 @@
       ],
       "uo_artifact": {
         "accepted": true,
-        "artifact_json_bytes": 13696,
+        "artifact_json_bytes": 13767,
         "contract": "AuthScan",
         "function_count": 3,
         "lean_stderr": "",
@@ -783,7 +783,7 @@
         "manifest_object_count": 2,
         "metadata_contract": "AuthScan",
         "mode": "uo",
-        "source_artifact_json_bytes": 13696,
+        "source_artifact_json_bytes": 13767,
         "state_object_count": 2
       },
       "uo_kernel_admission": {
@@ -828,7 +828,7 @@
       "benchmark": "ConfidentialMixer",
       "fullscan64_artifact": {
         "accepted": true,
-        "artifact_json_bytes": 16342,
+        "artifact_json_bytes": 16439,
         "contract": "ConfidentialMixer",
         "function_count": 4,
         "lean_stderr": "",
@@ -837,7 +837,7 @@
         "manifest_object_count": 2,
         "metadata_contract": "ConfidentialMixer",
         "mode": "uo",
-        "source_artifact_json_bytes": 16342,
+        "source_artifact_json_bytes": 16439,
         "state_object_count": 2
       },
       "fullscan64_kernel_admission": {
@@ -909,7 +909,7 @@
       },
       "oram_artifact": {
         "accepted": true,
-        "artifact_json_bytes": 16603,
+        "artifact_json_bytes": 16701,
         "contract": "ConfidentialMixer",
         "function_count": 4,
         "lean_stderr": "",
@@ -918,7 +918,7 @@
         "manifest_object_count": 2,
         "metadata_contract": "ConfidentialMixer",
         "mode": "uo",
-        "source_artifact_json_bytes": 16603,
+        "source_artifact_json_bytes": 16701,
         "state_object_count": 2
       },
       "oram_kernel_admission": {
@@ -990,7 +990,7 @@
       },
       "private_posmap_artifact": {
         "accepted": true,
-        "artifact_json_bytes": 16627,
+        "artifact_json_bytes": 16725,
         "contract": "ConfidentialMixer",
         "function_count": 4,
         "lean_stderr": "",
@@ -999,7 +999,7 @@
         "manifest_object_count": 2,
         "metadata_contract": "ConfidentialMixer",
         "mode": "uo",
-        "source_artifact_json_bytes": 16627,
+        "source_artifact_json_bytes": 16725,
         "state_object_count": 2
       },
       "private_posmap_kernel_admission": {
@@ -1071,7 +1071,7 @@
       },
       "raw_artifact": {
         "accepted": false,
-        "artifact_json_bytes": 6598,
+        "artifact_json_bytes": 6696,
         "contract": "ConfidentialMixer",
         "function_count": 4,
         "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: imported proof-grade translation artifacts do not satisfy Lean validity checks: source_view: confidential state objects use raw backends: confidential state object balances uses raw backend, confidential state object total uses raw backend; metadata policy checks failed for: deposit(bytes32,uint256): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[total,balances]), withdraw(bytes32,uint256): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[total,balances]), balanceOf(bytes32): metadata policy failed (secret policy=true, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[balances]), totalValue(): metadata policy failed (secret policy=true, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[total]); artifact_view: confidential state objects use raw backends: confidential state object balances uses raw backend, confidential state object total uses raw backend; metadata policy checks failed for: deposit(bytes32,uint256): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[total,balances]), withdraw(bytes32,uint256): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[total,balances]), balanceOf(bytes32): metadata policy failed (secret policy=true, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[balances]), totalValue(): metadata policy failed (secret policy=true, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[total])",
@@ -1080,7 +1080,7 @@
         "manifest_object_count": 2,
         "metadata_contract": "ConfidentialMixer",
         "mode": "raw",
-        "source_artifact_json_bytes": 6598,
+        "source_artifact_json_bytes": 6696,
         "state_object_count": 2
       },
       "source_raw": [
@@ -1095,7 +1095,7 @@
       ],
       "uo_artifact": {
         "accepted": true,
-        "artifact_json_bytes": 16334,
+        "artifact_json_bytes": 16432,
         "contract": "ConfidentialMixer",
         "function_count": 4,
         "lean_stderr": "",
@@ -1104,7 +1104,7 @@
         "manifest_object_count": 2,
         "metadata_contract": "ConfidentialMixer",
         "mode": "uo",
-        "source_artifact_json_bytes": 16334,
+        "source_artifact_json_bytes": 16432,
         "state_object_count": 2
       },
       "uo_kernel_admission": {
@@ -1181,7 +1181,7 @@
       "fullscan64_kernel_admission": null,
       "oram_artifact": {
         "accepted": true,
-        "artifact_json_bytes": 30662,
+        "artifact_json_bytes": 30806,
         "contract": "ERC20Lite",
         "function_count": 6,
         "lean_stderr": "",
@@ -1190,7 +1190,7 @@
         "manifest_object_count": 2,
         "metadata_contract": "ERC20Lite",
         "mode": "uo",
-        "source_artifact_json_bytes": 30662,
+        "source_artifact_json_bytes": 30806,
         "state_object_count": 2
       },
       "oram_kernel_admission": {
@@ -1292,7 +1292,7 @@
       },
       "private_posmap_artifact": {
         "accepted": true,
-        "artifact_json_bytes": 30690,
+        "artifact_json_bytes": 30834,
         "contract": "ERC20Lite",
         "function_count": 6,
         "lean_stderr": "",
@@ -1301,7 +1301,7 @@
         "manifest_object_count": 2,
         "metadata_contract": "ERC20Lite",
         "mode": "uo",
-        "source_artifact_json_bytes": 30690,
+        "source_artifact_json_bytes": 30834,
         "state_object_count": 2
       },
       "private_posmap_kernel_admission": {
@@ -1403,7 +1403,7 @@
       },
       "raw_artifact": {
         "accepted": false,
-        "artifact_json_bytes": 10654,
+        "artifact_json_bytes": 10797,
         "contract": "ERC20Lite",
         "function_count": 6,
         "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: imported proof-grade translation artifacts do not satisfy Lean validity checks: source_view: confidential state objects use raw backends: confidential state object allowances uses raw backend, confidential state object balances uses raw backend; metadata policy checks failed for: mint(address,uint256): metadata policy failed (secret policy=true, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[balances]), approve(address,address,uint256): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=true, confidential_reads=[]), transfer(address,address,uint256): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[balances]), transferFrom(address,address,address,uint256): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[balances,allowances]), balanceOf(address): metadata policy failed (secret policy=true, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[balances]), allowanceOf(address,address): metadata policy failed (secret policy=true, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[allowances]); artifact_view: confidential state objects use raw backends: confidential state object allowances uses raw backend, confidential state object balances uses raw backend; metadata policy checks failed for: mint(address,uint256): metadata policy failed (secret policy=true, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[balances]), approve(address,address,uint256): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=true, confidential_reads=[]), transfer(address,address,uint256): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[balances]), transferFrom(address,address,address,uint256): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[balances,allowances]), balanceOf(address): metadata policy failed (secret policy=true, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[balances]), allowanceOf(address,address): metadata policy failed (secret policy=true, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[allowances])",
@@ -1412,7 +1412,7 @@
         "manifest_object_count": 2,
         "metadata_contract": "ERC20Lite",
         "mode": "raw",
-        "source_artifact_json_bytes": 10654,
+        "source_artifact_json_bytes": 10797,
         "state_object_count": 2
       },
       "source_raw": [
@@ -1427,7 +1427,7 @@
       ],
       "uo_artifact": {
         "accepted": true,
-        "artifact_json_bytes": 30119,
+        "artifact_json_bytes": 30262,
         "contract": "ERC20Lite",
         "function_count": 6,
         "lean_stderr": "",
@@ -1436,7 +1436,7 @@
         "manifest_object_count": 2,
         "metadata_contract": "ERC20Lite",
         "mode": "uo",
-        "source_artifact_json_bytes": 30119,
+        "source_artifact_json_bytes": 30262,
         "state_object_count": 2
       },
       "uo_kernel_admission": {
@@ -1547,7 +1547,7 @@
       "private_posmap_kernel_admission": null,
       "raw_artifact": {
         "accepted": false,
-        "artifact_json_bytes": 4085,
+        "artifact_json_bytes": 4156,
         "contract": "FixedSlotClassifier",
         "function_count": 3,
         "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: imported proof-grade translation artifacts do not satisfy Lean validity checks: source_view: confidential state objects use raw backends: confidential state object last uses raw backend; metadata policy checks failed for: classify(uint256): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=true, confidential_reads=[]), sameSame(uint256): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=true, confidential_reads=[]), peek(): metadata policy failed (secret policy=true, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[last]); artifact_view: confidential state objects use raw backends: confidential state object last uses raw backend; metadata policy checks failed for: classify(uint256): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=true, confidential_reads=[]), sameSame(uint256): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=true, confidential_reads=[]), peek(): metadata policy failed (secret policy=true, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[last])",
@@ -1556,7 +1556,7 @@
         "manifest_object_count": 1,
         "metadata_contract": "FixedSlotClassifier",
         "mode": "raw",
-        "source_artifact_json_bytes": 4085,
+        "source_artifact_json_bytes": 4156,
         "state_object_count": 1
       },
       "source_raw": [
@@ -1571,7 +1571,7 @@
       ],
       "uo_artifact": {
         "accepted": true,
-        "artifact_json_bytes": 8972,
+        "artifact_json_bytes": 9043,
         "contract": "FixedSlotClassifier",
         "function_count": 3,
         "lean_stderr": "",
@@ -1580,7 +1580,7 @@
         "manifest_object_count": 1,
         "metadata_contract": "FixedSlotClassifier",
         "mode": "uo",
-        "source_artifact_json_bytes": 8972,
+        "source_artifact_json_bytes": 9043,
         "state_object_count": 1
       },
       "uo_kernel_admission": {
@@ -1646,7 +1646,7 @@
       "private_posmap_kernel_admission": null,
       "raw_artifact": {
         "accepted": false,
-        "artifact_json_bytes": 5543,
+        "artifact_json_bytes": 5638,
         "contract": "RegistryCRUD",
         "function_count": 4,
         "lean_stderr": "uncaught exception: failed to validate proof-grade translation artifacts: imported proof-grade translation artifacts do not satisfy Lean validity checks: source_view: confidential state objects use raw backends: confidential state object records uses raw backend; metadata policy checks failed for: upsert(bytes32,uint256): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=true, confidential_reads=[]), clear(bytes32): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=true, confidential_reads=[]), clearIfMatch(bytes32,uint256): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[records]), read(bytes32): metadata policy failed (secret policy=true, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[records]); artifact_view: confidential state objects use raw backends: confidential state object records uses raw backend; metadata policy checks failed for: upsert(bytes32,uint256): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=true, confidential_reads=[]), clear(bytes32): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=true, confidential_reads=[]), clearIfMatch(bytes32,uint256): metadata policy failed (secret policy=false, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[records]), read(bytes32): metadata policy failed (secret policy=true, loop admission=true, public_state_declassifies=true, public access=false, confidential_reads=[records])",
@@ -1655,7 +1655,7 @@
         "manifest_object_count": 1,
         "metadata_contract": "RegistryCRUD",
         "mode": "raw",
-        "source_artifact_json_bytes": 5543,
+        "source_artifact_json_bytes": 5638,
         "state_object_count": 1
       },
       "source_raw": [
@@ -1670,7 +1670,7 @@
       ],
       "uo_artifact": {
         "accepted": true,
-        "artifact_json_bytes": 13790,
+        "artifact_json_bytes": 13885,
         "contract": "RegistryCRUD",
         "function_count": 4,
         "lean_stderr": "",
@@ -1679,7 +1679,7 @@
         "manifest_object_count": 1,
         "metadata_contract": "RegistryCRUD",
         "mode": "uo",
-        "source_artifact_json_bytes": 13790,
+        "source_artifact_json_bytes": 13885,
         "state_object_count": 1
       },
       "uo_kernel_admission": {

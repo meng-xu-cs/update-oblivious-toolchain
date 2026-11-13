@@ -621,6 +621,7 @@ impl OramState {
                 scratch_bytes: bootstrap_scratch,
                 max_kernel_ops: parameters.metadata_pages,
                 max_commit_ops: 0,
+                max_load_ops: 0,
             })?;
             let directory_pages = encode_path_metadata_pages(
                 spec,
@@ -981,6 +982,7 @@ mod tests {
                 .max(8),
             max_kernel_ops: 0,
             max_commit_ops: 0,
+            max_load_ops: 0,
         })
         .unwrap()
     }
@@ -1611,6 +1613,7 @@ mod tests {
             scratch_bytes: parameters.directory_page_bytes,
             max_kernel_ops: 0,
             max_commit_ops: 0,
+            max_load_ops: 0,
         })
         .unwrap();
         let position_map = masked_position_map_from_options(&vec![None; parameters.capacity]);
@@ -1643,6 +1646,7 @@ mod tests {
             scratch_bytes: parameters.directory_page_bytes,
             max_kernel_ops: 0,
             max_commit_ops: 0,
+            max_load_ops: 0,
         })
         .unwrap();
         let err =
@@ -1666,6 +1670,7 @@ mod tests {
             scratch_bytes: parameters.directory_page_bytes,
             max_kernel_ops: 0,
             max_commit_ops: 0,
+            max_load_ops: 0,
         })
         .unwrap();
         let position_map_options = vec![None; parameters.capacity];
@@ -1692,6 +1697,7 @@ mod tests {
             scratch_bytes: parameters.directory_page_bytes,
             max_kernel_ops: 0,
             max_commit_ops: 0,
+            max_load_ops: 0,
         })
         .unwrap();
         let (decoded_position_map, decoded_stash) =

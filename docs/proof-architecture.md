@@ -66,7 +66,9 @@ conforming run of an admitted program executes the whole body
 (`evalKernelProgramExecuted_eq_body`). The exact store's encoding
 (`exactEncodeRun`) maps the executed statements to a physical trace: a full
 scan of the object for every storage access, in evaluation order, and at commit
-an `Update`-class rewrite of every touched object, in object-id order. The
+an `Update`-class rewrite of every object a statement writes, in object-id
+order; an object the statements only read is not written
+(`exactEncodeRun_rewrites_only_written`). The
 trace of a run is therefore the same for all admitted runs
 (`admittedKernel_exactUO`), and
 `paperMain_admittedKernel_exact_noninterference_moduloReleases` states the

@@ -469,7 +469,7 @@
     {
       "accepted": true,
       "entrypoint": "auth(bytes32)",
-      "gas_used": 2591,
+      "gas_used": 2475,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -917,7 +917,7 @@
     {
       "accepted": true,
       "entrypoint": "auth(bytes32)",
-      "gas_used": 2591,
+      "gas_used": 2475,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,

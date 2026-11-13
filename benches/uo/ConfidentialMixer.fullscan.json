@@ -10,8 +10,8 @@
     "metadata_canonicalization_sha256": "64d142abe365c5a14aad6e56121ac38a4b611bf73a04529ba672c43cfd6853f1",
     "compilation_mode": "uo",
     "compiler_version": "0.1.0",
-    "toolchain_manifest_sha256": "f51871012ebcef46dddea9d6af67dc77193dde25209fe42a2ec7ac76e917aff4",
-    "package_sha256": "2240d83f8014e483931ddaf31c1e9322d3029026de68ca8a5914d18736952478"
+    "toolchain_manifest_sha256": "c277bbb944b4d9d8b9e0cc74fc7b7e94e952bce2e9279251548e5984ab46e47c",
+    "package_sha256": "341ed53adbc5cf8c11fac3e6704b2e7a5d66d8b3db7238e60c31ed91bf7091ac"
   },
   "contract": {
     "contract": "ConfidentialMixer",
@@ -833,7 +833,7 @@
             "commitment"
           ],
           "entry_input_len": 32,
-          "public_gas_budget": 2489,
+          "public_gas_budget": 2257,
           "arena_bytes": 4096,
           "max_stack_words": 64,
           "max_hash_part_bytes": 0,
@@ -922,8 +922,9 @@
           "uoarray_writes": 0,
           "uomap_reads": 1,
           "uomap_writes": 0,
-          "max_commit_ops": 8,
+          "max_commit_ops": 0,
           "max_load_ops": 8,
+          "may_write_objects": [],
           "oram_accesses": {}
         },
         "deposit(bytes32,uint256)": {
@@ -1147,13 +1148,17 @@
           "uomap_writes": 1,
           "max_commit_ops": 9,
           "max_load_ops": 9,
+          "may_write_objects": [
+            1,
+            2
+          ],
           "oram_accesses": {}
         },
         "totalValue()": {
           "secret_args": [],
           "param_names": [],
           "entry_input_len": 0,
-          "public_gas_budget": 2076,
+          "public_gas_budget": 2047,
           "arena_bytes": 4096,
           "max_stack_words": 64,
           "max_hash_part_bytes": 0,
@@ -1227,8 +1232,9 @@
           "uoarray_writes": 0,
           "uomap_reads": 0,
           "uomap_writes": 0,
-          "max_commit_ops": 1,
+          "max_commit_ops": 0,
           "max_load_ops": 1,
+          "may_write_objects": [],
           "oram_accesses": {}
         },
         "withdraw(bytes32,uint256)": {
@@ -1514,6 +1520,10 @@
           "uomap_writes": 1,
           "max_commit_ops": 9,
           "max_load_ops": 9,
+          "may_write_objects": [
+            1,
+            2
+          ],
           "oram_accesses": {}
         }
       }

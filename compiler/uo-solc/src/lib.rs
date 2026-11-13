@@ -1424,12 +1424,18 @@ fn build_manifest_entry(
         apply_tree_presence_reuse(&function.body, frontend, &mut oram_accesses)?;
     }
     validate_oram_access_shape(&function.signature, &oram_accesses, frontend)?;
+    // The objects the body has a write statement for, predicated or not.
+    // Commit reseals these exact objects and no other, so an exact object
+    // the body only reads costs no commit operation. An ORAM map writes the
+    // path of every access, read or write.
+    let may_write_objects = written_objects(&function.body);
     let max_commit_ops = accessed_objects
         .iter()
         .map(|object_id| {
             let object = state_object_by_id(frontend, *object_id)?;
+            let may_write = may_write_objects.contains(object_id);
             Ok(match object.kind {
-                ContainerKind::Cell => 1usize,
+                ContainerKind::Cell => usize::from(may_write),
                 ContainerKind::Array | ContainerKind::Map
                     if object.backend == BackendKind::Oram =>
                 {
@@ -1440,7 +1446,10 @@ fn build_manifest_entry(
                         per_access
                     }
                 }
-                ContainerKind::Array | ContainerKind::Map => object.capacity.unwrap_or(1),
+                ContainerKind::Array | ContainerKind::Map if may_write => {
+                    object.capacity.unwrap_or(1)
+                }
+                ContainerKind::Array | ContainerKind::Map => 0,
             })
         })
         .collect::<Result<Vec<_>>>()?
@@ -1535,6 +1544,7 @@ fn build_manifest_entry(
         uomap_writes: counts.map_writes,
         max_commit_ops,
         max_load_ops,
+        may_write_objects: may_write_objects.into_iter().collect(),
         oram_accesses,
     })
 }
@@ -1769,6 +1779,44 @@ fn accessed_objects(statements: &[Statement]) -> BTreeSet<u32> {
     let mut ids = BTreeSet::new();
     for statement in statements {
         collect_statement_objects(statement, &mut ids);
+    }
+    ids
+}
+
+/// The objects the statements have a write statement for, whether or not it
+/// has a predicate and whatever branch or loop holds it.
+fn written_objects(statements: &[Statement]) -> BTreeSet<u32> {
+    fn collect(statement: &Statement, ids: &mut BTreeSet<u32>) {
+        match statement {
+            Statement::CellSet { object_id, .. }
+            | Statement::ArraySet { object_id, .. }
+            | Statement::MapPut { object_id, .. } => {
+                ids.insert(*object_id);
+            }
+            Statement::If {
+                then_body,
+                else_body,
+                ..
+            } => {
+                for stmt in then_body.iter().chain(else_body) {
+                    collect(stmt, ids);
+                }
+            }
+            Statement::For { body, .. } => {
+                for stmt in body {
+                    collect(stmt, ids);
+                }
+            }
+            Statement::Declare { .. }
+            | Statement::Assign { .. }
+            | Statement::Require { .. }
+            | Statement::AbortIf { .. }
+            | Statement::Return { .. } => {}
+        }
+    }
+    let mut ids = BTreeSet::new();
+    for statement in statements {
+        collect(statement, &mut ids);
     }
     ids
 }
@@ -6078,6 +6126,17 @@ bounds:
             .unwrap();
         assert_eq!(entry.uoarray_reads, 4);
         assert_eq!(entry.uocell_writes, 1);
-        assert_eq!(entry.max_commit_ops, 5);
+        // The call loads the four slots of the array and the cell. It writes
+        // the cell alone: the array, which it only reads, is not rewritten.
+        assert_eq!(entry.max_load_ops, 5);
+        assert_eq!(entry.max_commit_ops, 1);
+        assert_eq!(entry.may_write_objects.len(), 1);
+        let written = artifact
+            .contract
+            .state
+            .iter()
+            .find(|object| object.id == entry.may_write_objects[0])
+            .unwrap();
+        assert_eq!(written.kind, uo_core::ContainerKind::Cell);
     }
 }

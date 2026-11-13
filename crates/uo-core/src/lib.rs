@@ -67,9 +67,9 @@ pub use kernel_dsl::{
     RuntimeShellBoundarySlotBundle, RuntimeShellBoundarySlotBundleError,
 };
 pub use manifest::{
-    is_path_oram_scheme, validate_oram_access_shape, EntrypointManifest, OramManifest,
-    RuntimeKernelStepManifest, RuntimeManifest, StateObjectManifest,
-    PATH_ORAM_LOCAL_POSMAP_MAX_CAPACITY, PATH_ORAM_PRIVATE_POSMAP_SCHEME,
+    is_path_oram_scheme, slot_program_written_objects, validate_oram_access_shape,
+    EntrypointManifest, OramManifest, RuntimeKernelStepManifest, RuntimeManifest,
+    StateObjectManifest, PATH_ORAM_LOCAL_POSMAP_MAX_CAPACITY, PATH_ORAM_PRIVATE_POSMAP_SCHEME,
 };
 pub use metadata::{
     BoundsMetadata, ContractMetadata, DeclassificationKind, EntrypointMetadata, ReturnPolicy,

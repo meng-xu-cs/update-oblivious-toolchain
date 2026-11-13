@@ -297,20 +297,24 @@ each kind of call costs the same in every trial, at every occupancy level,
 and as every other kind its entrypoint serves: an insert, an overwrite and a
 write that changes nothing are one `put` to the observer, and how full the
 map is does not show. A write that aborts traces what a committed one does,
-on every backend. On the full scan and the local scheme a read costs what a
-write does; on the tree a write, a get and then a put of `3h + 1` node
-accesses, costs about four times a read: 260 against 980 physical operations
-at 256 entries, 654 against 2,556 at 16,384. The full scan moves 380 bytes
-per entry per operation. The tree moves fewer bytes than the full scan from
-2,048 entries for reads alone, 4,096 for an even mix and 8,192 for writes
-alone; it makes fewer physical operations from 128, 512 and 1,024 entries,
-and costs less modeled gas from 512, 2,048 and 4,096. The gas is that of
-cost model v2, which charges the sealed records a call reads, those at its
-start included, as it charges those it writes (see The Modeled Cost in
+on every backend. On the local scheme a read costs what a write does. On the
+full scan a write moves 380 bytes per entry, the scan and the rewrite of
+every slot, and a read moves 190: it scans the map and rewrites nothing,
+since its program has no write statement for the map. On the tree a write, a
+get and then a put of `3h + 1` node accesses, costs about four times a read:
+260 against 980 physical operations at 256 entries, 654 against 2,556 at
+16,384. The tree moves fewer bytes than the full scan from 4,096 entries for
+reads alone and from 8,192 for an even mix and for writes alone; it makes
+fewer physical operations from 512 entries for reads alone and for an even
+mix and from 1,024 for writes alone; and it costs less modeled gas from
+1,024, 2,048 and 4,096. The gas is that of cost model v2, which charges the
+sealed records a call reads, those at its start included, as it charges
+those it writes (see The Modeled Cost in
 [`claim-boundary.md`](./claim-boundary.md)). The local scheme makes fewer
-operations than the full scan from 8 entries and costs less gas from 16,
-but moves more bytes at every capacity it admits, and up to its 128 entries
-it costs less than the tree on every metric.
+operations than the full scan from 32 entries for reads alone, 16 for an
+even mix and 8 for writes alone, and costs less gas from 128, 32 and 16, but
+moves more bytes at every capacity it admits, and up to its 128 entries it
+costs less than the tree on every metric.
 
 Beside the traced counts the report gives the work that no trace records. A
 call on a Path ORAM map reads the map's counter and metadata pages when it
@@ -319,7 +323,7 @@ instrumented call also opens every bucket and metadata page of the tree
 twice, for the position-map witnesses it exports: 65,580 sealed records at
 16,384 entries, where a read traces 654 operations. The report also gives
 the size of what a call exports: at 16,384 entries the trace of a full-scan
-read is 20.7 MB of JSON, 17.5 MB of it private evidence, and that of a tree
+read is 18.2 MB of JSON, 16.2 MB of it private evidence, and that of a tree
 read 3.0 MB.
 
 The latencies are wall-clock times of a release build on one machine. The
@@ -327,7 +331,8 @@ validation script runs a quick profile of the sweep, whose latencies are a
 smoke test: one warmup round and two measured rounds, workloads of five
 calls, and maps above 256 entries left at 2 keys. The figures below come
 from the full profile (`scripts/run_capacity_sweep_full.sh`,
-`results/capacity_sweep_full.json`): 30 measured rounds of every kind of
+`results/capacity_sweep_full.json`) as it was measured before the changes
+the external review asked for: 30 measured rounds of every kind of
 call after 5 warmup rounds, at every occupancy level of every map, and a
 workload of 20 calls at each read fraction. Each figure is a median with its
 95% bootstrap interval. A call's time splits into copying the committed
@@ -364,10 +369,15 @@ ms copy the state and 12.5 ms load the map. Serializing the trace takes
 another 22.5 ms for the full-scan read and 2.9 ms for the tree's, and Lean
 checks the witness of the call in 240 ms and 64 ms. A call on the tree
 raises the probe's resident memory from 240 MB to 400 MB at 16,384 entries.
-These are the figures from before the optimizations of the external review:
+These figures are the baseline of the external review's optimizations:
 `review/2026-11-external-review/capacity_sweep_baseline.json` is this
-report, and Issues 30 to 38 of that review compare their savings with it
-(`scripts/compare_capacity_sweep.py`).
+report, Issues 30 to 38 of that review compare their savings with it
+(`scripts/compare_capacity_sweep.py`), and the sweep is run again when they
+are done. One of them is in: a full-scan read no longer rewrites the map.
+Its own work has not moved, since it now decodes every slot a second time
+to restore the map where it used to seal every slot, but its trace has half
+the events, and in the quick profile's two rounds the whole call takes about
+a third less than the baseline's 354.8 ms at 16,384 entries.
 
 The sweep also found a defect, which is fixed. An aborting call opens every
 slot of an exact map a third time, to restore it, and the allocator's

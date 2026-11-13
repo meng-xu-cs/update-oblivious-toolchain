@@ -10,8 +10,8 @@
     "metadata_canonicalization_sha256": "d4d37982ad376dbc375a0c57e8f2f21cdfad161f1da825dd86294c72fc17f033",
     "compilation_mode": "uo",
     "compiler_version": "0.1.0",
-    "toolchain_manifest_sha256": "f51871012ebcef46dddea9d6af67dc77193dde25209fe42a2ec7ac76e917aff4",
-    "package_sha256": "44a55095631169b5143a5b495b163810cc985afdf0a0efbb229e0f39c9e6e52d"
+    "toolchain_manifest_sha256": "c277bbb944b4d9d8b9e0cc74fc7b7e94e952bce2e9279251548e5984ab46e47c",
+    "package_sha256": "af850191b7c9b524c789fd325aba95aff090b70a8ed69e18d5b1ce36ce02c5ab"
   },
   "contract": {
     "contract": "ConfidentialMixer",
@@ -937,6 +937,7 @@
           "uomap_writes": 0,
           "max_commit_ops": 330,
           "max_load_ops": 351,
+          "may_write_objects": [],
           "oram_accesses": {
             "1": 11
           }
@@ -1162,6 +1163,10 @@
           "uomap_writes": 1,
           "max_commit_ops": 1351,
           "max_load_ops": 1372,
+          "may_write_objects": [
+            1,
+            2
+          ],
           "oram_accesses": {
             "1": 45
           }
@@ -1170,7 +1175,7 @@
           "secret_args": [],
           "param_names": [],
           "entry_input_len": 0,
-          "public_gas_budget": 2076,
+          "public_gas_budget": 2047,
           "arena_bytes": 4096,
           "max_stack_words": 64,
           "max_hash_part_bytes": 0,
@@ -1244,8 +1249,9 @@
           "uoarray_writes": 0,
           "uomap_reads": 0,
           "uomap_writes": 0,
-          "max_commit_ops": 1,
+          "max_commit_ops": 0,
           "max_load_ops": 1,
+          "may_write_objects": [],
           "oram_accesses": {}
         },
         "withdraw(bytes32,uint256)": {
@@ -1531,6 +1537,10 @@
           "uomap_writes": 1,
           "max_commit_ops": 1351,
           "max_load_ops": 1372,
+          "may_write_objects": [
+            1,
+            2
+          ],
           "oram_accesses": {
             "1": 45
           }

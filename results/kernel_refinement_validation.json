@@ -387,7 +387,7 @@
       "cold_store_object_count": 2,
       "commit_object_count": 2,
       "entrypoint": "auth(bytes32)",
-      "gas_used": 2591,
+      "gas_used": 2475,
       "kernel_json_bytes": 3803,
       "kernel_refinement_json_bytes": 1065,
       "kernel_witness": {
@@ -774,7 +774,7 @@
       "cold_store_object_count": 2,
       "commit_object_count": 2,
       "entrypoint": "auth(bytes32)",
-      "gas_used": 2591,
+      "gas_used": 2475,
       "kernel_json_bytes": 3803,
       "kernel_refinement_json_bytes": 1065,
       "kernel_witness": {

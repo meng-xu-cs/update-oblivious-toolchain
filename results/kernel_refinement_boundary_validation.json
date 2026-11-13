@@ -505,7 +505,7 @@
       "controller_phase_count": 3,
       "entrypoint": "auth(bytes32)",
       "exit_events": 4,
-      "gas_used": 2591,
+      "gas_used": 2475,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 8,
         "expected_kernel_step_public_object_schedule": [
@@ -965,7 +965,7 @@
       "scenario": "AuthScan/uo/class0",
       "setup_calls": 2,
       "shared_resource_events": 3,
-      "witness_json_bytes": 8260
+      "witness_json_bytes": 7956
     },
     {
       "accepted": true,
@@ -974,7 +974,7 @@
       "controller_phase_count": 3,
       "entrypoint": "auth(bytes32)",
       "exit_events": 4,
-      "gas_used": 2591,
+      "gas_used": 2475,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 8,
         "expected_kernel_step_public_object_schedule": [
@@ -1434,7 +1434,7 @@
       "scenario": "AuthScan/uo/class1",
       "setup_calls": 2,
       "shared_resource_events": 3,
-      "witness_json_bytes": 8260
+      "witness_json_bytes": 7956
     },
     {
       "accepted": true,

@@ -101,6 +101,7 @@ structure ImportedProofRelevantEntrypointView where
   uomap_writes : Nat
   max_commit_ops : Nat
   max_load_ops : Nat
+  may_write_objects : List Nat
   oram_accesses : List ImportedProofRelevantOramAccessView
 deriving Repr, DecidableEq, FromJson, ToJson
 
@@ -542,6 +543,7 @@ private def parseImportedManifestEntrypointViewFromRawJson
     , uomap_writes := ← lookupFieldAs json "uomap_writes"
     , max_commit_ops := ← lookupFieldAs json "max_commit_ops"
     , max_load_ops := ← lookupFieldAs json "max_load_ops"
+    , may_write_objects := ← lookupFieldAs json "may_write_objects"
     , oram_accesses := ← parseImportedOramAccessViewsFromRawJson (← lookupFieldJson json "oram_accesses")
     }
 
@@ -1245,6 +1247,58 @@ end
 private def accessedObjectIdsInBodyStrings (body : List String) : Except String (List Nat) :=
   body.foldlM (init := ([] : List Nat)) fun acc item => do
     pure <| mergeDistinctNatLists acc (← collectAccessedObjectIdsStatement (← parseJsonString item))
+
+mutual
+
+/-- The objects a statement has a write statement for: its own target, or
+those of the statements a branch or a loop holds, whatever their predicates. -/
+private partial def collectWrittenObjectIdsStatement
+  (json : Json) : Except String (List Nat) := do
+  if taggedPayload? json "Declare" |>.isSome then
+    pure []
+  else if taggedPayload? json "Assign" |>.isSome then
+    pure []
+  else if taggedPayload? json "Require" |>.isSome then
+    pure []
+  else if taggedPayload? json "AbortIf" |>.isSome then
+    pure []
+  else if let some inner := taggedPayload? json "If" then
+    pure <| mergeDistinctNatLists
+      (← collectWrittenObjectIdsStatementArray (← lookupFieldAs inner "then_body"))
+      (← collectWrittenObjectIdsStatementArray (← lookupFieldAs inner "else_body"))
+  else if let some inner := taggedPayload? json "For" then
+    collectWrittenObjectIdsStatementArray (← lookupFieldAs inner "body")
+  else if let some inner := taggedPayload? json "CellSet" then
+    let objectId : Nat ← lookupFieldAs inner "object_id"
+    pure [objectId]
+  else if let some inner := taggedPayload? json "ArraySet" then
+    let objectId : Nat ← lookupFieldAs inner "object_id"
+    pure [objectId]
+  else if let some inner := taggedPayload? json "MapPut" then
+    let objectId : Nat ← lookupFieldAs inner "object_id"
+    pure [objectId]
+  else if taggedPayload? json "Return" |>.isSome then
+    pure []
+  else
+    throw "unsupported statement shape in translation bundle"
+
+private partial def collectWrittenObjectIdsStatementArray
+  (items : List Json) : Except String (List Nat) :=
+  items.foldlM (init := ([] : List Nat)) fun acc item => do
+    pure <| mergeDistinctNatLists acc (← collectWrittenObjectIdsStatement item)
+
+end
+
+/-- The objects a body may write: every object it has a write statement for. -/
+private def writtenObjectIdsInBodyStrings (body : List String) : Except String (List Nat) :=
+  body.foldlM (init := ([] : List Nat)) fun acc item => do
+    pure <| mergeDistinctNatLists acc (← collectWrittenObjectIdsStatement (← parseJsonString item))
+
+/-- Whether a list of ids is in strictly increasing order. -/
+private def strictlyIncreasingNats : List Nat → Bool
+  | [] => true
+  | [_] => true
+  | x :: y :: rest => decide (x < y) && strictlyIncreasingNats (y :: rest)
 
 structure PolicySensitivityJson where
   returnSensitive : Bool := false
@@ -2145,20 +2199,26 @@ theorem validateImportedOramShape_accepts_private_posmap_capacity_above_local_po
       1 = true := by
   native_decide
 
+/-- The sealed records a call of `fn` may write: each slot of each exact
+object its body has a write statement for, and the path and metadata pages
+of each access of an ORAM map. An exact object the body only reads is not
+rewritten. -/
 def expectedCommitOpsForFunction
   (view : ImportedProofRelevantContractView)
   (fn : ImportedProofRelevantFunctionView) :
   Except String Nat := do
   let accessedObjects ← accessedObjectIdsInBodyStrings fn.body
+  let writtenObjects ← writtenObjectIdsInBodyStrings fn.body
   let oramAccesses ← countFunctionOramAccesses fn view.state
   accessedObjects.foldlM (init := 0) fun acc objectId => do
     let stateObject ←
       match stateObjectById? view.state objectId with
       | some object => pure object
       | none => throw s!"unknown object id {objectId}"
+    let written := writtenObjects.contains objectId
     let addition ←
       if stateObject.kind == "cell" then
-        pure 1
+        pure (if written then 1 else 0)
       else if stateObject.kind == "array" || stateObject.kind == "map" then
         if stateObject.backend == "oram" then
           match manifestObjectById? view.manifest.objects objectId with
@@ -2173,7 +2233,7 @@ def expectedCommitOpsForFunction
               | none => throw s!"ORAM object {objectId} is missing ORAM manifest data"
           | none => throw s!"manifest is missing object id {objectId}"
         else
-          pure <| stateObject.capacity.getD 1
+          pure (if written then stateObject.capacity.getD 1 else 0)
       else
         throw s!"unsupported state object kind for object id {objectId}"
     pure (acc + addition)
@@ -2270,6 +2330,26 @@ private def functionMaxCommitOpsMatchesManifest
   match expectedCommitOpsForFunction view fn with
   | .error _ => false
   | .ok expected => entry.max_commit_ops == expected
+
+/-- The manifest lists the objects the function's body may write, in
+increasing id order. -/
+private def functionMayWriteObjectsMatchManifest
+  (fn : ImportedProofRelevantFunctionView)
+  (entry : ImportedProofRelevantEntrypointView) : Bool :=
+  match writtenObjectIdsInBodyStrings fn.body with
+  | .error _ => false
+  | .ok expected =>
+      strictlyIncreasingNats entry.may_write_objects &&
+        listedEquivalent expected entry.may_write_objects
+
+private def functionMayWriteObjectsMismatchMessage
+  (fn : ImportedProofRelevantFunctionView)
+  (entry : ImportedProofRelevantEntrypointView) : String :=
+  match writtenObjectIdsInBodyStrings fn.body with
+  | .error err =>
+      s!"{fn.signature}: failed to compute may_write_objects: {err}"
+  | .ok expected =>
+      s!"{fn.signature}: the body writes objects {expected}, manifest lists {entry.may_write_objects}"
 
 private def functionMaxLoadOpsMismatchMessage
   (view : ImportedProofRelevantContractView)
@@ -2452,6 +2532,31 @@ private def manifestLoadOpMismatchMessages
             tail
           else
             functionMaxLoadOpsMismatchMessage view fn entry :: tail
+
+private def functionsMatchManifestMayWriteObjects :
+  List ImportedProofRelevantFunctionView →
+  List ImportedProofRelevantEntrypointView → Bool
+  | [], _ => true
+  | fn :: rest, entrypoints =>
+      match lookupEntrypoint fn.signature entrypoints with
+      | none => false
+      | some entry =>
+          functionMayWriteObjectsMatchManifest fn entry &&
+            functionsMatchManifestMayWriteObjects rest entrypoints
+
+private def manifestMayWriteMismatchMessages :
+  List ImportedProofRelevantFunctionView →
+  List ImportedProofRelevantEntrypointView → List String
+  | [], _ => []
+  | fn :: rest, entrypoints =>
+      let tail := manifestMayWriteMismatchMessages rest entrypoints
+      match lookupEntrypoint fn.signature entrypoints with
+      | none => s!"{fn.signature}: missing manifest entrypoint" :: tail
+      | some entry =>
+          if functionMayWriteObjectsMatchManifest fn entry then
+            tail
+          else
+            functionMayWriteObjectsMismatchMessage fn entry :: tail
 
 private def functionMetadataMismatchMessage
   (view : ImportedProofRelevantContractView)
@@ -3882,6 +3987,7 @@ def ImportedProofRelevantContractView.checkStructuralValid
     functionsMatchManifestOramAccesses view view.functions view.manifest.entrypoints &&
     functionsMatchManifestCommitOps view view.functions view.manifest.entrypoints &&
     functionsMatchManifestLoadOps view view.functions view.manifest.entrypoints &&
+    functionsMatchManifestMayWriteObjects view.functions view.manifest.entrypoints &&
     functionsMetadataWellFormed view view.functions view.manifest.entrypoints
 
 def ImportedProofRelevantContractView.StructuralValid
@@ -3976,6 +4082,12 @@ def ImportedProofRelevantContractView.validationErrors
       ["manifest max_load_ops do not match recomputed body accesses for: " ++
         String.intercalate ", "
           (manifestLoadOpMismatchMessages view view.functions view.manifest.entrypoints)]
+    else
+      []) ++
+    (if !(functionsMatchManifestMayWriteObjects view.functions view.manifest.entrypoints) then
+      ["manifest may_write_objects are not the objects the body writes for: " ++
+        String.intercalate ", "
+          (manifestMayWriteMismatchMessages view.functions view.manifest.entrypoints)]
     else
       []) ++
     (if !(functionsMetadataWellFormed view view.functions view.manifest.entrypoints) then
@@ -4438,6 +4550,29 @@ private theorem functionsMatchManifestLoadOps_exact_of_lookup
           simp [functionsMatchManifestLoadOps, hHd] at hMatch
         exact ih hMatch.2 hMem hLookup
 
+private theorem functionsMatchManifestMayWriteObjects_exact_of_lookup
+  {functions : List ImportedProofRelevantFunctionView}
+  {entrypoints : List ImportedProofRelevantEntrypointView}
+  {fn : ImportedProofRelevantFunctionView}
+  {entry : ImportedProofRelevantEntrypointView}
+  (hMatch : functionsMatchManifestMayWriteObjects functions entrypoints = true)
+  (hMem : fn ∈ functions)
+  (hLookup : lookupEntrypoint fn.signature entrypoints = some entry) :
+  functionMayWriteObjectsMatchManifest fn entry = true := by
+  induction functions generalizing fn entry with
+  | nil =>
+      cases hMem
+  | cons hd tl ih =>
+      simp only [List.mem_cons] at hMem
+      rcases hMem with hEq | hMem
+      · subst hEq
+        have hHead := hMatch
+        simp [functionsMatchManifestMayWriteObjects, hLookup] at hHead
+        exact hHead.1
+      · cases hHd : lookupEntrypoint hd.signature entrypoints <;>
+          simp [functionsMatchManifestMayWriteObjects, hHd] at hMatch
+        exact ih hMatch.2 hMem hLookup
+
 private theorem kernelStepsTargetNonRawStateObjects_exact_of_mem
   {state : List ImportedProofRelevantStateObjectView}
   {steps : List ImportedProofRelevantKernelStepView}
@@ -4501,11 +4636,13 @@ private theorem ImportedProofRelevantContractView.structural_exactness_checks
     functionsMatchManifestCounts view.functions view.manifest.entrypoints = true ∧
     functionsMatchManifestOramAccesses view view.functions view.manifest.entrypoints = true ∧
     functionsMatchManifestCommitOps view view.functions view.manifest.entrypoints = true ∧
-    functionsMatchManifestLoadOps view view.functions view.manifest.entrypoints = true := by
+    functionsMatchManifestLoadOps view view.functions view.manifest.entrypoints = true ∧
+    functionsMatchManifestMayWriteObjects view.functions view.manifest.entrypoints = true := by
   have hChecks := hValid
   simp [ImportedProofRelevantContractView.StructuralValid,
     ImportedProofRelevantContractView.checkStructuralValid] at hChecks
-  rcases hChecks with ⟨hPrefix18, _hMetadata⟩
+  rcases hChecks with ⟨hPrefix19, _hMetadata⟩
+  rcases hPrefix19 with ⟨hPrefix18, hMayWrite⟩
   rcases hPrefix18 with ⟨hPrefix17, hLoad⟩
   rcases hPrefix17 with ⟨hPrefix16, hCommit⟩
   rcases hPrefix16 with ⟨hPrefix15, hOram⟩
@@ -4513,7 +4650,7 @@ private theorem ImportedProofRelevantContractView.structural_exactness_checks
   rcases hPrefix14 with ⟨hPrefix13, hBoundary⟩
   rcases hPrefix13 with ⟨hPrefix12, hSecrets⟩
   rcases hPrefix12 with ⟨_hPrefix11, hLowering⟩
-  exact ⟨hLowering, hSecrets, hBoundary, hCounts, hOram, hCommit, hLoad⟩
+  exact ⟨hLowering, hSecrets, hBoundary, hCounts, hOram, hCommit, hLoad, hMayWrite⟩
 
 private theorem ImportedProofRelevantContractView.structural_confidential_kernel_targets
   (view : ImportedProofRelevantContractView)
@@ -4523,7 +4660,8 @@ private theorem ImportedProofRelevantContractView.structural_confidential_kernel
   have hChecks := hValid
   simp [ImportedProofRelevantContractView.StructuralValid,
     ImportedProofRelevantContractView.checkStructuralValid] at hChecks
-  rcases hChecks with ⟨hPrefix18, _hMetadata⟩
+  rcases hChecks with ⟨hPrefix19, _hMetadata⟩
+  rcases hPrefix19 with ⟨hPrefix18, _hMayWrite⟩
   rcases hPrefix18 with ⟨hPrefix17, _hLoad⟩
   rcases hPrefix17 with ⟨hPrefix16, _hCommit⟩
   rcases hPrefix16 with ⟨hPrefix15, _hOram⟩
@@ -4759,7 +4897,7 @@ theorem ImportedProofRelevantContractView.manifest_load_ops_exact_of_lookup
     entry.max_load_ops = maxLoadOps := by
   have hMatch :=
     functionsMatchManifestLoadOps_exact_of_lookup
-      (view.structural_exactness_checks hValid).2.2.2.2.2.2
+      (view.structural_exactness_checks hValid).2.2.2.2.2.2.1
       hMem
       hLookup
   cases hLoad : expectedLoadOpsForFunction view fn with
@@ -4769,6 +4907,41 @@ theorem ImportedProofRelevantContractView.manifest_load_ops_exact_of_lookup
       have hFact := hMatch
       simp [functionMaxLoadOpsMatchesManifest, hLoad] at hFact
       exact ⟨maxLoadOps, rfl, hFact⟩
+
+/-- The manifest entry lists exactly the objects the function's body has a
+write statement for, in increasing id order. -/
+def ImportedProofRelevantEntrypointView.listsWrittenObjectsOf
+  (entry : ImportedProofRelevantEntrypointView)
+  (fn : ImportedProofRelevantFunctionView) : Prop :=
+  ∃ written,
+    writtenObjectIdsInBodyStrings fn.body = .ok written ∧
+    strictlyIncreasingNats entry.may_write_objects = true ∧
+    listedEquivalent written entry.may_write_objects = true
+
+/-- A structurally valid view's manifest lists, for each function, the objects
+its body has a write statement for, in increasing id order: the objects the
+runtime reseals at commit, and the exact objects whose slots
+`expectedCommitOpsForFunction` counts. -/
+theorem ImportedProofRelevantContractView.manifest_may_write_objects_exact_of_lookup
+  (view : ImportedProofRelevantContractView)
+  {fn : ImportedProofRelevantFunctionView}
+  {entry : ImportedProofRelevantEntrypointView}
+  (hValid : view.StructuralValid)
+  (hMem : fn ∈ view.functions)
+  (hLookup : lookupEntrypoint fn.signature view.manifest.entrypoints = some entry) :
+  entry.listsWrittenObjectsOf fn := by
+  have hMatch :=
+    functionsMatchManifestMayWriteObjects_exact_of_lookup
+      (view.structural_exactness_checks hValid).2.2.2.2.2.2.2
+      hMem
+      hLookup
+  cases hWritten : writtenObjectIdsInBodyStrings fn.body with
+  | error err =>
+      simp [functionMayWriteObjectsMatchManifest, hWritten] at hMatch
+  | ok written =>
+      have hFact := hMatch
+      simp [functionMayWriteObjectsMatchManifest, hWritten] at hFact
+      exact ⟨written, hWritten, hFact.1, hFact.2⟩
 
 theorem functionStoredDslMatchesBody_confidential_exact
   {fn : ImportedProofRelevantFunctionView}

@@ -548,7 +548,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "confidential_core_kernel_interface_slot_bundle_json_bytes": 17802,
+      "confidential_core_kernel_interface_slot_bundle_json_bytes": 17498,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "AuthScan",
@@ -575,7 +575,7 @@
       "controller_phase_count": 3,
       "entrypoint": "auth(bytes32)",
       "exit_events": 4,
-      "gas_used": 2591,
+      "gas_used": 2475,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 8,
         "expected_kernel_step_public_object_schedule": [
@@ -1038,7 +1038,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "confidential_core_kernel_interface_slot_bundle_json_bytes": 17802,
+      "confidential_core_kernel_interface_slot_bundle_json_bytes": 17498,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "AuthScan",
@@ -1065,7 +1065,7 @@
       "controller_phase_count": 3,
       "entrypoint": "auth(bytes32)",
       "exit_events": 4,
-      "gas_used": 2591,
+      "gas_used": 2475,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 8,
         "expected_kernel_step_public_object_schedule": [

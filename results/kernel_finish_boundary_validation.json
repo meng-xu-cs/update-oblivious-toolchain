@@ -396,7 +396,7 @@
       "accepted": true,
       "boundary_events": 2,
       "entrypoint": "auth(bytes32)",
-      "gas_used": 2591,
+      "gas_used": 2475,
       "kernel_finish_bundle": {
         "emitted_kernel_step_count": 8,
         "entrypoint_id": "auth(bytes32)",
@@ -789,7 +789,7 @@
       "accepted": true,
       "boundary_events": 2,
       "entrypoint": "auth(bytes32)",
-      "gas_used": 2591,
+      "gas_used": 2475,
       "kernel_finish_bundle": {
         "emitted_kernel_step_count": 8,
         "entrypoint_id": "auth(bytes32)",

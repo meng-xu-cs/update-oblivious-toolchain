@@ -10,8 +10,8 @@
     "metadata_canonicalization_sha256": "4e3a033dbb19868817f8e25a6a1631b7f390bb2ea5b6699799192377b0535003",
     "compilation_mode": "uo",
     "compiler_version": "0.1.0",
-    "toolchain_manifest_sha256": "f51871012ebcef46dddea9d6af67dc77193dde25209fe42a2ec7ac76e917aff4",
-    "package_sha256": "c3cf8135403ddf73e87bd34fe6349ea7225c02646d099ee585bce7b26f4ada4e"
+    "toolchain_manifest_sha256": "c277bbb944b4d9d8b9e0cc74fc7b7e94e952bce2e9279251548e5984ab46e47c",
+    "package_sha256": "7fd1c55fc38c0254fa7b706b631bdc604a926c2703c9f69bdb6df2d45c436feb"
   },
   "contract": {
     "contract": "ERC20Lite",
@@ -1854,6 +1854,7 @@
           "uomap_writes": 0,
           "max_commit_ops": 40,
           "max_load_ops": 72,
+          "may_write_objects": [],
           "oram_accesses": {
             "2": 1
           }
@@ -2025,6 +2026,9 @@
           "uomap_writes": 1,
           "max_commit_ops": 40,
           "max_load_ops": 72,
+          "may_write_objects": [
+            2
+          ],
           "oram_accesses": {
             "2": 1
           }
@@ -2126,6 +2130,7 @@
           "uomap_writes": 0,
           "max_commit_ops": 330,
           "max_load_ops": 351,
+          "may_write_objects": [],
           "oram_accesses": {
             "1": 11
           }
@@ -2269,6 +2274,9 @@
           "uomap_writes": 1,
           "max_commit_ops": 1350,
           "max_load_ops": 1371,
+          "may_write_objects": [
+            1
+          ],
           "oram_accesses": {
             "1": 45
           }
@@ -2586,6 +2594,9 @@
           "uomap_writes": 2,
           "max_commit_ops": 2700,
           "max_load_ops": 2721,
+          "may_write_objects": [
+            1
+          ],
           "oram_accesses": {
             "1": 90
           }
@@ -3077,6 +3088,10 @@
           "uomap_writes": 3,
           "max_commit_ops": 2780,
           "max_load_ops": 2833,
+          "may_write_objects": [
+            1,
+            2
+          ],
           "oram_accesses": {
             "1": 90,
             "2": 2

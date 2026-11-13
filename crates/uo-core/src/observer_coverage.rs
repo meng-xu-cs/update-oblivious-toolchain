@@ -83,6 +83,7 @@ pub const ENTRYPOINT_MANIFEST_FIELDS: &[&str] = &[
     "uomap_writes",
     "max_commit_ops",
     "max_load_ops",
+    "may_write_objects",
     "oram_accesses",
 ];
 

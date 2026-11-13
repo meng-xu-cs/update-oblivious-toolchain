@@ -9616,6 +9616,7 @@ mod tests {
             uomap_writes: 0,
             max_commit_ops: 0,
             max_load_ops: 0,
+            may_write_objects: Vec::new(),
             oram_accesses: BTreeMap::new(),
         }
     }
@@ -9653,6 +9654,7 @@ mod tests {
                 uomap_writes: 0,
                 max_commit_ops: 0,
                 max_load_ops: 0,
+                may_write_objects: Vec::new(),
                 oram_accesses: BTreeMap::new(),
             },
         );

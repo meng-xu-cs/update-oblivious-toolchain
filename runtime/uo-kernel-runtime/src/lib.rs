@@ -577,6 +577,7 @@ mod tests {
             scratch_bytes: 1024,
             max_kernel_ops: 8,
             max_commit_ops: 0,
+            max_load_ops: 0,
         }
     }
 
@@ -621,6 +622,7 @@ mod tests {
                 scratch_bytes: 1024,
                 max_kernel_ops: 1,
                 max_commit_ops: 0,
+                max_load_ops: 0,
             },
             &[],
         )
@@ -637,6 +639,7 @@ mod tests {
                 scratch_bytes: 1024,
                 max_kernel_ops: 4,
                 max_commit_ops: 0,
+                max_load_ops: 0,
             },
             vec![
                 RuntimeKernelStepWitness::new(UoOpcode::Begin, None).unwrap(),

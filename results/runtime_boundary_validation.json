@@ -1878,7 +1878,17 @@
       "files": [
         "runtime/uo-evm/src/state.rs"
       ],
-      "pattern": "entry.object.commit(old, aborted, recorder, allocator)?;",
+      "pattern": "let may_write = may_write_objects.contains(&id);",
+      "restricted": true
+    },
+    {
+      "expected_files": [
+        "runtime/uo-evm/src/state.rs"
+      ],
+      "files": [
+        "runtime/uo-evm/src/state.rs"
+      ],
+      "pattern": ".commit(old, aborted, may_write, recorder, allocator)?;",
       "restricted": true
     },
     {

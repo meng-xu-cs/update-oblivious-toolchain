@@ -111,11 +111,11 @@
       "uo": {
         "aborted": false,
         "executable": true,
-        "gas_used": 2591,
+        "gas_used": 2475,
         "getters": [
           "1"
         ],
-        "physical_writes": 5,
+        "physical_writes": 1,
         "rejected": false,
         "return": "1"
       },

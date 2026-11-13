@@ -367,6 +367,7 @@ pub struct ProofRelevantEntrypointView {
     pub uomap_writes: usize,
     pub max_commit_ops: usize,
     pub max_load_ops: usize,
+    pub may_write_objects: Vec<u32>,
     pub oram_accesses: Vec<ProofRelevantOramAccessView>,
 }
 
@@ -404,6 +405,7 @@ impl ProofRelevantEntrypointView {
             uomap_writes: entrypoint.uomap_writes,
             max_commit_ops: entrypoint.max_commit_ops,
             max_load_ops: entrypoint.max_load_ops,
+            may_write_objects: entrypoint.may_write_objects.clone(),
             oram_accesses: entrypoint
                 .oram_accesses
                 .iter()
@@ -569,6 +571,7 @@ const ENTRYPOINT_VIEW_FIELDS: &[&str] = &[
     "max_hash_part_bytes",
     "max_load_ops",
     "max_stack_words",
+    "may_write_objects",
     "oram_accesses",
     "param_names",
     "public_env",
@@ -872,6 +875,7 @@ mod tests {
             uomap_writes: 0,
             max_commit_ops: 0,
             max_load_ops: 0,
+            may_write_objects: Vec::new(),
             oram_accesses: Default::default(),
         };
         let view = ProofRelevantEntrypointView::from_manifest_entrypoint("f(uint256)", &entrypoint)
@@ -917,6 +921,7 @@ mod tests {
             uomap_writes: 0,
             max_commit_ops: 0,
             max_load_ops: 0,
+            may_write_objects: Vec::new(),
             oram_accesses: Default::default(),
         };
         let view =
@@ -957,6 +962,7 @@ mod tests {
             uomap_writes: 0,
             max_commit_ops: 0,
             max_load_ops: 0,
+            may_write_objects: Vec::new(),
             oram_accesses: Default::default(),
         };
         let view = ProofRelevantEntrypointView::from_manifest_entrypoint("f(uint256)", &entrypoint)

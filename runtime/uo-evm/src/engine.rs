@@ -2105,6 +2105,88 @@ bounds:
     }
 
     #[test]
+    fn a_full_scan_read_writes_nothing_and_an_aborted_write_still_rewrites() {
+        let base = include_str!(bench_raw!("SweepMap.pathoram.yaml"));
+        let metadata = base
+            .replace("    capacity: 16\n", "    capacity: 8\n")
+            .replace("    backend: oram\n", "    backend: full_scan\n")
+            .replace("    oram_scheme: path_oram_local_posmap_v1\n", "");
+        assert_ne!(metadata, base, "the sidecar's map lines changed");
+        let artifact = compile_bench(bench_raw!("SweepMap.sol"), &metadata, ProgramMode::Uo);
+        let entry = |signature: &str| &artifact.contract.manifest.entrypoints[signature];
+        let records = artifact.contract.state[0].id;
+        // The manifest lists the map for the writers and not for the reader,
+        // and counts its slots as commit operations only for the writers.
+        assert!(entry("read(bytes32)").may_write_objects.is_empty());
+        assert_eq!(entry("read(bytes32)").max_commit_ops, 0);
+        assert_eq!(entry("read(bytes32)").max_load_ops, 8);
+        for writer in [
+            "put(bytes32,uint256)",
+            "clear(bytes32)",
+            "putBelow(bytes32,uint256,uint256)",
+        ] {
+            assert_eq!(entry(writer).may_write_objects, vec![records], "{writer}");
+            assert_eq!(entry(writer).max_commit_ops, 8, "{writer}");
+            assert_eq!(entry(writer).max_load_ops, 8, "{writer}");
+        }
+
+        let mut instance = ContractInstance::deploy_with_seed(artifact.clone(), 5).unwrap();
+        let counts = |result: &CallResult| {
+            let receipt = result.receipt();
+            (receipt.physical_reads.len(), receipt.physical_writes.len())
+        };
+        let put = instance
+            .call("put(bytes32,uint256)", vec![b32(1), Value::uint(9)])
+            .unwrap();
+        assert_eq!(counts(&put), (8, 8));
+        // A read scans the map and rewrites no slot, whether or not it finds
+        // its key.
+        for key in [1u8, 2] {
+            let read = instance.call("read(bytes32)", vec![b32(key)]).unwrap();
+            assert_eq!(counts(&read), (8, 0), "key {key}");
+        }
+        // A write whose guard fails aborts and still rewrites every slot,
+        // with what the map held.
+        let guarded = instance
+            .call(
+                "putBelow(bytes32,uint256,uint256)",
+                vec![b32(1), Value::uint(5), Value::uint(0)],
+            )
+            .unwrap();
+        assert!(guarded.aborted);
+        assert_eq!(counts(&guarded), (8, 8));
+        assert!(guarded
+            .receipt()
+            .physical_writes
+            .iter()
+            .all(|write| write.class == uo_core::WriteClass::Update));
+        let read = instance.call("read(bytes32)", vec![b32(1)]).unwrap();
+        assert_eq!(read.return_value, Some(Value::uint(9)));
+        assert_objects_are_cold(&instance);
+
+        // What commit reseals comes from the program. A manifest that lists
+        // other objects than its slot program writes is refused before the
+        // call runs.
+        let mut drifted = artifact;
+        drifted
+            .contract
+            .manifest
+            .entrypoints
+            .get_mut("put(bytes32,uint256)")
+            .unwrap()
+            .may_write_objects
+            .clear();
+        let mut instance = ContractInstance::deploy_with_seed(drifted, 5).unwrap();
+        let error = instance
+            .call("put(bytes32,uint256)", vec![b32(1), Value::uint(9)])
+            .unwrap_err();
+        assert!(
+            format!("{error:#}").contains("are not the objects its slot program writes"),
+            "{error:#}"
+        );
+    }
+
+    #[test]
     fn deployed_path_oram_state_is_cold_before_first_call() {
         let artifact = compile_bench(
             bench_raw!("SingleAccessMap.sol"),

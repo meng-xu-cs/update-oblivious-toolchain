@@ -128,6 +128,7 @@ def observerCoverageKeys : List String :=
   , "EntrypointManifest.uomap_writes"
   , "EntrypointManifest.max_commit_ops"
   , "EntrypointManifest.max_load_ops"
+  , "EntrypointManifest.may_write_objects"
   , "EntrypointManifest.oram_accesses"
   , "OramManifest.scheme"
   , "OramManifest.block_size"

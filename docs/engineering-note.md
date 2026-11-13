@@ -15,6 +15,15 @@ with nonzero filler, encode logical zeros as marker-free records, and
 rerandomize physical rewrites. Normalized `M+` traces therefore collapse to
 public-determined update schedules after initialization.
 
+A call scans every exact object it accesses and, when it commits, rewrites
+slot by slot exactly the exact objects its program has a write statement
+for: whether or not the write's predicate held, and also when the call
+aborted, with what the object held. An object the program only reads is not
+rewritten. The rule is static: it is read off the program, which is public,
+and not off what a run did, so it shows nothing about a run. The manifest
+names the objects (`may_write_objects`), and the commit bound and the
+modeled cost count the slots of those objects only.
+
 ## Computational-UO
 
 The proof-grade computational path is the concrete

@@ -83,14 +83,18 @@ pub struct AllocatorPlan {
     pub scratch_bytes: usize,
     pub max_kernel_ops: usize,
     /// The entrypoint's commit operations (the manifest's `max_commit_ops`):
-    /// the slots, pages and buckets the call writes. The call opens each one
-    /// when it loads its object or reads its path and seals it when it
-    /// writes it, and it opens a slot of an exact object once more to
-    /// restore it when the call aborts or leaves the object unread. That is
-    /// at most three reservations of scratch per operation, each wiped: six
-    /// resource events.
+    /// the slots, pages and buckets the call writes. The call seals each
+    /// once: one reservation of scratch, wiped, so two resource events.
     #[serde(default)]
     pub max_commit_ops: usize,
+    /// The entrypoint's load operations (the manifest's `max_load_ops`): the
+    /// slots, pages and buckets the call reads. The call opens each when it
+    /// loads its object or reads its path, and it opens a slot of an exact
+    /// object once more to restore it when the call aborts or does not write
+    /// the object: at most two reservations of scratch, each wiped, so four
+    /// resource events.
+    #[serde(default)]
+    pub max_load_ops: usize,
 }
 
 impl AllocatorPlan {
@@ -101,6 +105,7 @@ impl AllocatorPlan {
             scratch_bytes: arena_bytes / 4,
             max_kernel_ops: 0,
             max_commit_ops: 0,
+            max_load_ops: 0,
         }
     }
 
@@ -119,6 +124,7 @@ impl AllocatorPlan {
             canonical_kernel_steps.len()
         };
         plan.max_commit_ops = entry.max_commit_ops;
+        plan.max_load_ops = entry.max_load_ops;
         plan
     }
 }
@@ -271,15 +277,21 @@ impl AllocatorSession {
     }
 }
 
-/// The resource events a call may log for each of its commit operations:
-/// see `AllocatorPlan::max_commit_ops`.
-const RESOURCE_EVENTS_PER_COMMIT_OP: usize = 6;
+/// The resource events a call may log for each of its load operations and
+/// for each of its commit operations: see `AllocatorPlan::max_load_ops` and
+/// `AllocatorPlan::max_commit_ops`.
+const RESOURCE_EVENTS_PER_LOAD_OP: usize = 4;
+const RESOURCE_EVENTS_PER_COMMIT_OP: usize = 2;
 
 fn resource_event_capacity(plan: &AllocatorPlan) -> usize {
     plan.max_kernel_ops
         .saturating_add(plan.max_stack_words)
         .saturating_mul(128)
         .saturating_add(128)
+        .saturating_add(
+            plan.max_load_ops
+                .saturating_mul(RESOURCE_EVENTS_PER_LOAD_OP),
+        )
         .saturating_add(
             plan.max_commit_ops
                 .saturating_mul(RESOURCE_EVENTS_PER_COMMIT_OP),
@@ -401,21 +413,21 @@ mod tests {
             uomap_writes: 5,
             max_commit_ops: 9,
             max_load_ops: 9,
+            may_write_objects: Vec::new(),
             oram_accesses: Default::default(),
         }
     }
 
     #[test]
-    fn session_logs_three_reservations_per_commit_operation() {
-        // An aborting call on an exact map of 5,000 slots: each slot opened
-        // at load, opened again to restore it, and sealed at commit.
-        let run = |commit_ops: usize, reservations: usize| {
+    fn session_logs_two_reservations_per_load_and_one_per_commit_operation() {
+        let run = |load_ops: usize, commit_ops: usize, reservations: usize| {
             let mut session = AllocatorSession::new(AllocatorPlan {
                 arena_bytes: 0,
                 max_stack_words: 0,
                 scratch_bytes: 64,
                 max_kernel_ops: 0,
                 max_commit_ops: commit_ops,
+                max_load_ops: load_ops,
             })
             .unwrap();
             for _ in 0..reservations {
@@ -426,13 +438,22 @@ mod tests {
             }
             session.finish()
         };
-        assert!(run(5000, 3 * 5000).is_ok());
-        // The log has 128 events to spare, which a fourth pass does not fit.
-        assert!(run(5000, 3 * 5000 + 64).is_ok());
-        let error = run(5000, 4 * 5000).unwrap_err();
-        assert!(error
-            .to_string()
-            .contains("allocator resource-event capacity exceeded"));
+        let exceeded = |error: anyhow::Error| {
+            error
+                .to_string()
+                .contains("allocator resource-event capacity exceeded")
+        };
+        // An aborting call on an exact map of 5,000 slots that it may write:
+        // each slot opened at load, opened again to restore it, and sealed at
+        // commit. The log has 128 events to spare, which a fourth pass does
+        // not fit.
+        assert!(run(5000, 5000, 3 * 5000).is_ok());
+        assert!(run(5000, 5000, 3 * 5000 + 64).is_ok());
+        assert!(exceeded(run(5000, 5000, 4 * 5000).unwrap_err()));
+        // A call that only reads the map writes no slot: each slot opened at
+        // load and opened again to restore it.
+        assert!(run(5000, 0, 2 * 5000).is_ok());
+        assert!(exceeded(run(5000, 0, 3 * 5000).unwrap_err()));
     }
 
     #[test]
@@ -473,6 +494,7 @@ mod tests {
             scratch_bytes: 1024,
             max_kernel_ops: 1,
             max_commit_ops: 0,
+            max_load_ops: 0,
         })
         .unwrap();
         session.record_kernel_op().unwrap();
@@ -487,6 +509,7 @@ mod tests {
             scratch_bytes: 1024,
             max_kernel_ops: 4,
             max_commit_ops: 0,
+            max_load_ops: 0,
         })
         .unwrap();
         session
@@ -503,6 +526,7 @@ mod tests {
             scratch_bytes: 1024,
             max_kernel_ops: 4,
             max_commit_ops: 0,
+            max_load_ops: 0,
         })
         .unwrap();
         session.record_kernel_op().unwrap();
@@ -523,6 +547,7 @@ mod tests {
             scratch_bytes: 1024,
             max_kernel_ops: 4,
             max_commit_ops: 0,
+            max_load_ops: 0,
         })
         .unwrap();
         {

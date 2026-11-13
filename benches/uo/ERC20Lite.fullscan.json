@@ -10,8 +10,8 @@
     "metadata_canonicalization_sha256": "fbf9767001ffba5f6dedd2456767f2da4785be497f4d0a8778a5f52bafd2dcc7",
     "compilation_mode": "uo",
     "compiler_version": "0.1.0",
-    "toolchain_manifest_sha256": "f51871012ebcef46dddea9d6af67dc77193dde25209fe42a2ec7ac76e917aff4",
-    "package_sha256": "7656244d168f0aca160e47d75a18e1e1226608917751087209dcd7e4b3f6a6e1"
+    "toolchain_manifest_sha256": "c277bbb944b4d9d8b9e0cc74fc7b7e94e952bce2e9279251548e5984ab46e47c",
+    "package_sha256": "6409dc01856cb14819a1074894afd61d03f04ddcb1d149cc6a4562e50dd04bde"
   },
   "contract": {
     "contract": "ERC20Lite",
@@ -1694,7 +1694,7 @@
             "spender"
           ],
           "entry_input_len": 40,
-          "public_gas_budget": 2985,
+          "public_gas_budget": 2521,
           "arena_bytes": 4160,
           "max_stack_words": 65,
           "max_hash_part_bytes": 20,
@@ -1826,8 +1826,9 @@
           "uoarray_writes": 0,
           "uomap_reads": 1,
           "uomap_writes": 0,
-          "max_commit_ops": 16,
+          "max_commit_ops": 0,
           "max_load_ops": 16,
+          "may_write_objects": [],
           "oram_accesses": {}
         },
         "approve(address,address,uint256)": {
@@ -1997,6 +1998,9 @@
           "uomap_writes": 1,
           "max_commit_ops": 16,
           "max_load_ops": 16,
+          "may_write_objects": [
+            2
+          ],
           "oram_accesses": {}
         },
         "balanceOf(address)": {
@@ -2005,7 +2009,7 @@
             "owner"
           ],
           "entry_input_len": 20,
-          "public_gas_budget": 2489,
+          "public_gas_budget": 2257,
           "arena_bytes": 4096,
           "max_stack_words": 64,
           "max_hash_part_bytes": 0,
@@ -2094,8 +2098,9 @@
           "uoarray_writes": 0,
           "uomap_reads": 1,
           "uomap_writes": 0,
-          "max_commit_ops": 8,
+          "max_commit_ops": 0,
           "max_load_ops": 8,
+          "may_write_objects": [],
           "oram_accesses": {}
         },
         "mint(address,uint256)": {
@@ -2237,6 +2242,9 @@
           "uomap_writes": 1,
           "max_commit_ops": 8,
           "max_load_ops": 8,
+          "may_write_objects": [
+            1
+          ],
           "oram_accesses": {}
         },
         "transfer(address,address,uint256)": {
@@ -2552,6 +2560,9 @@
           "uomap_writes": 2,
           "max_commit_ops": 8,
           "max_load_ops": 8,
+          "may_write_objects": [
+            1
+          ],
           "oram_accesses": {}
         },
         "transferFrom(address,address,address,uint256)": {
@@ -3041,6 +3052,10 @@
           "uomap_writes": 3,
           "max_commit_ops": 24,
           "max_load_ops": 24,
+          "may_write_objects": [
+            1,
+            2
+          ],
           "oram_accesses": {}
         }
       }

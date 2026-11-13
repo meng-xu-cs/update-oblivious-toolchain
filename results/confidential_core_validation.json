@@ -428,7 +428,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "confidential_core_bundle_json_bytes": 10015,
+      "confidential_core_bundle_json_bytes": 9711,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "AuthScan",
@@ -454,7 +454,7 @@
       "controller_phase_count": 3,
       "entrypoint": "auth(bytes32)",
       "exit_events": 4,
-      "gas_used": 2591,
+      "gas_used": 2475,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -834,7 +834,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "confidential_core_bundle_json_bytes": 10015,
+      "confidential_core_bundle_json_bytes": 9711,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "AuthScan",
@@ -860,7 +860,7 @@
       "controller_phase_count": 3,
       "entrypoint": "auth(bytes32)",
       "exit_events": 4,
-      "gas_used": 2591,
+      "gas_used": 2475,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,

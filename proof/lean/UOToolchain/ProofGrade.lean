@@ -195,6 +195,24 @@ theorem proofGrade_source_manifest_load_ops_exact_of_lookup
       hMem
       hLookup
 
+/-- The manifest of a proof-grade bundle lists, for each function, the objects
+its body has a write statement for: the objects the runtime reseals at
+commit. An exact object off the list is one the function only reads, and the
+commit bound counts none of its slots. -/
+theorem proofGrade_source_manifest_may_write_objects_exact_of_lookup
+  (bundle : ImportedProofRelevantTranslationBundle)
+  (hValid : bundle.ProofGradeValid)
+  {fn : ImportedProofRelevantFunctionView}
+  {entry : ImportedProofRelevantEntrypointView}
+  (hMem : fn ∈ bundle.source_view.functions)
+  (hLookup : lookupEntrypoint fn.signature bundle.source_view.manifest.entrypoints = some entry) :
+  entry.listsWrittenObjectsOf fn := by
+  exact
+    bundle.source_view.manifest_may_write_objects_exact_of_lookup
+      (bundle.source_view_structural_valid hValid)
+      hMem
+      hLookup
+
 theorem proofGrade_source_manifest_witness_with_expected_of_lookup
   (bundle : ImportedProofRelevantTranslationBundle)
   (hValid : bundle.ProofGradeValid)

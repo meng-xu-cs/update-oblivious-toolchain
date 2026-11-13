@@ -94,11 +94,17 @@ pub(in crate::runtime) struct ConfidentialRuntimeShadowState {
     // The public-state digest of the call's candidate state, taken when the
     // call commits.
     candidate_public_state_hash: Option<String>,
+    // The objects the call's program may write, which commit reseals: set
+    // from the program before it runs.
+    may_write_objects: Option<Box<[u32]>>,
 }
 
 #[derive(Debug)]
 pub(in crate::runtime) struct PublicRuntimeShadowState {
     shadow: RuntimeShadowState,
+    // The objects the entrypoint may write, which commit reseals: set from
+    // the manifest before the entrypoint runs.
+    may_write_objects: Option<Box<[u32]>>,
 }
 
 impl RuntimeObjectEntry {
@@ -342,7 +348,13 @@ impl ContractRuntime {
             .object_mut(object_id)?
             .bulk_put_for_diagnostics(entries, &mut allocator)?;
         let mut recorder = CallRecorder::begin_with_input_len("bulk load", 0);
-        shadow.commit_against(&self.committed, false, &mut recorder, &mut allocator)?;
+        shadow.commit_against(
+            &self.committed,
+            false,
+            &[object_id],
+            &mut recorder,
+            &mut allocator,
+        )?;
         self.committed = shadow.into_cold_committed_state()?;
         Ok(())
     }
@@ -538,6 +550,7 @@ impl ContractRuntime {
                 scratch_bytes: 1024,
                 max_kernel_ops: 16,
                 max_commit_ops: 0,
+                max_load_ops: 0,
             },
             &[],
         )?;
@@ -833,10 +846,14 @@ impl RuntimeShadowState {
         Ok(())
     }
 
+    /// Commit the call's objects over the committed state. `may_write_objects`
+    /// are the objects the call's program has a write statement for: an
+    /// exact object is resealed exactly when it is one of them.
     pub(in crate::runtime) fn commit_against(
         &mut self,
         committed: &CommittedRuntimeState,
         aborted: bool,
+        may_write_objects: &[u32],
         recorder: &mut CallRecorder,
         allocator: &mut AllocatorSession,
     ) -> Result<Box<[u32]>> {
@@ -862,8 +879,10 @@ impl RuntimeShadowState {
                     let Some(entry) = shadow.next() else {
                         return Err(anyhow!("peeked shadow entry vanished during commit"));
                     };
-                    let committed_object =
-                        entry.object.commit(old, aborted, recorder, allocator)?;
+                    let may_write = may_write_objects.contains(&id);
+                    let committed_object = entry
+                        .object
+                        .commit(old, aborted, may_write, recorder, allocator)?;
                     committed_object_ids.push(id)?;
                     next_objects.push(RuntimeObjectEntry {
                         object_id: id,
@@ -905,6 +924,7 @@ impl ConfidentialRuntimeShadowState {
         Self {
             shadow,
             candidate_public_state_hash: None,
+            may_write_objects: None,
         }
     }
 
@@ -944,8 +964,11 @@ impl ConfidentialRuntimeShadowState {
                 .objects
                 .staged_public_state_digest(&committed.objects)?,
         );
+        let Some(may_write_objects) = self.may_write_objects.as_deref() else {
+            bail!("confidential call committed before its program was prepared");
+        };
         self.shadow
-            .commit_against(committed, aborted, recorder, allocator)
+            .commit_against(committed, aborted, may_write_objects, recorder, allocator)
     }
 
     pub(in crate::runtime) fn into_cold_committed_state(self) -> Result<CommittedRuntimeState> {
@@ -960,7 +983,16 @@ impl ConfidentialRuntimeShadowState {
 
 impl PublicRuntimeShadowState {
     pub(in crate::runtime) fn from_shadow(shadow: RuntimeShadowState) -> Self {
-        Self { shadow }
+        Self {
+            shadow,
+            may_write_objects: None,
+        }
+    }
+
+    /// Name the objects the entrypoint may write, from its manifest entry:
+    /// what commit reseals.
+    pub(in crate::runtime) fn set_may_write_objects(&mut self, may_write_objects: &[u32]) {
+        self.may_write_objects = Some(may_write_objects.into());
     }
 
     pub(in crate::runtime) fn object_mut(&mut self, object_id: u32) -> Result<&mut RuntimeObject> {
@@ -982,8 +1014,11 @@ impl PublicRuntimeShadowState {
         recorder: &mut CallRecorder,
         allocator: &mut AllocatorSession,
     ) -> Result<Box<[u32]>> {
+        let Some(may_write_objects) = self.may_write_objects.as_deref() else {
+            bail!("public call committed before its may-write objects were named");
+        };
         self.shadow
-            .commit_against(committed, aborted, recorder, allocator)
+            .commit_against(committed, aborted, may_write_objects, recorder, allocator)
     }
 
     pub(in crate::runtime) fn into_cold_committed_state(self) -> Result<CommittedRuntimeState> {
@@ -1025,6 +1060,7 @@ fn public_state_snapshot_allocator() -> Result<AllocatorSession> {
         scratch_bytes: 1 << 20,
         max_kernel_ops: 0,
         max_commit_ops: 0,
+        max_load_ops: 0,
     })
 }
 
@@ -1155,6 +1191,10 @@ impl RuntimeKernelConfidentialStore for ConfidentialRuntimeShadowState {
             self.object_mut(object_id)?
                 .install_presence_reuse_plan(flags.into_boxed_slice())?;
         }
+        // Commit reseals the exact objects the program has a write statement
+        // for, and no other.
+        self.may_write_objects =
+            Some(uo_core::slot_program_written_objects(program).into_boxed_slice());
         Ok(())
     }
 }

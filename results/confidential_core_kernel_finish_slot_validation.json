@@ -472,7 +472,7 @@
       "controller_phase_count": 3,
       "entrypoint": "auth(bytes32)",
       "exit_events": 4,
-      "gas_used": 2591,
+      "gas_used": 2475,
       "kernel_finish_bundle": {
         "emitted_kernel_step_count": 8,
         "entrypoint_id": "auth(bytes32)",
@@ -890,7 +890,7 @@
       "controller_phase_count": 3,
       "entrypoint": "auth(bytes32)",
       "exit_events": 4,
-      "gas_used": 2591,
+      "gas_used": 2475,
       "kernel_finish_bundle": {
         "emitted_kernel_step_count": 8,
         "entrypoint_id": "auth(bytes32)",

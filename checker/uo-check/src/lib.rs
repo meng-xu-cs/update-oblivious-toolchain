@@ -316,8 +316,21 @@ pub fn check_artifact(artifact: &CompiledArtifact) -> Result<Vec<String>> {
             &expected_accesses,
             &artifact.contract.state,
         )?;
-        let expected_max_commit_ops =
-            expected_commit_ops(&function.body, &expected_accesses, &artifact.contract.state)?;
+        let expected_may_write = expected_may_write_objects(&function.body);
+        if entry.may_write_objects != expected_may_write {
+            bail!(
+                "manifest may_write_objects mismatch for entrypoint {}: {:?} != {:?}",
+                function.signature,
+                entry.may_write_objects,
+                expected_may_write
+            );
+        }
+        let expected_max_commit_ops = expected_commit_ops(
+            &function.body,
+            &expected_accesses,
+            &expected_may_write,
+            &artifact.contract.state,
+        )?;
         if entry.max_commit_ops != expected_max_commit_ops {
             bail!(
                 "manifest max_commit_ops mismatch for entrypoint {}: {} != {}",
@@ -994,17 +1007,61 @@ fn validate_oram_access_shape(
     uo_core::validate_oram_access_shape(signature, oram_accesses, state)
 }
 
+/// The objects an entrypoint may write, in increasing id order: every object
+/// its body has a write statement for, whether or not the statement has a
+/// predicate and whatever branch or loop holds it.
+fn expected_may_write_objects(statements: &[Statement]) -> Vec<u32> {
+    fn collect(statement: &Statement, written: &mut BTreeSet<u32>) {
+        match statement {
+            Statement::CellSet { object_id, .. }
+            | Statement::ArraySet { object_id, .. }
+            | Statement::MapPut { object_id, .. } => {
+                written.insert(*object_id);
+            }
+            Statement::If {
+                then_body,
+                else_body,
+                ..
+            } => {
+                for stmt in then_body.iter().chain(else_body) {
+                    collect(stmt, written);
+                }
+            }
+            Statement::For { body, .. } => {
+                for stmt in body {
+                    collect(stmt, written);
+                }
+            }
+            Statement::Declare { .. }
+            | Statement::Assign { .. }
+            | Statement::Require { .. }
+            | Statement::AbortIf { .. }
+            | Statement::Return { .. } => {}
+        }
+    }
+    let mut written = BTreeSet::new();
+    for statement in statements {
+        collect(statement, &mut written);
+    }
+    written.into_iter().collect()
+}
+
+/// The sealed records an entrypoint may write: each slot of each exact object
+/// it may write, and the path and metadata pages of each access of an ORAM
+/// map. An exact object the entrypoint only reads is not rewritten.
 fn expected_commit_ops(
     statements: &[Statement],
     oram_accesses: &BTreeMap<u32, usize>,
+    may_write: &[u32],
     state: &[StateObject],
 ) -> Result<usize> {
     accessed_objects(statements)?
         .into_iter()
         .map(|object_id| {
             let object = state_object_by_id(state, object_id)?;
+            let written = may_write.contains(&object_id);
             Ok(match object.kind {
-                uo_core::ContainerKind::Cell => 1usize,
+                uo_core::ContainerKind::Cell => usize::from(written),
                 uo_core::ContainerKind::Array | uo_core::ContainerKind::Map
                     if object.backend == BackendKind::Oram =>
                 {
@@ -1015,9 +1072,10 @@ fn expected_commit_ops(
                         per_access
                     }
                 }
-                uo_core::ContainerKind::Array | uo_core::ContainerKind::Map => {
+                uo_core::ContainerKind::Array | uo_core::ContainerKind::Map if written => {
                     object.capacity.unwrap_or(1)
                 }
+                uo_core::ContainerKind::Array | uo_core::ContainerKind::Map => 0,
             })
         })
         .collect::<Result<Vec<_>>>()
@@ -1841,7 +1899,7 @@ bounds:
 
     #[test]
     fn artifact_checker_rejects_resource_bound_drift() {
-        for bound in ["max_commit_ops", "max_load_ops"] {
+        for bound in ["max_commit_ops", "max_load_ops", "may_write_objects"] {
             let (_, _, mut artifact) = sample_artifact();
             let signature = artifact.contract.functions[0].signature.clone();
             let entry = artifact
@@ -1850,10 +1908,11 @@ bounds:
                 .entrypoints
                 .get_mut(&signature)
                 .unwrap();
-            if bound == "max_commit_ops" {
-                entry.max_commit_ops += 1;
-            } else {
-                entry.max_load_ops += 1;
+            match bound {
+                "max_commit_ops" => entry.max_commit_ops += 1,
+                "max_load_ops" => entry.max_load_ops += 1,
+                // An object the body does not write.
+                _ => entry.may_write_objects.push(u32::MAX),
             }
             let err = check_artifact(&artifact).unwrap_err();
             assert!(

@@ -277,7 +277,7 @@
     {
       "accepted": true,
       "entrypoint": "auth(bytes32)",
-      "gas_used": 2591,
+      "gas_used": 2475,
       "kernel_json_bytes": 3803,
       "kernel_op_count": 8,
       "kernel_step_count": 8,
@@ -593,7 +593,7 @@
     {
       "accepted": true,
       "entrypoint": "auth(bytes32)",
-      "gas_used": 2591,
+      "gas_used": 2475,
       "kernel_json_bytes": 3803,
       "kernel_op_count": 8,
       "kernel_step_count": 8,

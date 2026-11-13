@@ -1295,10 +1295,19 @@ impl RuntimeObject {
         }
     }
 
+    /// Commit the object a call ran on over the committed one, `old`.
+    /// `may_write` says whether the call's program has a write statement for
+    /// the object. An exact object is resealed, slot by slot, exactly when
+    /// it does, whether or not a write ran or its predicate held, and also
+    /// when the call aborted, with the committed contents. An exact object
+    /// the program only reads is restored from storage with no write. The
+    /// decision is the program's, not the object's access flags. A Path
+    /// ORAM map has written its paths as it was accessed.
     pub(in crate::runtime) fn commit(
         self,
         old: &Self,
         aborted: bool,
+        may_write: bool,
         trace: &mut CallRecorder,
         allocator: &mut AllocatorSession,
     ) -> Result<Self> {
@@ -1322,7 +1331,7 @@ impl RuntimeObject {
             }
             (Self::UoCell(new), Self::UoCell(old)) => {
                 let mut next = new;
-                let restored_value = if aborted || !next.accessed {
+                let restored_value = if aborted || !may_write {
                     Some(old.decode_value_from_storage(allocator)?)
                 } else {
                     None
@@ -1335,7 +1344,7 @@ impl RuntimeObject {
                     &mut next.value,
                     restored_value,
                     aborted,
-                    next.accessed,
+                    may_write,
                     |committed_value| {
                         seal_canonical_value_commit_slot(
                             &spec_name,
@@ -1407,7 +1416,7 @@ impl RuntimeObject {
             }
             (Self::UoArray(new), Self::UoArray(old)) => {
                 let mut next = new;
-                let restored_values = if aborted || !next.accessed {
+                let restored_values = if aborted || !may_write {
                     Some(old.decode_values_from_storage(allocator)?)
                 } else {
                     None
@@ -1420,7 +1429,7 @@ impl RuntimeObject {
                     &mut next.values,
                     restored_values.as_deref(),
                     aborted,
-                    next.accessed,
+                    may_write,
                     |index, value| {
                         let physical = physical_slots.get_mut(index).ok_or_else(|| {
                             anyhow!(
@@ -1477,7 +1486,7 @@ impl RuntimeObject {
             }
             (Self::UoSmallMap(new), Self::UoSmallMap(old)) => {
                 let mut next = new;
-                let restored_entries = if aborted || !next.accessed {
+                let restored_entries = if aborted || !may_write {
                     Some(old.decode_entries_from_storage(allocator)?)
                 } else {
                     None
@@ -1490,7 +1499,7 @@ impl RuntimeObject {
                     &mut next.entries,
                     restored_entries.as_deref(),
                     aborted,
-                    next.accessed,
+                    may_write,
                     |index, entry| {
                         let physical = physical_slots.get_mut(index).ok_or_else(|| {
                             anyhow!(
@@ -1797,6 +1806,7 @@ mod tests {
             scratch_bytes: 1024,
             max_kernel_ops: 0,
             max_commit_ops: 0,
+            max_load_ops: 0,
         })
         .unwrap()
     }
@@ -2101,7 +2111,7 @@ mod tests {
         let mut recorder = crate::controller::CallRecorder::begin("commit_test", &[]);
         let mut commit_allocator = tx_allocator();
         let committed = new
-            .commit(&old, true, &mut recorder, &mut commit_allocator)
+            .commit(&old, true, true, &mut recorder, &mut commit_allocator)
             .unwrap();
         commit_allocator.finish().unwrap();
 
@@ -2131,7 +2141,7 @@ mod tests {
         let mut recorder = crate::controller::CallRecorder::begin("commit_test", &[]);
         let mut commit_allocator = tx_allocator();
         let committed = new
-            .commit(&old, false, &mut recorder, &mut commit_allocator)
+            .commit(&old, false, false, &mut recorder, &mut commit_allocator)
             .unwrap();
         commit_allocator.finish().unwrap();
 
@@ -2142,6 +2152,80 @@ mod tests {
                 assert!(!cell.written);
             }
             _ => unreachable!(),
+        }
+    }
+
+    #[test]
+    fn exact_objects_are_resealed_exactly_when_the_call_may_write_them() {
+        // The decision is the program's: whether it has a write statement for
+        // the object. Whether the call touched the object, and whether it
+        // aborted, do not change it.
+        fn sealed(object: &RuntimeObject) -> Vec<Vec<u8>> {
+            let (_, records) = object.sealed_storage_for_test().unwrap();
+            records.into_iter().map(<[u8]>::to_vec).collect()
+        }
+        fn mark_accessed(object: &mut RuntimeObject) {
+            match object {
+                RuntimeObject::UoCell(cell) => cell.accessed = true,
+                RuntimeObject::UoArray(array) => array.accessed = true,
+                RuntimeObject::UoSmallMap(map) => map.accessed = true,
+                _ => unreachable!(),
+            }
+        }
+        for (spec, seed) in [
+            (cell_spec(), 0xE001u64),
+            (array_spec(), 0xE002),
+            (small_map_spec(), 0xE003),
+        ] {
+            let old = RuntimeObject::instantiate_with_seed(&spec, seed).unwrap();
+            let stored = sealed(&old);
+            let slots = stored.len();
+            for (accessed, aborted, may_write) in [
+                (true, false, false),
+                (false, false, false),
+                (true, true, false),
+                (true, false, true),
+                (false, false, true),
+                (true, true, true),
+            ] {
+                let mut shadow_allocator = tx_allocator();
+                let mut new = old.clone_for_tx(&mut shadow_allocator).unwrap();
+                shadow_allocator.finish().unwrap();
+                if accessed {
+                    mark_accessed(&mut new);
+                }
+                let mut recorder = crate::controller::CallRecorder::begin("commit_test", &[]);
+                let mut commit_allocator = tx_allocator();
+                let committed = new
+                    .commit(
+                        &old,
+                        aborted,
+                        may_write,
+                        &mut recorder,
+                        &mut commit_allocator,
+                    )
+                    .unwrap();
+                commit_allocator.finish().unwrap();
+                let case = format!(
+                    "{} accessed={accessed} aborted={aborted} may_write={may_write}",
+                    spec.name
+                );
+                if may_write {
+                    // Every slot is sealed again, under a later nonce.
+                    assert_eq!(recorder.physical_write_count(), slots, "{case}");
+                    let resealed = sealed(&committed);
+                    assert_eq!(resealed.len(), slots, "{case}");
+                    assert!(
+                        resealed.iter().zip(&stored).all(|(new, old)| new != old),
+                        "{case}"
+                    );
+                } else {
+                    // No write, and storage is as it was.
+                    assert_eq!(recorder.physical_write_count(), 0, "{case}");
+                    assert_eq!(sealed(&committed), stored, "{case}");
+                }
+                assert!(committed.committed_cache_is_cold(), "{case}");
+            }
         }
     }
 
@@ -2170,7 +2254,7 @@ mod tests {
         let mut recorder = crate::controller::CallRecorder::begin("commit_test", &[]);
         let mut commit_allocator = tx_allocator();
         let committed = new
-            .commit(&old, false, &mut recorder, &mut commit_allocator)
+            .commit(&old, false, true, &mut recorder, &mut commit_allocator)
             .unwrap();
         commit_allocator.finish().unwrap();
 
@@ -2267,7 +2351,7 @@ mod tests {
         let mut recorder = crate::controller::CallRecorder::begin("commit_test", &[]);
         let mut commit_allocator = tx_allocator();
         let committed = new
-            .commit(&old, false, &mut recorder, &mut commit_allocator)
+            .commit(&old, false, false, &mut recorder, &mut commit_allocator)
             .unwrap();
         commit_allocator.finish().unwrap();
 
@@ -2394,7 +2478,7 @@ mod tests {
         let mut recorder = crate::controller::CallRecorder::begin("commit_test", &[]);
         let mut commit_allocator = tx_allocator();
         let committed = new
-            .commit(&old, false, &mut recorder, &mut commit_allocator)
+            .commit(&old, false, true, &mut recorder, &mut commit_allocator)
             .unwrap();
         commit_allocator.finish().unwrap();
 
@@ -2518,7 +2602,7 @@ mod tests {
         let mut recorder = crate::controller::CallRecorder::begin("commit_test", &[]);
         let mut commit_allocator = tx_allocator();
         let committed = new
-            .commit(&old, true, &mut recorder, &mut commit_allocator)
+            .commit(&old, true, true, &mut recorder, &mut commit_allocator)
             .unwrap();
         commit_allocator.finish().unwrap();
 
@@ -2580,7 +2664,7 @@ mod tests {
         let mut recorder = crate::controller::CallRecorder::begin("commit_test", &[]);
         let mut commit_allocator = tx_allocator();
         let committed = new
-            .commit(&old, false, &mut recorder, &mut commit_allocator)
+            .commit(&old, false, true, &mut recorder, &mut commit_allocator)
             .unwrap();
         commit_allocator.finish().unwrap();
 
@@ -2636,7 +2720,7 @@ mod tests {
         let mut recorder = crate::controller::CallRecorder::begin("commit_test", &[]);
         let mut commit_allocator = tx_allocator();
         let committed = new
-            .commit(&old, false, &mut recorder, &mut commit_allocator)
+            .commit(&old, false, false, &mut recorder, &mut commit_allocator)
             .unwrap();
         commit_allocator.finish().unwrap();
 
@@ -2708,7 +2792,7 @@ mod tests {
 
             let mut commit_allocator = tx_allocator();
             let committed = new
-                .commit(&old, aborted, &mut recorder, &mut commit_allocator)
+                .commit(&old, aborted, true, &mut recorder, &mut commit_allocator)
                 .unwrap();
             commit_allocator.finish().unwrap();
             assert!(recorder.physical_write_count() > writes_before_commit);
