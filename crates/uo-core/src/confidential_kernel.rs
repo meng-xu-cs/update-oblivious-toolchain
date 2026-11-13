@@ -3061,6 +3061,158 @@ mod tests {
         );
     }
 
+    /// Run `lhs op rhs` through the slot interpreter, with the operands in
+    /// slots as a call's arguments are.
+    fn kernel_binary(op: BinaryOp, lhs: &Value, rhs: &Value) -> Value {
+        let mut runtime = MockRuntime::with_slot_count(2);
+        runtime.store_slot(0, lhs.clone()).unwrap();
+        runtime.store_slot(1, rhs.clone()).unwrap();
+        let program = ConfidentialKernelSlotProgram {
+            entrypoint_id: "binary(uint256,uint256)".into(),
+            param_count: 2,
+            return_type: None,
+            secret_args: vec![0, 1],
+            slot_count: 2,
+            body: vec![ConfidentialKernelSlotStatement::Return {
+                value: Some(ConfidentialKernelSlotExpr::Binary {
+                    op,
+                    lhs: Box::new(ConfidentialKernelSlotExpr::Slot { slot: 0 }),
+                    rhs: Box::new(ConfidentialKernelSlotExpr::Slot { slot: 1 }),
+                }),
+            }]
+            .into_boxed_slice(),
+        };
+        let outcome = execute_confidential_kernel_slot_program(&mut runtime, &program).unwrap();
+        let (aborted, value) = outcome.into_parts();
+        assert!(!aborted);
+        value.unwrap()
+    }
+
+    #[test]
+    fn kernel_binary_operators_keep_their_values_without_operand_branches() {
+        // The kernel's operators no longer branch on their operands. Their
+        // values are the ones the operators with branches gave: here each
+        // is compared with a definition that does not use the kernel's own
+        // operations.
+        let limbs = |seed: u64| {
+            // SplitMix64, four limbs from one seed.
+            let mut state = seed;
+            let mut bytes = [0u8; 32];
+            for chunk in bytes.chunks_mut(8) {
+                state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+                let mut z = state;
+                z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+                z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+                chunk.copy_from_slice(&(z ^ (z >> 31)).to_be_bytes());
+            }
+            Uint256::from_be_bytes(bytes)
+        };
+        let high = Uint256::from_hex_str(
+            "8000000000000000000000000000000000000000000000000000000000000000",
+        )
+        .unwrap();
+        let mut operands = vec![
+            Uint256::ZERO,
+            Uint256::ONE,
+            Uint256::from_u64(97),
+            Uint256::from_u64(u64::MAX),
+            Uint256::from_u128(1u128 << 64),
+            high,
+            high.wrapping_add(Uint256::ONE),
+            Uint256::MAX,
+        ];
+        operands.extend((1..=12u64).map(limbs));
+        // Two operands that differ in their lowest limb alone.
+        operands.push(limbs(1).wrapping_add(Uint256::ONE));
+        let one = Uint256::ONE;
+        for lhs in &operands {
+            for rhs in &operands {
+                let (lhs, rhs) = (*lhs, *rhs);
+                let case = format!("{lhs} and {rhs}");
+                let run = |op: BinaryOp| kernel_binary(op, &Value::uint(lhs), &Value::uint(rhs));
+                // a - b is a + !b + 1.
+                assert_eq!(
+                    run(BinaryOp::Sub),
+                    Value::uint(lhs.wrapping_add(rhs.bitxor(Uint256::MAX)).wrapping_add(one)),
+                    "{case}"
+                );
+                assert_eq!(run(BinaryOp::Eq), Value::Bool(lhs == rhs), "{case}");
+                assert_eq!(run(BinaryOp::Neq), Value::Bool(lhs != rhs), "{case}");
+                assert_eq!(run(BinaryOp::Lt), Value::Bool(lhs < rhs), "{case}");
+                assert_eq!(run(BinaryOp::Lte), Value::Bool(lhs <= rhs), "{case}");
+                assert_eq!(run(BinaryOp::Gt), Value::Bool(lhs > rhs), "{case}");
+                assert_eq!(run(BinaryOp::Gte), Value::Bool(lhs >= rhs), "{case}");
+                let quotient = run(BinaryOp::Div).as_uint().unwrap();
+                let remainder = run(BinaryOp::Mod).as_uint().unwrap();
+                if rhs == Uint256::ZERO {
+                    // The EVM's DIV and MOD by zero are zero.
+                    assert_eq!(
+                        (quotient, remainder),
+                        (Uint256::ZERO, Uint256::ZERO),
+                        "{case}"
+                    );
+                } else {
+                    // The one quotient and remainder of the division.
+                    assert!(remainder < rhs, "{case}");
+                    assert_eq!(
+                        quotient.wrapping_mul(rhs).wrapping_add(remainder),
+                        lhs,
+                        "{case}"
+                    );
+                    // The quotient does not overflow: q * d <= n.
+                    if quotient != Uint256::ZERO {
+                        assert!(rhs <= lhs, "{case}");
+                    }
+                }
+                // The truth of a word is that it is not zero.
+                assert_eq!(
+                    run(BinaryOp::And),
+                    Value::Bool(lhs != Uint256::ZERO && rhs != Uint256::ZERO),
+                    "{case}"
+                );
+                assert_eq!(
+                    run(BinaryOp::Or),
+                    Value::Bool(lhs != Uint256::ZERO || rhs != Uint256::ZERO),
+                    "{case}"
+                );
+            }
+        }
+        for lhs in [false, true] {
+            for rhs in [false, true] {
+                let run = |op: BinaryOp| kernel_binary(op, &Value::Bool(lhs), &Value::Bool(rhs));
+                assert_eq!(run(BinaryOp::And), Value::Bool(lhs && rhs));
+                assert_eq!(run(BinaryOp::Or), Value::Bool(lhs || rhs));
+                assert_eq!(run(BinaryOp::Eq), Value::Bool(lhs == rhs));
+                assert_eq!(run(BinaryOp::Neq), Value::Bool(lhs != rhs));
+            }
+        }
+        // Equality of the other value shapes is the derived one.
+        let shaped = [
+            Value::Bytes32([7u8; 32]),
+            Value::Bytes32([8u8; 32]),
+            Value::Address([7u8; 20]),
+            Value::Address([9u8; 20]),
+            Value::Struct(vec![("amount".into(), Value::uint(5))].into_boxed_slice()),
+            Value::Struct(vec![("amount".into(), Value::uint(6))].into_boxed_slice()),
+            Value::Array(vec![Value::uint(1), Value::uint(2)].into_boxed_slice()),
+            Value::Array(vec![Value::uint(1), Value::uint(3)].into_boxed_slice()),
+        ];
+        for lhs in &shaped {
+            for rhs in &shaped {
+                assert_eq!(
+                    kernel_binary(BinaryOp::Eq, lhs, rhs),
+                    Value::Bool(lhs == rhs),
+                    "{lhs:?} and {rhs:?}"
+                );
+                assert_eq!(
+                    kernel_binary(BinaryOp::Neq, lhs, rhs),
+                    Value::Bool(lhs != rhs),
+                    "{lhs:?} and {rhs:?}"
+                );
+            }
+        }
+    }
+
     #[test]
     fn shared_slot_interpreter_rejects_non_normalized_programs() {
         let mut runtime = MockRuntime::with_slot_count(1);

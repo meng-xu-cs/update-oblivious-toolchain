@@ -341,6 +341,50 @@ The components are interpreted as follows:
 The concrete SGX/TEE observer pins live in
 [`runtime/tee-observer.md`](./runtime/tee-observer.md).
 
+### The Kernel's Operators
+
+The observer has no timing component, and CPU-time obliviousness is a
+non-claim (see Non-Claims). Below that boundary the confidential kernel's
+operators are still written not to branch on an operand. A 256-bit
+subtraction is a borrow chain, less-than is the borrow of a subtraction,
+equality and the zero test fold the limbs or the bytes, division makes its
+256 rounds with a masked subtraction and masks a zero divisor, the boolean
+operators do not short-circuit, and an array index is converted by a mask
+(`crates/uo-core/src/types.rs`, and `eval_confidential_kernel_binary_generated`
+in the Lean-generated kernel). A differential test keeps the operators'
+values: it runs the implementations they replaced beside them on random and
+edge operands.
+
+The evidence is of two kinds, and neither is a claim about machine code:
+
+- Source text. `kernel_operators_do_not_branch_on_operands` in
+  `runtime_boundary_validation.json` holds when none of those operations
+  has a token of a branch, an early return or a short-circuit, and the
+  kernel's evaluator uses them and no operator that has one. The Lean
+  implementation interface pins the same text, and two tamper scenarios, a
+  short-circuit `and` and a remainder that returns early for a zero divisor,
+  are rejected.
+- Instruction counts of one build. `results/kernel_operator_instructions.json`
+  (`scripts/measure_kernel_operator_instructions.sh`) counts, under
+  callgrind and in a release build, the instructions the slot interpreter
+  executes for one evaluation of each operator: 14 operators on 256-bit
+  operands in 13 classes (zero or not, equal or not, the limb in which the
+  operands first differ and which is larger, a borrow through every limb), 4
+  on booleans, and the index conversion. Every operator has one count
+  whatever the class, and the counts repeat. Before the change 8 of the 19
+  had more than one: division and remainder took from 462 to 16,136
+  instructions, since a zero divisor returned early, where they now take
+  16,646 and 16,654; the four comparisons had two counts each; and so had
+  `and` and `or`, which short-circuited.
+
+A compiler may still emit a branch for a comparison or a select. The count
+shows that this build's code runs the same number of instructions for those
+operands; it shows nothing about cache or branch-predictor state, about
+another compiler or target, or about the rest of a call. One operation of
+the kernel still depends on an operand: indexing an array value, such as a
+struct field that is an array, reads the element at the index and fails on
+an index out of range (`eval_confidential_kernel_array_index_generated`).
+
 ### The Modeled Cost
 
 The public gas of a confidential entrypoint is a function of its schedule,

@@ -9153,6 +9153,67 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "mutation": "reintroduce a generated-interpreter `state.returned` break so the source-backed implementation interface must reject runtime schedule truncation after return",
         }),
     )?);
+    // Issue 34: the kernel's operators do not branch on their operands.
+    let mut tampered_runtime_implementation_kernel_short_circuit =
+        runtime_implementation_interface.clone();
+    tampered_runtime_implementation_kernel_short_circuit.generated_confidential_kernel_source =
+        tampered_runtime_implementation_kernel_short_circuit
+            .generated_confidential_kernel_source
+            .replace(
+                "lhs_bool_generated(&lhs)? & lhs_bool_generated(&rhs)?,",
+                "lhs_bool_generated(&lhs)? && lhs_bool_generated(&rhs)?,",
+            );
+    if tampered_runtime_implementation_kernel_short_circuit.generated_confidential_kernel_source
+        == runtime_implementation_interface.generated_confidential_kernel_source
+    {
+        bail!("the short-circuit tamper scenario did not change the generated kernel");
+    }
+    scenarios.push(validate_tampered_json_case(
+        "runtime_implementation_interface/kernel_operator_short_circuit_drift",
+        &tampered_runtime_implementation_kernel_short_circuit,
+        |interface_path| {
+            Ok(Command::new(&runtime_implementation_interface_checker)
+                .arg(interface_path)
+                .output()?)
+        },
+        json!({
+            "scenario": "runtime_implementation_interface/kernel_operator_short_circuit_drift",
+            "artifact_kind": "proofgrade_runtime_implementation_interface",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "evaluate the kernel's boolean `and` with a short-circuit, so that its second operand is read only when the first is true, and the implementation interface must reject a kernel operator that branches on an operand",
+        }),
+    )?);
+    let mut tampered_runtime_implementation_uint256_remainder_branch =
+        runtime_implementation_interface.clone();
+    tampered_runtime_implementation_uint256_remainder_branch.types_source =
+        tampered_runtime_implementation_uint256_remainder_branch
+            .types_source
+            .replace(
+                "        Self::select(divisor.nonzero_mask(), remainder, Self::ZERO)\n",
+                "        if divisor.is_zero() {\n            return Self::ZERO;\n        }\n        remainder\n",
+            );
+    if tampered_runtime_implementation_uint256_remainder_branch.types_source
+        == runtime_implementation_interface.types_source
+    {
+        bail!("the remainder tamper scenario did not change the 256-bit integer source");
+    }
+    scenarios.push(validate_tampered_json_case(
+        "runtime_implementation_interface/uint256_remainder_zero_divisor_branch_drift",
+        &tampered_runtime_implementation_uint256_remainder_branch,
+        |interface_path| {
+            Ok(Command::new(&runtime_implementation_interface_checker)
+                .arg(interface_path)
+                .output()?)
+        },
+        json!({
+            "scenario": "runtime_implementation_interface/uint256_remainder_zero_divisor_branch_drift",
+            "artifact_kind": "proofgrade_runtime_implementation_interface",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "return early from the 256-bit remainder when the divisor is zero instead of masking the remainder, so the implementation interface must reject an arithmetic operation of the kernel that returns early on an operand",
+        }),
+    )?);
     let tampered_runtime_small_confidential_kernel_return_break =
         ImportedRuntimeImplementationSmallConfidentialKernelBoundary {
             implementation_interface: tampered_runtime_implementation_return_break.clone(),
@@ -27412,6 +27473,146 @@ fn check_seal_nonces_come_from_the_seal_count(
         )
 }
 
+/// The text of a function from its signature line to its closing brace, which
+/// stands alone at `indent`. `None` when the signature is not in the source.
+fn rust_fn_text<'a>(source: &'a str, signature: &str, indent: &str) -> Option<&'a str> {
+    let start = source.find(signature)?;
+    let rest = &source[start..];
+    let close = format!("\n{indent}}}\n");
+    let end = rest.find(&close)?;
+    Some(&rest[..end + close.len()])
+}
+
+/// Tokens of a branch, an early return or a short-circuit. A function whose
+/// operands are a confidential kernel's has none of them.
+const OPERAND_BRANCH_TOKENS: [&str; 14] = [
+    "if ", "match ", "return", "&&", "||", "break", "continue", "while ", "loop ", "?", ".then",
+    ".all(", ".any(", ".find(",
+];
+
+/// The 256-bit operations a confidential kernel runs on its operands, by
+/// signature. Each is checked to have no token of a branch.
+const KERNEL_UINT_OPERATIONS: [&str; 16] = [
+    "    pub fn is_zero(self) -> bool {",
+    "    fn nonzero_mask(self) -> u64 {",
+    "    pub fn ct_eq(self, rhs: Self) -> bool {",
+    "    fn select(mask: u64, when_set: Self, otherwise: Self) -> Self {",
+    "    pub fn as_bool(self) -> bool {",
+    "    pub fn to_usize_saturating(self) -> usize {",
+    "    pub fn wrapping_add(self, rhs: Self) -> Self {",
+    "    fn borrowing_sub(self, rhs: Self) -> (Self, u64) {",
+    "    pub fn wrapping_sub(self, rhs: Self) -> Self {",
+    "    pub fn ct_lt(self, rhs: Self) -> bool {",
+    "    pub fn wrapping_neg(self) -> Self {",
+    "    pub fn wrapping_mul(self, rhs: Self) -> Self {",
+    "    pub fn div_rem(self, divisor: Self) -> (Self, Self) {",
+    "    pub fn div_or_zero(self, divisor: Self) -> Self {",
+    "    pub fn rem_or_zero(self, divisor: Self) -> Self {",
+    "    fn shl1(self) -> Self {",
+];
+
+/// Whether the confidential kernel's binary operators, and the 256-bit
+/// operations under them, are written without a branch or an early return
+/// on an operand. Subtraction is a borrow chain, less-than is the borrow of
+/// a subtraction, equality and the zero test fold the limbs, division runs
+/// its 256 rounds with a masked subtraction and masks a zero divisor, and
+/// the boolean operators do not short-circuit. This is a check of source
+/// text: it says what the code asks for, not what a compiler emits
+/// (`results/kernel_operator_instructions.json` counts the instructions of
+/// one build).
+fn check_kernel_operators_do_not_branch_on_operands(
+    types_production_source: &str,
+    generated_confidential_kernel_production_source: &str,
+    generated_value_ops_production_source: &str,
+) -> bool {
+    let types = types_production_source;
+    let kernel = generated_confidential_kernel_production_source;
+    let value_ops = generated_value_ops_production_source;
+    let branch_free = |text: &str| {
+        !OPERAND_BRANCH_TOKENS
+            .iter()
+            .any(|token| text.contains(token))
+    };
+    let operations_branch_free = KERNEL_UINT_OPERATIONS.iter().all(|signature| {
+        types.matches(signature).count() == 1
+            && rust_fn_text(types, signature, "    ").is_some_and(branch_free)
+    });
+    let Some(evaluator) = rust_fn_text(kernel, "fn eval_confidential_kernel_binary_generated(", "")
+    else {
+        return false;
+    };
+    let masked_equality = [
+        "fn masked_eq_uint256(lhs: Uint256, rhs: Uint256) -> bool {",
+        "fn masked_eq_bytes<const N: usize>(lhs: [u8; N], rhs: [u8; N]) -> bool {",
+        "fn masked_eq_u8(lhs: u8, rhs: u8) -> bool {",
+    ]
+    .iter()
+    .all(|signature| rust_fn_text(value_ops, signature, "").is_some_and(branch_free));
+    operations_branch_free
+        // The formulas the operations rest on.
+        && types.contains(
+            "    pub fn is_zero(self) -> bool {\n        (self.0[0] | self.0[1] | self.0[2] | self.0[3]) == 0\n    }",
+        )
+        && types.contains(
+            "            let difference = (self.0[idx] as u128)\n                .wrapping_sub(rhs.0[idx] as u128)\n                .wrapping_sub(borrow);\n            *slot = difference as u64;\n            borrow = (difference >> 64) & 1;",
+        )
+        && types.contains(
+            "    pub fn wrapping_sub(self, rhs: Self) -> Self {\n        self.borrowing_sub(rhs).0\n    }",
+        )
+        && types.contains(
+            "    pub fn ct_lt(self, rhs: Self) -> bool {\n        self.borrowing_sub(rhs).1 != 0\n    }",
+        )
+        && types.contains(
+            "        for bit in (0..256).rev() {\n            remainder = remainder.shl1();\n            remainder.0[0] |= (self.0[bit / 64] >> (bit % 64)) & 1;\n            let (reduced, borrow) = remainder.borrowing_sub(divisor);\n            let fits = borrow.wrapping_sub(1);\n            remainder = Self::select(fits, reduced, remainder);\n            quotient.0[bit / 64] |= (fits & 1) << (bit % 64);\n        }",
+        )
+        && types.contains("            Self::select(divisor.nonzero_mask(), quotient, Self::ZERO),")
+        && types.contains(
+            "        let (_, remainder) = self.div_rem(divisor);\n        Self::select(divisor.nonzero_mask(), remainder, Self::ZERO)",
+        )
+        && types.contains("            *slot = (when_set.0[idx] & mask) | (otherwise.0[idx] & !mask);")
+        && types.contains("    pub fn as_bool(self) -> bool {\n        !self.is_zero()\n    }")
+        // The kernel's evaluator uses them, and no operator with a branch.
+        // It dispatches on the operator, which is public, and `?` passes
+        // on an operand of the wrong shape, which the program's types rule
+        // out: neither depends on an operand's value.
+        && !OPERAND_BRANCH_TOKENS
+            .iter()
+            .filter(|token| !matches!(**token, "match " | "?"))
+            .any(|token| evaluator.contains(token))
+        && evaluator.matches("match ").count() == 1
+        && evaluator.contains(") -> Result<Value> {\n    match op {")
+        && [
+            "lhs_uint_generated(&lhs)?.wrapping_sub(lhs_uint_generated(&rhs)?),",
+            "lhs_uint_generated(&lhs)?.div_or_zero(lhs_uint_generated(&rhs)?),",
+            "lhs_uint_generated(&lhs)?.rem_or_zero(lhs_uint_generated(&rhs)?),",
+            "BinaryOp::Eq => Ok(Value::Bool(Value::confidential_eq(&lhs, &rhs))),",
+            "BinaryOp::Neq => Ok(Value::Bool(!Value::confidential_eq(&lhs, &rhs))),",
+            "BinaryOp::Lt => Ok(Value::Bool(\n            lhs_uint_generated(&lhs)?.ct_lt(lhs_uint_generated(&rhs)?),",
+            "BinaryOp::Lte => Ok(Value::Bool(\n            !lhs_uint_generated(&rhs)?.ct_lt(lhs_uint_generated(&lhs)?),",
+            "BinaryOp::Gt => Ok(Value::Bool(\n            lhs_uint_generated(&rhs)?.ct_lt(lhs_uint_generated(&lhs)?),",
+            "BinaryOp::Gte => Ok(Value::Bool(\n            !lhs_uint_generated(&lhs)?.ct_lt(lhs_uint_generated(&rhs)?),",
+            "BinaryOp::And => Ok(Value::Bool(\n            lhs_bool_generated(&lhs)? & lhs_bool_generated(&rhs)?,",
+            "BinaryOp::Or => Ok(Value::Bool(\n            lhs_bool_generated(&lhs)? | lhs_bool_generated(&rhs)?,",
+        ]
+        .iter()
+        .all(|arm| evaluator.contains(arm))
+        && ![" == ", " != ", " < ", " <= ", " > ", " >= ", ".div_rem(", "is_zero()"]
+            .iter()
+            .any(|operator| evaluator.contains(operator))
+        // An array index is converted without a branch, and nowhere through
+        // the conversion that has one.
+        && kernel.matches("to_usize_saturating()").count() == 3
+        && !kernel.contains("checked_to_usize")
+        // Equality of values folds their bytes.
+        && masked_equality
+        && value_ops.contains(
+            "            (Value::Uint(lhs), Value::Uint(rhs)) => masked_eq_uint256(*lhs, *rhs),",
+        )
+        && value_ops.contains(
+            "    for (lhs_byte, rhs_byte) in lhs.into_iter().zip(rhs) {\n        diff |= lhs_byte ^ rhs_byte;\n    }\n    diff == 0",
+        )
+}
+
 /// The files whose production code may name the class `Update` or build a
 /// write event from a class it names: the generated helpers that seal a
 /// record in place, each behind the check of the write's bytes.
@@ -45197,6 +45398,12 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         &production_source_slice(&generated_store_surface_source),
         &generated_store_codec_source,
     );
+    let kernel_operators_do_not_branch_on_operands =
+        check_kernel_operators_do_not_branch_on_operands(
+            &production_source_slice(&types_source),
+            &production_source_slice(&generated_confidential_kernel_source),
+            &production_source_slice(&generated_value_ops_source),
+        );
     let runtime_src = root.join("runtime");
     let sealed_writes_are_classified_from_their_bytes =
         check_sealed_writes_are_classified_from_their_bytes(
@@ -46615,6 +46822,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "seal_nonces_come_from_the_seal_count": seal_nonces_come_from_the_seal_count,
         "sealed_writes_are_classified_from_their_bytes":
             sealed_writes_are_classified_from_their_bytes,
+        "kernel_operators_do_not_branch_on_operands": kernel_operators_do_not_branch_on_operands,
         "private_evidence_stays_inside_the_runtime": private_evidence_stays_inside_the_runtime,
         "production_calls_issue_chained_receipts": production_calls_issue_chained_receipts,
         "theorem_certificate_constructor_checks":
@@ -47559,6 +47767,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && runtime_secrets_derive_from_the_master_secret
             && seal_nonces_come_from_the_seal_count
             && sealed_writes_are_classified_from_their_bytes
+            && kernel_operators_do_not_branch_on_operands
             && private_evidence_stays_inside_the_runtime
             && production_calls_issue_chained_receipts
             && theorem_certificate_constructor_surface_restricted
@@ -55707,6 +55916,168 @@ mod tests {
         );
         assert_ne!(literal, codecs);
         assert!(!ok(&trace, &helpers, &literal, &oram, &store));
+    }
+
+    #[test]
+    fn kernel_operator_check_rejects_the_drifts_it_guards() {
+        use super::{check_kernel_operators_do_not_branch_on_operands, repo_root};
+        let root = repo_root();
+        let read = |rel: &str| std::fs::read_to_string(root.join(rel)).unwrap();
+        let types = production_source_slice(&read("crates/uo-core/src/types.rs"));
+        let kernel =
+            production_source_slice(&read("crates/uo-core/src/generated_confidential_kernel.rs"));
+        let value_ops = production_source_slice(&read("crates/uo-core/src/generated_value_ops.rs"));
+        let ok = |types: &str, kernel: &str, value_ops: &str| {
+            check_kernel_operators_do_not_branch_on_operands(types, kernel, value_ops)
+        };
+
+        // The sources pass as they are.
+        assert!(ok(&types, &kernel, &value_ops));
+
+        let drift = |source: &str, from: &str, to: &str| {
+            let drifted = source.replace(from, to);
+            assert_ne!(drifted, source, "the drift did not apply: {from}");
+            drifted
+        };
+        // A zero test that stops at the first limb that is not zero.
+        let early_zero = drift(
+            &types,
+            "    pub fn is_zero(self) -> bool {\n        (self.0[0] | self.0[1] | self.0[2] | self.0[3]) == 0\n    }",
+            "    pub fn is_zero(self) -> bool {\n        self.0.iter().all(|limb| *limb == 0)\n    }",
+        );
+        assert!(!ok(&early_zero, &kernel, &value_ops));
+        // A subtraction that branches on each limb's borrow.
+        let branching_sub = drift(
+            &types,
+            "            *slot = difference as u64;\n            borrow = (difference >> 64) & 1;",
+            "            *slot = difference as u64;\n            borrow = if self.0[idx] as u128 >= rhs.0[idx] as u128 + borrow { 0 } else { 1 };",
+        );
+        assert!(!ok(&branching_sub, &kernel, &value_ops));
+        // A less-than that compares limb by limb and returns at the first
+        // difference.
+        let early_lt = drift(
+            &types,
+            "    pub fn ct_lt(self, rhs: Self) -> bool {\n        self.borrowing_sub(rhs).1 != 0\n    }",
+            "    pub fn ct_lt(self, rhs: Self) -> bool {\n        for idx in (0..4).rev() {\n            if self.0[idx] != rhs.0[idx] {\n                return self.0[idx] < rhs.0[idx];\n            }\n        }\n        false\n    }",
+        );
+        assert!(!ok(&early_lt, &kernel, &value_ops));
+        // A division that returns early for a zero divisor.
+        let early_div = drift(
+            &types,
+            "        let mut quotient = Self::ZERO;\n        let mut remainder = Self::ZERO;\n        for bit in (0..256).rev() {",
+            "        if divisor.is_zero() {\n            return (Self::ZERO, self);\n        }\n        let mut quotient = Self::ZERO;\n        let mut remainder = Self::ZERO;\n        for bit in (0..256).rev() {",
+        );
+        assert!(!ok(&early_div, &kernel, &value_ops));
+        // A division round that subtracts only when the divisor fits.
+        let conditional_round = drift(
+            &types,
+            "            remainder = Self::select(fits, reduced, remainder);",
+            "            if fits != 0 {\n                remainder = reduced;\n            }",
+        );
+        assert!(!ok(&conditional_round, &kernel, &value_ops));
+        // A remainder by zero that is chosen by a branch.
+        let branching_rem = drift(
+            &types,
+            "        Self::select(divisor.nonzero_mask(), remainder, Self::ZERO)",
+            "        if divisor.is_zero() {\n            Self::ZERO\n        } else {\n            remainder\n        }",
+        );
+        assert!(!ok(&branching_rem, &kernel, &value_ops));
+        // An index conversion that branches on the high limbs.
+        let branching_index = drift(
+            &types,
+            "        usize::try_from(self.0[0] | high).unwrap_or(usize::MAX)",
+            "        if high != 0 {\n            return usize::MAX;\n        }\n        usize::try_from(self.0[0]).unwrap_or(usize::MAX)",
+        );
+        assert!(!ok(&branching_index, &kernel, &value_ops));
+
+        // A kernel evaluator that goes back to the operators with branches.
+        for (from, to) in [
+            (
+                "BinaryOp::Eq => Ok(Value::Bool(Value::confidential_eq(&lhs, &rhs))),",
+                "BinaryOp::Eq => Ok(Value::Bool(lhs == rhs)),",
+            ),
+            (
+                "            lhs_uint_generated(&lhs)?.ct_lt(lhs_uint_generated(&rhs)?),\n        )),\n        BinaryOp::Lte",
+                "            lhs_uint_generated(&lhs)? < lhs_uint_generated(&rhs)?,\n        )),\n        BinaryOp::Lte",
+            ),
+            (
+                "            lhs_bool_generated(&lhs)? & lhs_bool_generated(&rhs)?,",
+                "            lhs_bool_generated(&lhs)? && lhs_bool_generated(&rhs)?,",
+            ),
+            (
+                "            lhs_bool_generated(&lhs)? | lhs_bool_generated(&rhs)?,",
+                "            lhs_bool_generated(&lhs)? || lhs_bool_generated(&rhs)?,",
+            ),
+            (
+                "        BinaryOp::Div => Ok(Value::Uint(\n            lhs_uint_generated(&lhs)?.div_or_zero(lhs_uint_generated(&rhs)?),\n        )),",
+                "        BinaryOp::Div => {\n            let divisor = lhs_uint_generated(&rhs)?;\n            Ok(Value::Uint(if divisor.is_zero() {\n                Uint256::ZERO\n            } else {\n                lhs_uint_generated(&lhs)?.div_rem(divisor).0\n            }))\n        }",
+            ),
+            (
+                "let index = index.to_usize_saturating();\n            runtime.array_get(*object_id, index)",
+                "let index = index.checked_to_usize().unwrap_or(usize::MAX);\n            runtime.array_get(*object_id, index)",
+            ),
+        ] {
+            let drifted = drift(&kernel, from, to);
+            assert!(!ok(&types, &drifted, &value_ops), "{to}");
+        }
+
+        // An equality of values that stops at the first byte that differs.
+        let early_eq = drift(
+            &value_ops,
+            "    for (lhs_byte, rhs_byte) in lhs.into_iter().zip(rhs) {\n        diff |= lhs_byte ^ rhs_byte;\n    }\n    diff == 0",
+            "    for (lhs_byte, rhs_byte) in lhs.into_iter().zip(rhs) {\n        if lhs_byte != rhs_byte {\n            return false;\n        }\n    }\n    true",
+        );
+        assert!(!ok(&types, &kernel, &early_eq));
+    }
+
+    #[test]
+    fn kernel_operator_instruction_report_measures_the_committed_sources() {
+        // The report is written by scripts/measure_kernel_operator_instructions.sh,
+        // not by the probe. It names the sources it measured by their digests:
+        // a change to one of them makes the committed counts those of other
+        // code, and the script has to run again.
+        use super::repo_root;
+        use sha2::{Digest, Sha256};
+        let root = repo_root();
+        let report: serde_json::Value = serde_json::from_str(
+            &std::fs::read_to_string(root.join("results/kernel_operator_instructions.json"))
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(report["schema"], "uo-kernel-operator-instructions-v1");
+        assert_eq!(report["runs_agree"], true);
+        assert_eq!(report["same_values_before_and_after"], true);
+        assert_eq!(report["after_every_operator_has_one_count"], true);
+        let after = report["revisions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|revision| revision["label"] == "after")
+            .unwrap();
+        let sources = after["source_sha256"].as_object().unwrap();
+        for path in [
+            "crates/uo-core/src/types.rs",
+            "crates/uo-core/src/generated_confidential_kernel.rs",
+            "crates/uo-core/src/generated_value_ops.rs",
+            "crates/uo-core/examples/kernel_operator_classes.rs",
+        ] {
+            let digest = hex::encode(Sha256::digest(std::fs::read(root.join(path)).unwrap()));
+            assert_eq!(
+                sources.get(path).and_then(|value| value.as_str()),
+                Some(digest.as_str()),
+                "{path} changed since results/kernel_operator_instructions.json was measured; \
+                 run scripts/measure_kernel_operator_instructions.sh again"
+            );
+        }
+        assert_eq!(sources.len(), 4);
+        // Every operator of the measured build has one count for all its
+        // classes of operands.
+        let operators = after["operators"].as_array().unwrap();
+        assert_eq!(operators.len(), 19);
+        for operator in operators {
+            assert_eq!(operator["distinct_counts"], 1, "{}", operator["operator"]);
+            assert!(operator["classes"].as_u64().unwrap() >= 4);
+        }
     }
 
     #[test]

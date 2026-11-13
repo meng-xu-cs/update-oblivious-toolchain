@@ -51,6 +51,9 @@ fn report_mode(report: &str) -> &'static str {
         | "capacity_sweep_full"
         // Written by scripts/measure_tree_eviction_instructions.sh, not the probe.
         | "tree_eviction_instructions"
+        // Written by scripts/measure_kernel_operator_instructions.sh, not the
+        // probe.
+        | "kernel_operator_instructions"
         | "abort_rollback"
         | "admission_matrix"
         | "claim_status"

@@ -20,6 +20,14 @@ establish and what they do not).
   regenerate it: the script exports two revisions, builds each in release and
   runs the capacity sweep under callgrind, which needs valgrind and takes about
   12 minutes on four cores.
+- `scripts/measure_kernel_operator_instructions.sh` writes
+  `results/kernel_operator_instructions.json`, which `run_validation.sh` does
+  not regenerate either: it builds the example
+  `crates/uo-core/examples/kernel_operator_classes.rs` in release at the last
+  commit whose kernel operators branched on their operands and in the working
+  tree, and counts under callgrind the instructions of one evaluation of each
+  operator on every class of operands. It needs valgrind and takes about two
+  minutes on four cores.
 - The capacity sweep has two profiles with one schema
   (`uo-capacity-sweep-v4`). `run_validation.sh` runs the quick one into
   `results/capacity_sweep.json`: one warmup round and two measured rounds of
@@ -50,6 +58,7 @@ establish and what they do not).
 | Runtime and storage cost | `overheads.json` (modeled gas, physical reads and writes, bytes moved, trace and artifact sizes per benchmark and backend) |
 | Scalability | `capacity_sweep.json` and `capacity_sweep_full.json` (one map of 1 to 16,384 entries on every backend, at five occupancy levels: the traced counts of seven kinds of call, the untraced reads at a call's start and in its witness snapshots, read/write mixes computed and executed, break-even capacities, and release-build latencies with medians, 95th percentiles and bootstrap intervals, split into staging, loading, the runtime's own work, witnesses, proof objects, JSON serialization and Lean's check of a sampled call, with peak resident memory and evidence sizes) |
 | Cost of a tree node access | `tree_eviction_instructions.json` (callgrind instruction counts per node access of the private scheme, before and after the eviction rewrite) |
+| Do the kernel's operators branch on their operands? | `kernel_operator_instructions.json` (callgrind instruction counts of one evaluation of each binary operator of the confidential kernel, and of an array index's conversion, for every class of operands, before and after the operators were made branch-free), with `kernel_operators_do_not_branch_on_operands` in `runtime_boundary_validation.json` for the source |
 | Verification and TCB cost | `reviewer_summary.json` (proof-checking time per report, proof-artifact size budget, trusted line counts), `tamper_validation.json`, `lean_assumption_budget.json`, `static_checks.json` (including the kernel admission of every confidential entrypoint) |
 | Theorem instances and runtime-to-theorem bridges | `bridge_validation.json`, `pathoram_pair_validation.json`, `canonical_pathoram_pair_validation.json`, `fresh_coin_validation.json`, `pathoram_hidden_validation.json`, and the `*_boundary_validation.json` and `*_refinement*_validation.json` reports |
 | Language surface and porting effort | `admission_matrix.json` (accepted and rejected source features); the benchmark sources and sidecars under `benches/raw/` |

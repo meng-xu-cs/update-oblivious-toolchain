@@ -549,6 +549,7 @@ top_level_booleans:
   kernel_interface_validation_uses_bundle_checker: true
   kernel_keccak_iterates_boxed_hash_parts_in_place: true
   kernel_only_state_helper_surface_restricted: true
+  kernel_operators_do_not_branch_on_operands: true
   kernel_refinement_boundary_validation_uses_boundary_checker: true
   kernel_runtime_phase_helper_path_restricted: true
   kernel_runtime_phase_tracker_uses_shared_transition_fn: true

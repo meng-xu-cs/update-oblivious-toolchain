@@ -15,7 +15,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1571795,
+      "boundary_json_bytes": 1588411,
       "confidential_slot_program": {
         "entrypoint_id": "classify(uint256)",
         "expected_runtime_step_count": 4,
@@ -31,12 +31,12 @@
       "implementation_interface_source_bytes": {
         "allocator": 18956,
         "confidential_core": 46817,
-        "confidential_kernel": 116465,
+        "confidential_kernel": 123298,
         "controller": 21368,
         "core_lib": 8623,
         "engine": 107366,
         "fresh_coins": 5031,
-        "generated_confidential_kernel": 25055,
+        "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 28313,
         "generated_oram_codecs": 205894,
@@ -59,7 +59,7 @@
         "theorem": 6359,
         "trace": 435296,
         "trusted_kernel": 4548,
-        "types": 29154
+        "types": 38703
       },
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -266,7 +266,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1571795,
+      "boundary_json_bytes": 1588411,
       "confidential_slot_program": {
         "entrypoint_id": "classify(uint256)",
         "expected_runtime_step_count": 4,
@@ -282,12 +282,12 @@
       "implementation_interface_source_bytes": {
         "allocator": 18956,
         "confidential_core": 46817,
-        "confidential_kernel": 116465,
+        "confidential_kernel": 123298,
         "controller": 21368,
         "core_lib": 8623,
         "engine": 107366,
         "fresh_coins": 5031,
-        "generated_confidential_kernel": 25055,
+        "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 28313,
         "generated_oram_codecs": 205894,
@@ -310,7 +310,7 @@
         "theorem": 6359,
         "trace": 435296,
         "trusted_kernel": 4548,
-        "types": 29154
+        "types": 38703
       },
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -517,7 +517,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1575146,
+      "boundary_json_bytes": 1591762,
       "confidential_slot_program": {
         "entrypoint_id": "auth(bytes32)",
         "expected_runtime_step_count": 8,
@@ -533,12 +533,12 @@
       "implementation_interface_source_bytes": {
         "allocator": 18956,
         "confidential_core": 46817,
-        "confidential_kernel": 116465,
+        "confidential_kernel": 123298,
         "controller": 21368,
         "core_lib": 8623,
         "engine": 107366,
         "fresh_coins": 5031,
-        "generated_confidential_kernel": 25055,
+        "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 28313,
         "generated_oram_codecs": 205894,
@@ -561,7 +561,7 @@
         "theorem": 6359,
         "trace": 435296,
         "trusted_kernel": 4548,
-        "types": 29154
+        "types": 38703
       },
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -923,7 +923,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1575146,
+      "boundary_json_bytes": 1591762,
       "confidential_slot_program": {
         "entrypoint_id": "auth(bytes32)",
         "expected_runtime_step_count": 8,
@@ -939,12 +939,12 @@
       "implementation_interface_source_bytes": {
         "allocator": 18956,
         "confidential_core": 46817,
-        "confidential_kernel": 116465,
+        "confidential_kernel": 123298,
         "controller": 21368,
         "core_lib": 8623,
         "engine": 107366,
         "fresh_coins": 5031,
-        "generated_confidential_kernel": 25055,
+        "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 28313,
         "generated_oram_codecs": 205894,
@@ -967,7 +967,7 @@
         "theorem": 6359,
         "trace": 435296,
         "trusted_kernel": 4548,
-        "types": 29154
+        "types": 38703
       },
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -1329,7 +1329,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1573651,
+      "boundary_json_bytes": 1590267,
       "confidential_slot_program": {
         "entrypoint_id": "upsert(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -1345,12 +1345,12 @@
       "implementation_interface_source_bytes": {
         "allocator": 18956,
         "confidential_core": 46817,
-        "confidential_kernel": 116465,
+        "confidential_kernel": 123298,
         "controller": 21368,
         "core_lib": 8623,
         "engine": 107366,
         "fresh_coins": 5031,
-        "generated_confidential_kernel": 25055,
+        "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 28313,
         "generated_oram_codecs": 205894,
@@ -1373,7 +1373,7 @@
         "theorem": 6359,
         "trace": 435296,
         "trusted_kernel": 4548,
-        "types": 29154
+        "types": 38703
       },
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -1742,7 +1742,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1573651,
+      "boundary_json_bytes": 1590267,
       "confidential_slot_program": {
         "entrypoint_id": "upsert(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -1758,12 +1758,12 @@
       "implementation_interface_source_bytes": {
         "allocator": 18956,
         "confidential_core": 46817,
-        "confidential_kernel": 116465,
+        "confidential_kernel": 123298,
         "controller": 21368,
         "core_lib": 8623,
         "engine": 107366,
         "fresh_coins": 5031,
-        "generated_confidential_kernel": 25055,
+        "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 28313,
         "generated_oram_codecs": 205894,
@@ -1786,7 +1786,7 @@
         "theorem": 6359,
         "trace": 435296,
         "trusted_kernel": 4548,
-        "types": 29154
+        "types": 38703
       },
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -2155,7 +2155,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1575243,
+      "boundary_json_bytes": 1591859,
       "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
@@ -2171,12 +2171,12 @@
       "implementation_interface_source_bytes": {
         "allocator": 18956,
         "confidential_core": 46817,
-        "confidential_kernel": 116465,
+        "confidential_kernel": 123298,
         "controller": 21368,
         "core_lib": 8623,
         "engine": 107366,
         "fresh_coins": 5031,
-        "generated_confidential_kernel": 25055,
+        "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 28313,
         "generated_oram_codecs": 205894,
@@ -2199,7 +2199,7 @@
         "theorem": 6359,
         "trace": 435296,
         "trusted_kernel": 4548,
-        "types": 29154
+        "types": 38703
       },
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -2652,7 +2652,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1575243,
+      "boundary_json_bytes": 1591859,
       "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
@@ -2668,12 +2668,12 @@
       "implementation_interface_source_bytes": {
         "allocator": 18956,
         "confidential_core": 46817,
-        "confidential_kernel": 116465,
+        "confidential_kernel": 123298,
         "controller": 21368,
         "core_lib": 8623,
         "engine": 107366,
         "fresh_coins": 5031,
-        "generated_confidential_kernel": 25055,
+        "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 28313,
         "generated_oram_codecs": 205894,
@@ -2696,7 +2696,7 @@
         "theorem": 6359,
         "trace": 435296,
         "trusted_kernel": 4548,
-        "types": 29154
+        "types": 38703
       },
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -3149,7 +3149,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1576547,
+      "boundary_json_bytes": 1593163,
       "confidential_slot_program": {
         "entrypoint_id": "approve(address,address,uint256)",
         "expected_runtime_step_count": 4,
@@ -3165,12 +3165,12 @@
       "implementation_interface_source_bytes": {
         "allocator": 18956,
         "confidential_core": 46817,
-        "confidential_kernel": 116465,
+        "confidential_kernel": 123298,
         "controller": 21368,
         "core_lib": 8623,
         "engine": 107366,
         "fresh_coins": 5031,
-        "generated_confidential_kernel": 25055,
+        "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 28313,
         "generated_oram_codecs": 205894,
@@ -3193,7 +3193,7 @@
         "theorem": 6359,
         "trace": 435296,
         "trusted_kernel": 4548,
-        "types": 29154
+        "types": 38703
       },
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -3792,7 +3792,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1576547,
+      "boundary_json_bytes": 1593163,
       "confidential_slot_program": {
         "entrypoint_id": "approve(address,address,uint256)",
         "expected_runtime_step_count": 4,
@@ -3808,12 +3808,12 @@
       "implementation_interface_source_bytes": {
         "allocator": 18956,
         "confidential_core": 46817,
-        "confidential_kernel": 116465,
+        "confidential_kernel": 123298,
         "controller": 21368,
         "core_lib": 8623,
         "engine": 107366,
         "fresh_coins": 5031,
-        "generated_confidential_kernel": 25055,
+        "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 28313,
         "generated_oram_codecs": 205894,
@@ -3836,7 +3836,7 @@
         "theorem": 6359,
         "trace": 435296,
         "trusted_kernel": 4548,
-        "types": 29154
+        "types": 38703
       },
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -4435,7 +4435,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "boundary_json_bytes": 1574242,
+      "boundary_json_bytes": 1590858,
       "confidential_slot_program": {
         "entrypoint_id": "put(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -4451,12 +4451,12 @@
       "implementation_interface_source_bytes": {
         "allocator": 18956,
         "confidential_core": 46817,
-        "confidential_kernel": 116465,
+        "confidential_kernel": 123298,
         "controller": 21368,
         "core_lib": 8623,
         "engine": 107366,
         "fresh_coins": 5031,
-        "generated_confidential_kernel": 25055,
+        "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 28313,
         "generated_oram_codecs": 205894,
@@ -4479,7 +4479,7 @@
         "theorem": 6359,
         "trace": 435296,
         "trusted_kernel": 4548,
-        "types": 29154
+        "types": 38703
       },
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -4896,7 +4896,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "boundary_json_bytes": 1574242,
+      "boundary_json_bytes": 1590858,
       "confidential_slot_program": {
         "entrypoint_id": "put(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -4912,12 +4912,12 @@
       "implementation_interface_source_bytes": {
         "allocator": 18956,
         "confidential_core": 46817,
-        "confidential_kernel": 116465,
+        "confidential_kernel": 123298,
         "controller": 21368,
         "core_lib": 8623,
         "engine": 107366,
         "fresh_coins": 5031,
-        "generated_confidential_kernel": 25055,
+        "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 28313,
         "generated_oram_codecs": 205894,
@@ -4940,7 +4940,7 @@
         "theorem": 6359,
         "trace": 435296,
         "trusted_kernel": 4548,
-        "types": 29154
+        "types": 38703
       },
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -5357,7 +5357,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 1576941,
+      "boundary_json_bytes": 1593557,
       "confidential_slot_program": {
         "entrypoint_id": "add(bytes32,uint256)",
         "expected_runtime_step_count": 5,
@@ -5373,12 +5373,12 @@
       "implementation_interface_source_bytes": {
         "allocator": 18956,
         "confidential_core": 46817,
-        "confidential_kernel": 116465,
+        "confidential_kernel": 123298,
         "controller": 21368,
         "core_lib": 8623,
         "engine": 107366,
         "fresh_coins": 5031,
-        "generated_confidential_kernel": 25055,
+        "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 28313,
         "generated_oram_codecs": 205894,
@@ -5401,7 +5401,7 @@
         "theorem": 6359,
         "trace": 435296,
         "trusted_kernel": 4548,
-        "types": 29154
+        "types": 38703
       },
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -6021,7 +6021,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 1576941,
+      "boundary_json_bytes": 1593557,
       "confidential_slot_program": {
         "entrypoint_id": "add(bytes32,uint256)",
         "expected_runtime_step_count": 5,
@@ -6037,12 +6037,12 @@
       "implementation_interface_source_bytes": {
         "allocator": 18956,
         "confidential_core": 46817,
-        "confidential_kernel": 116465,
+        "confidential_kernel": 123298,
         "controller": 21368,
         "core_lib": 8623,
         "engine": 107366,
         "fresh_coins": 5031,
-        "generated_confidential_kernel": 25055,
+        "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 28313,
         "generated_oram_codecs": 205894,
@@ -6065,7 +6065,7 @@
         "theorem": 6359,
         "trace": 435296,
         "trusted_kernel": 4548,
-        "types": 29154
+        "types": 38703
       },
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -6685,7 +6685,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 1584452,
+      "boundary_json_bytes": 1601068,
       "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
@@ -6701,12 +6701,12 @@
       "implementation_interface_source_bytes": {
         "allocator": 18956,
         "confidential_core": 46817,
-        "confidential_kernel": 116465,
+        "confidential_kernel": 123298,
         "controller": 21368,
         "core_lib": 8623,
         "engine": 107366,
         "fresh_coins": 5031,
-        "generated_confidential_kernel": 25055,
+        "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 28313,
         "generated_oram_codecs": 205894,
@@ -6729,7 +6729,7 @@
         "theorem": 6359,
         "trace": 435296,
         "trusted_kernel": 4548,
-        "types": 29154
+        "types": 38703
       },
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
@@ -7938,7 +7938,7 @@
     {
       "accepted": true,
       "boundary_events": 14,
-      "boundary_json_bytes": 1613995,
+      "boundary_json_bytes": 1630611,
       "confidential_slot_program": {
         "entrypoint_id": "transferFrom(address,address,address,uint256)",
         "expected_runtime_step_count": 9,
@@ -7954,12 +7954,12 @@
       "implementation_interface_source_bytes": {
         "allocator": 18956,
         "confidential_core": 46817,
-        "confidential_kernel": 116465,
+        "confidential_kernel": 123298,
         "controller": 21368,
         "core_lib": 8623,
         "engine": 107366,
         "fresh_coins": 5031,
-        "generated_confidential_kernel": 25055,
+        "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 28313,
         "generated_oram_codecs": 205894,
@@ -7982,7 +7982,7 @@
         "theorem": 6359,
         "trace": 435296,
         "trusted_kernel": 4548,
-        "types": 29154
+        "types": 38703
       },
       "kernel_witness": {
         "canonical_loaded_object_schedule": [

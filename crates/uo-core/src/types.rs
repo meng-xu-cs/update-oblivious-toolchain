@@ -107,8 +107,43 @@ impl Uint256 {
         Ok(Self::from_be_bytes(bytes))
     }
 
+    // A confidential kernel runs these operations on its operands:
+    // `is_zero`, `as_bool`, `ct_eq`, `ct_lt`, `to_usize_saturating`, the
+    // wrapping arithmetic, the bitwise operations, `div_rem`, `div_or_zero`
+    // and `rem_or_zero`. None of them branches or returns early on an
+    // operand: each makes the same steps whatever the limbs hold, and a
+    // choice between two results is a masked select. `checked_to_usize` and
+    // the ordering of `Ord` do branch, and the kernel does not use them.
+
+    /// Whether the value is zero, from the OR of its limbs.
     pub fn is_zero(self) -> bool {
-        self.0.iter().all(|limb| *limb == 0)
+        (self.0[0] | self.0[1] | self.0[2] | self.0[3]) == 0
+    }
+
+    /// All ones when the value is not zero, and zero when it is.
+    fn nonzero_mask(self) -> u64 {
+        0u64.wrapping_sub(u64::from(
+            (self.0[0] | self.0[1] | self.0[2] | self.0[3]) != 0,
+        ))
+    }
+
+    /// Whether `self` equals `rhs`, from the OR of the limbs' differences.
+    pub fn ct_eq(self, rhs: Self) -> bool {
+        ((self.0[0] ^ rhs.0[0])
+            | (self.0[1] ^ rhs.0[1])
+            | (self.0[2] ^ rhs.0[2])
+            | (self.0[3] ^ rhs.0[3]))
+            == 0
+    }
+
+    /// `when_set` under a mask of all ones and `otherwise` under a mask of
+    /// zero, limb by limb.
+    fn select(mask: u64, when_set: Self, otherwise: Self) -> Self {
+        let mut out = [0u64; 4];
+        for (idx, slot) in out.iter_mut().enumerate() {
+            *slot = (when_set.0[idx] & mask) | (otherwise.0[idx] & !mask);
+        }
+        Self(out)
     }
 
     pub fn as_bool(self) -> bool {
@@ -122,8 +157,12 @@ impl Uint256 {
         usize::try_from(self.0[0]).ok()
     }
 
+    /// The value as an index, or `usize::MAX` when it does not fit. The
+    /// limbs above the lowest are folded into a mask that saturates the
+    /// lowest one.
     pub fn to_usize_saturating(self) -> usize {
-        self.checked_to_usize().unwrap_or(usize::MAX)
+        let high = 0u64.wrapping_sub(u64::from((self.0[1] | self.0[2] | self.0[3]) != 0));
+        usize::try_from(self.0[0] | high).unwrap_or(usize::MAX)
     }
 
     pub fn wrapping_add(self, rhs: Self) -> Self {
@@ -137,21 +176,29 @@ impl Uint256 {
         Self(out)
     }
 
-    pub fn wrapping_sub(self, rhs: Self) -> Self {
+    /// `self - rhs` modulo 2^256, and the borrow out of the top limb: 1 when
+    /// `self < rhs` and 0 otherwise. Each limb is subtracted in 128 bits,
+    /// where the borrow is bit 64 of the difference.
+    fn borrowing_sub(self, rhs: Self) -> (Self, u64) {
         let mut out = [0u64; 4];
         let mut borrow = 0u128;
         for (idx, slot) in out.iter_mut().enumerate() {
-            let lhs = self.0[idx] as u128;
-            let subtrahend = rhs.0[idx] as u128 + borrow;
-            if lhs >= subtrahend {
-                *slot = (lhs - subtrahend) as u64;
-                borrow = 0;
-            } else {
-                *slot = ((1u128 << 64) + lhs - subtrahend) as u64;
-                borrow = 1;
-            }
+            let difference = (self.0[idx] as u128)
+                .wrapping_sub(rhs.0[idx] as u128)
+                .wrapping_sub(borrow);
+            *slot = difference as u64;
+            borrow = (difference >> 64) & 1;
         }
-        Self(out)
+        (Self(out), borrow as u64)
+    }
+
+    pub fn wrapping_sub(self, rhs: Self) -> Self {
+        self.borrowing_sub(rhs).0
+    }
+
+    /// Whether `self < rhs`: the borrow of `self - rhs`.
+    pub fn ct_lt(self, rhs: Self) -> bool {
+        self.borrowing_sub(rhs).1 != 0
     }
 
     pub fn wrapping_neg(self) -> Self {
@@ -172,23 +219,38 @@ impl Uint256 {
         Self(out)
     }
 
+    /// Quotient and remainder, by 256 rounds of restoring division: each
+    /// round shifts a bit of the dividend into the remainder, subtracts the
+    /// divisor, and keeps the difference under a mask when the subtraction
+    /// did not borrow. A zero divisor gives a zero quotient and the dividend
+    /// as the remainder: every round then subtracts zero, and the quotient
+    /// is masked off at the end.
     pub fn div_rem(self, divisor: Self) -> (Self, Self) {
-        if divisor.is_zero() {
-            return (Self::ZERO, self);
-        }
         let mut quotient = Self::ZERO;
         let mut remainder = Self::ZERO;
         for bit in (0..256).rev() {
             remainder = remainder.shl1();
-            if self.bit(bit) {
-                remainder.0[0] |= 1;
-            }
-            if remainder >= divisor {
-                remainder = remainder.wrapping_sub(divisor);
-                quotient.set_bit(bit);
-            }
+            remainder.0[0] |= (self.0[bit / 64] >> (bit % 64)) & 1;
+            let (reduced, borrow) = remainder.borrowing_sub(divisor);
+            let fits = borrow.wrapping_sub(1);
+            remainder = Self::select(fits, reduced, remainder);
+            quotient.0[bit / 64] |= (fits & 1) << (bit % 64);
         }
-        (quotient, remainder)
+        (
+            Self::select(divisor.nonzero_mask(), quotient, Self::ZERO),
+            remainder,
+        )
+    }
+
+    /// The quotient as the EVM's `DIV` gives it: zero for a zero divisor.
+    pub fn div_or_zero(self, divisor: Self) -> Self {
+        self.div_rem(divisor).0
+    }
+
+    /// The remainder as the EVM's `MOD` gives it: zero for a zero divisor.
+    pub fn rem_or_zero(self, divisor: Self) -> Self {
+        let (_, remainder) = self.div_rem(divisor);
+        Self::select(divisor.nonzero_mask(), remainder, Self::ZERO)
     }
 
     #[allow(clippy::should_implement_trait)]
@@ -214,18 +276,6 @@ impl Uint256 {
             carry = self.0[idx] >> 63;
         }
         Self(out)
-    }
-
-    fn bit(self, bit: usize) -> bool {
-        let limb = bit / 64;
-        let offset = bit % 64;
-        ((self.0[limb] >> offset) & 1) != 0
-    }
-
-    fn set_bit(&mut self, bit: usize) {
-        let limb = bit / 64;
-        let offset = bit % 64;
-        self.0[limb] |= 1u64 << offset;
     }
 
     fn checked_mul_u32(self, rhs: u32) -> Option<Self> {
@@ -700,6 +750,183 @@ mod tests {
             value
         );
         assert_eq!(value.as_bytes32().unwrap(), high_bit.to_be_bytes());
+    }
+
+    /// The implementations the branch-free ones replaced. They branch on
+    /// their operands: a differential test's reference, and nothing else.
+    mod reference {
+        use super::Uint256;
+
+        pub(super) fn is_zero(value: Uint256) -> bool {
+            value.0.iter().all(|limb| *limb == 0)
+        }
+
+        pub(super) fn wrapping_sub(lhs: Uint256, rhs: Uint256) -> Uint256 {
+            let mut out = [0u64; 4];
+            let mut borrow = 0u128;
+            for (idx, slot) in out.iter_mut().enumerate() {
+                let minuend = lhs.0[idx] as u128;
+                let subtrahend = rhs.0[idx] as u128 + borrow;
+                if minuend >= subtrahend {
+                    *slot = (minuend - subtrahend) as u64;
+                    borrow = 0;
+                } else {
+                    *slot = ((1u128 << 64) + minuend - subtrahend) as u64;
+                    borrow = 1;
+                }
+            }
+            Uint256(out)
+        }
+
+        fn bit(value: Uint256, bit: usize) -> bool {
+            ((value.0[bit / 64] >> (bit % 64)) & 1) != 0
+        }
+
+        pub(super) fn div_rem(dividend: Uint256, divisor: Uint256) -> (Uint256, Uint256) {
+            if is_zero(divisor) {
+                return (Uint256::ZERO, dividend);
+            }
+            let mut quotient = Uint256::ZERO;
+            let mut remainder = Uint256::ZERO;
+            for index in (0..256).rev() {
+                remainder = remainder.shl1();
+                if bit(dividend, index) {
+                    remainder.0[0] |= 1;
+                }
+                if remainder >= divisor {
+                    remainder = wrapping_sub(remainder, divisor);
+                    quotient.0[index / 64] |= 1u64 << (index % 64);
+                }
+            }
+            (quotient, remainder)
+        }
+
+        pub(super) fn to_usize_saturating(value: Uint256) -> usize {
+            value.checked_to_usize().unwrap_or(usize::MAX)
+        }
+    }
+
+    /// SplitMix64: a fixed stream of operands for the differential tests.
+    struct OperandStream(u64);
+
+    impl OperandStream {
+        fn next_u64(&mut self) -> u64 {
+            self.0 = self.0.wrapping_add(0x9E37_79B9_7F4A_7C15);
+            let mut z = self.0;
+            z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+            z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+            z ^ (z >> 31)
+        }
+
+        /// A value whose limbs are random, zero or all ones, so that equal
+        /// limbs, borrows across limbs and short operands all turn up.
+        fn next_uint(&mut self) -> Uint256 {
+            let mut limbs = [0u64; 4];
+            for limb in limbs.iter_mut() {
+                *limb = match self.next_u64() % 4 {
+                    0 => 0,
+                    1 => u64::MAX,
+                    _ => self.next_u64(),
+                };
+            }
+            Uint256(limbs)
+        }
+    }
+
+    fn edge_operands() -> Vec<Uint256> {
+        let mut edges = vec![
+            Uint256::ZERO,
+            Uint256::ONE,
+            Uint256::from_u64(2),
+            Uint256::from_u64(97),
+            Uint256::from_u64(u64::MAX),
+            Uint256::from_u128(1u128 << 64),
+            Uint256::from_u128(u128::MAX),
+            Uint256::MAX,
+            Uint256::MAX.wrapping_sub(Uint256::ONE),
+        ];
+        // One bit set in each limb, and the same with the bits below it.
+        for limb in 0..4 {
+            for bit in [0, 63] {
+                let mut limbs = [0u64; 4];
+                limbs[limb] = 1u64 << bit;
+                let power = Uint256(limbs);
+                edges.push(power);
+                edges.push(power.wrapping_sub(Uint256::ONE));
+            }
+        }
+        edges
+    }
+
+    #[test]
+    fn branch_free_arithmetic_agrees_with_the_implementations_it_replaced() {
+        let mut stream = OperandStream(0x5549_4e54_3235_3634);
+        let edges = edge_operands();
+        let mut pairs: Vec<(Uint256, Uint256)> = Vec::new();
+        for lhs in &edges {
+            for rhs in &edges {
+                pairs.push((*lhs, *rhs));
+            }
+        }
+        for _ in 0..4000 {
+            let lhs = stream.next_uint();
+            let rhs = stream.next_uint();
+            pairs.push((lhs, rhs));
+            // Operands that agree in their high limbs.
+            let mut near = lhs;
+            near.0[0] = rhs.0[0];
+            pairs.push((lhs, near));
+            // A divisor of one, two or three limbs.
+            let mut short = rhs;
+            for limb in (1 + (stream.next_u64() % 3) as usize)..4 {
+                short.0[limb] = 0;
+            }
+            pairs.push((lhs, short));
+        }
+        assert!(pairs.len() > 12_000);
+        let (mut borrows, mut equal, mut zero_divisors, mut saturated) = (0, 0, 0, 0);
+        for (lhs, rhs) in pairs {
+            let case = format!("{lhs:?} and {rhs:?}");
+            assert_eq!(lhs.is_zero(), reference::is_zero(lhs), "{case}");
+            assert_eq!(lhs.ct_eq(rhs), lhs == rhs, "{case}");
+            assert_eq!(lhs.ct_lt(rhs), lhs < rhs, "{case}");
+            assert_eq!(rhs.ct_lt(lhs), lhs > rhs, "{case}");
+            assert_eq!(!rhs.ct_lt(lhs), lhs <= rhs, "{case}");
+            assert_eq!(!lhs.ct_lt(rhs), lhs >= rhs, "{case}");
+            assert_eq!(
+                lhs.wrapping_sub(rhs),
+                reference::wrapping_sub(lhs, rhs),
+                "{case}"
+            );
+            let (quotient, remainder) = reference::div_rem(lhs, rhs);
+            assert_eq!(lhs.div_rem(rhs), (quotient, remainder), "{case}");
+            if rhs.is_zero() {
+                assert_eq!(lhs.div_or_zero(rhs), Uint256::ZERO, "{case}");
+                assert_eq!(lhs.rem_or_zero(rhs), Uint256::ZERO, "{case}");
+            } else {
+                assert_eq!(lhs.div_or_zero(rhs), quotient, "{case}");
+                assert_eq!(lhs.rem_or_zero(rhs), remainder, "{case}");
+                // The division is one: the quotient and the remainder give
+                // the dividend back, and the remainder is below the divisor.
+                assert!(remainder < rhs, "{case}");
+                assert_eq!(
+                    quotient.wrapping_mul(rhs).wrapping_add(remainder),
+                    lhs,
+                    "{case}"
+                );
+            }
+            assert_eq!(
+                lhs.to_usize_saturating(),
+                reference::to_usize_saturating(lhs),
+                "{case}"
+            );
+            borrows += usize::from(lhs < rhs);
+            equal += usize::from(lhs == rhs);
+            zero_divisors += usize::from(rhs.is_zero());
+            saturated += usize::from(lhs.to_usize_saturating() == usize::MAX);
+        }
+        // Every class of operand was met.
+        assert!(borrows > 1000 && equal > 20 && zero_divisors > 20 && saturated > 1000);
     }
 
     #[test]

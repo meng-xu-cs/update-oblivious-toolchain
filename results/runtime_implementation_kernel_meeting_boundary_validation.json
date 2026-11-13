@@ -15,7 +15,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1573835,
+      "boundary_json_bytes": 1590451,
       "confidential_statement_trace_bridge_boundary_theorem_checked": true,
       "entrypoint": "classify(uint256)",
       "gas_used": 2115,
@@ -23,12 +23,12 @@
       "implementation_interface_source_bytes": {
         "allocator": 18956,
         "confidential_core": 46817,
-        "confidential_kernel": 116465,
+        "confidential_kernel": 123298,
         "controller": 21368,
         "core_lib": 8623,
         "engine": 107366,
         "fresh_coins": 5031,
-        "generated_confidential_kernel": 25055,
+        "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 28313,
         "generated_oram_codecs": 205894,
@@ -51,7 +51,7 @@
         "theorem": 6359,
         "trace": 435296,
         "trusted_kernel": 4548,
-        "types": 29154
+        "types": 38703
       },
       "kernel_finish_slot_bundle": {
         "entrypoint_id": "classify(uint256)",
@@ -262,7 +262,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1573835,
+      "boundary_json_bytes": 1590451,
       "confidential_statement_trace_bridge_boundary_theorem_checked": true,
       "entrypoint": "classify(uint256)",
       "gas_used": 2115,
@@ -270,12 +270,12 @@
       "implementation_interface_source_bytes": {
         "allocator": 18956,
         "confidential_core": 46817,
-        "confidential_kernel": 116465,
+        "confidential_kernel": 123298,
         "controller": 21368,
         "core_lib": 8623,
         "engine": 107366,
         "fresh_coins": 5031,
-        "generated_confidential_kernel": 25055,
+        "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 28313,
         "generated_oram_codecs": 205894,
@@ -298,7 +298,7 @@
         "theorem": 6359,
         "trace": 435296,
         "trusted_kernel": 4548,
-        "types": 29154
+        "types": 38703
       },
       "kernel_finish_slot_bundle": {
         "entrypoint_id": "classify(uint256)",
@@ -509,7 +509,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1579302,
+      "boundary_json_bytes": 1595918,
       "confidential_statement_trace_bridge_boundary_theorem_checked": true,
       "entrypoint": "auth(bytes32)",
       "gas_used": 2475,
@@ -517,12 +517,12 @@
       "implementation_interface_source_bytes": {
         "allocator": 18956,
         "confidential_core": 46817,
-        "confidential_kernel": 116465,
+        "confidential_kernel": 123298,
         "controller": 21368,
         "core_lib": 8623,
         "engine": 107366,
         "fresh_coins": 5031,
-        "generated_confidential_kernel": 25055,
+        "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 28313,
         "generated_oram_codecs": 205894,
@@ -545,7 +545,7 @@
         "theorem": 6359,
         "trace": 435296,
         "trusted_kernel": 4548,
-        "types": 29154
+        "types": 38703
       },
       "kernel_finish_slot_bundle": {
         "entrypoint_id": "auth(bytes32)",
@@ -911,7 +911,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1579302,
+      "boundary_json_bytes": 1595918,
       "confidential_statement_trace_bridge_boundary_theorem_checked": true,
       "entrypoint": "auth(bytes32)",
       "gas_used": 2475,
@@ -919,12 +919,12 @@
       "implementation_interface_source_bytes": {
         "allocator": 18956,
         "confidential_core": 46817,
-        "confidential_kernel": 116465,
+        "confidential_kernel": 123298,
         "controller": 21368,
         "core_lib": 8623,
         "engine": 107366,
         "fresh_coins": 5031,
-        "generated_confidential_kernel": 25055,
+        "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 28313,
         "generated_oram_codecs": 205894,
@@ -947,7 +947,7 @@
         "theorem": 6359,
         "trace": 435296,
         "trusted_kernel": 4548,
-        "types": 29154
+        "types": 38703
       },
       "kernel_finish_slot_bundle": {
         "entrypoint_id": "auth(bytes32)",
@@ -1313,7 +1313,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1577665,
+      "boundary_json_bytes": 1594281,
       "confidential_statement_trace_bridge_boundary_theorem_checked": true,
       "entrypoint": "upsert(bytes32,uint256)",
       "gas_used": 2496,
@@ -1321,12 +1321,12 @@
       "implementation_interface_source_bytes": {
         "allocator": 18956,
         "confidential_core": 46817,
-        "confidential_kernel": 116465,
+        "confidential_kernel": 123298,
         "controller": 21368,
         "core_lib": 8623,
         "engine": 107366,
         "fresh_coins": 5031,
-        "generated_confidential_kernel": 25055,
+        "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 28313,
         "generated_oram_codecs": 205894,
@@ -1349,7 +1349,7 @@
         "theorem": 6359,
         "trace": 435296,
         "trusted_kernel": 4548,
-        "types": 29154
+        "types": 38703
       },
       "kernel_finish_slot_bundle": {
         "entrypoint_id": "upsert(bytes32,uint256)",
@@ -1722,7 +1722,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1577665,
+      "boundary_json_bytes": 1594281,
       "confidential_statement_trace_bridge_boundary_theorem_checked": true,
       "entrypoint": "upsert(bytes32,uint256)",
       "gas_used": 2496,
@@ -1730,12 +1730,12 @@
       "implementation_interface_source_bytes": {
         "allocator": 18956,
         "confidential_core": 46817,
-        "confidential_kernel": 116465,
+        "confidential_kernel": 123298,
         "controller": 21368,
         "core_lib": 8623,
         "engine": 107366,
         "fresh_coins": 5031,
-        "generated_confidential_kernel": 25055,
+        "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 28313,
         "generated_oram_codecs": 205894,
@@ -1758,7 +1758,7 @@
         "theorem": 6359,
         "trace": 435296,
         "trusted_kernel": 4548,
-        "types": 29154
+        "types": 38703
       },
       "kernel_finish_slot_bundle": {
         "entrypoint_id": "upsert(bytes32,uint256)",
@@ -2131,7 +2131,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1580465,
+      "boundary_json_bytes": 1597081,
       "confidential_statement_trace_bridge_boundary_theorem_checked": true,
       "entrypoint": "deposit(bytes32,uint256)",
       "gas_used": 2632,
@@ -2139,12 +2139,12 @@
       "implementation_interface_source_bytes": {
         "allocator": 18956,
         "confidential_core": 46817,
-        "confidential_kernel": 116465,
+        "confidential_kernel": 123298,
         "controller": 21368,
         "core_lib": 8623,
         "engine": 107366,
         "fresh_coins": 5031,
-        "generated_confidential_kernel": 25055,
+        "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 28313,
         "generated_oram_codecs": 205894,
@@ -2167,7 +2167,7 @@
         "theorem": 6359,
         "trace": 435296,
         "trusted_kernel": 4548,
-        "types": 29154
+        "types": 38703
       },
       "kernel_finish_slot_bundle": {
         "entrypoint_id": "deposit(bytes32,uint256)",
@@ -2624,7 +2624,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1580465,
+      "boundary_json_bytes": 1597081,
       "confidential_statement_trace_bridge_boundary_theorem_checked": true,
       "entrypoint": "deposit(bytes32,uint256)",
       "gas_used": 2632,
@@ -2632,12 +2632,12 @@
       "implementation_interface_source_bytes": {
         "allocator": 18956,
         "confidential_core": 46817,
-        "confidential_kernel": 116465,
+        "confidential_kernel": 123298,
         "controller": 21368,
         "core_lib": 8623,
         "engine": 107366,
         "fresh_coins": 5031,
-        "generated_confidential_kernel": 25055,
+        "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 28313,
         "generated_oram_codecs": 205894,
@@ -2660,7 +2660,7 @@
         "theorem": 6359,
         "trace": 435296,
         "trusted_kernel": 4548,
-        "types": 29154
+        "types": 38703
       },
       "kernel_finish_slot_bundle": {
         "entrypoint_id": "deposit(bytes32,uint256)",
@@ -3117,7 +3117,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1583318,
+      "boundary_json_bytes": 1599934,
       "confidential_statement_trace_bridge_boundary_theorem_checked": true,
       "entrypoint": "approve(address,address,uint256)",
       "gas_used": 2992,
@@ -3125,12 +3125,12 @@
       "implementation_interface_source_bytes": {
         "allocator": 18956,
         "confidential_core": 46817,
-        "confidential_kernel": 116465,
+        "confidential_kernel": 123298,
         "controller": 21368,
         "core_lib": 8623,
         "engine": 107366,
         "fresh_coins": 5031,
-        "generated_confidential_kernel": 25055,
+        "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 28313,
         "generated_oram_codecs": 205894,
@@ -3153,7 +3153,7 @@
         "theorem": 6359,
         "trace": 435296,
         "trusted_kernel": 4548,
-        "types": 29154
+        "types": 38703
       },
       "kernel_finish_slot_bundle": {
         "entrypoint_id": "approve(address,address,uint256)",
@@ -3756,7 +3756,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1583318,
+      "boundary_json_bytes": 1599934,
       "confidential_statement_trace_bridge_boundary_theorem_checked": true,
       "entrypoint": "approve(address,address,uint256)",
       "gas_used": 2992,
@@ -3764,12 +3764,12 @@
       "implementation_interface_source_bytes": {
         "allocator": 18956,
         "confidential_core": 46817,
-        "confidential_kernel": 116465,
+        "confidential_kernel": 123298,
         "controller": 21368,
         "core_lib": 8623,
         "engine": 107366,
         "fresh_coins": 5031,
-        "generated_confidential_kernel": 25055,
+        "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 28313,
         "generated_oram_codecs": 205894,
@@ -3792,7 +3792,7 @@
         "theorem": 6359,
         "trace": 435296,
         "trusted_kernel": 4548,
-        "types": 29154
+        "types": 38703
       },
       "kernel_finish_slot_bundle": {
         "entrypoint_id": "approve(address,address,uint256)",
@@ -4395,7 +4395,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "boundary_json_bytes": 1578850,
+      "boundary_json_bytes": 1595466,
       "confidential_statement_trace_bridge_boundary_theorem_checked": true,
       "entrypoint": "put(bytes32,uint256)",
       "gas_used": 2757,
@@ -4403,12 +4403,12 @@
       "implementation_interface_source_bytes": {
         "allocator": 18956,
         "confidential_core": 46817,
-        "confidential_kernel": 116465,
+        "confidential_kernel": 123298,
         "controller": 21368,
         "core_lib": 8623,
         "engine": 107366,
         "fresh_coins": 5031,
-        "generated_confidential_kernel": 25055,
+        "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 28313,
         "generated_oram_codecs": 205894,
@@ -4431,7 +4431,7 @@
         "theorem": 6359,
         "trace": 435296,
         "trusted_kernel": 4548,
-        "types": 29154
+        "types": 38703
       },
       "kernel_finish_slot_bundle": {
         "entrypoint_id": "put(bytes32,uint256)",
@@ -4852,7 +4852,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "boundary_json_bytes": 1578850,
+      "boundary_json_bytes": 1595466,
       "confidential_statement_trace_bridge_boundary_theorem_checked": true,
       "entrypoint": "put(bytes32,uint256)",
       "gas_used": 2757,
@@ -4860,12 +4860,12 @@
       "implementation_interface_source_bytes": {
         "allocator": 18956,
         "confidential_core": 46817,
-        "confidential_kernel": 116465,
+        "confidential_kernel": 123298,
         "controller": 21368,
         "core_lib": 8623,
         "engine": 107366,
         "fresh_coins": 5031,
-        "generated_confidential_kernel": 25055,
+        "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 28313,
         "generated_oram_codecs": 205894,
@@ -4888,7 +4888,7 @@
         "theorem": 6359,
         "trace": 435296,
         "trusted_kernel": 4548,
-        "types": 29154
+        "types": 38703
       },
       "kernel_finish_slot_bundle": {
         "entrypoint_id": "put(bytes32,uint256)",
@@ -5309,7 +5309,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 1584071,
+      "boundary_json_bytes": 1600687,
       "confidential_statement_trace_bridge_boundary_theorem_checked": true,
       "entrypoint": "add(bytes32,uint256)",
       "gas_used": 3376,
@@ -5317,12 +5317,12 @@
       "implementation_interface_source_bytes": {
         "allocator": 18956,
         "confidential_core": 46817,
-        "confidential_kernel": 116465,
+        "confidential_kernel": 123298,
         "controller": 21368,
         "core_lib": 8623,
         "engine": 107366,
         "fresh_coins": 5031,
-        "generated_confidential_kernel": 25055,
+        "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 28313,
         "generated_oram_codecs": 205894,
@@ -5345,7 +5345,7 @@
         "theorem": 6359,
         "trace": 435296,
         "trusted_kernel": 4548,
-        "types": 29154
+        "types": 38703
       },
       "kernel_finish_slot_bundle": {
         "entrypoint_id": "add(bytes32,uint256)",
@@ -5969,7 +5969,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 1584071,
+      "boundary_json_bytes": 1600687,
       "confidential_statement_trace_bridge_boundary_theorem_checked": true,
       "entrypoint": "add(bytes32,uint256)",
       "gas_used": 3376,
@@ -5977,12 +5977,12 @@
       "implementation_interface_source_bytes": {
         "allocator": 18956,
         "confidential_core": 46817,
-        "confidential_kernel": 116465,
+        "confidential_kernel": 123298,
         "controller": 21368,
         "core_lib": 8623,
         "engine": 107366,
         "fresh_coins": 5031,
-        "generated_confidential_kernel": 25055,
+        "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 28313,
         "generated_oram_codecs": 205894,
@@ -6005,7 +6005,7 @@
         "theorem": 6359,
         "trace": 435296,
         "trusted_kernel": 4548,
-        "types": 29154
+        "types": 38703
       },
       "kernel_finish_slot_bundle": {
         "entrypoint_id": "add(bytes32,uint256)",
@@ -6629,7 +6629,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 1598883,
+      "boundary_json_bytes": 1615499,
       "confidential_statement_trace_bridge_boundary_theorem_checked": true,
       "entrypoint": "deposit(bytes32,uint256)",
       "gas_used": 5445,
@@ -6637,12 +6637,12 @@
       "implementation_interface_source_bytes": {
         "allocator": 18956,
         "confidential_core": 46817,
-        "confidential_kernel": 116465,
+        "confidential_kernel": 123298,
         "controller": 21368,
         "core_lib": 8623,
         "engine": 107366,
         "fresh_coins": 5031,
-        "generated_confidential_kernel": 25055,
+        "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 28313,
         "generated_oram_codecs": 205894,
@@ -6665,7 +6665,7 @@
         "theorem": 6359,
         "trace": 435296,
         "trusted_kernel": 4548,
-        "types": 29154
+        "types": 38703
       },
       "kernel_finish_slot_bundle": {
         "entrypoint_id": "deposit(bytes32,uint256)",
@@ -7878,7 +7878,7 @@
     {
       "accepted": true,
       "boundary_events": 14,
-      "boundary_json_bytes": 1657000,
+      "boundary_json_bytes": 1673616,
       "confidential_statement_trace_bridge_boundary_theorem_checked": true,
       "entrypoint": "transferFrom(address,address,address,uint256)",
       "gas_used": 13952,
@@ -7886,12 +7886,12 @@
       "implementation_interface_source_bytes": {
         "allocator": 18956,
         "confidential_core": 46817,
-        "confidential_kernel": 116465,
+        "confidential_kernel": 123298,
         "controller": 21368,
         "core_lib": 8623,
         "engine": 107366,
         "fresh_coins": 5031,
-        "generated_confidential_kernel": 25055,
+        "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
         "generated_object_helpers": 28313,
         "generated_oram_codecs": 205894,
@@ -7914,7 +7914,7 @@
         "theorem": 6359,
         "trace": 435296,
         "trusted_kernel": 4548,
-        "types": 29154
+        "types": 38703
       },
       "kernel_finish_slot_bundle": {
         "entrypoint_id": "transferFrom(address,address,address,uint256)",

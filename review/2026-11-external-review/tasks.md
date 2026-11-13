@@ -551,6 +551,12 @@ operators branch on secret operands in the confidential kernel.
    (zero and nonzero divisor, borrow and no borrow, equal and unequal high
    limbs).
 
+The conversion of an array index (`to_usize_saturating`) is made branch-free
+with the rest, since the kernel applies it to an operand. What stays is not
+arithmetic: indexing an array value by an operand
+(`eval_confidential_kernel_array_index_generated`) reads the element at the
+index and fails on an index out of range. `docs/claim-boundary.md` names it.
+
 #### Acceptance criteria
 
 - A committed report shows equal instruction counts per operation in a

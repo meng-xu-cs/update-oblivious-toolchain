@@ -1,0 +1,796 @@
+{
+  "schema": "uo-kernel-operator-instructions-v1",
+  "metric": "callgrind instruction reads (Ir) inside the slot interpreter's evaluation of `return slot0 <operator> slot1` (`index`: `return array[slot0]`), inclusive of callees, summed over the evaluations of one process",
+  "scope": "instruction counts of one release build under callgrind; not a claim about cache or branch-predictor state, nor about machine code built elsewhere",
+  "evaluations_per_run": 16,
+  "repeats": 2,
+  "tools": {
+    "valgrind": "valgrind-3.22.0",
+    "rustc": "rustc 1.82.0 (f6e511eec 2024-10-15)",
+    "arch": "x86_64"
+  },
+  "example": "crates/uo-core/examples/kernel_operator_classes.rs",
+  "revisions": [
+    {
+      "label": "before",
+      "revision": "a3eb01aeacb15c30ee851a70c7ae1f58e0d929ea",
+      "source_sha256": {
+        "crates/uo-core/src/types.rs": "81fce8534d71f9b93ca68ef2dce295c75864b9e728367fcefbc8921cb6a0c41c",
+        "crates/uo-core/src/generated_confidential_kernel.rs": "2f92b7c9f329b063a8578299c753869cefef45189f379a45736368797932c2c9",
+        "crates/uo-core/src/generated_value_ops.rs": "3effb137ddbaa2ceec65c938a50482ad933b1f4638c2b3fd4a8835587824a07d",
+        "crates/uo-core/examples/kernel_operator_classes.rs": "4b7746191ed2ac08f7cf48090d9b075eae5c649760bfbcfbc8b925fdce309510"
+      },
+      "operators_measured": 19,
+      "operators_with_one_count": 11,
+      "operators": [
+        {
+          "operator": "add",
+          "classes": 13,
+          "distinct_counts": 1,
+          "fewest_instructions": 7328,
+          "most_instructions": 7328,
+          "instructions": {
+            "zero_zero": 7328,
+            "zero_rhs": 7328,
+            "zero_lhs": 7328,
+            "equal": 7328,
+            "low_limb_above": 7328,
+            "low_limb_below": 7328,
+            "high_limb_above": 7328,
+            "high_limb_below": 7328,
+            "borrow_chain": 7328,
+            "small": 7328,
+            "max_max": 7328,
+            "max_one": 7328,
+            "one_max": 7328
+          }
+        },
+        {
+          "operator": "sub",
+          "classes": 13,
+          "distinct_counts": 1,
+          "fewest_instructions": 7520,
+          "most_instructions": 7520,
+          "instructions": {
+            "zero_zero": 7520,
+            "zero_rhs": 7520,
+            "zero_lhs": 7520,
+            "equal": 7520,
+            "low_limb_above": 7520,
+            "low_limb_below": 7520,
+            "high_limb_above": 7520,
+            "high_limb_below": 7520,
+            "borrow_chain": 7520,
+            "small": 7520,
+            "max_max": 7520,
+            "max_one": 7520,
+            "one_max": 7520
+          }
+        },
+        {
+          "operator": "mul",
+          "classes": 13,
+          "distinct_counts": 1,
+          "fewest_instructions": 7920,
+          "most_instructions": 7920,
+          "instructions": {
+            "zero_zero": 7920,
+            "zero_rhs": 7920,
+            "zero_lhs": 7920,
+            "equal": 7920,
+            "low_limb_above": 7920,
+            "low_limb_below": 7920,
+            "high_limb_above": 7920,
+            "high_limb_below": 7920,
+            "borrow_chain": 7920,
+            "small": 7920,
+            "max_max": 7920,
+            "max_one": 7920,
+            "one_max": 7920
+          }
+        },
+        {
+          "operator": "div",
+          "classes": 13,
+          "distinct_counts": 8,
+          "fewest_instructions": 7392,
+          "most_instructions": 258176,
+          "instructions": {
+            "zero_zero": 7392,
+            "zero_rhs": 7392,
+            "zero_lhs": 114816,
+            "equal": 115376,
+            "low_limb_above": 115376,
+            "low_limb_below": 115104,
+            "high_limb_above": 115120,
+            "high_limb_below": 114816,
+            "borrow_chain": 188816,
+            "small": 189360,
+            "max_max": 115376,
+            "max_one": 258176,
+            "one_max": 114816
+          }
+        },
+        {
+          "operator": "mod",
+          "classes": 13,
+          "distinct_counts": 8,
+          "fewest_instructions": 7392,
+          "most_instructions": 258192,
+          "instructions": {
+            "zero_zero": 7392,
+            "zero_rhs": 7392,
+            "zero_lhs": 114832,
+            "equal": 115392,
+            "low_limb_above": 115392,
+            "low_limb_below": 115120,
+            "high_limb_above": 115136,
+            "high_limb_below": 114832,
+            "borrow_chain": 188832,
+            "small": 189376,
+            "max_max": 115392,
+            "max_one": 258192,
+            "one_max": 114832
+          }
+        },
+        {
+          "operator": "bitand",
+          "classes": 13,
+          "distinct_counts": 1,
+          "fewest_instructions": 7280,
+          "most_instructions": 7280,
+          "instructions": {
+            "zero_zero": 7280,
+            "zero_rhs": 7280,
+            "zero_lhs": 7280,
+            "equal": 7280,
+            "low_limb_above": 7280,
+            "low_limb_below": 7280,
+            "high_limb_above": 7280,
+            "high_limb_below": 7280,
+            "borrow_chain": 7280,
+            "small": 7280,
+            "max_max": 7280,
+            "max_one": 7280,
+            "one_max": 7280
+          }
+        },
+        {
+          "operator": "bitor",
+          "classes": 13,
+          "distinct_counts": 1,
+          "fewest_instructions": 7264,
+          "most_instructions": 7264,
+          "instructions": {
+            "zero_zero": 7264,
+            "zero_rhs": 7264,
+            "zero_lhs": 7264,
+            "equal": 7264,
+            "low_limb_above": 7264,
+            "low_limb_below": 7264,
+            "high_limb_above": 7264,
+            "high_limb_below": 7264,
+            "borrow_chain": 7264,
+            "small": 7264,
+            "max_max": 7264,
+            "max_one": 7264,
+            "one_max": 7264
+          }
+        },
+        {
+          "operator": "bitxor",
+          "classes": 13,
+          "distinct_counts": 1,
+          "fewest_instructions": 7280,
+          "most_instructions": 7280,
+          "instructions": {
+            "zero_zero": 7280,
+            "zero_rhs": 7280,
+            "zero_lhs": 7280,
+            "equal": 7280,
+            "low_limb_above": 7280,
+            "low_limb_below": 7280,
+            "high_limb_above": 7280,
+            "high_limb_below": 7280,
+            "borrow_chain": 7280,
+            "small": 7280,
+            "max_max": 7280,
+            "max_one": 7280,
+            "one_max": 7280
+          }
+        },
+        {
+          "operator": "eq",
+          "classes": 13,
+          "distinct_counts": 1,
+          "fewest_instructions": 7440,
+          "most_instructions": 7440,
+          "instructions": {
+            "zero_zero": 7440,
+            "zero_rhs": 7440,
+            "zero_lhs": 7440,
+            "equal": 7440,
+            "low_limb_above": 7440,
+            "low_limb_below": 7440,
+            "high_limb_above": 7440,
+            "high_limb_below": 7440,
+            "borrow_chain": 7440,
+            "small": 7440,
+            "max_max": 7440,
+            "max_one": 7440,
+            "one_max": 7440
+          }
+        },
+        {
+          "operator": "neq",
+          "classes": 13,
+          "distinct_counts": 1,
+          "fewest_instructions": 7472,
+          "most_instructions": 7472,
+          "instructions": {
+            "zero_zero": 7472,
+            "zero_rhs": 7472,
+            "zero_lhs": 7472,
+            "equal": 7472,
+            "low_limb_above": 7472,
+            "low_limb_below": 7472,
+            "high_limb_above": 7472,
+            "high_limb_below": 7472,
+            "borrow_chain": 7472,
+            "small": 7472,
+            "max_max": 7472,
+            "max_one": 7472,
+            "one_max": 7472
+          }
+        },
+        {
+          "operator": "lt",
+          "classes": 13,
+          "distinct_counts": 2,
+          "fewest_instructions": 7264,
+          "most_instructions": 7424,
+          "instructions": {
+            "zero_zero": 7424,
+            "zero_rhs": 7264,
+            "zero_lhs": 7264,
+            "equal": 7424,
+            "low_limb_above": 7424,
+            "low_limb_below": 7424,
+            "high_limb_above": 7264,
+            "high_limb_below": 7264,
+            "borrow_chain": 7264,
+            "small": 7424,
+            "max_max": 7424,
+            "max_one": 7264,
+            "one_max": 7264
+          }
+        },
+        {
+          "operator": "lte",
+          "classes": 13,
+          "distinct_counts": 2,
+          "fewest_instructions": 7376,
+          "most_instructions": 7648,
+          "instructions": {
+            "zero_zero": 7648,
+            "zero_rhs": 7376,
+            "zero_lhs": 7376,
+            "equal": 7648,
+            "low_limb_above": 7648,
+            "low_limb_below": 7648,
+            "high_limb_above": 7376,
+            "high_limb_below": 7376,
+            "borrow_chain": 7376,
+            "small": 7648,
+            "max_max": 7648,
+            "max_one": 7376,
+            "one_max": 7376
+          }
+        },
+        {
+          "operator": "gt",
+          "classes": 13,
+          "distinct_counts": 2,
+          "fewest_instructions": 7344,
+          "most_instructions": 7616,
+          "instructions": {
+            "zero_zero": 7616,
+            "zero_rhs": 7344,
+            "zero_lhs": 7344,
+            "equal": 7616,
+            "low_limb_above": 7616,
+            "low_limb_below": 7616,
+            "high_limb_above": 7344,
+            "high_limb_below": 7344,
+            "borrow_chain": 7344,
+            "small": 7616,
+            "max_max": 7616,
+            "max_one": 7344,
+            "one_max": 7344
+          }
+        },
+        {
+          "operator": "gte",
+          "classes": 13,
+          "distinct_counts": 2,
+          "fewest_instructions": 7344,
+          "most_instructions": 7616,
+          "instructions": {
+            "zero_zero": 7616,
+            "zero_rhs": 7344,
+            "zero_lhs": 7344,
+            "equal": 7616,
+            "low_limb_above": 7616,
+            "low_limb_below": 7616,
+            "high_limb_above": 7344,
+            "high_limb_below": 7344,
+            "borrow_chain": 7344,
+            "small": 7616,
+            "max_max": 7616,
+            "max_one": 7344,
+            "one_max": 7344
+          }
+        },
+        {
+          "operator": "and_bool",
+          "classes": 4,
+          "distinct_counts": 2,
+          "fewest_instructions": 6880,
+          "most_instructions": 7120,
+          "instructions": {
+            "false_false": 6880,
+            "false_true": 6880,
+            "true_false": 7120,
+            "true_true": 7120
+          }
+        },
+        {
+          "operator": "or_bool",
+          "classes": 4,
+          "distinct_counts": 2,
+          "fewest_instructions": 6864,
+          "most_instructions": 7152,
+          "instructions": {
+            "false_false": 7152,
+            "false_true": 7152,
+            "true_false": 6864,
+            "true_true": 6864
+          }
+        },
+        {
+          "operator": "eq_bool",
+          "classes": 4,
+          "distinct_counts": 1,
+          "fewest_instructions": 7168,
+          "most_instructions": 7168,
+          "instructions": {
+            "false_false": 7168,
+            "false_true": 7168,
+            "true_false": 7168,
+            "true_true": 7168
+          }
+        },
+        {
+          "operator": "neq_bool",
+          "classes": 4,
+          "distinct_counts": 1,
+          "fewest_instructions": 7200,
+          "most_instructions": 7200,
+          "instructions": {
+            "false_false": 7200,
+            "false_true": 7200,
+            "true_false": 7200,
+            "true_true": 7200
+          }
+        },
+        {
+          "operator": "index",
+          "classes": 6,
+          "distinct_counts": 1,
+          "fewest_instructions": 4480,
+          "most_instructions": 4480,
+          "instructions": {
+            "zero": 4480,
+            "small": 4480,
+            "low_limb_max": 4480,
+            "second_limb": 4480,
+            "top_limb": 4480,
+            "max": 4480
+          }
+        }
+      ]
+    },
+    {
+      "label": "after",
+      "revision": "working tree",
+      "source_sha256": {
+        "crates/uo-core/src/types.rs": "96c98f864226938feaf4bec8eb902bbcd5e32d409ae35300fa113d52e7bed968",
+        "crates/uo-core/src/generated_confidential_kernel.rs": "b0b847711ab41aa1a453bc0669df783e3ce426776bf7eaf953a71948c42a9ea6",
+        "crates/uo-core/src/generated_value_ops.rs": "3effb137ddbaa2ceec65c938a50482ad933b1f4638c2b3fd4a8835587824a07d",
+        "crates/uo-core/examples/kernel_operator_classes.rs": "4b7746191ed2ac08f7cf48090d9b075eae5c649760bfbcfbc8b925fdce309510"
+      },
+      "operators_measured": 19,
+      "operators_with_one_count": 19,
+      "operators": [
+        {
+          "operator": "add",
+          "classes": 13,
+          "distinct_counts": 1,
+          "fewest_instructions": 7328,
+          "most_instructions": 7328,
+          "instructions": {
+            "zero_zero": 7328,
+            "zero_rhs": 7328,
+            "zero_lhs": 7328,
+            "equal": 7328,
+            "low_limb_above": 7328,
+            "low_limb_below": 7328,
+            "high_limb_above": 7328,
+            "high_limb_below": 7328,
+            "borrow_chain": 7328,
+            "small": 7328,
+            "max_max": 7328,
+            "max_one": 7328,
+            "one_max": 7328
+          }
+        },
+        {
+          "operator": "sub",
+          "classes": 13,
+          "distinct_counts": 1,
+          "fewest_instructions": 7568,
+          "most_instructions": 7568,
+          "instructions": {
+            "zero_zero": 7568,
+            "zero_rhs": 7568,
+            "zero_lhs": 7568,
+            "equal": 7568,
+            "low_limb_above": 7568,
+            "low_limb_below": 7568,
+            "high_limb_above": 7568,
+            "high_limb_below": 7568,
+            "borrow_chain": 7568,
+            "small": 7568,
+            "max_max": 7568,
+            "max_one": 7568,
+            "one_max": 7568
+          }
+        },
+        {
+          "operator": "mul",
+          "classes": 13,
+          "distinct_counts": 1,
+          "fewest_instructions": 7920,
+          "most_instructions": 7920,
+          "instructions": {
+            "zero_zero": 7920,
+            "zero_rhs": 7920,
+            "zero_lhs": 7920,
+            "equal": 7920,
+            "low_limb_above": 7920,
+            "low_limb_below": 7920,
+            "high_limb_above": 7920,
+            "high_limb_below": 7920,
+            "borrow_chain": 7920,
+            "small": 7920,
+            "max_max": 7920,
+            "max_one": 7920,
+            "one_max": 7920
+          }
+        },
+        {
+          "operator": "div",
+          "classes": 13,
+          "distinct_counts": 1,
+          "fewest_instructions": 266336,
+          "most_instructions": 266336,
+          "instructions": {
+            "zero_zero": 266336,
+            "zero_rhs": 266336,
+            "zero_lhs": 266336,
+            "equal": 266336,
+            "low_limb_above": 266336,
+            "low_limb_below": 266336,
+            "high_limb_above": 266336,
+            "high_limb_below": 266336,
+            "borrow_chain": 266336,
+            "small": 266336,
+            "max_max": 266336,
+            "max_one": 266336,
+            "one_max": 266336
+          }
+        },
+        {
+          "operator": "mod",
+          "classes": 13,
+          "distinct_counts": 1,
+          "fewest_instructions": 266464,
+          "most_instructions": 266464,
+          "instructions": {
+            "zero_zero": 266464,
+            "zero_rhs": 266464,
+            "zero_lhs": 266464,
+            "equal": 266464,
+            "low_limb_above": 266464,
+            "low_limb_below": 266464,
+            "high_limb_above": 266464,
+            "high_limb_below": 266464,
+            "borrow_chain": 266464,
+            "small": 266464,
+            "max_max": 266464,
+            "max_one": 266464,
+            "one_max": 266464
+          }
+        },
+        {
+          "operator": "bitand",
+          "classes": 13,
+          "distinct_counts": 1,
+          "fewest_instructions": 7280,
+          "most_instructions": 7280,
+          "instructions": {
+            "zero_zero": 7280,
+            "zero_rhs": 7280,
+            "zero_lhs": 7280,
+            "equal": 7280,
+            "low_limb_above": 7280,
+            "low_limb_below": 7280,
+            "high_limb_above": 7280,
+            "high_limb_below": 7280,
+            "borrow_chain": 7280,
+            "small": 7280,
+            "max_max": 7280,
+            "max_one": 7280,
+            "one_max": 7280
+          }
+        },
+        {
+          "operator": "bitor",
+          "classes": 13,
+          "distinct_counts": 1,
+          "fewest_instructions": 7264,
+          "most_instructions": 7264,
+          "instructions": {
+            "zero_zero": 7264,
+            "zero_rhs": 7264,
+            "zero_lhs": 7264,
+            "equal": 7264,
+            "low_limb_above": 7264,
+            "low_limb_below": 7264,
+            "high_limb_above": 7264,
+            "high_limb_below": 7264,
+            "borrow_chain": 7264,
+            "small": 7264,
+            "max_max": 7264,
+            "max_one": 7264,
+            "one_max": 7264
+          }
+        },
+        {
+          "operator": "bitxor",
+          "classes": 13,
+          "distinct_counts": 1,
+          "fewest_instructions": 7280,
+          "most_instructions": 7280,
+          "instructions": {
+            "zero_zero": 7280,
+            "zero_rhs": 7280,
+            "zero_lhs": 7280,
+            "equal": 7280,
+            "low_limb_above": 7280,
+            "low_limb_below": 7280,
+            "high_limb_above": 7280,
+            "high_limb_below": 7280,
+            "borrow_chain": 7280,
+            "small": 7280,
+            "max_max": 7280,
+            "max_one": 7280,
+            "one_max": 7280
+          }
+        },
+        {
+          "operator": "eq",
+          "classes": 13,
+          "distinct_counts": 1,
+          "fewest_instructions": 9024,
+          "most_instructions": 9024,
+          "instructions": {
+            "zero_zero": 9024,
+            "zero_rhs": 9024,
+            "zero_lhs": 9024,
+            "equal": 9024,
+            "low_limb_above": 9024,
+            "low_limb_below": 9024,
+            "high_limb_above": 9024,
+            "high_limb_below": 9024,
+            "borrow_chain": 9024,
+            "small": 9024,
+            "max_max": 9024,
+            "max_one": 9024,
+            "one_max": 9024
+          }
+        },
+        {
+          "operator": "neq",
+          "classes": 13,
+          "distinct_counts": 1,
+          "fewest_instructions": 9056,
+          "most_instructions": 9056,
+          "instructions": {
+            "zero_zero": 9056,
+            "zero_rhs": 9056,
+            "zero_lhs": 9056,
+            "equal": 9056,
+            "low_limb_above": 9056,
+            "low_limb_below": 9056,
+            "high_limb_above": 9056,
+            "high_limb_below": 9056,
+            "borrow_chain": 9056,
+            "small": 9056,
+            "max_max": 9056,
+            "max_one": 9056,
+            "one_max": 9056
+          }
+        },
+        {
+          "operator": "lt",
+          "classes": 13,
+          "distinct_counts": 1,
+          "fewest_instructions": 7616,
+          "most_instructions": 7616,
+          "instructions": {
+            "zero_zero": 7616,
+            "zero_rhs": 7616,
+            "zero_lhs": 7616,
+            "equal": 7616,
+            "low_limb_above": 7616,
+            "low_limb_below": 7616,
+            "high_limb_above": 7616,
+            "high_limb_below": 7616,
+            "borrow_chain": 7616,
+            "small": 7616,
+            "max_max": 7616,
+            "max_one": 7616,
+            "one_max": 7616
+          }
+        },
+        {
+          "operator": "lte",
+          "classes": 13,
+          "distinct_counts": 1,
+          "fewest_instructions": 7616,
+          "most_instructions": 7616,
+          "instructions": {
+            "zero_zero": 7616,
+            "zero_rhs": 7616,
+            "zero_lhs": 7616,
+            "equal": 7616,
+            "low_limb_above": 7616,
+            "low_limb_below": 7616,
+            "high_limb_above": 7616,
+            "high_limb_below": 7616,
+            "borrow_chain": 7616,
+            "small": 7616,
+            "max_max": 7616,
+            "max_one": 7616,
+            "one_max": 7616
+          }
+        },
+        {
+          "operator": "gt",
+          "classes": 13,
+          "distinct_counts": 1,
+          "fewest_instructions": 7616,
+          "most_instructions": 7616,
+          "instructions": {
+            "zero_zero": 7616,
+            "zero_rhs": 7616,
+            "zero_lhs": 7616,
+            "equal": 7616,
+            "low_limb_above": 7616,
+            "low_limb_below": 7616,
+            "high_limb_above": 7616,
+            "high_limb_below": 7616,
+            "borrow_chain": 7616,
+            "small": 7616,
+            "max_max": 7616,
+            "max_one": 7616,
+            "one_max": 7616
+          }
+        },
+        {
+          "operator": "gte",
+          "classes": 13,
+          "distinct_counts": 1,
+          "fewest_instructions": 7616,
+          "most_instructions": 7616,
+          "instructions": {
+            "zero_zero": 7616,
+            "zero_rhs": 7616,
+            "zero_lhs": 7616,
+            "equal": 7616,
+            "low_limb_above": 7616,
+            "low_limb_below": 7616,
+            "high_limb_above": 7616,
+            "high_limb_below": 7616,
+            "borrow_chain": 7616,
+            "small": 7616,
+            "max_max": 7616,
+            "max_one": 7616,
+            "one_max": 7616
+          }
+        },
+        {
+          "operator": "and_bool",
+          "classes": 4,
+          "distinct_counts": 1,
+          "fewest_instructions": 6896,
+          "most_instructions": 6896,
+          "instructions": {
+            "false_false": 6896,
+            "false_true": 6896,
+            "true_false": 6896,
+            "true_true": 6896
+          }
+        },
+        {
+          "operator": "or_bool",
+          "classes": 4,
+          "distinct_counts": 1,
+          "fewest_instructions": 6896,
+          "most_instructions": 6896,
+          "instructions": {
+            "false_false": 6896,
+            "false_true": 6896,
+            "true_false": 6896,
+            "true_true": 6896
+          }
+        },
+        {
+          "operator": "eq_bool",
+          "classes": 4,
+          "distinct_counts": 1,
+          "fewest_instructions": 7232,
+          "most_instructions": 7232,
+          "instructions": {
+            "false_false": 7232,
+            "false_true": 7232,
+            "true_false": 7232,
+            "true_true": 7232
+          }
+        },
+        {
+          "operator": "neq_bool",
+          "classes": 4,
+          "distinct_counts": 1,
+          "fewest_instructions": 7264,
+          "most_instructions": 7264,
+          "instructions": {
+            "false_false": 7264,
+            "false_true": 7264,
+            "true_false": 7264,
+            "true_true": 7264
+          }
+        },
+        {
+          "operator": "index",
+          "classes": 6,
+          "distinct_counts": 1,
+          "fewest_instructions": 4496,
+          "most_instructions": 4496,
+          "instructions": {
+            "zero": 4496,
+            "small": 4496,
+            "low_limb_max": 4496,
+            "second_limb": 4496,
+            "top_limb": 4496,
+            "max": 4496
+          }
+        }
+      ]
+    }
+  ],
+  "runs_agree": true,
+  "same_values_before_and_after": true,
+  "after_every_operator_has_one_count": true
+}

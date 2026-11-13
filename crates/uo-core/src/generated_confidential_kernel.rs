@@ -426,22 +426,12 @@ fn eval_confidential_kernel_binary_generated(
         BinaryOp::Mul => Ok(Value::Uint(
             lhs_uint_generated(&lhs)?.wrapping_mul(lhs_uint_generated(&rhs)?),
         )),
-        BinaryOp::Div => {
-            let divisor = lhs_uint_generated(&rhs)?;
-            Ok(Value::Uint(if divisor.is_zero() {
-                Uint256::ZERO
-            } else {
-                lhs_uint_generated(&lhs)?.div_rem(divisor).0
-            }))
-        }
-        BinaryOp::Mod => {
-            let divisor = lhs_uint_generated(&rhs)?;
-            Ok(Value::Uint(if divisor.is_zero() {
-                Uint256::ZERO
-            } else {
-                lhs_uint_generated(&lhs)?.div_rem(divisor).1
-            }))
-        }
+        BinaryOp::Div => Ok(Value::Uint(
+            lhs_uint_generated(&lhs)?.div_or_zero(lhs_uint_generated(&rhs)?),
+        )),
+        BinaryOp::Mod => Ok(Value::Uint(
+            lhs_uint_generated(&lhs)?.rem_or_zero(lhs_uint_generated(&rhs)?),
+        )),
         BinaryOp::BitAnd => Ok(Value::Uint(
             lhs_uint_generated(&lhs)?.bitand(lhs_uint_generated(&rhs)?),
         )),
@@ -451,25 +441,25 @@ fn eval_confidential_kernel_binary_generated(
         BinaryOp::BitXor => Ok(Value::Uint(
             lhs_uint_generated(&lhs)?.bitxor(lhs_uint_generated(&rhs)?),
         )),
-        BinaryOp::Eq => Ok(Value::Bool(lhs == rhs)),
-        BinaryOp::Neq => Ok(Value::Bool(lhs != rhs)),
+        BinaryOp::Eq => Ok(Value::Bool(Value::confidential_eq(&lhs, &rhs))),
+        BinaryOp::Neq => Ok(Value::Bool(!Value::confidential_eq(&lhs, &rhs))),
         BinaryOp::Lt => Ok(Value::Bool(
-            lhs_uint_generated(&lhs)? < lhs_uint_generated(&rhs)?,
+            lhs_uint_generated(&lhs)?.ct_lt(lhs_uint_generated(&rhs)?),
         )),
         BinaryOp::Lte => Ok(Value::Bool(
-            lhs_uint_generated(&lhs)? <= lhs_uint_generated(&rhs)?,
+            !lhs_uint_generated(&rhs)?.ct_lt(lhs_uint_generated(&lhs)?),
         )),
         BinaryOp::Gt => Ok(Value::Bool(
-            lhs_uint_generated(&lhs)? > lhs_uint_generated(&rhs)?,
+            lhs_uint_generated(&rhs)?.ct_lt(lhs_uint_generated(&lhs)?),
         )),
         BinaryOp::Gte => Ok(Value::Bool(
-            lhs_uint_generated(&lhs)? >= lhs_uint_generated(&rhs)?,
+            !lhs_uint_generated(&lhs)?.ct_lt(lhs_uint_generated(&rhs)?),
         )),
         BinaryOp::And => Ok(Value::Bool(
-            lhs_bool_generated(&lhs)? && lhs_bool_generated(&rhs)?,
+            lhs_bool_generated(&lhs)? & lhs_bool_generated(&rhs)?,
         )),
         BinaryOp::Or => Ok(Value::Bool(
-            lhs_bool_generated(&lhs)? || lhs_bool_generated(&rhs)?,
+            lhs_bool_generated(&lhs)? | lhs_bool_generated(&rhs)?,
         )),
     }
 }

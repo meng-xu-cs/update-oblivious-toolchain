@@ -1,6 +1,6 @@
 {
   "accepted": true,
-  "artifact_json_bytes": 1569272,
+  "artifact_json_bytes": 1585888,
   "checker": "proof/lean/.lake/build/bin/checkProofGradeRuntimeSmallConfidentialKernelBoundary",
   "handwritten_runtime_public_only_theorem_checked": true,
   "lean_checker_input": "source-backed runtime small confidential-kernel boundary",
@@ -12,10 +12,10 @@
   "small_confidential_kernel_boundary_theorem_checked": true,
   "source_bytes": {
     "allocator": 18956,
-    "confidential_kernel": 116465,
+    "confidential_kernel": 123298,
     "engine": 107366,
     "fresh_coins": 5031,
-    "generated_confidential_kernel": 25055,
+    "generated_confidential_kernel": 24848,
     "generated_kernel_machine": 5241,
     "generated_object_helpers": 28313,
     "generated_oram_codecs": 205894,
@@ -31,7 +31,7 @@
     "store_codec": 11066,
     "store_lib": 154,
     "store_store": 4516,
-    "types": 29154
+    "types": 38703
   },
   "source_files": [
     "runtime/uo-evm/src/engine.rs",

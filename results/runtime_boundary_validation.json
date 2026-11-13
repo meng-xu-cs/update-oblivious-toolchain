@@ -774,6 +774,7 @@
     }
   ],
   "kernel_only_state_helper_surface_restricted": true,
+  "kernel_operators_do_not_branch_on_operands": true,
   "kernel_refinement_boundary_validation_uses_boundary_checker": true,
   "kernel_restricted_signature_checks": [
     {
