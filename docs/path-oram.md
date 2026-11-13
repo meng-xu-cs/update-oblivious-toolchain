@@ -334,8 +334,7 @@ validation script runs a quick profile of the sweep, whose latencies are a
 smoke test: one warmup round and two measured rounds, workloads of five
 calls, and maps above 256 entries left at 2 keys. The figures below come
 from the full profile (`scripts/run_capacity_sweep_full.sh`,
-`results/capacity_sweep_full.json`) as it was measured before the changes
-the external review asked for: 30 measured rounds of every kind of
+`results/capacity_sweep_full.json`): 30 measured rounds of every kind of
 call after 5 warmup rounds, at every occupancy level of every map, and a
 workload of 20 calls at each read fraction. Each figure is a median with its
 95% bootstrap interval. A call's time splits into copying the committed
@@ -343,57 +342,65 @@ state for the call, loading the call's objects from the copy, the rest of
 the runtime's own work, the position-map witnesses, and the proof bundles
 of the trace; the report also times the JSON serialization of the trace and
 Lean's check of one call of each kind, and gives the peak resident memory.
+The profile was run when Issues 30 to 35 of the external review were in.
+`review/2026-11-external-review/capacity_sweep_baseline.json` is the same
+profile as it was measured before them, and
+`scripts/compare_capacity_sweep.py` compares two reports.
 
-On its own work, the call without witnesses and proof bundles, a read on
-the tree is faster than one on the full scan from 4,096 entries (16.7 ms
-[16.2, 17.8] against 18.3 ms [18.1, 18.5]; at 16,384 entries 48.7 ms [45.1,
-52.9] against 72.2 ms [71.7, 74.3]), and a write is slower at every capacity
-(84.4 ms [80.6, 91.9] against 72.5 ms [72.0, 73.8] at 16,384). The executed
-workloads cost what the computed mixes say, to the byte and the physical
-operation in every workload, and 39 units of modeled gas more for each write
-behind the guard, an entrypoint the mixes do not have. Their latencies give
-the same order: an even mix of reads and writes is faster on the tree from
-16,384 entries at every occupancy level (62.6 ms a call [55.1, 69.8] against
-77.3 ms [73.2, 82.3] on full maps), and writes alone are not. Occupancy does
-not move the counts and moves the latencies little: from 4,096 entries on, a
-kind's median spreads by 18% at most over the five levels, and a tree read
-at 16,384 entries takes 48.7 ms with 2 keys stored and 53.1 ms on a full
-map. A write that aborts on the full scan takes 106.3 ms [105.0, 109.8]
-where a committed one takes 72.5 ms: it decodes every slot again to restore
-the map.
+On its own work, the call without witnesses and proof bundles, the full
+scan is the faster backend below 16,384 entries and the tree at 16,384. A
+read takes 19.0 ms [19.0, 19.2] on the full scan and 20.5 ms [20.2, 21.1]
+on the tree at 8,192 entries, and 39.9 ms [39.5, 40.8] and 33.0 ms [32.4,
+33.8] at 16,384. A write on the tree takes half as long again as one on the
+full scan at 8,192 entries (54.4 ms [53.3, 54.8] against 35.0 ms [34.8,
+35.6] for an overwrite) and about as long at 16,384 (71.8 ms [71.2, 73.4]
+against 73.7 ms [72.5, 74.5]). The executed workloads cost what the
+computed mixes say, to the byte and the physical operation in every
+workload, and 39 units of modeled gas more for each write behind the guard,
+an entrypoint the mixes do not have. Their mean latencies give the same
+order. At 16,384 entries the tree is the faster backend for every read
+fraction at every occupancy level but one, writes alone on half-full maps,
+where the two do not separate (72.3 ms a call [70.3, 75.3] against 71.8 ms
+[71.6, 72.0]). On full maps writes alone take 62.3 ms a call [60.6, 64.1]
+on the tree against 73.5 ms [73.0, 73.9], and an even mix 46.7 ms [38.8,
+54.3] against 56.4 ms [49.6, 63.1]: a mix's calls are of two kinds, so its
+intervals are wide and these two overlap. Occupancy does not move the
+counts and moves the latencies little: from 4,096 entries on, a kind's
+median spreads by 19% at most over the five levels, and a tree read at
+16,384 entries takes 33.0 ms with 2 keys stored and 27.8 ms on a full map.
+A write that aborts does the work of one that commits: 74.8 ms [74.0, 76.6]
+on the full scan at 16,384 entries.
 
 Whole calls on the tree are slower at every capacity and for every mix
-(480.8 ms [472.0, 501.6] against 354.8 ms [345.1, 370.9] for a read at
-16,384 entries). The witness snapshots take 392.6 ms of that tree read, and
-the proof bundles of the full scan's 32,768-event trace take 283.9 ms of
-its read. Of the full scan's own 72.2 ms, 32.5 ms load the map, which
-decrypts every slot, and 1.2 ms copy the state; of the tree's 48.7 ms, 10.6
-ms copy the state and 12.5 ms load the map. Serializing the trace takes
-another 22.5 ms for the full-scan read and 2.9 ms for the tree's, and Lean
-checks the witness of the call in 240 ms and 64 ms. A call on the tree
-raises the probe's resident memory from 240 MB to 400 MB at 16,384 entries.
-These figures are the baseline of the external review's optimizations:
-`review/2026-11-external-review/capacity_sweep_baseline.json` is this
-report, Issues 30 to 38 of that review compare their savings with it
-(`scripts/compare_capacity_sweep.py`), and the sweep is run again when they
-are done. Two of them are in. A full-scan read no longer rewrites the map,
-and a call opens each slot of an exact object once, when it loads the
-object: commit opens nothing, so a read does its load and its scan, and a
-write that aborts does the work of one that commits. A run of the sweep at
-16,384 entries alone, 15 rounds after 3 warmup rounds
-(`review/2026-11-external-review/capacity_sweep_16384_issue32.json`), gives
-a full-scan read 39.1 ms [38.1, 39.7] of its own work where the baseline
-has 72.2 ms, and 176.4 ms [174.7, 178.9] for the whole call where it has
-354.8 ms; a write that aborts takes 70.7 ms [69.4, 71.8] where it took
-106.3 ms, and a committed one 70.0 ms [68.6, 70.8]. The tree has not moved:
-its read takes 46.2 ms [45.2, 47.4] and its write 82.8 ms [81.2, 84.7]. So
-the comparison above no longer holds for the runtime as it is. On its own
-work the full scan is now the faster backend at 16,384 entries for reads
-and for writes, and the tree keeps its advantage in bytes, physical
-operations and gas. The latency break-evens are recomputed with the full
-profile when the tree's work that is linear in the store is gone (Issues 36
-to 38): of its read's 46.2 ms, 9.8 ms copy the state and 11.7 ms load the
-map.
+(468.5 ms [463.4, 474.4] against 182.8 ms [179.2, 184.6] for a read at
+16,384 entries). The witness snapshots take 390.3 ms of that tree read, and
+the proof bundles of the full scan's 16,384-event trace take 143.1 ms of
+its read. Of the full scan's own 39.9 ms, 33.5 ms load the map, which
+decrypts every slot, and 1.1 ms copy the state; of the tree's 33.0 ms, 4.7
+ms copy the state and 6.0 ms load the map. Serializing the trace takes
+another 13.3 ms for the full-scan read and 3.3 ms for the tree's, and Lean
+checks the witness of the call in 161 ms and 74 ms. A call on the tree
+raises the probe's resident memory from 206 MB to 373 MB at 16,384 entries.
+
+Against the baseline, at 16,384 entries: a full-scan read took 72.2 ms of
+its own work and 354.8 ms as a whole call, and takes 39.9 ms and 182.8 ms.
+It no longer rewrites the map, and a call opens each slot of an exact
+object once, when it loads the object. A full-scan write that aborts took
+106.3 ms, since it decoded every slot again to restore the map, and takes
+what a committed one does, which has not moved (72.5 ms, now 73.7 ms). A
+tree read took 48.7 ms and a tree write 84.4 ms, and they take 33.0 ms and
+71.8 ms: a sealed record has half the bytes it had, so copying the state
+fell from 10.6 ms to 4.7 ms and loading the map from 12.5 ms to 6.0 ms. The
+shorter record does not make the full scan faster: its load is the
+decryption of 16,384 records, 32.5 ms then and 33.5 ms now. In the baseline
+a tree read was the faster one from 4,096 entries and a tree write the
+slower one at every capacity. The full scan's saving on reads moved the
+first break-even up to 16,384 entries, and the tree's saving brought its
+write level with the full scan's there. The tree's advantage in bytes,
+physical operations and gas is as it was. What still grows with the store
+on the tree is the copy of the state, the load of the map and, in an
+instrumented call, the witness snapshots (Issues 36 to 38 of the review);
+the profile is run again when they are done.
 
 The sweep also found a defect, which is fixed. An aborting call opened every
 slot of an exact map again to restore it, and the allocator's budget of

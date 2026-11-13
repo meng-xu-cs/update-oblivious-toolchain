@@ -54,8 +54,8 @@
     },
     {
       "path": "capacity_sweep_full.json",
-      "bytes": 2850507,
-      "sha256": "746287a51fa7286da598f829558810b092d81c6354b7d569679b5c9f5515fcd7"
+      "bytes": 2911121,
+      "sha256": "cef72f2f4bc3c5effa99e3cc50b47aa464cf0f3fcad34d25d85863549b993f36"
     },
     {
       "path": "claim_artifact_manifest.json",

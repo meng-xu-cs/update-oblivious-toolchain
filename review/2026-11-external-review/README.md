@@ -8,7 +8,6 @@ directory holds the response.
 | [`validation.md`](./validation.md) | every factual claim of the review checked against the code, and a position on each recommendation |
 | [`tasks.md`](./tasks.md) | Issues 22 to 53: description, fix and acceptance criteria |
 | [`capacity_sweep_baseline.json`](./capacity_sweep_baseline.json) | the capacity sweep's full profile as Issue 27 measured it, before any optimization: what Issues 30 to 38 compare their savings with |
-| [`capacity_sweep_16384_issue32.json`](./capacity_sweep_16384_issue32.json) | the sweep at 16,384 entries alone after Issues 31 and 32, 15 rounds after 3 warmup rounds: an interim measurement until the full profile is run again |
 | this file | the positions in brief, the order of work, and the tracker |
 
 The review text is not in the repository; `validation.md` restates each
@@ -72,7 +71,9 @@ Issue 22 has the options and the reasoning.
    savings need a fair baseline, and the wording fix costs nothing.
 4. **Wave 3, structural savings and primitive hardening** (Issues 30 to
    35). Small changes whose savings follow from the schedule, each with a
-   mechanical acceptance test.
+   mechanical acceptance test. Done; the full profile of the sweep was run
+   again after it (`results/capacity_sweep_full.json`), and
+   `docs/path-oram.md` has its figures beside the baseline's.
 5. **Wave 4, no work linear in the store** (Issues 36 to 38). Then rerun
    the sweep of Issue 27 and update the break-evens.
 6. **Wave 5, theorem coverage** (Issues 39 and 40). Independent of Waves 3
@@ -103,7 +104,7 @@ its engineering part is Wave 4, its certified part is research.
 | 32 | Load each exact object once per call | 3 | M | 30 | done | `551a528` |
 | 33 | Check each UO write's class against its bytes | 3 | S | | done | `a3eb01a` |
 | 34 | Make the confidential kernel's 256-bit arithmetic branch-free | 3 | M | | done | `35e4bb8` |
-| 35 | Match the record codec to the observer unit | 3 | M | | done | |
+| 35 | Match the record codec to the observer unit | 3 | M | | done | `d848180` |
 | 36 | Remove the whole-store witness snapshots from a call | 4 | M | 25 | todo | |
 | 37 | Stage a call without copying the store | 4 | M | | todo | |
 | 38 | Compress scan schedules in traces and proof objects | 4 | M to L | 31, 32 | todo | |
