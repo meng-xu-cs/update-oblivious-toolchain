@@ -169,7 +169,7 @@ where
     let replaced: Box<[u8]> = (&*physical).into();
     if !cipher.seal_and_wipe_into_slice(aad.as_bytes(), payload, rng, physical) {
         bail!(
-            "sealed payload buffer for {} fell below required public ciphertext size",
+            "sealed payload buffer for {} does not hold a sealed record of the required public size",
             location
         );
     }

@@ -56,6 +56,11 @@ def allUpdate (events : List StoreWriteShape) : Prop :=
     event ∈ events →
       event.writeClass = RuntimeStoreCodecSemantics.StoreWriteClass.update
 
+/-- The shape of a UO slot at deployment: its public length. The bytes stand
+for that length alone. The slot itself holds a sealed filler record
+(`filler_boxed` in `runtime/uo-store/src/generated_surface.rs`), never
+zeros: a slot with a zero unit holds no record
+(`RuntimeStoreCodecSemantics.decodeSealedRecord_none_of_zero_unit`). -/
 def bootstrappedUoSlotShape
     (object : String)
     (logicalLen : Nat) : StoreSlot :=

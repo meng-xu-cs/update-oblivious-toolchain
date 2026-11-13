@@ -347,8 +347,8 @@ theorem kernelExactTrace_eq_static (encodeRun : List KernelStatement → Trace) 
 emits: one scan of the map and one read of the cell, though the body accesses
 each twice, then one rewrite of each written object in object-id order. -/
 private def depositLayout : Nat → ExactObjectLayout
-  | 1 => { name := "balances", kind := .mapKind, slots := 8, recordLen := 190 }
-  | 2 => { name := "total", kind := .cell, slots := 1, recordLen := 124 }
+  | 1 => { name := "balances", kind := .mapKind, slots := 8, recordLen := 96 }
+  | 2 => { name := "total", kind := .cell, slots := 1, recordLen := 64 }
   | _ => { name := "", kind := .cell, slots := 0, recordLen := 0 }
 
 private def depositBody : List KernelStatement :=

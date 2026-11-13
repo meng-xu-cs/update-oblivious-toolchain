@@ -297,9 +297,12 @@ each kind of call costs the same in every trial, at every occupancy level,
 and as every other kind its entrypoint serves: an insert, an overwrite and a
 write that changes nothing are one `put` to the observer, and how full the
 map is does not show. A write that aborts traces what a committed one does,
-on every backend. On the local scheme a read costs what a write does. On the
-full scan a write moves 380 bytes per entry, the scan and the rewrite of
-every slot, and a read moves 190: it scans the map and rewrites nothing,
+on every backend. On the local scheme a read costs what a write does. A
+sealed map record is 96 bytes, three 32-byte units, and a sealed 256-bit
+value 64: each unit is one marker byte and 31 bytes of nonce, ciphertext and
+tag (the nibble encoding these records had before took 190 and 124 bytes).
+On the full scan a write moves 192 bytes per entry, the scan and the rewrite
+of every slot, and a read moves 96: it scans the map and rewrites nothing,
 since its program has no write statement for the map. On the tree a write, a
 get and then a put of `3h + 1` node accesses, costs about four times a read:
 260 against 980 physical operations at 256 entries, 654 against 2,556 at
@@ -318,12 +321,12 @@ costs less than the tree on every metric.
 
 Beside the traced counts the report gives the work that no trace records. A
 call on a Path ORAM map reads the map's counter and metadata pages when it
-starts: 24 reads of 43,776 bytes on the tree at 16,384 entries. An
+starts: 24 reads of 22,880 bytes on the tree at 16,384 entries. An
 instrumented call also opens every bucket and metadata page of the tree
 twice, for the position-map witnesses it exports: 65,580 sealed records at
 16,384 entries, where a read traces 654 operations. The report also gives
 the size of what a call exports: at 16,384 entries the trace of a full-scan
-read is 11.1 MB of JSON, 9.1 MB of it private evidence, and that of a tree
+read is 11.0 MB of JSON, 9.1 MB of it private evidence, and that of a tree
 read 3.0 MB.
 
 The latencies are wall-clock times of a release build on one machine. The

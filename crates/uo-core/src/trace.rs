@@ -8327,8 +8327,11 @@ pub const STORAGE_OBSERVER_UNIT_BYTES: usize = 32;
 /// and each 32-byte word of the new record, the last one as far as the
 /// record reaches, is classified on its own: it is not zero, the word it
 /// replaces is not zero, and the two differ. Every write of a sealed record
-/// must pass: one that does not shows a repeated nonce or a broken encoding,
-/// and its class would tell the observer about the call.
+/// must pass. A sealed record carries one of two nonzero markers in the
+/// first byte of every word, and a record written over another carries the
+/// marker its predecessor does not, so the write passes whatever the
+/// ciphertexts are. One that does not shows a slot that held no record or a
+/// broken encoding, and its class would tell the observer about the call.
 pub fn is_update_write(old: &[u8], new: &[u8]) -> bool {
     old.len() == new.len()
         && !new.is_empty()

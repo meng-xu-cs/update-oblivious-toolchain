@@ -2592,93 +2592,111 @@ theorem
   importedRuntimeImplementationKernelMachineConfinementBoundary_valid_storeCodecRoundtrip
   {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
   (hValid : boundary.Valid)
-  {bytes : List Nat}
-  (hBytes : ∀ byte, byte ∈ bytes → RuntimeStoreCodecSemantics.ValidByte byte) :
-  RuntimeStoreCodecSemantics.decodeNonzero
-      (RuntimeStoreCodecSemantics.encodeNonzero bytes) = some bytes := by
+  {unitLen marker : Nat}
+  {content : List Nat}
+  (hUnit : 2 ≤ unitLen)
+  (hMarker : RuntimeStoreCodecSemantics.ValidMarker marker)
+  (hContent : content ≠ []) :
+  RuntimeStoreCodecSemantics.decodeUnitsInto? unitLen content.length
+      (RuntimeStoreCodecSemantics.encodeUnits unitLen marker content) =
+    some (marker, content) := by
   exact
     RuntimePaperNativeKernelAssumptions.storeCodecRoundtrip
       (boundary.toRuntimePaperNativeKernelAssumptions hValid)
-      hBytes
+      hUnit hMarker hContent
 
 theorem
   importedRuntimeImplementationKernelMachineConfinementBoundary_valid_storeCodecTransportShape
   {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
   (hValid : boundary.Valid)
-  {bytes : List Nat}
-  (hBytes : ∀ byte, byte ∈ bytes → RuntimeStoreCodecSemantics.ValidByte byte) :
-  (RuntimeStoreCodecSemantics.encodeNonzero bytes).length = 2 * bytes.length ∧
-    ∀ nibble,
-      nibble ∈ RuntimeStoreCodecSemantics.encodeNonzero bytes →
-        RuntimeStoreCodecSemantics.ValidEncodedNibble nibble := by
+  {unitLen marker : Nat}
+  {content : List Nat}
+  (hUnit : 2 ≤ unitLen)
+  (hMarker : RuntimeStoreCodecSemantics.ValidMarker marker)
+  (hBytes : ∀ byte, byte ∈ content → RuntimeStoreCodecSemantics.ValidByte byte) :
+  (RuntimeStoreCodecSemantics.encodeUnits unitLen marker content).length =
+      unitLen * RuntimeStoreCodecSemantics.unitCount unitLen content.length ∧
+    (∀ byte,
+      byte ∈ RuntimeStoreCodecSemantics.encodeUnits unitLen marker content →
+        RuntimeStoreCodecSemantics.ValidByte byte) ∧
+    ∀ unit,
+      unit ∈
+          RuntimeStoreCodecSemantics.unitsOf unitLen
+            (RuntimeStoreCodecSemantics.encodeUnits unitLen marker content) →
+        unit.head? = some marker ∧ RuntimeStoreCodecSemantics.allZero unit = false := by
   exact
     RuntimePaperNativeKernelAssumptions.storeCodecTransportShape
       (boundary.toRuntimePaperNativeKernelAssumptions hValid)
-      hBytes
+      hUnit hMarker hBytes
 
 theorem
   importedRuntimeImplementationKernelMachineConfinementBoundary_valid_storeCodecDecodeSound
   {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
   (hValid : boundary.Valid)
-  {encoded bytes : List Nat}
+  {unitLen contentLen marker : Nat}
+  {encoded content : List Nat}
+  (hUnit : 2 ≤ unitLen)
   (hDecode :
-    RuntimeStoreCodecSemantics.decodeNonzero encoded = some bytes) :
-  encoded.length = 2 * bytes.length ∧
-    (∀ byte, byte ∈ bytes → RuntimeStoreCodecSemantics.ValidByte byte) ∧
-    (∀ nibble,
-      nibble ∈ encoded →
-        RuntimeStoreCodecSemantics.ValidEncodedNibble nibble) := by
+    RuntimeStoreCodecSemantics.decodeUnitsInto? unitLen contentLen encoded =
+      some (marker, content)) :
+  RuntimeStoreCodecSemantics.ValidMarker marker ∧
+    content.length = contentLen ∧
+    encoded = RuntimeStoreCodecSemantics.encodeUnits unitLen marker content := by
   exact
     RuntimePaperNativeKernelAssumptions.storeCodecDecodeSound
       (boundary.toRuntimePaperNativeKernelAssumptions hValid)
-      hDecode
+      hUnit hDecode
 
 theorem
-  importedRuntimeImplementationKernelMachineConfinementBoundary_valid_storeCodecDecodeIntoRoundtrip
+  importedRuntimeImplementationKernelMachineConfinementBoundary_valid_storeCodecResealIsUpdate
   {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
   (hValid : boundary.Valid)
-  {bytes : List Nat}
-  (hBytes : ∀ byte, byte ∈ bytes → RuntimeStoreCodecSemantics.ValidByte byte) :
-  RuntimeStoreCodecSemantics.decodeNonzeroInto?
-      bytes.length (RuntimeStoreCodecSemantics.encodeNonzero bytes) =
-    some bytes := by
+  {unitLen oldMarker newMarker : Nat}
+  {old content : List Nat}
+  (hUnit : 2 ≤ unitLen)
+  (hOld : RuntimeStoreCodecSemantics.recordMarker? unitLen old = some oldMarker)
+  (hNext : RuntimeStoreCodecSemantics.nextMarker? oldMarker = some newMarker)
+  (hContent : content ≠ [])
+  (hLen :
+    old.length = unitLen * RuntimeStoreCodecSemantics.unitCount unitLen content.length) :
+  RuntimeStoreCodecSemantics.isUpdateWrite unitLen old
+      (RuntimeStoreCodecSemantics.encodeUnits unitLen newMarker content) =
+    true := by
   exact
-    RuntimePaperNativeKernelAssumptions.storeCodecDecodeIntoRoundtrip
+    RuntimePaperNativeKernelAssumptions.storeCodecResealIsUpdate
       (boundary.toRuntimePaperNativeKernelAssumptions hValid)
-      hBytes
+      hUnit hOld hNext hContent hLen
 
 theorem
   importedRuntimeImplementationKernelMachineConfinementBoundary_valid_storeCodecDecodeIntoRejectsLengthMismatch
   {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
   (hValid : boundary.Valid)
-  {byteLen : Nat}
+  {unitLen contentLen : Nat}
   {encoded : List Nat}
-  (hLen : encoded.length ≠ 2 * byteLen) :
-  RuntimeStoreCodecSemantics.decodeNonzeroInto? byteLen encoded = none := by
+  (hUnit : 2 ≤ unitLen)
+  (hLen :
+    encoded.length ≠ unitLen * RuntimeStoreCodecSemantics.unitCount unitLen contentLen) :
+  RuntimeStoreCodecSemantics.decodeUnitsInto? unitLen contentLen encoded = none := by
   exact
     RuntimePaperNativeKernelAssumptions.storeCodecDecodeIntoRejectsLengthMismatch
       (boundary.toRuntimePaperNativeKernelAssumptions hValid)
-      hLen
+      hUnit hLen
 
 theorem
-  importedRuntimeImplementationKernelMachineConfinementBoundary_valid_storeCodecDecodeIntoSound
+  importedRuntimeImplementationKernelMachineConfinementBoundary_valid_storeCodecDecodeRejectsZeroUnit
   {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
   (hValid : boundary.Valid)
-  {byteLen : Nat}
-  {encoded bytes : List Nat}
-  (hDecode :
-    RuntimeStoreCodecSemantics.decodeNonzeroInto? byteLen encoded =
-      some bytes) :
-  encoded.length = 2 * byteLen ∧
-    bytes.length = byteLen ∧
-    (∀ byte, byte ∈ bytes → RuntimeStoreCodecSemantics.ValidByte byte) ∧
-    (∀ nibble,
-      nibble ∈ encoded →
-        RuntimeStoreCodecSemantics.ValidEncodedNibble nibble) := by
+  {unitLen contentLen : Nat}
+  {encoded unit : List Nat}
+  (hUnit : 2 ≤ unitLen)
+  (hMem : unit ∈ RuntimeStoreCodecSemantics.unitsOf unitLen encoded)
+  (hZero : RuntimeStoreCodecSemantics.allZero unit = true) :
+  RuntimeStoreCodecSemantics.decodeUnitsInto? unitLen contentLen encoded = none ∧
+    RuntimeStoreCodecSemantics.recordMarker? unitLen encoded = none := by
   exact
-    RuntimePaperNativeKernelAssumptions.storeCodecDecodeIntoSound
+    RuntimePaperNativeKernelAssumptions.storeCodecDecodeRejectsZeroUnit
       (boundary.toRuntimePaperNativeKernelAssumptions hValid)
-      hDecode
+      hUnit hMem hZero
 
 theorem
   importedRuntimeImplementationKernelMachineConfinementBoundary_valid_storeSealedEncodedLen
@@ -2686,27 +2704,23 @@ theorem
   (hValid : boundary.Valid)
   (payloadLen : Nat) :
   RuntimeStoreCodecSemantics.sealedEncodedLen payloadLen =
-    2 * (RuntimeStoreCodecSemantics.sealedMagicLen +
-      RuntimeStoreCodecSemantics.sealedNonceBytes +
-      payloadLen +
-      RuntimeStoreCodecSemantics.sealedTagBytes) := by
+    RuntimeStoreCodecSemantics.sealedUnitBytes *
+      RuntimeStoreCodecSemantics.unitCount RuntimeStoreCodecSemantics.sealedUnitBytes
+        (RuntimeStoreCodecSemantics.sealedNonceBytes + payloadLen + RuntimeStoreCodecSemantics.sealedTagBytes) := by
   exact
     RuntimePaperNativeKernelAssumptions.storeSealedEncodedLen
       (boundary.toRuntimePaperNativeKernelAssumptions hValid)
       payloadLen
 
 theorem
-  importedRuntimeImplementationKernelMachineConfinementBoundary_valid_storeSealedPlainLen
+  importedRuntimeImplementationKernelMachineConfinementBoundary_valid_storeSealedContentLen
   {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
   (hValid : boundary.Valid)
   (payloadLen : Nat) :
-  RuntimeStoreCodecSemantics.sealedPlainLen payloadLen =
-    RuntimeStoreCodecSemantics.sealedMagicLen +
-      RuntimeStoreCodecSemantics.sealedNonceBytes +
-      payloadLen +
-      RuntimeStoreCodecSemantics.sealedTagBytes := by
+  RuntimeStoreCodecSemantics.sealedContentLen payloadLen =
+    RuntimeStoreCodecSemantics.sealedNonceBytes + payloadLen + RuntimeStoreCodecSemantics.sealedTagBytes := by
   exact
-    RuntimePaperNativeKernelAssumptions.storeSealedPlainLen
+    RuntimePaperNativeKernelAssumptions.storeSealedContentLen
       (boundary.toRuntimePaperNativeKernelAssumptions hValid)
       payloadLen
 
@@ -2714,21 +2728,21 @@ theorem
   importedRuntimeImplementationKernelMachineConfinementBoundary_valid_storeSealedRecordDecodeShape
   {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
   (hValid : boundary.Valid)
-  {payloadLen : Nat}
-  {encoded sealed : List Nat}
+  {payloadLen marker : Nat}
+  {encoded content : List Nat}
   (hDecode :
-    RuntimeStoreCodecSemantics.decodeNonzero encoded = some sealed)
-  (hEncodedLen :
-    encoded.length = RuntimeStoreCodecSemantics.sealedEncodedLen payloadLen) :
-  sealed.length = RuntimeStoreCodecSemantics.sealedPlainLen payloadLen ∧
+    RuntimeStoreCodecSemantics.decodeUnitsInto? RuntimeStoreCodecSemantics.sealedUnitBytes
+        (RuntimeStoreCodecSemantics.sealedContentLen payloadLen) encoded =
+      some (marker, content)) :
+  encoded.length = RuntimeStoreCodecSemantics.sealedEncodedLen payloadLen ∧
+    content.length = RuntimeStoreCodecSemantics.sealedContentLen payloadLen ∧
     ∃ parts,
-      RuntimeStoreCodecSemantics.splitSealedRecord? payloadLen sealed =
-          some parts ∧
-        parts.ValidShape payloadLen := by
+      RuntimeStoreCodecSemantics.splitSealedRecord? payloadLen marker content = some parts ∧
+        parts.ValidOpenShape payloadLen := by
   exact
     RuntimePaperNativeKernelAssumptions.storeSealedRecordDecodeShape
       (boundary.toRuntimePaperNativeKernelAssumptions hValid)
-      hDecode hEncodedLen
+      hDecode
 
 theorem
   importedRuntimeImplementationKernelMachineConfinementBoundary_valid_storeSealedRecordOpenShape
@@ -2738,8 +2752,7 @@ theorem
   {encoded : List Nat}
   {parts : RuntimeStoreCodecSemantics.SealedRecordParts}
   (hDecode :
-    RuntimeStoreCodecSemantics.decodeSealedRecord? payloadLen encoded =
-      some parts) :
+    RuntimeStoreCodecSemantics.decodeSealedRecord? payloadLen encoded = some parts) :
   encoded.length = RuntimeStoreCodecSemantics.sealedEncodedLen payloadLen ∧
     parts.ValidOpenShape payloadLen := by
   exact
@@ -2753,8 +2766,7 @@ theorem
   (hValid : boundary.Valid)
   {payloadLen : Nat}
   {encoded : List Nat}
-  (hLen :
-    encoded.length ≠ RuntimeStoreCodecSemantics.sealedEncodedLen payloadLen) :
+  (hLen : encoded.length ≠ RuntimeStoreCodecSemantics.sealedEncodedLen payloadLen) :
   RuntimeStoreCodecSemantics.decodeSealedRecord? payloadLen encoded = none := by
   exact
     RuntimePaperNativeKernelAssumptions.storeSealedRecordRejectsLengthMismatch
@@ -2769,23 +2781,15 @@ theorem
   {encoded : List Nat}
   {parts : RuntimeStoreCodecSemantics.SealedRecordParts}
   (hDecode :
-    RuntimeStoreCodecSemantics.decodeSealedRecord? payloadLen encoded =
-      some parts) :
+    RuntimeStoreCodecSemantics.decodeSealedRecord? payloadLen encoded = some parts) :
   encoded.length = RuntimeStoreCodecSemantics.sealedEncodedLen payloadLen ∧
     parts.ValidOpenShape payloadLen ∧
-    (∀ nibble,
-      nibble ∈ encoded →
-        RuntimeStoreCodecSemantics.ValidEncodedNibble nibble) ∧
-    ∃ sealed,
-      RuntimeStoreCodecSemantics.decodeNonzero encoded = some sealed ∧
-        RuntimeStoreCodecSemantics.splitSealedRecord? payloadLen sealed =
-            some parts ∧
-          parts.bytes = sealed ∧
-          sealed.length = RuntimeStoreCodecSemantics.sealedPlainLen payloadLen ∧
-          (∀ byte, byte ∈ sealed →
-            RuntimeStoreCodecSemantics.ValidByte byte) ∧
-          (∀ byte, byte ∈ parts.bytes →
-            RuntimeStoreCodecSemantics.ValidByte byte) := by
+    encoded = RuntimeStoreCodecSemantics.encodeSealedRecord parts ∧
+    RuntimeStoreCodecSemantics.decodeUnitsInto? RuntimeStoreCodecSemantics.sealedUnitBytes
+        (RuntimeStoreCodecSemantics.sealedContentLen payloadLen) encoded =
+      some (parts.marker, parts.bytes) ∧
+    RuntimeStoreCodecSemantics.splitSealedRecord? payloadLen parts.marker parts.bytes = some parts ∧
+    parts.bytes.length = RuntimeStoreCodecSemantics.sealedContentLen payloadLen := by
   exact
     RuntimePaperNativeKernelAssumptions.storeSealedRecordOpenTransportSound
       (boundary.toRuntimePaperNativeKernelAssumptions hValid)
@@ -2799,10 +2803,8 @@ theorem
   {encoded : List Nat}
   {parts : RuntimeStoreCodecSemantics.SealedRecordParts}
   (hDecode :
-    RuntimeStoreCodecSemantics.decodeSealedRecord? payloadLen encoded =
-      some parts) :
-  RuntimeStoreCodecSemantics.UoStoreSlotCiphertextShape
-    payloadLen encoded := by
+    RuntimeStoreCodecSemantics.decodeSealedRecord? payloadLen encoded = some parts) :
+  RuntimeStoreCodecSemantics.UoStoreSlotCiphertextShape payloadLen encoded := by
   exact
     RuntimePaperNativeKernelAssumptions.storeUoSlotCiphertextShape
       (boundary.toRuntimePaperNativeKernelAssumptions hValid)
@@ -2814,17 +2816,13 @@ theorem
   (hValid : boundary.Valid)
   {payloadLen : Nat}
   {parts : RuntimeStoreCodecSemantics.SealedRecordParts}
-  (hOpenShape : parts.ValidOpenShape payloadLen)
-  (hBytes :
-    ∀ byte, byte ∈ parts.bytes →
-      RuntimeStoreCodecSemantics.ValidByte byte) :
-  RuntimeStoreCodecSemantics.decodeSealedRecord? payloadLen
-      (RuntimeStoreCodecSemantics.encodeNonzero parts.bytes) =
+  (hOpenShape : parts.ValidOpenShape payloadLen) :
+  RuntimeStoreCodecSemantics.decodeSealedRecord? payloadLen (RuntimeStoreCodecSemantics.encodeSealedRecord parts) =
     some parts := by
   exact
     RuntimePaperNativeKernelAssumptions.storeSealedRecordTransportRoundtrip
       (boundary.toRuntimePaperNativeKernelAssumptions hValid)
-      hOpenShape hBytes
+      hOpenShape
 
 theorem
   importedRuntimeImplementationKernelMachineConfinementBoundary_valid_storeSealedRecordEncodedLength
@@ -2833,8 +2831,7 @@ theorem
   {payloadLen : Nat}
   {parts : RuntimeStoreCodecSemantics.SealedRecordParts}
   (hShape : parts.ValidShape payloadLen) :
-  (RuntimeStoreCodecSemantics.encodeNonzero parts.bytes).length =
-      RuntimeStoreCodecSemantics.sealedEncodedLen payloadLen := by
+  (RuntimeStoreCodecSemantics.encodeSealedRecord parts).length = RuntimeStoreCodecSemantics.sealedEncodedLen payloadLen := by
   exact
     RuntimePaperNativeKernelAssumptions.storeSealedRecordEncodedLength
       (boundary.toRuntimePaperNativeKernelAssumptions hValid)
@@ -2846,34 +2843,59 @@ theorem
   (hValid : boundary.Valid)
   {payloadLen : Nat}
   {parts : RuntimeStoreCodecSemantics.SealedRecordParts}
-  (hShape : parts.ValidShape payloadLen)
-  (hBytes :
-    ∀ byte, byte ∈ parts.bytes →
-      RuntimeStoreCodecSemantics.ValidByte byte) :
-  RuntimeStoreCodecSemantics.UoStoreSlotCiphertextShape
-    payloadLen (RuntimeStoreCodecSemantics.encodeNonzero parts.bytes) := by
+  (hOpenShape : parts.ValidOpenShape payloadLen) :
+  RuntimeStoreCodecSemantics.UoStoreSlotCiphertextShape payloadLen (RuntimeStoreCodecSemantics.encodeSealedRecord parts) := by
   exact
     RuntimePaperNativeKernelAssumptions.storeEncodedUoSlotCiphertextShape
       (boundary.toRuntimePaperNativeKernelAssumptions hValid)
-      hShape hBytes
+      hOpenShape
 
 theorem
-  importedRuntimeImplementationKernelMachineConfinementBoundary_valid_storeSealedRecordRejectsWrongMagic
+  importedRuntimeImplementationKernelMachineConfinementBoundary_valid_storeSealedRecordRejectsWrongMarker
   {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
   (hValid : boundary.Valid)
   {payloadLen : Nat}
   {parts : RuntimeStoreCodecSemantics.SealedRecordParts}
   (hShape : parts.ValidShape payloadLen)
-  (hMagic : parts.magic ≠ RuntimeStoreCodecSemantics.sealedMagic)
-  (hBytes :
-    ∀ byte, byte ∈ parts.bytes →
-      RuntimeStoreCodecSemantics.ValidByte byte) :
-  RuntimeStoreCodecSemantics.decodeSealedRecord? payloadLen
-      (RuntimeStoreCodecSemantics.encodeNonzero parts.bytes) = none := by
+  (hMarker : ¬ RuntimeStoreCodecSemantics.ValidMarker parts.marker) :
+  RuntimeStoreCodecSemantics.decodeSealedRecord? payloadLen (RuntimeStoreCodecSemantics.encodeSealedRecord parts) = none := by
   exact
-    RuntimePaperNativeKernelAssumptions.storeSealedRecordRejectsWrongMagic
+    RuntimePaperNativeKernelAssumptions.storeSealedRecordRejectsWrongMarker
       (boundary.toRuntimePaperNativeKernelAssumptions hValid)
-      hShape hMagic hBytes
+      hShape hMarker
+
+theorem
+  importedRuntimeImplementationKernelMachineConfinementBoundary_valid_storeSealedRecordRejectsZeroUnit
+  {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
+  (hValid : boundary.Valid)
+  {payloadLen : Nat}
+  {encoded unit : List Nat}
+  (hMem : unit ∈ RuntimeStoreCodecSemantics.unitsOf RuntimeStoreCodecSemantics.sealedUnitBytes encoded)
+  (hZero : RuntimeStoreCodecSemantics.allZero unit = true) :
+  RuntimeStoreCodecSemantics.decodeSealedRecord? payloadLen encoded = none := by
+  exact
+    RuntimePaperNativeKernelAssumptions.storeSealedRecordRejectsZeroUnit
+      (boundary.toRuntimePaperNativeKernelAssumptions hValid)
+      hMem hZero
+
+theorem
+  importedRuntimeImplementationKernelMachineConfinementBoundary_valid_storeSealedRecordResealIsUpdate
+  {boundary : ImportedRuntimeImplementationKernelMachineConfinementBoundary}
+  (hValid : boundary.Valid)
+  {payloadLen oldMarker : Nat}
+  {old : List Nat}
+  {parts : RuntimeStoreCodecSemantics.SealedRecordParts}
+  (hOldLen : old.length = RuntimeStoreCodecSemantics.sealedEncodedLen payloadLen)
+  (hOldMarker : RuntimeStoreCodecSemantics.recordMarker? RuntimeStoreCodecSemantics.sealedUnitBytes old = some oldMarker)
+  (hShape : parts.ValidShape payloadLen)
+  (hNext : RuntimeStoreCodecSemantics.nextMarker? oldMarker = some parts.marker) :
+  RuntimeStoreCodecSemantics.isUpdateWrite RuntimeStoreCodecSemantics.storageObserverUnitBytes old
+      (RuntimeStoreCodecSemantics.encodeSealedRecord parts) =
+    true := by
+  exact
+    RuntimePaperNativeKernelAssumptions.storeSealedRecordResealIsUpdate
+      (boundary.toRuntimePaperNativeKernelAssumptions hValid)
+      hOldLen hOldMarker hShape hNext
 
 theorem
   importedRuntimeImplementationKernelMachineConfinementBoundary_valid_storeUoUpdateWriteShapeAccepted

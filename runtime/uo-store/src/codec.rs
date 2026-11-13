@@ -6,39 +6,17 @@ mod generated_surface;
 pub use generated_surface::StoreCipher;
 
 use generated_codec::{
-    decode_nonzero_into, seal_nonce, sealed_encoded_len as generated_sealed_encoded_len,
-    write_nonzero_encoded, SEALED_MAGIC, SEALED_NONCE_BYTES, SEALED_TAG_BYTES,
+    next_marker, read_units, record_marker, seal_nonce,
+    sealed_content_len as generated_sealed_content_len,
+    sealed_encoded_len as generated_sealed_encoded_len, write_units, SEALED_MARKERS,
+    SEALED_NONCE_BYTES, SEALED_TAG_BYTES,
 };
-
-#[cfg(test)]
-#[derive(Clone, Debug)]
-struct NonZeroCodec;
-
-#[cfg(test)]
-impl NonZeroCodec {
-    fn encode_bytes(payload: &[u8]) -> Vec<u8> {
-        let mut out = vec![0u8; payload.len() * 2];
-        let mut cursor = 0usize;
-        write_nonzero_encoded(&mut out, &mut cursor, payload);
-        debug_assert_eq!(cursor, out.len());
-        out
-    }
-
-    fn decode_bytes(byte_len: usize, encoded: &[u8]) -> Option<Vec<u8>> {
-        if encoded.len() != byte_len * 2 {
-            return None;
-        }
-        let mut decoded = vec![0u8; byte_len];
-        decode_nonzero_into(encoded, &mut decoded)?;
-        Some(decoded)
-    }
-}
 
 #[cfg(test)]
 mod tests {
     use super::{
-        generated_sealed_encoded_len, seal_nonce, NonZeroCodec, StoreCipher, SEALED_MAGIC,
-        SEALED_NONCE_BYTES, SEALED_TAG_BYTES,
+        generated_sealed_content_len, generated_sealed_encoded_len, read_units, record_marker,
+        seal_nonce, write_units, StoreCipher, SEALED_MARKERS, SEALED_NONCE_BYTES,
     };
     use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
@@ -51,9 +29,19 @@ mod tests {
         let encoded = cipher
             .seal_and_wipe_boxed(b"object:slot", &mut payload_for_seal, &mut rng)
             .unwrap();
-        let sealed_len = SEALED_MAGIC.len() + SEALED_NONCE_BYTES + payload.len() + SEALED_TAG_BYTES;
-        let sealed = NonZeroCodec::decode_bytes(sealed_len, &encoded).unwrap();
-        sealed[SEALED_MAGIC.len()..SEALED_MAGIC.len() + SEALED_NONCE_BYTES].to_vec()
+        let mut content = vec![0u8; generated_sealed_content_len(payload.len())];
+        read_units(&encoded, &mut content).unwrap();
+        content[..SEALED_NONCE_BYTES].to_vec()
+    }
+
+    /// A record of `payload` that replaces none.
+    fn fresh_record(cipher: &StoreCipher, payload: &[u8]) -> Vec<u8> {
+        let mut rng = ChaCha20Rng::seed_from_u64(0);
+        let mut payload = payload.to_vec();
+        cipher
+            .seal_and_wipe_boxed(b"object:slot", &mut payload, &mut rng)
+            .unwrap()
+            .into_vec()
     }
 
     /// The Lean model `sealNonce` and its example: four zero bytes, then the
@@ -131,9 +119,15 @@ mod tests {
         cipher.set_seal_count_for_test(u64::MAX - 1);
         assert_eq!(sealed_nonce(&cipher, 1, &[7]), seal_nonce(u64::MAX - 1));
         let mut rng = ChaCha20Rng::seed_from_u64(1);
+        // The record the failed seals would have replaced: the last one the
+        // key sealed.
+        let record = {
+            let other = StoreCipher::random();
+            fresh_record(&other, &[5u8, 6u8])
+        };
         for _ in 0..2 {
             let mut payload = vec![5u8, 6u8];
-            let mut encoded = vec![0u8; generated_sealed_encoded_len(payload.len())];
+            let mut encoded = record.clone();
             assert!(!cipher.seal_and_wipe_into_slice(
                 b"object:slot",
                 &mut payload,
@@ -141,7 +135,7 @@ mod tests {
                 &mut encoded,
             ));
             assert_eq!(payload, vec![0u8; 2]);
-            assert_eq!(encoded, vec![0u8; generated_sealed_encoded_len(2)]);
+            assert_eq!(encoded, record);
             let mut payload = vec![5u8, 6u8];
             assert!(cipher
                 .seal_and_wipe_boxed(b"object:slot", &mut payload, &mut rng)
@@ -156,19 +150,133 @@ mod tests {
     }
 
     #[test]
-    fn nonzero_transport_records_are_always_nonzero() {
-        let encoded = NonZeroCodec::encode_bytes(&[0u8, 0xFF, 0x11]);
-        assert!(encoded.iter().all(|byte| *byte != 0));
+    fn a_sealed_record_is_a_whole_number_of_units() {
+        // A unit is a 32-byte word: one marker and 31 bytes of nonce,
+        // ciphertext and tag. A 256-bit value takes two words and a map
+        // record of a 256-bit key and value three.
+        assert_eq!(generated_sealed_content_len(32), 12 + 32 + 16);
+        assert_eq!(generated_sealed_encoded_len(32), 64);
+        assert_eq!(generated_sealed_encoded_len(65), 96);
+        assert_eq!(generated_sealed_encoded_len(0), 32);
+        // 31 bytes of content fill one unit, and one more starts another.
+        assert_eq!(generated_sealed_encoded_len(3), 32);
+        assert_eq!(generated_sealed_encoded_len(4), 64);
+        let cipher = StoreCipher::random();
+        for payload_len in [0usize, 1, 3, 4, 32, 34, 35, 65, 348] {
+            let record = fresh_record(&cipher, &vec![0x3Cu8; payload_len]);
+            assert_eq!(record.len(), generated_sealed_encoded_len(payload_len));
+            assert_eq!(record.len() % 32, 0);
+        }
     }
 
     #[test]
-    fn nonzero_transport_roundtrips_payload() {
-        let payload = [0u8, 0xAB, 0xCD, 0xEF];
-        let encoded = NonZeroCodec::encode_bytes(&payload);
-        assert_eq!(
-            NonZeroCodec::decode_bytes(payload.len(), &encoded),
-            Some(payload.to_vec())
-        );
+    fn units_roundtrip_content_and_carry_one_marker() {
+        let content: Vec<u8> = (0..70u8).collect();
+        for marker in SEALED_MARKERS {
+            let mut encoded = vec![0xEEu8; 96];
+            assert!(write_units(
+                &mut encoded,
+                marker,
+                &[&content[..12], &content[12..54], &content[54..]]
+            ));
+            assert_eq!(record_marker(&encoded), Some(marker));
+            for unit in encoded.chunks_exact(32) {
+                assert_eq!(unit[0], marker);
+            }
+            // 93 bytes of content fit three units; 70 leave 23 zeros.
+            assert!(encoded[3 + 70..].iter().all(|byte| *byte == 0));
+            let mut decoded = vec![0u8; content.len()];
+            assert_eq!(read_units(&encoded, &mut decoded), Some(marker));
+            assert_eq!(decoded, content);
+        }
+        // A buffer of another size is not written.
+        let mut short = vec![0u8; 64];
+        assert!(!write_units(&mut short, SEALED_MARKERS[0], &[&content]));
+        assert_eq!(short, vec![0u8; 64]);
+    }
+
+    #[test]
+    fn a_record_with_a_zero_or_foreign_unit_is_not_read() {
+        let cipher = StoreCipher::random();
+        let payload = [7u8; 40];
+        let record = fresh_record(&cipher, &payload);
+        assert_eq!(record.len(), 96);
+        let open = |encoded: &[u8]| {
+            cipher.with_opened_payload(b"object:slot", payload.len(), encoded, |bytes| {
+                bytes.to_vec()
+            })
+        };
+        assert_eq!(open(&record), Some(payload.to_vec()));
+        for unit in 0..3 {
+            // A unit that is zero has no marker.
+            let mut zeroed = record.clone();
+            zeroed[32 * unit..32 * (unit + 1)].fill(0);
+            assert_eq!(record_marker(&zeroed), None);
+            assert_eq!(open(&zeroed), None, "unit {unit} zeroed");
+            // Nor has one whose first byte is neither marker.
+            let mut foreign = record.clone();
+            foreign[32 * unit] = 0x01;
+            assert_eq!(open(&foreign), None, "unit {unit} foreign");
+            // The units of a record carry one marker.
+            let mut mixed = record.clone();
+            mixed[32 * unit] = SEALED_MARKERS[1];
+            assert_eq!(open(&mixed), None, "unit {unit} mixed");
+        }
+        // The bytes after the content are zero: 68 bytes of content leave
+        // 25 in the last unit.
+        let mut padded = record.clone();
+        *padded.last_mut().unwrap() = 1;
+        assert_eq!(open(&padded), None);
+        // A record is not read at another length.
+        assert_eq!(open(&record[..64]), None);
+        let mut longer = record.clone();
+        longer.extend_from_slice(&record[..32]);
+        assert_eq!(open(&longer), None);
+    }
+
+    #[test]
+    fn a_record_written_over_another_differs_from_it_in_every_unit() {
+        // The first record under a key carries the first marker; each record
+        // sealed over it carries the marker its predecessor does not. So a
+        // write is an Update in every unit whatever the ciphertexts are:
+        // here the key is made again for each seal, which repeats the nonce,
+        // and the payload is the same, so that the ciphertexts are equal.
+        let cipher = || StoreCipher::from_rng(&mut ChaCha20Rng::seed_from_u64(0x35));
+        let mut rng = ChaCha20Rng::seed_from_u64(1);
+        let payload = [0x11u8; 65];
+        let mut record = fresh_record(&cipher(), &payload);
+        assert_eq!(record_marker(&record), Some(SEALED_MARKERS[0]));
+        for round in 1..=4 {
+            let previous = record.clone();
+            let mut payload_for_seal = payload.to_vec();
+            assert!(cipher().seal_and_wipe_into_slice(
+                b"object:slot",
+                &mut payload_for_seal,
+                &mut rng,
+                &mut record,
+            ));
+            assert_eq!(record_marker(&record), Some(SEALED_MARKERS[round % 2]));
+            assert_eq!(record.len(), previous.len());
+            for (old_unit, new_unit) in previous.chunks_exact(32).zip(record.chunks_exact(32)) {
+                // The units differ in their marker and in nothing else.
+                assert_ne!(old_unit[0], new_unit[0]);
+                assert_eq!(old_unit[1..], new_unit[1..]);
+            }
+            assert!(uo_core::is_update_write(&previous, &record));
+        }
+        // A buffer that holds no record is not sealed over.
+        for mut not_a_record in [vec![0u8; 96], vec![0x01u8; 96]] {
+            let before = not_a_record.clone();
+            let mut payload_for_seal = payload.to_vec();
+            assert!(!cipher().seal_and_wipe_into_slice(
+                b"object:slot",
+                &mut payload_for_seal,
+                &mut rng,
+                &mut not_a_record,
+            ));
+            assert_eq!(payload_for_seal, vec![0u8; 65]);
+            assert_eq!(not_a_record, before);
+        }
     }
 
     #[test]
@@ -223,7 +331,8 @@ mod tests {
         let cipher = StoreCipher::random();
         let mut rng = ChaCha20Rng::seed_from_u64(43);
         let mut payload = vec![5u8, 6u8, 7u8, 8u8];
-        let mut encoded = vec![0u8; generated_sealed_encoded_len(payload.len())];
+        let mut encoded = fresh_record(&cipher, &[0u8; 4]);
+        assert_eq!(encoded.len(), generated_sealed_encoded_len(payload.len()));
         let encoded_ptr = encoded.as_ptr();
 
         assert!(cipher.seal_and_wipe_into_slice(

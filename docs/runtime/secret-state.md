@@ -86,8 +86,12 @@ and the ownership boundaries that keep them auditable.
     the call unless every 32-byte unit of the new record is an `Update` of
     the unit it replaces: not zero, not zero before, and changed
     (`uo_core::is_update_write`). The write's event is recorded after that
-    check and nowhere else. A write that fails it, as one that repeats a
-    nonce for the same value would, never reaches a trace as an `Update`.
+    check and nowhere else. The record codec makes the check pass whatever
+    the ciphertexts are: every 32-byte unit of a sealed record begins with
+    one of two nonzero marker bytes, and a record sealed over another
+    carries the marker its predecessor does not. A slot that holds no such
+    record is not sealed over, and a write that fails the check never
+    reaches a trace as an `Update`.
 
 ### What a nonce shows
 
@@ -100,6 +104,14 @@ an evaluation error is dropped with its trace, but its seals stay counted:
 the next record's nonce then shows how many records the dropped call had
 sealed under that key. Evaluation errors are outside the trace claims (see
 [`proof-architecture.md`](../proof-architecture.md)).
+
+### What a marker shows
+
+A record's marker shows the parity of the number of times the record has
+been written since its object was deployed. Each of those writes is one
+recorded storage write, so the marker follows from the storage trace and
+shows nothing more. A call that is dropped leaves the committed records and
+their markers as they were.
 
 ## Enforcement
 
@@ -150,9 +162,23 @@ Lean checker must reject: the check removed from the objects' and ORAM maps'
 seal (`runtime_implementation_interface/sealed_write_update_check_drift`) and
 from the store's
 (`runtime_implementation_interface/store_sealed_write_update_check_drift`).
-Tests of `runtime/uo-evm/src/objects.rs` and `runtime/uo-store/src/store.rs`
-set a seal count back, so that a write repeats the nonce of the record it
-replaces, and see the write fail.
+The record codec is pinned in `storeCipherUsesExactSizeNonzeroBuffers`, with
+two more scenarios: a marker taken from a record's first unit alone, so that
+a record with a zero unit would be read and sealed over
+(`runtime_implementation_interface/store_codec_zero_unit_accept_drift`), and
+a record sealed under the marker of the record it replaces
+(`runtime_implementation_interface/store_reseal_marker_reuse_drift`). The
+Lean model of the codec proves that a record sealed over a record is an
+`Update` in every unit (`encodeSealedRecord_reseal_isUpdate` in
+`UOToolchain/RuntimeStoreCodecSemantics.lean`). Tests of
+`runtime/uo-evm/src/objects.rs`, `runtime/uo-store/src/store.rs` and
+`runtime/uo-store/src/codec.rs` set a seal count back, so that a write
+repeats the nonce of the record it replaces and, for the same value, its
+ciphertext, and see that the write is still an `Update`: the two records
+differ in the marker of every unit. The codec's tests also show that a
+record with a zero unit, a unit with the other marker or a byte after its
+content is not read, and that a buffer that holds no record is not sealed
+over.
 
 Invariant 11 also has a Lean statement and tests. `sealNonceRun_nodup` and
 `sealNonceRun_disjoint_of_le` in `UOToolchain/RuntimeStoreCodecSemantics.lean`

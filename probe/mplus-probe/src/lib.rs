@@ -9980,6 +9980,56 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "mutation": "build the store's write event without the check that every 32-byte unit of the new slot is an Update of the unit it replaces, so the implementation interface must reject a store write that is labeled Update by assertion",
         }),
     )?);
+    let mut tampered_runtime_implementation_store_codec_zero_unit =
+        runtime_implementation_interface.clone();
+    tampered_runtime_implementation_store_codec_zero_unit.generated_store_codec_source =
+        replace_exactly_once(
+            &tampered_runtime_implementation_store_codec_zero_unit.generated_store_codec_source,
+            "    for unit in encoded.chunks_exact(SEALED_UNIT_BYTES) {\n        if *unit.first()? != marker {\n            return None;\n        }\n    }\n    Some(marker)",
+            "    Some(marker)",
+            "runtime implementation store-codec zero-unit tamper",
+        )?;
+    scenarios.push(validate_tampered_json_case(
+        "runtime_implementation_interface/store_codec_zero_unit_accept_drift",
+        &tampered_runtime_implementation_store_codec_zero_unit,
+        |interface_path| {
+            Ok(Command::new(&runtime_implementation_interface_checker)
+                .arg(interface_path)
+                .output()?)
+        },
+        json!({
+            "scenario": "runtime_implementation_interface/store_codec_zero_unit_accept_drift",
+            "artifact_kind": "proofgrade_runtime_implementation_interface",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "take a sealed record's marker from its first 32-byte unit alone, so a record with a zero unit after the first is read and can be sealed over; the implementation interface must reject a record codec that accepts a zero unit",
+        }),
+    )?);
+    let mut tampered_runtime_implementation_store_reseal_marker =
+        runtime_implementation_interface.clone();
+    tampered_runtime_implementation_store_reseal_marker.generated_store_surface_source =
+        replace_exactly_once(
+            &tampered_runtime_implementation_store_reseal_marker.generated_store_surface_source,
+            "    let marker = record_marker(out).and_then(next_marker);",
+            "    let marker = record_marker(out);",
+            "runtime implementation store-surface reseal marker tamper",
+        )?;
+    scenarios.push(validate_tampered_json_case(
+        "runtime_implementation_interface/store_reseal_marker_reuse_drift",
+        &tampered_runtime_implementation_store_reseal_marker,
+        |interface_path| {
+            Ok(Command::new(&runtime_implementation_interface_checker)
+                .arg(interface_path)
+                .output()?)
+        },
+        json!({
+            "scenario": "runtime_implementation_interface/store_reseal_marker_reuse_drift",
+            "artifact_kind": "proofgrade_runtime_implementation_interface",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "seal a record over another under the marker of the record it replaces instead of the other marker, so a unit would differ from the unit it replaces only if its ciphertext bytes do; the implementation interface must reject a reseal that does not change the marker",
+        }),
+    )?);
     let tampered_runtime_small_confidential_kernel_generated_object_helpers_commit =
         ImportedRuntimeImplementationSmallConfidentialKernelBoundary {
             implementation_interface:
@@ -13525,7 +13575,7 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "artifact_kind": "proofgrade_runtime_implementation_interface",
             "benchmark": "SingleAccessMap/pathoram/put",
             "entrypoint": target.entrypoint,
-            "mutation": "replace the Lean-generated nonzero transport allocation with a growable capacity-only vector while keeping the handwritten codec shell fixed, so the strengthened implementation interface must reject drift in the lower-level generated store transport discipline",
+            "mutation": "replace the Lean-generated sealed-record allocation with a growable capacity-only vector while keeping the handwritten codec shell fixed, so the strengthened implementation interface must reject drift in the lower-level generated store transport discipline",
         }),
     )?);
     let tampered_runtime_small_confidential_kernel_store_exact_size_transport =
@@ -13546,7 +13596,7 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "artifact_kind": "proofgrade_runtime_small_confidential_kernel_boundary",
             "benchmark": "SingleAccessMap/pathoram/put",
             "entrypoint": target.entrypoint,
-            "mutation": "replace the Lean-generated nonzero transport allocation with a growable capacity-only vector while keeping the handwritten codec shell fixed, so the standalone small-kernel boundary must reject drift in the lower-level generated store transport discipline",
+            "mutation": "replace the Lean-generated sealed-record allocation with a growable capacity-only vector while keeping the handwritten codec shell fixed, so the standalone small-kernel boundary must reject drift in the lower-level generated store transport discipline",
         }),
     )?);
     let tampered_runtime_shared_confidential_kernel_store_exact_size_transport =
@@ -13567,7 +13617,7 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "artifact_kind": "proofgrade_runtime_shared_confidential_kernel_boundary",
             "benchmark": "SingleAccessMap/pathoram/put",
             "entrypoint": target.entrypoint,
-            "mutation": "replace the Lean-generated nonzero transport allocation with a growable capacity-only vector while keeping the handwritten codec shell fixed, so the shared-kernel boundary must reject drift in the lower-level generated store transport discipline",
+            "mutation": "replace the Lean-generated sealed-record allocation with a growable capacity-only vector while keeping the handwritten codec shell fixed, so the shared-kernel boundary must reject drift in the lower-level generated store transport discipline",
         }),
     )?);
     let tampered_runtime_implementation_store_exact_size_transport_boundary =
@@ -13589,7 +13639,7 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
             "benchmark": "SingleAccessMap/pathoram/put",
             "entrypoint": target.entrypoint,
-            "mutation": "replace the Lean-generated nonzero transport allocation with a growable capacity-only vector while keeping the emitted kernel-interface bundle fixed, so the combined confinement boundary must reject drift in the lower-level generated store transport discipline",
+            "mutation": "replace the Lean-generated sealed-record allocation with a growable capacity-only vector while keeping the emitted kernel-interface bundle fixed, so the combined confinement boundary must reject drift in the lower-level generated store transport discipline",
         }),
     )?);
     let tampered_runtime_implementation_kernel_machine_confinement_store_exact_size_transport =
@@ -13621,7 +13671,7 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
             "benchmark": "SingleAccessMap/pathoram/put",
             "entrypoint": target.entrypoint,
-            "mutation": "replace the Lean-generated nonzero transport allocation with a growable capacity-only vector while keeping the native machine-confinement witness fixed, so the paper-facing machine theorem route must reject drift in the lower-level generated store transport discipline",
+            "mutation": "replace the Lean-generated sealed-record allocation with a growable capacity-only vector while keeping the native machine-confinement witness fixed, so the paper-facing machine theorem route must reject drift in the lower-level generated store transport discipline",
         }),
     )?);
     let mut tampered_runtime_implementation_store_surface_split_decoder =
@@ -19356,11 +19406,11 @@ fn run_runtime_residual_helper_shell_boundary_validation() -> Result<JsonValue> 
         "store_codec_roundtrip_theorem_checked": true,
         "store_codec_transport_shape_theorem_checked": true,
         "store_codec_decode_sound_theorem_checked": true,
-        "store_codec_decode_into_roundtrip_theorem_checked": true,
+        "store_codec_reseal_is_update_theorem_checked": true,
         "store_codec_decode_into_rejects_length_mismatch_theorem_checked": true,
-        "store_codec_decode_into_sound_theorem_checked": true,
+        "store_codec_decode_rejects_zero_unit_theorem_checked": true,
         "store_sealed_encoded_len_theorem_checked": true,
-        "store_sealed_plain_len_theorem_checked": true,
+        "store_sealed_content_len_theorem_checked": true,
         "store_sealed_record_decode_shape_theorem_checked": true,
         "store_sealed_record_open_shape_theorem_checked": true,
         "store_sealed_record_rejects_length_mismatch_theorem_checked": true,
@@ -19369,7 +19419,9 @@ fn run_runtime_residual_helper_shell_boundary_validation() -> Result<JsonValue> 
         "store_sealed_record_transport_roundtrip_theorem_checked": true,
         "store_sealed_record_encoded_length_theorem_checked": true,
         "store_encoded_uo_slot_ciphertext_shape_theorem_checked": true,
-        "store_sealed_record_rejects_wrong_magic_theorem_checked": true,
+        "store_sealed_record_rejects_wrong_marker_theorem_checked": true,
+        "store_sealed_record_rejects_zero_unit_theorem_checked": true,
+        "store_sealed_record_reseal_is_update_theorem_checked": true,
         "store_surface_zeroed_bytes_length_theorem_checked": true,
         "store_surface_zeroed_bytes_valid_theorem_checked": true,
         "store_surface_read_exact_range_length_theorem_checked": true,
@@ -22477,11 +22529,11 @@ fn validate_runtime_implementation_kernel_machine_confinement_boundary_case(
             "array_access_selects_slot_unique_theorem_checked": true,
             "store_codec_transport_shape_theorem_checked": true,
             "store_codec_decode_sound_theorem_checked": true,
-            "store_codec_decode_into_roundtrip_theorem_checked": true,
+            "store_codec_reseal_is_update_theorem_checked": true,
             "store_codec_decode_into_rejects_length_mismatch_theorem_checked": true,
-            "store_codec_decode_into_sound_theorem_checked": true,
+            "store_codec_decode_rejects_zero_unit_theorem_checked": true,
             "store_sealed_encoded_len_theorem_checked": true,
-            "store_sealed_plain_len_theorem_checked": true,
+            "store_sealed_content_len_theorem_checked": true,
             "store_sealed_record_decode_shape_theorem_checked": true,
             "store_sealed_record_open_shape_theorem_checked": true,
             "store_sealed_record_rejects_length_mismatch_theorem_checked": true,
@@ -22490,7 +22542,9 @@ fn validate_runtime_implementation_kernel_machine_confinement_boundary_case(
             "store_sealed_record_transport_roundtrip_theorem_checked": true,
             "store_sealed_record_encoded_length_theorem_checked": true,
             "store_encoded_uo_slot_ciphertext_shape_theorem_checked": true,
-            "store_sealed_record_rejects_wrong_magic_theorem_checked": true,
+            "store_sealed_record_rejects_wrong_marker_theorem_checked": true,
+            "store_sealed_record_rejects_zero_unit_theorem_checked": true,
+            "store_sealed_record_reseal_is_update_theorem_checked": true,
             "store_surface_zeroed_bytes_length_theorem_checked": true,
             "store_surface_zeroed_bytes_valid_theorem_checked": true,
             "store_surface_read_exact_range_length_theorem_checked": true,
@@ -30736,43 +30790,53 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && store_codec_source.contains("mod generated_codec;")
         && store_codec_source.contains("use generated_codec::{")
         && !store_codec_source.contains("decode_nonzero_bytes(byte_len, encoded)")
-        && !store_codec_source.contains("const SEALED_MAGIC: [u8; 2] = [0xA5, 0x5A];")
-        && !store_codec_source.contains(
-            "fn write_nonzero_encoded(out: &mut [u8], cursor: &mut usize, bytes: &[u8])",
-        )
-        && !store_codec_source
-            .contains("fn decode_nonzero_into(encoded: &[u8], out: &mut [u8]) -> Option<()>")
+        && !store_codec_source.contains("const SEALED_MARKERS: [u8; 2] = [0xA5, 0x5A];")
+        && !store_codec_source.contains("const SEALED_UNIT_BYTES: usize = 32;")
+        && !store_codec_source.contains("fn write_units(out: &mut [u8], marker: u8, content: &[&[u8]])")
+        && !store_codec_source.contains("fn read_units(encoded: &[u8], out: &mut [u8]) -> Option<u8>")
+        && !store_codec_source.contains("fn record_marker(encoded: &[u8]) -> Option<u8>")
+        && !store_codec_source.contains("fn next_marker(marker: u8) -> Option<u8>")
         && !store_codec_source.contains("let mut payload = vec![0u8; payload_len];")
         && generated_store_codec_source.contains(
             "// @generated by proof/lean/GenerateRuntimeStoreCodecRust.lean; do not edit by hand.",
         )
-        && generated_store_codec_source
-            .contains("pub(super) const SEALED_MAGIC: [u8; 2] = [0xA5, 0x5A];")
+        && generated_store_codec_source.contains("pub(super) const SEALED_UNIT_BYTES: usize = 32;")
+        && generated_store_codec_source.contains("pub(super) const SEALED_MARKERS: [u8; 2] = [0xA5, 0x5A];")
         && generated_store_codec_source
             .contains("pub(super) const SEALED_NONCE_BYTES: usize = 12;")
         && generated_store_codec_source
             .contains("pub(super) const SEALED_TAG_BYTES: usize = 16;")
         && generated_store_codec_source
             .contains("pub(super) fn sealed_encoded_len(payload_len: usize) -> usize {")
-        && generated_store_codec_source.contains(
-            "pub(super) fn write_nonzero_encoded(out: &mut [u8], cursor: &mut usize, bytes: &[u8]) -> bool {",
-        )
-        && generated_store_codec_source
-            .contains("let Some(encoded_len) = bytes.len().checked_mul(2) else {")
-        && generated_store_codec_source
-            .contains("let Some(end) = (*cursor).checked_add(encoded_len) else {")
-        && generated_store_codec_source.contains("let Some(out) = out.get_mut(*cursor..end) else {")
-        && generated_store_codec_source
-            .contains("for (chunk, byte) in out.chunks_exact_mut(2).zip(bytes.iter()) {")
-        && generated_store_codec_source.contains("let Some(hi) = chunk.get_mut(0) else {")
-        && generated_store_codec_source.contains("*hi = (byte >> 4) + 1;")
-        && generated_store_codec_source.contains("let Some(lo) = chunk.get_mut(1) else {")
-        && generated_store_codec_source.contains("*lo = (byte & 0x0F) + 1;")
-        && generated_store_codec_source
-            .contains("pub(super) fn decode_nonzero_into(encoded: &[u8], out: &mut [u8]) -> Option<()> {")
-        && generated_store_codec_source
-            .contains("for (chunk, out_byte) in encoded.chunks_exact(2).zip(out.iter_mut()) {")
-        && generated_store_codec_source.contains("*out_byte = ((hi - 1) << 4) | (lo - 1);")
+        && generated_store_codec_source.contains("pub(super) fn sealed_content_len(payload_len: usize) -> usize {")
+        && generated_store_codec_source.contains("SEALED_NONCE_BYTES + payload_len + SEALED_TAG_BYTES")
+        && generated_store_codec_source.contains("pub(super) fn sealed_unit_count(payload_len: usize) -> usize {")
+        && generated_store_codec_source.contains("sealed_content_len(payload_len).div_ceil(SEALED_UNIT_BYTES - 1)")
+        && generated_store_codec_source.contains("SEALED_UNIT_BYTES * sealed_unit_count(payload_len)")
+        && generated_store_codec_source.contains("pub(super) fn record_marker(encoded: &[u8]) -> Option<u8> {")
+        && generated_store_codec_source.contains("if encoded.is_empty() || encoded.len() % SEALED_UNIT_BYTES != 0 {")
+        && generated_store_codec_source.contains("let marker = *encoded.first()?;")
+        && generated_store_codec_source.contains("if marker != SEALED_MARKERS[0] && marker != SEALED_MARKERS[1] {")
+        && generated_store_codec_source.contains("for unit in encoded.chunks_exact(SEALED_UNIT_BYTES) {")
+        && generated_store_codec_source.contains("if *unit.first()? != marker {")
+        && generated_store_codec_source.contains("pub(super) fn next_marker(marker: u8) -> Option<u8> {")
+        && generated_store_codec_source.contains("if marker == SEALED_MARKERS[0] {\n        Some(SEALED_MARKERS[1])")
+        && generated_store_codec_source.contains("} else if marker == SEALED_MARKERS[1] {\n        Some(SEALED_MARKERS[0])")
+        && generated_store_codec_source.contains("pub(super) fn write_units(out: &mut [u8], marker: u8, content: &[&[u8]]) -> bool {")
+        && generated_store_codec_source.contains("if out.len() != encoded_len {")
+        && generated_store_codec_source.contains("for unit in out.chunks_exact_mut(SEALED_UNIT_BYTES) {")
+        && generated_store_codec_source.contains("*head = marker;")
+        && generated_store_codec_source.contains("*slot = bytes.next().copied().unwrap_or(0);")
+        && generated_store_codec_source.contains("bytes.next().is_none()")
+        && generated_store_codec_source.contains("pub(super) fn read_units(encoded: &[u8], out: &mut [u8]) -> Option<u8> {")
+        && generated_store_codec_source.contains("if encoded.len() != encoded_len {")
+        && generated_store_codec_source.contains("let marker = record_marker(encoded)?;")
+        && generated_store_codec_source.contains("for byte in unit.iter().skip(1) {")
+        && generated_store_codec_source.contains("} else if *byte != 0 {\n                return None;")
+        && !generated_store_codec_source.contains("fn write_nonzero_encoded(")
+        && !generated_store_codec_source.contains("fn decode_nonzero_into(")
+        && !generated_store_codec_source.contains("SEALED_MAGIC")
+        && !generated_store_codec_source.contains("byte >> 4")
         && !generated_store_codec_source.contains("let end = *cursor + bytes.len() * 2;")
         && !generated_store_codec_source.contains("let out = &mut out[*cursor..end];")
         && !generated_store_codec_source.contains("for (index, byte) in bytes.iter().enumerate() {")
@@ -30819,9 +30883,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && generated_store_surface_source.contains("pub struct StoreCipher {")
         && generated_store_surface_source.contains("key: [u8; 32],")
         && generated_store_surface_source.contains("seals: Arc<AtomicU64>,")
-        && generated_store_surface_source.contains(
-            "decode_nonzero_into, generated_sealed_encoded_len, seal_nonce, write_nonzero_encoded,",
-        )
+        && generated_store_surface_source.contains("generated_sealed_content_len, generated_sealed_encoded_len, next_marker, read_units,")
+        && generated_store_surface_source.contains("record_marker, seal_nonce, write_units, SEALED_MARKERS, SEALED_NONCE_BYTES, SEALED_TAG_BYTES,")
         && generated_store_surface_source.contains("struct WipeOnDrop<'a> {")
         && generated_store_surface_source.contains("impl Drop for WipeOnDrop<'_> {")
         && generated_store_surface_source.contains("impl fmt::Debug for StoreCipher {")
@@ -30859,16 +30922,17 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && generated_store_surface_source.contains("pub(super) fn seal_and_wipe_into_slice(")
         && generated_store_surface_source
             .contains("let required_len = generated_sealed_encoded_len(payload.as_slice().len());")
-        && generated_store_surface_source
-            .contains("if !write_nonzero_encoded(out, &mut cursor, &SEALED_MAGIC) {")
-        && generated_store_surface_source
-            .contains("if !write_nonzero_encoded(out, &mut cursor, &nonce_bytes) {")
-        && generated_store_surface_source
-            .contains("if !write_nonzero_encoded(out, &mut cursor, payload.as_slice()) {")
-        && generated_store_surface_source
-            .contains("if !write_nonzero_encoded(out, &mut cursor, tag.as_slice()) {")
-        && !generated_store_surface_source
-            .contains("write_nonzero_encoded(out, &mut cursor, &SEALED_MAGIC);")
+        && generated_store_surface_source.contains("Some(SEALED_MARKERS[0]),")
+        && generated_store_surface_source.contains("let marker = record_marker(out).and_then(next_marker);")
+        && generated_store_surface_source.contains("seal_and_wipe_units(cipher, aad, payload, rng, marker, out)")
+        && generated_store_surface_source.contains("fn seal_and_wipe_units(")
+        && generated_store_surface_source.contains("let Some(marker) = marker else {")
+        && generated_store_surface_source.contains("if out.len() != required_len {")
+        && generated_store_surface_source.contains("write_units(\n        out,\n        marker,\n        &[&nonce_bytes, payload.as_slice(), tag.as_slice()],\n    )\n}")
+        && !generated_store_surface_source.contains("&[&nonce_bytes, payload.as_slice(), tag.as_slice()],\n    );")
+        && !generated_store_surface_source.contains("write_nonzero_encoded(")
+        && !generated_store_surface_source.contains("decode_nonzero_into(")
+        && !generated_store_surface_source.contains("SEALED_MAGIC")
         && generated_store_surface_source.contains(".encrypt_in_place_detached(")
         && generated_store_surface_source.contains("Nonce::from_slice(&nonce_bytes),")
         && generated_store_surface_source.contains("payload.as_mut_slice(),")
@@ -30876,8 +30940,8 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && generated_store_surface_source.contains("let mut filler = zeroed_boxed_bytes(len)?;")
         && generated_store_surface_source.contains("fn open_boxed(")
         && !generated_store_surface_source.contains("pub(super) fn open_boxed(")
-        && generated_store_surface_source.contains("decode_nonzero_into(encoded, &mut sealed)?;")
-        && generated_store_surface_source.contains("let mut sealed = zeroed_boxed_bytes(sealed_len).ok()?;")
+        && generated_store_surface_source.contains("read_units(encoded, &mut sealed)?;")
+        && generated_store_surface_source.contains("let mut sealed = zeroed_boxed_bytes(generated_sealed_content_len(payload_len)).ok()?;")
         && generated_store_surface_source
             .contains("fn checked_end(start: usize, len: usize) -> Option<usize> {")
         && generated_store_surface_source.contains("start.checked_add(len)")
@@ -30886,10 +30950,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && generated_store_surface_source.contains("bytes.get(start..end)")
         && generated_store_surface_source
             .contains("fn copy_exact_into(out: &mut [u8], input: &[u8]) -> Option<()> {")
-        && generated_store_surface_source
-            .contains("let magic = read_exact_range(&sealed, 0, SEALED_MAGIC.len())?;")
-        && generated_store_surface_source
-            .contains("let nonce_start = SEALED_MAGIC.len();")
+        && generated_store_surface_source.contains("let nonce_start = 0usize;")
         && generated_store_surface_source
             .contains("let ciphertext_start = checked_end(nonce_start, SEALED_NONCE_BYTES)?;")
         && generated_store_surface_source
@@ -30904,7 +30965,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && generated_store_surface_source.contains("let mut payload = zeroed_boxed_bytes(payload_len).ok()?;")
         && generated_store_surface_source.contains("copy_exact_into(&mut payload, ciphertext)?;")
         && !production_source_slice(&generated_store_surface_source)
-            .contains("sealed.split_at(SEALED_MAGIC.len())")
+            .contains("sealed.split_at(SEALED_NONCE_BYTES)")
         && !production_source_slice(&generated_store_surface_source)
             .contains("rest.split_at(SEALED_NONCE_BYTES)")
         && !production_source_slice(&generated_store_surface_source)
@@ -30912,7 +30973,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && !production_source_slice(&generated_store_surface_source)
             .contains("fn checked_split_at(bytes: &[u8], mid: usize) -> Option<(&[u8], &[u8])> {")
         && !production_source_slice(&generated_store_surface_source)
-            .contains("checked_split_at(&sealed, SEALED_MAGIC.len())?")
+            .contains("checked_split_at(&sealed, SEALED_NONCE_BYTES)?")
         && !production_source_slice(&generated_store_surface_source)
             .contains("checked_split_at(rest, SEALED_NONCE_BYTES)?")
         && !production_source_slice(&generated_store_surface_source)
@@ -31932,16 +31993,18 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             "\"generated_store_helpers_match_lean_generator_theorem_checked\": true",
         );
     let runtime_residual_helper_shell_boundary_store_codec_semantics_theorems_present =
-        lean_runtime_store_codec_semantics_source.contains("def decodeNonzeroInto?")
-            && lean_runtime_store_codec_semantics_source.contains(
-                "theorem decodeNonzeroInto?_encodeNonzero",
-            )
-            && lean_runtime_store_codec_semantics_source.contains(
-                "theorem decodeNonzeroInto?_rejectsEncodedLengthMismatch",
-            )
-            && lean_runtime_store_codec_semantics_source.contains(
-                "theorem decodeNonzeroInto?_some_sound",
-            )
+        lean_runtime_store_codec_semantics_source.contains("def decodeUnitsInto?")
+            && lean_runtime_store_codec_semantics_source.contains("def encodeUnits")
+            && lean_runtime_store_codec_semantics_source.contains("def recordMarker?")
+            && lean_runtime_store_codec_semantics_source.contains("def nextMarker?")
+            && lean_runtime_store_codec_semantics_source.contains("theorem decodeUnitsInto?_encodeUnits")
+            && lean_runtime_store_codec_semantics_source.contains("theorem decodeUnitsInto?_none_of_length_ne")
+            && lean_runtime_store_codec_semantics_source.contains("theorem decodeUnitsInto?_some")
+            && lean_runtime_store_codec_semantics_source.contains("theorem decodeUnitsInto?_none_of_zero_unit")
+            && lean_runtime_store_codec_semantics_source.contains("theorem encodeUnits_units_nonzero")
+            && lean_runtime_store_codec_semantics_source.contains("theorem isUpdateWrite_of_markers")
+            && lean_runtime_store_codec_semantics_source.contains("theorem isUpdateWrite_encodeUnits")
+            && lean_runtime_store_codec_semantics_source.contains("theorem encodeSealedRecord_reseal_isUpdate")
             && lean_runtime_store_codec_semantics_source.contains("def readExactRange?")
             && lean_runtime_store_codec_semantics_source.contains("def copyExactInto?")
             && lean_runtime_store_codec_semantics_source.contains(
@@ -31993,15 +32056,15 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         ) && lean_runtime_implementation_interface_source.contains(
             "RuntimeImplementationInterface.residualHelperShellBoundary_storeCodecDecodeSound",
         ) && lean_runtime_implementation_interface_source.contains(
-            "RuntimeImplementationInterface.residualHelperShellBoundary_storeCodecDecodeIntoRoundtrip",
+            "RuntimeImplementationInterface.residualHelperShellBoundary_storeCodecResealIsUpdate",
         ) && lean_runtime_implementation_interface_source.contains(
             "RuntimeImplementationInterface.residualHelperShellBoundary_storeCodecDecodeIntoRejectsLengthMismatch",
         ) && lean_runtime_implementation_interface_source.contains(
-            "RuntimeImplementationInterface.residualHelperShellBoundary_storeCodecDecodeIntoSound",
+            "RuntimeImplementationInterface.residualHelperShellBoundary_storeCodecDecodeRejectsZeroUnit",
         ) && lean_runtime_implementation_interface_source.contains(
             "RuntimeImplementationInterface.residualHelperShellBoundary_storeSealedEncodedLen",
         ) && lean_runtime_implementation_interface_source.contains(
-            "RuntimeImplementationInterface.residualHelperShellBoundary_storeSealedPlainLen",
+            "RuntimeImplementationInterface.residualHelperShellBoundary_storeSealedContentLen",
         ) && lean_runtime_implementation_interface_source.contains(
             "RuntimeImplementationInterface.residualHelperShellBoundary_storeSealedRecordDecodeShape",
         ) && lean_runtime_implementation_interface_source.contains(
@@ -32019,7 +32082,11 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         ) && lean_runtime_implementation_interface_source.contains(
             "RuntimeImplementationInterface.residualHelperShellBoundary_storeEncodedUoSlotCiphertextShape",
         ) && lean_runtime_implementation_interface_source.contains(
-            "RuntimeImplementationInterface.residualHelperShellBoundary_storeSealedRecordRejectsWrongMagic",
+            "RuntimeImplementationInterface.residualHelperShellBoundary_storeSealedRecordRejectsWrongMarker",
+        ) && lean_runtime_implementation_interface_source.contains(
+            "RuntimeImplementationInterface.residualHelperShellBoundary_storeSealedRecordRejectsZeroUnit",
+        ) && lean_runtime_implementation_interface_source.contains(
+            "RuntimeImplementationInterface.residualHelperShellBoundary_storeSealedRecordResealIsUpdate",
         ) && lean_runtime_implementation_interface_source.contains(
             "RuntimeImplementationInterface.residualHelperShellBoundary_storeSurfaceZeroedBytesLength",
         ) && lean_runtime_implementation_interface_source.contains(
@@ -32089,15 +32156,15 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         ) && runtime_residual_helper_shell_boundary_checker_source.contains(
             "importedBoundaryStoreCodecDecodeSound",
         ) && runtime_residual_helper_shell_boundary_checker_source.contains(
-            "importedBoundaryStoreCodecDecodeIntoRoundtrip",
+            "importedBoundaryStoreCodecResealIsUpdate",
         ) && runtime_residual_helper_shell_boundary_checker_source.contains(
             "importedBoundaryStoreCodecDecodeIntoRejectsLengthMismatch",
         ) && runtime_residual_helper_shell_boundary_checker_source.contains(
-            "importedBoundaryStoreCodecDecodeIntoSound",
+            "importedBoundaryStoreCodecDecodeRejectsZeroUnit",
         ) && runtime_residual_helper_shell_boundary_checker_source.contains(
             "importedBoundaryStoreSealedEncodedLen",
         ) && runtime_residual_helper_shell_boundary_checker_source.contains(
-            "importedBoundaryStoreSealedPlainLen",
+            "importedBoundaryStoreSealedContentLen",
         ) && runtime_residual_helper_shell_boundary_checker_source.contains(
             "importedBoundaryStoreSealedRecordDecodeShape",
         ) && runtime_residual_helper_shell_boundary_checker_source.contains(
@@ -32115,7 +32182,11 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         ) && runtime_residual_helper_shell_boundary_checker_source.contains(
             "importedBoundaryStoreEncodedUoSlotCiphertextShape",
         ) && runtime_residual_helper_shell_boundary_checker_source.contains(
-            "importedBoundaryStoreSealedRecordRejectsWrongMagic",
+            "importedBoundaryStoreSealedRecordRejectsWrongMarker",
+        ) && runtime_residual_helper_shell_boundary_checker_source.contains(
+            "importedBoundaryStoreSealedRecordRejectsZeroUnit",
+        ) && runtime_residual_helper_shell_boundary_checker_source.contains(
+            "importedBoundaryStoreSealedRecordResealIsUpdate",
         ) && runtime_residual_helper_shell_boundary_checker_source.contains(
             "importedBoundaryStoreSurfaceZeroedBytesLength",
         ) && runtime_residual_helper_shell_boundary_checker_source.contains(
@@ -32185,15 +32256,15 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         ) && runtime_residual_helper_shell_boundary_validation_fn_source.contains(
             "\"store_codec_decode_sound_theorem_checked\": true",
         ) && runtime_residual_helper_shell_boundary_validation_fn_source.contains(
-            "\"store_codec_decode_into_roundtrip_theorem_checked\": true",
+            "\"store_codec_reseal_is_update_theorem_checked\": true",
         ) && runtime_residual_helper_shell_boundary_validation_fn_source.contains(
             "\"store_codec_decode_into_rejects_length_mismatch_theorem_checked\": true",
         ) && runtime_residual_helper_shell_boundary_validation_fn_source.contains(
-            "\"store_codec_decode_into_sound_theorem_checked\": true",
+            "\"store_codec_decode_rejects_zero_unit_theorem_checked\": true",
         ) && runtime_residual_helper_shell_boundary_validation_fn_source.contains(
             "\"store_sealed_encoded_len_theorem_checked\": true",
         ) && runtime_residual_helper_shell_boundary_validation_fn_source.contains(
-            "\"store_sealed_plain_len_theorem_checked\": true",
+            "\"store_sealed_content_len_theorem_checked\": true",
         ) && runtime_residual_helper_shell_boundary_validation_fn_source.contains(
             "\"store_sealed_record_decode_shape_theorem_checked\": true",
         ) && runtime_residual_helper_shell_boundary_validation_fn_source.contains(
@@ -32211,7 +32282,11 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         ) && runtime_residual_helper_shell_boundary_validation_fn_source.contains(
             "\"store_encoded_uo_slot_ciphertext_shape_theorem_checked\": true",
         ) && runtime_residual_helper_shell_boundary_validation_fn_source.contains(
-            "\"store_sealed_record_rejects_wrong_magic_theorem_checked\": true",
+            "\"store_sealed_record_rejects_wrong_marker_theorem_checked\": true",
+        ) && runtime_residual_helper_shell_boundary_validation_fn_source.contains(
+            "\"store_sealed_record_rejects_zero_unit_theorem_checked\": true",
+        ) && runtime_residual_helper_shell_boundary_validation_fn_source.contains(
+            "\"store_sealed_record_reseal_is_update_theorem_checked\": true",
         ) && runtime_residual_helper_shell_boundary_validation_fn_source.contains(
             "\"store_surface_zeroed_bytes_length_theorem_checked\": true",
         ) && runtime_residual_helper_shell_boundary_validation_fn_source.contains(
@@ -35129,16 +35204,18 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
                 .iter()
                 .all(|needle| kernel_machine_confinement_validation_fn_source.contains(needle));
     let runtime_implementation_kernel_machine_confinement_codec_layout_theorems_present =
-        lean_runtime_store_codec_semantics_source.contains("def decodeNonzeroInto?")
-            && lean_runtime_store_codec_semantics_source.contains(
-                "theorem decodeNonzeroInto?_encodeNonzero",
-            )
-            && lean_runtime_store_codec_semantics_source.contains(
-                "theorem decodeNonzeroInto?_rejectsEncodedLengthMismatch",
-            )
-            && lean_runtime_store_codec_semantics_source.contains(
-                "theorem decodeNonzeroInto?_some_sound",
-            )
+        lean_runtime_store_codec_semantics_source.contains("def decodeUnitsInto?")
+            && lean_runtime_store_codec_semantics_source.contains("def encodeUnits")
+            && lean_runtime_store_codec_semantics_source.contains("def recordMarker?")
+            && lean_runtime_store_codec_semantics_source.contains("def nextMarker?")
+            && lean_runtime_store_codec_semantics_source.contains("theorem decodeUnitsInto?_encodeUnits")
+            && lean_runtime_store_codec_semantics_source.contains("theorem decodeUnitsInto?_none_of_length_ne")
+            && lean_runtime_store_codec_semantics_source.contains("theorem decodeUnitsInto?_some")
+            && lean_runtime_store_codec_semantics_source.contains("theorem decodeUnitsInto?_none_of_zero_unit")
+            && lean_runtime_store_codec_semantics_source.contains("theorem encodeUnits_units_nonzero")
+            && lean_runtime_store_codec_semantics_source.contains("theorem isUpdateWrite_of_markers")
+            && lean_runtime_store_codec_semantics_source.contains("theorem isUpdateWrite_encodeUnits")
+            && lean_runtime_store_codec_semantics_source.contains("theorem encodeSealedRecord_reseal_isUpdate")
             && lean_runtime_store_codec_semantics_source.contains("def readExactRange?")
             && lean_runtime_store_codec_semantics_source.contains("def copyExactInto?")
             && lean_runtime_store_codec_semantics_source.contains(
@@ -35225,17 +35302,17 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         ) && lean_runtime_implementation_interface_source.contains(
             "RuntimePaperNativeKernelAssumptions.storeCodecDecodeSound",
         ) && lean_runtime_implementation_interface_source.contains(
-            "RuntimePaperNativeKernelAssumptions.storeCodecDecodeIntoRoundtrip",
+            "RuntimePaperNativeKernelAssumptions.storeCodecResealIsUpdate",
         ) && lean_runtime_implementation_interface_source.contains(
             "RuntimePaperNativeKernelAssumptions.storeCodecDecodeIntoRejectsLengthMismatch",
         ) && lean_runtime_implementation_interface_source.contains(
-            "RuntimePaperNativeKernelAssumptions.storeCodecDecodeIntoSound",
+            "RuntimePaperNativeKernelAssumptions.storeCodecDecodeRejectsZeroUnit",
         ) && lean_runtime_implementation_interface_source.contains(
             "RuntimePaperNativeKernelAssumptions.storeTraceUsesExactBoxedBacking",
         ) && lean_runtime_implementation_interface_source.contains(
             "RuntimePaperNativeKernelAssumptions.storeSealedEncodedLen",
         ) && lean_runtime_implementation_interface_source.contains(
-            "RuntimePaperNativeKernelAssumptions.storeSealedPlainLen",
+            "RuntimePaperNativeKernelAssumptions.storeSealedContentLen",
         ) && lean_runtime_implementation_interface_source.contains(
             "RuntimePaperNativeKernelAssumptions.storeSealedRecordDecodeShape",
         ) && lean_runtime_implementation_interface_source.contains(
@@ -35253,7 +35330,11 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         ) && lean_runtime_implementation_interface_source.contains(
             "RuntimePaperNativeKernelAssumptions.storeEncodedUoSlotCiphertextShape",
         ) && lean_runtime_implementation_interface_source.contains(
-            "RuntimePaperNativeKernelAssumptions.storeSealedRecordRejectsWrongMagic",
+            "RuntimePaperNativeKernelAssumptions.storeSealedRecordRejectsWrongMarker",
+        ) && lean_runtime_implementation_interface_source.contains(
+            "RuntimePaperNativeKernelAssumptions.storeSealedRecordRejectsZeroUnit",
+        ) && lean_runtime_implementation_interface_source.contains(
+            "RuntimePaperNativeKernelAssumptions.storeSealedRecordResealIsUpdate",
         ) && lean_runtime_implementation_interface_source.contains(
             "RuntimePaperNativeKernelAssumptions.storeSurfaceZeroedBytesLength",
         ) && lean_runtime_implementation_interface_source.contains(
@@ -35461,15 +35542,15 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         ) && lean_runtime_implementation_interface_json_source.contains(
             "importedRuntimeImplementationKernelMachineConfinementBoundary_valid_storeCodecDecodeSound",
         ) && lean_runtime_implementation_interface_json_source.contains(
-            "importedRuntimeImplementationKernelMachineConfinementBoundary_valid_storeCodecDecodeIntoRoundtrip",
+            "importedRuntimeImplementationKernelMachineConfinementBoundary_valid_storeCodecResealIsUpdate",
         ) && lean_runtime_implementation_interface_json_source.contains(
             "importedRuntimeImplementationKernelMachineConfinementBoundary_valid_storeCodecDecodeIntoRejectsLengthMismatch",
         ) && lean_runtime_implementation_interface_json_source.contains(
-            "importedRuntimeImplementationKernelMachineConfinementBoundary_valid_storeCodecDecodeIntoSound",
+            "importedRuntimeImplementationKernelMachineConfinementBoundary_valid_storeCodecDecodeRejectsZeroUnit",
         ) && lean_runtime_implementation_interface_json_source.contains(
             "importedRuntimeImplementationKernelMachineConfinementBoundary_valid_storeSealedEncodedLen",
         ) && lean_runtime_implementation_interface_json_source.contains(
-            "importedRuntimeImplementationKernelMachineConfinementBoundary_valid_storeSealedPlainLen",
+            "importedRuntimeImplementationKernelMachineConfinementBoundary_valid_storeSealedContentLen",
         ) && lean_runtime_implementation_interface_json_source.contains(
             "importedRuntimeImplementationKernelMachineConfinementBoundary_valid_storeSealedRecordDecodeShape",
         ) && lean_runtime_implementation_interface_json_source.contains(
@@ -35487,7 +35568,11 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         ) && lean_runtime_implementation_interface_json_source.contains(
             "importedRuntimeImplementationKernelMachineConfinementBoundary_valid_storeEncodedUoSlotCiphertextShape",
         ) && lean_runtime_implementation_interface_json_source.contains(
-            "importedRuntimeImplementationKernelMachineConfinementBoundary_valid_storeSealedRecordRejectsWrongMagic",
+            "importedRuntimeImplementationKernelMachineConfinementBoundary_valid_storeSealedRecordRejectsWrongMarker",
+        ) && lean_runtime_implementation_interface_json_source.contains(
+            "importedRuntimeImplementationKernelMachineConfinementBoundary_valid_storeSealedRecordRejectsZeroUnit",
+        ) && lean_runtime_implementation_interface_json_source.contains(
+            "importedRuntimeImplementationKernelMachineConfinementBoundary_valid_storeSealedRecordResealIsUpdate",
         ) && lean_runtime_implementation_interface_json_source.contains(
             "importedRuntimeImplementationKernelMachineConfinementBoundary_valid_storeSurfaceZeroedBytesLength",
         ) && lean_runtime_implementation_interface_json_source.contains(
@@ -35695,15 +35780,15 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         ) && lean_runtime_implementation_kernel_machine_confinement_checker_source.contains(
             "importedBoundaryStoreCodecDecodeSound",
         ) && lean_runtime_implementation_kernel_machine_confinement_checker_source.contains(
-            "importedBoundaryStoreCodecDecodeIntoRoundtrip",
+            "importedBoundaryStoreCodecResealIsUpdate",
         ) && lean_runtime_implementation_kernel_machine_confinement_checker_source.contains(
             "importedBoundaryStoreCodecDecodeIntoRejectsLengthMismatch",
         ) && lean_runtime_implementation_kernel_machine_confinement_checker_source.contains(
-            "importedBoundaryStoreCodecDecodeIntoSound",
+            "importedBoundaryStoreCodecDecodeRejectsZeroUnit",
         ) && lean_runtime_implementation_kernel_machine_confinement_checker_source.contains(
             "importedBoundaryStoreSealedEncodedLen",
         ) && lean_runtime_implementation_kernel_machine_confinement_checker_source.contains(
-            "importedBoundaryStoreSealedPlainLen",
+            "importedBoundaryStoreSealedContentLen",
         ) && lean_runtime_implementation_kernel_machine_confinement_checker_source.contains(
             "importedBoundaryStoreSealedRecordDecodeShape",
         ) && lean_runtime_implementation_kernel_machine_confinement_checker_source.contains(
@@ -35721,7 +35806,11 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         ) && lean_runtime_implementation_kernel_machine_confinement_checker_source.contains(
             "importedBoundaryStoreEncodedUoSlotCiphertextShape",
         ) && lean_runtime_implementation_kernel_machine_confinement_checker_source.contains(
-            "importedBoundaryStoreSealedRecordRejectsWrongMagic",
+            "importedBoundaryStoreSealedRecordRejectsWrongMarker",
+        ) && lean_runtime_implementation_kernel_machine_confinement_checker_source.contains(
+            "importedBoundaryStoreSealedRecordRejectsZeroUnit",
+        ) && lean_runtime_implementation_kernel_machine_confinement_checker_source.contains(
+            "importedBoundaryStoreSealedRecordResealIsUpdate",
         ) && lean_runtime_implementation_kernel_machine_confinement_checker_source.contains(
             "importedBoundaryPaperNativeStoreSurfaceZeroedBytesLength",
         ) && lean_runtime_implementation_kernel_machine_confinement_checker_source.contains(
@@ -35935,15 +36024,15 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         ) && kernel_machine_confinement_validation_fn_source.contains(
             "\"store_codec_decode_sound_theorem_checked\": true",
         ) && kernel_machine_confinement_validation_fn_source.contains(
-            "\"store_codec_decode_into_roundtrip_theorem_checked\": true",
+            "\"store_codec_reseal_is_update_theorem_checked\": true",
         ) && kernel_machine_confinement_validation_fn_source.contains(
             "\"store_codec_decode_into_rejects_length_mismatch_theorem_checked\": true",
         ) && kernel_machine_confinement_validation_fn_source.contains(
-            "\"store_codec_decode_into_sound_theorem_checked\": true",
+            "\"store_codec_decode_rejects_zero_unit_theorem_checked\": true",
         ) && kernel_machine_confinement_validation_fn_source.contains(
             "\"store_sealed_encoded_len_theorem_checked\": true",
         ) && kernel_machine_confinement_validation_fn_source.contains(
-            "\"store_sealed_plain_len_theorem_checked\": true",
+            "\"store_sealed_content_len_theorem_checked\": true",
         ) && kernel_machine_confinement_validation_fn_source.contains(
             "\"store_sealed_record_decode_shape_theorem_checked\": true",
         ) && kernel_machine_confinement_validation_fn_source.contains(
@@ -35961,7 +36050,11 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         ) && kernel_machine_confinement_validation_fn_source.contains(
             "\"store_encoded_uo_slot_ciphertext_shape_theorem_checked\": true",
         ) && kernel_machine_confinement_validation_fn_source.contains(
-            "\"store_sealed_record_rejects_wrong_magic_theorem_checked\": true",
+            "\"store_sealed_record_rejects_wrong_marker_theorem_checked\": true",
+        ) && kernel_machine_confinement_validation_fn_source.contains(
+            "\"store_sealed_record_rejects_zero_unit_theorem_checked\": true",
+        ) && kernel_machine_confinement_validation_fn_source.contains(
+            "\"store_sealed_record_reseal_is_update_theorem_checked\": true",
         ) && kernel_machine_confinement_validation_fn_source.contains(
             "\"store_surface_zeroed_bytes_length_theorem_checked\": true",
         ) && kernel_machine_confinement_validation_fn_source.contains(
@@ -44631,33 +44724,43 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && generated_store_codec_source.contains(
             "// @generated by proof/lean/GenerateRuntimeStoreCodecRust.lean; do not edit by hand.",
         )
-        && generated_store_codec_source
-            .contains("pub(super) const SEALED_MAGIC: [u8; 2] = [0xA5, 0x5A];")
+        && generated_store_codec_source.contains("pub(super) const SEALED_UNIT_BYTES: usize = 32;")
+        && generated_store_codec_source.contains("pub(super) const SEALED_MARKERS: [u8; 2] = [0xA5, 0x5A];")
         && generated_store_codec_source
             .contains("pub(super) const SEALED_NONCE_BYTES: usize = 12;")
         && generated_store_codec_source
             .contains("pub(super) const SEALED_TAG_BYTES: usize = 16;")
         && generated_store_codec_source
             .contains("pub(super) fn sealed_encoded_len(payload_len: usize) -> usize {")
-        && generated_store_codec_source.contains(
-            "pub(super) fn write_nonzero_encoded(out: &mut [u8], cursor: &mut usize, bytes: &[u8]) -> bool {",
-        )
-        && generated_store_codec_source
-            .contains("let Some(encoded_len) = bytes.len().checked_mul(2) else {")
-        && generated_store_codec_source
-            .contains("let Some(end) = (*cursor).checked_add(encoded_len) else {")
-        && generated_store_codec_source.contains("let Some(out) = out.get_mut(*cursor..end) else {")
-        && generated_store_codec_source
-            .contains("for (chunk, byte) in out.chunks_exact_mut(2).zip(bytes.iter()) {")
-        && generated_store_codec_source.contains("let Some(hi) = chunk.get_mut(0) else {")
-        && generated_store_codec_source.contains("*hi = (byte >> 4) + 1;")
-        && generated_store_codec_source.contains("let Some(lo) = chunk.get_mut(1) else {")
-        && generated_store_codec_source.contains("*lo = (byte & 0x0F) + 1;")
-        && generated_store_codec_source
-            .contains("pub(super) fn decode_nonzero_into(encoded: &[u8], out: &mut [u8]) -> Option<()> {")
-        && generated_store_codec_source
-            .contains("for (chunk, out_byte) in encoded.chunks_exact(2).zip(out.iter_mut()) {")
-        && generated_store_codec_source.contains("*out_byte = ((hi - 1) << 4) | (lo - 1);")
+        && generated_store_codec_source.contains("pub(super) fn sealed_content_len(payload_len: usize) -> usize {")
+        && generated_store_codec_source.contains("SEALED_NONCE_BYTES + payload_len + SEALED_TAG_BYTES")
+        && generated_store_codec_source.contains("pub(super) fn sealed_unit_count(payload_len: usize) -> usize {")
+        && generated_store_codec_source.contains("sealed_content_len(payload_len).div_ceil(SEALED_UNIT_BYTES - 1)")
+        && generated_store_codec_source.contains("SEALED_UNIT_BYTES * sealed_unit_count(payload_len)")
+        && generated_store_codec_source.contains("pub(super) fn record_marker(encoded: &[u8]) -> Option<u8> {")
+        && generated_store_codec_source.contains("if encoded.is_empty() || encoded.len() % SEALED_UNIT_BYTES != 0 {")
+        && generated_store_codec_source.contains("let marker = *encoded.first()?;")
+        && generated_store_codec_source.contains("if marker != SEALED_MARKERS[0] && marker != SEALED_MARKERS[1] {")
+        && generated_store_codec_source.contains("for unit in encoded.chunks_exact(SEALED_UNIT_BYTES) {")
+        && generated_store_codec_source.contains("if *unit.first()? != marker {")
+        && generated_store_codec_source.contains("pub(super) fn next_marker(marker: u8) -> Option<u8> {")
+        && generated_store_codec_source.contains("if marker == SEALED_MARKERS[0] {\n        Some(SEALED_MARKERS[1])")
+        && generated_store_codec_source.contains("} else if marker == SEALED_MARKERS[1] {\n        Some(SEALED_MARKERS[0])")
+        && generated_store_codec_source.contains("pub(super) fn write_units(out: &mut [u8], marker: u8, content: &[&[u8]]) -> bool {")
+        && generated_store_codec_source.contains("if out.len() != encoded_len {")
+        && generated_store_codec_source.contains("for unit in out.chunks_exact_mut(SEALED_UNIT_BYTES) {")
+        && generated_store_codec_source.contains("*head = marker;")
+        && generated_store_codec_source.contains("*slot = bytes.next().copied().unwrap_or(0);")
+        && generated_store_codec_source.contains("bytes.next().is_none()")
+        && generated_store_codec_source.contains("pub(super) fn read_units(encoded: &[u8], out: &mut [u8]) -> Option<u8> {")
+        && generated_store_codec_source.contains("if encoded.len() != encoded_len {")
+        && generated_store_codec_source.contains("let marker = record_marker(encoded)?;")
+        && generated_store_codec_source.contains("for byte in unit.iter().skip(1) {")
+        && generated_store_codec_source.contains("} else if *byte != 0 {\n                return None;")
+        && !generated_store_codec_source.contains("fn write_nonzero_encoded(")
+        && !generated_store_codec_source.contains("fn decode_nonzero_into(")
+        && !generated_store_codec_source.contains("SEALED_MAGIC")
+        && !generated_store_codec_source.contains("byte >> 4")
         && !generated_store_codec_source.contains("let end = *cursor + bytes.len() * 2;")
         && !generated_store_codec_source.contains("let out = &mut out[*cursor..end];")
         && !generated_store_codec_source.contains("for (index, byte) in bytes.iter().enumerate() {")
@@ -44680,9 +44783,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && generated_store_surface_source.contains("pub struct StoreCipher {")
         && generated_store_surface_source.contains("key: [u8; 32],")
         && generated_store_surface_source.contains("seals: Arc<AtomicU64>,")
-        && generated_store_surface_source.contains(
-            "decode_nonzero_into, generated_sealed_encoded_len, seal_nonce, write_nonzero_encoded,",
-        )
+        && generated_store_surface_source.contains("generated_sealed_content_len, generated_sealed_encoded_len, next_marker, read_units,")
+        && generated_store_surface_source.contains("record_marker, seal_nonce, write_units, SEALED_MARKERS, SEALED_NONCE_BYTES, SEALED_TAG_BYTES,")
         && generated_store_surface_source.contains("struct WipeOnDrop<'a> {")
         && generated_store_surface_source.contains("impl Drop for WipeOnDrop<'_> {")
         && generated_store_surface_source
@@ -44709,19 +44811,20 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             .contains("self::with_opened_payload(self, aad, payload_len, encoded, f)")
         && generated_store_surface_source
             .contains("let mut encoded = zeroed_boxed_bytes(generated_sealed_encoded_len(payload.len()))?;")
-        && generated_store_surface_source
-            .contains("if !write_nonzero_encoded(out, &mut cursor, &SEALED_MAGIC) {")
-        && generated_store_surface_source
-            .contains("if !write_nonzero_encoded(out, &mut cursor, &nonce_bytes) {")
-        && generated_store_surface_source
-            .contains("if !write_nonzero_encoded(out, &mut cursor, payload.as_slice()) {")
-        && generated_store_surface_source
-            .contains("if !write_nonzero_encoded(out, &mut cursor, tag.as_slice()) {")
-        && !generated_store_surface_source
-            .contains("write_nonzero_encoded(out, &mut cursor, &SEALED_MAGIC);")
+        && generated_store_surface_source.contains("Some(SEALED_MARKERS[0]),")
+        && generated_store_surface_source.contains("let marker = record_marker(out).and_then(next_marker);")
+        && generated_store_surface_source.contains("seal_and_wipe_units(cipher, aad, payload, rng, marker, out)")
+        && generated_store_surface_source.contains("fn seal_and_wipe_units(")
+        && generated_store_surface_source.contains("let Some(marker) = marker else {")
+        && generated_store_surface_source.contains("if out.len() != required_len {")
+        && generated_store_surface_source.contains("write_units(\n        out,\n        marker,\n        &[&nonce_bytes, payload.as_slice(), tag.as_slice()],\n    )\n}")
+        && !generated_store_surface_source.contains("&[&nonce_bytes, payload.as_slice(), tag.as_slice()],\n    );")
+        && !generated_store_surface_source.contains("write_nonzero_encoded(")
+        && !generated_store_surface_source.contains("decode_nonzero_into(")
+        && !generated_store_surface_source.contains("SEALED_MAGIC")
         && generated_store_surface_source.contains(".decrypt_in_place_detached(")
         && generated_store_surface_source.contains("let mut filler = zeroed_boxed_bytes(len)?;")
-        && generated_store_surface_source.contains("let mut sealed = zeroed_boxed_bytes(sealed_len).ok()?;")
+        && generated_store_surface_source.contains("let mut sealed = zeroed_boxed_bytes(generated_sealed_content_len(payload_len)).ok()?;")
         && generated_store_surface_source
             .contains("fn checked_end(start: usize, len: usize) -> Option<usize> {")
         && generated_store_surface_source.contains("start.checked_add(len)")
@@ -44730,10 +44833,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && generated_store_surface_source.contains("bytes.get(start..end)")
         && generated_store_surface_source
             .contains("fn copy_exact_into(out: &mut [u8], input: &[u8]) -> Option<()> {")
-        && generated_store_surface_source
-            .contains("let magic = read_exact_range(&sealed, 0, SEALED_MAGIC.len())?;")
-        && generated_store_surface_source
-            .contains("let nonce_start = SEALED_MAGIC.len();")
+        && generated_store_surface_source.contains("let nonce_start = 0usize;")
         && generated_store_surface_source
             .contains("let ciphertext_start = checked_end(nonce_start, SEALED_NONCE_BYTES)?;")
         && generated_store_surface_source
@@ -44758,7 +44858,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !generated_store_surface_source
             .contains("let mut payload = vec![0u8; payload_len].into_boxed_slice();")
         && !production_source_slice(&generated_store_surface_source)
-            .contains("sealed.split_at(SEALED_MAGIC.len())")
+            .contains("sealed.split_at(SEALED_NONCE_BYTES)")
         && !production_source_slice(&generated_store_surface_source)
             .contains("rest.split_at(SEALED_NONCE_BYTES)")
         && !production_source_slice(&generated_store_surface_source)
@@ -44766,7 +44866,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !production_source_slice(&generated_store_surface_source)
             .contains("fn checked_split_at(bytes: &[u8], mid: usize) -> Option<(&[u8], &[u8])> {")
         && !production_source_slice(&generated_store_surface_source)
-            .contains("checked_split_at(&sealed, SEALED_MAGIC.len())?")
+            .contains("checked_split_at(&sealed, SEALED_NONCE_BYTES)?")
         && !production_source_slice(&generated_store_surface_source)
             .contains("checked_split_at(rest, SEALED_NONCE_BYTES)?")
         && !production_source_slice(&generated_store_surface_source)
@@ -44776,12 +44876,12 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !store_codec_source.contains("Vec::with_capacity(payload.len() * 2)")
         && !store_codec_source.contains("Vec::with_capacity(encoded.len() / 2)")
         && !store_codec_source.contains("push_nonzero_encoded(")
-        && !store_codec_source.contains("const SEALED_MAGIC: [u8; 2] = [0xA5, 0x5A];")
-        && !store_codec_source.contains(
-            "fn write_nonzero_encoded(out: &mut [u8], cursor: &mut usize, bytes: &[u8])",
-        )
-        && !store_codec_source
-            .contains("fn decode_nonzero_into(encoded: &[u8], out: &mut [u8]) -> Option<()>")
+        && !store_codec_source.contains("const SEALED_MARKERS: [u8; 2] = [0xA5, 0x5A];")
+        && !store_codec_source.contains("const SEALED_UNIT_BYTES: usize = 32;")
+        && !store_codec_source.contains("fn write_units(out: &mut [u8], marker: u8, content: &[&[u8]])")
+        && !store_codec_source.contains("fn read_units(encoded: &[u8], out: &mut [u8]) -> Option<u8>")
+        && !store_codec_source.contains("fn record_marker(encoded: &[u8]) -> Option<u8>")
+        && !store_codec_source.contains("fn next_marker(marker: u8) -> Option<u8>")
         && !store_codec_source.contains(".encrypt(\n")
         && !store_codec_source.contains(".decrypt(\n");
     let execution_trace_omits_runtime_telemetry = core_trace_source
@@ -46592,7 +46692,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         json!({
             "name": "StoreCipher and plaintext staging",
             "owner": "runtime/uo-store/src/codec.rs, runtime/uo-store/src/generated_codec.rs, runtime/uo-store/src/generated_store_helpers.rs, and runtime/uo-store/src/store.rs",
-            "boundary": "direct seal/open stays in codec; the deterministic nonzero transport helpers live in a Lean-generated codec fragment, the exact-size plaintext staging and wipe-on-drop shell now live in the Lean-generated surface fragment, and the handwritten codec shell is reduced to key lifecycle plus public delegating methods; the fixed-size raw/UO slot stores keep their ciphertext cells in boxed buffers via Lean-generated raw-slot allocation and copy-and-wipe helpers while the UO bootstrap/write path is forced through Lean-generated boxed-filler and seal-into helpers and records only public update-shape write evidence rather than cloning ciphertext snapshots",
+            "boundary": "direct seal/open stays in codec; the deterministic unit codec helpers (one nonzero marker byte in each 32-byte unit of a record) live in a Lean-generated codec fragment, the exact-size plaintext staging and wipe-on-drop shell now live in the Lean-generated surface fragment, and the handwritten codec shell is reduced to key lifecycle plus public delegating methods; the fixed-size raw/UO slot stores keep their ciphertext cells in boxed buffers via Lean-generated raw-slot allocation and copy-and-wipe helpers while the UO bootstrap/write path is forced through Lean-generated boxed-filler and seal-into helpers and records only public update-shape write evidence rather than cloning ciphertext snapshots",
             "checked": store_cipher_key_zeroizes_on_drop
                 && store_cipher_exposes_wipe_helpers
                 && store_cipher_uses_exact_size_nonzero_buffers
@@ -51675,7 +51775,7 @@ fn run_engineering_cost(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Resul
             "store_cipher": "ChaCha20-Poly1305 sealed store",
             "nonce_policy": "fresh per-write runtime RNG/counter-derived nonces",
             "metadata_encryption": "Path-ORAM position-map and stash metadata pages are sealed",
-            "zero_detection_setting": "raw zero encoding is evaluation-only; admitted UO storage uses sealed nonzero transport",
+            "zero_detection_setting": "raw zero encoding is evaluation-only; admitted UO storage uses sealed records with a nonzero marker in every 32-byte unit",
             "discard_unmap_setting": "not used by in-process runtime",
             "sparse_metadata_setting": "fixed public metadata pages",
             "dirty_bitmap_setting": "fixed public write schedules, not host-visible dirty-bit elision",
@@ -51968,8 +52068,10 @@ fn static_storage_summary(artifact: &CompiledArtifact) -> Result<JsonValue> {
     }))
 }
 
+/// The bytes of a sealed record of `payload_len` bytes: whole 32-byte units,
+/// each one marker byte and 31 bytes of nonce, ciphertext and tag.
 fn sealed_encoded_len(payload_len: usize) -> usize {
-    2 * (2 + 12 + payload_len + 16)
+    32 * (12 + payload_len + 16).div_ceil(31)
 }
 
 #[cfg(feature = "insecure-eval-raw")]

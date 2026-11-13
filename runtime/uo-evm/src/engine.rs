@@ -1536,14 +1536,16 @@ bounds:
             .collect()
     }
 
-    /// The counter that a sealed record's nonce carries. A record is its
-    /// bytes in two nonzero nibbles each: two bytes of magic, the twelve of
-    /// the nonce, then the ciphertext and the tag.
+    /// The counter that a sealed record's nonce carries. A record is a
+    /// whole number of 32-byte units, each a marker and 31 bytes of content:
+    /// the twelve bytes of the nonce, then the ciphertext and the tag.
     fn sealed_record_counter(record: &[u8]) -> u64 {
-        let byte = |index: usize| ((record[2 * index] - 1) << 4) | (record[2 * index + 1] - 1);
-        assert_eq!([byte(0), byte(1)], [0xA5, 0x5A], "not a sealed record");
-        assert_eq!([byte(2), byte(3), byte(4), byte(5)], [0u8; 4]);
-        u64::from_be_bytes(std::array::from_fn(|index| byte(6 + index)))
+        assert_eq!(record.len() % 32, 0, "not a sealed record");
+        assert!(matches!(record[0], 0xA5 | 0x5A), "not a sealed record");
+        assert!(record.chunks_exact(32).all(|unit| unit[0] == record[0]));
+        // The nonce is the first twelve bytes of the first unit's content.
+        assert_eq!(record[1..5], [0u8; 4]);
+        u64::from_be_bytes(std::array::from_fn(|index| record[5 + index]))
     }
 
     /// The nonce counters of the records in a state's storage, by object id.

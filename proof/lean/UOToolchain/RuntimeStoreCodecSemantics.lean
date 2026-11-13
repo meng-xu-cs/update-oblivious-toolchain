@@ -2,11 +2,17 @@ namespace UOToolchain
 
 namespace RuntimeStoreCodecSemantics
 
-def sealedMagicLen : Nat := 2
 def sealedNonceBytes : Nat := 12
 def sealedTagBytes : Nat := 16
-def byteRadix : Nat := 16
-def sealedMagic : List Nat := [165, 90]
+
+/-- The unit of a sealed record (`SEALED_UNIT_BYTES` in
+`runtime/uo-store/src/generated_codec.rs`): a 32-byte storage word, the unit
+the storage observer classifies. A sealed record is a whole number of them. -/
+def sealedUnitBytes : Nat := 32
+
+/-- The two values of a record's marker, the first byte of each of its units
+(`SEALED_MARKERS`). Neither is zero. -/
+def sealedMarkers : List Nat := [165, 90]
 
 /-- ChaCha20-Poly1305 cipher key length in bytes, matching RFC 8439 section 2.5
 (32-byte / 256-bit key). The Rust runtime pins this to `key: [u8; 32]` in
@@ -16,52 +22,8 @@ key shape. The Lean constant lets WP5 codec theorems refer to this length
 without re-deriving it from the Rust source. -/
 def cipherKeyBytes : Nat := 32
 
-def sealedEncodedLen (payloadLen : Nat) : Nat :=
-  2 * (sealedMagicLen + sealedNonceBytes + payloadLen + sealedTagBytes)
-
-def sealedPlainLen (payloadLen : Nat) : Nat :=
-  sealedMagicLen + sealedNonceBytes + payloadLen + sealedTagBytes
-
-def encodeByte (byte : Nat) : List Nat :=
-  [byte / byteRadix + 1, byte % byteRadix + 1]
-
-def encodeNonzero : List Nat → List Nat
-  | [] => []
-  | byte :: bytes => encodeByte byte ++ encodeNonzero bytes
-
-def decodeByte (hi lo : Nat) : Option Nat :=
-  if hi = 0 ∨ byteRadix < hi ∨ lo = 0 ∨ byteRadix < lo then
-    none
-  else
-    some ((hi - 1) * byteRadix + (lo - 1))
-
-def decodeNonzero : List Nat → Option (List Nat)
-  | [] => some []
-  | hi :: lo :: rest => do
-      let byte ← decodeByte hi lo
-      let bytes ← decodeNonzero rest
-      some (byte :: bytes)
-  | [_] => none
-
-def decodeNonzeroInto?
-    (byteLen : Nat)
-    (encoded : List Nat) : Option (List Nat) :=
-  match decodeNonzero encoded with
-  | none => none
-  | some bytes =>
-      if bytes.length = byteLen then some bytes else none
-
 def ValidByte (byte : Nat) : Prop :=
   byte < 256
-
-def ValidEncodedNibble (nibble : Nat) : Prop :=
-  0 < nibble ∧ nibble ≤ byteRadix
-
-def UoStoreSlotCiphertextShape
-    (payloadLen : Nat)
-    (encoded : List Nat) : Prop :=
-  encoded.length = sealedEncodedLen payloadLen ∧
-    ∀ nibble, nibble ∈ encoded → ValidEncodedNibble nibble
 
 inductive StoreWriteClass where
   | set
@@ -95,61 +57,6 @@ def UoStoreUpdateWriteAccepted
     (write : StoreWriteShape) : Prop :=
   write = uoStoreUpdateWriteShape object slotLen
 
-structure SealedRecordParts where
-  magic : List Nat
-  nonce : List Nat
-  ciphertext : List Nat
-  tag : List Nat
-deriving Repr, DecidableEq
-
-def SealedRecordParts.ValidShape
-    (payloadLen : Nat)
-    (parts : SealedRecordParts) : Prop :=
-  parts.magic.length = sealedMagicLen ∧
-    parts.nonce.length = sealedNonceBytes ∧
-    parts.ciphertext.length = payloadLen ∧
-    parts.tag.length = sealedTagBytes
-
-def SealedRecordParts.ValidOpenShape
-    (payloadLen : Nat)
-    (parts : SealedRecordParts) : Prop :=
-  parts.ValidShape payloadLen ∧
-    parts.magic = sealedMagic
-
-def SealedRecordParts.bytes
-    (parts : SealedRecordParts) : List Nat :=
-  parts.magic ++ parts.nonce ++ parts.ciphertext ++ parts.tag
-
-def sealedRecordParts
-    (payloadLen : Nat)
-    (sealed : List Nat) : SealedRecordParts :=
-  let afterMagic := sealed.drop sealedMagicLen
-  let afterNonce := afterMagic.drop sealedNonceBytes
-  { magic := sealed.take sealedMagicLen
-  , nonce := afterMagic.take sealedNonceBytes
-  , ciphertext := afterNonce.take payloadLen
-  , tag := (afterNonce.drop payloadLen).take sealedTagBytes
-  }
-
-def splitSealedRecord?
-    (payloadLen : Nat)
-    (sealed : List Nat) : Option SealedRecordParts :=
-  if sealed.length = sealedPlainLen payloadLen then
-    some (sealedRecordParts payloadLen sealed)
-  else
-    none
-
-def decodeSealedRecord?
-    (payloadLen : Nat)
-    (encoded : List Nat) : Option SealedRecordParts :=
-  match decodeNonzero encoded with
-  | none => none
-  | some sealed =>
-      match splitSealedRecord? payloadLen sealed with
-      | none => none
-      | some parts =>
-          if parts.magic = sealedMagic then some parts else none
-
 def zeroedBytes (len : Nat) : List Nat :=
   List.replicate len 0
 
@@ -167,29 +74,6 @@ def readExactRange?
 def copyExactInto?
     (out input : List Nat) : Option (List Nat) :=
   if out.length = input.length then some input else none
-
-def sealAndWipeIntoSliceAccepted
-    (payloadLen outLen : Nat) : Prop :=
-  outLen = sealedEncodedLen payloadLen
-
-def openBoxedPayloadShape?
-    (payloadLen : Nat)
-    (encoded : List Nat) : Option Nat :=
-  match decodeSealedRecord? payloadLen encoded with
-  | none => none
-  | some parts => some parts.ciphertext.length
-
-theorem sealedEncodedLen_public_formula
-    (payloadLen : Nat) :
-  sealedEncodedLen payloadLen =
-      2 * (sealedMagicLen + sealedNonceBytes + payloadLen + sealedTagBytes) := by
-  rfl
-
-theorem sealedPlainLen_public_formula
-    (payloadLen : Nat) :
-    sealedPlainLen payloadLen =
-      sealedMagicLen + sealedNonceBytes + payloadLen + sealedTagBytes := by
-  rfl
 
 theorem zeroedBytes_length
     (len : Nat) :
@@ -261,551 +145,6 @@ theorem copyExactInto?_rejectsLengthMismatch
     copyExactInto? out input = none := by
   simp [copyExactInto?, hLen]
 
-theorem sealAndWipeIntoSliceAccepted_exactLength
-    (payloadLen : Nat) :
-    sealAndWipeIntoSliceAccepted payloadLen
-      (sealedEncodedLen payloadLen) := by
-  rfl
-
-theorem sealAndWipeIntoSliceAccepted_rejectsLengthMismatch
-    {payloadLen outLen : Nat}
-    (hLen : outLen ≠ sealedEncodedLen payloadLen) :
-    ¬ sealAndWipeIntoSliceAccepted payloadLen outLen := by
-  intro hAccepted
-  exact hLen hAccepted
-
-theorem encodeByte_length
-    (byte : Nat) :
-    (encodeByte byte).length = 2 := by
-  rfl
-
-theorem encodeNonzero_length
-    (bytes : List Nat) :
-    (encodeNonzero bytes).length = 2 * bytes.length := by
-  induction bytes with
-  | nil => rfl
-  | cons byte bytes ih =>
-      simp [encodeNonzero, encodeByte, ih, Nat.mul_succ]
-
-theorem encodeByte_validEncodedNibble
-    {byte nibble : Nat}
-    (hByte : ValidByte byte)
-    (hMem : nibble ∈ encodeByte byte) :
-    ValidEncodedNibble nibble := by
-  have hRadixPos : 0 < byteRadix := by decide
-  have hDiv : byte / byteRadix < byteRadix := by
-    unfold ValidByte at hByte
-    unfold byteRadix
-    exact Nat.div_lt_of_lt_mul (by simpa using hByte)
-  have hMod : byte % byteRadix < byteRadix :=
-    Nat.mod_lt byte hRadixPos
-  unfold byteRadix at hDiv hMod
-  simp [encodeByte] at hMem
-  rcases hMem with hNibble | hNibble
-  · rw [hNibble]
-    unfold ValidEncodedNibble byteRadix
-    omega
-  · rw [hNibble]
-    unfold ValidEncodedNibble byteRadix
-    omega
-
-theorem encodeNonzero_validEncodedNibbles
-    {bytes : List Nat}
-    (hBytes : ∀ byte, byte ∈ bytes → ValidByte byte)
-    {nibble : Nat}
-    (hMem : nibble ∈ encodeNonzero bytes) :
-    ValidEncodedNibble nibble := by
-  induction bytes with
-  | nil =>
-      simp [encodeNonzero] at hMem
-  | cons byte bytes ih =>
-      simp [encodeNonzero] at hMem
-      rcases hMem with hHead | hTail
-      · exact encodeByte_validEncodedNibble (hBytes byte (by simp)) hHead
-      · exact
-          ih
-            (fun tailByte hTailByte =>
-              hBytes tailByte (by simp [hTailByte]))
-            hTail
-
-theorem decodeByte_encodeByte
-    {byte : Nat}
-    (hByte : ValidByte byte) :
-    decodeByte (byte / byteRadix + 1) (byte % byteRadix + 1) =
-      some byte := by
-  have hRadixPos : 0 < byteRadix := by decide
-  have hDiv : byte / byteRadix < byteRadix := by
-    unfold ValidByte at hByte
-    unfold byteRadix
-    exact Nat.div_lt_of_lt_mul (by simpa using hByte)
-  have hMod : byte % byteRadix < byteRadix :=
-    Nat.mod_lt byte hRadixPos
-  unfold byteRadix at hDiv hMod
-  have hCond :
-      ¬ (byte / byteRadix + 1 = 0 ∨
-        byteRadix < byte / byteRadix + 1 ∨
-        byte % byteRadix + 1 = 0 ∨
-        byteRadix < byte % byteRadix + 1) := by
-    unfold byteRadix
-    omega
-  unfold decodeByte
-  split
-  · rename_i hBad
-    exact False.elim (hCond hBad)
-  · simp [Nat.div_add_mod']
-
-theorem decodeByte_sound
-    {hi lo byte : Nat}
-    (hDecode : decodeByte hi lo = some byte) :
-    ValidEncodedNibble hi ∧ ValidEncodedNibble lo ∧ ValidByte byte := by
-  unfold decodeByte at hDecode
-  split at hDecode
-  · contradiction
-  · rename_i hGood
-    cases hDecode
-    have hHiLower : 0 < hi := by
-      by_cases hZero : hi = 0
-      · exact False.elim (hGood (Or.inl hZero))
-      · exact Nat.pos_of_ne_zero hZero
-    have hLoLower : 0 < lo := by
-      by_cases hZero : lo = 0
-      · exact False.elim (hGood (Or.inr (Or.inr (Or.inl hZero))))
-      · exact Nat.pos_of_ne_zero hZero
-    have hHiUpper : hi ≤ byteRadix := by
-      by_cases hGt : byteRadix < hi
-      · exact False.elim (hGood (Or.inr (Or.inl hGt)))
-      · exact Nat.le_of_not_gt hGt
-    have hLoUpper : lo ≤ byteRadix := by
-      by_cases hGt : byteRadix < lo
-      · exact False.elim (hGood (Or.inr (Or.inr (Or.inr hGt))))
-      · exact Nat.le_of_not_gt hGt
-    unfold ValidEncodedNibble ValidByte byteRadix at *
-    omega
-
-theorem decodeNonzero_sound
-    {encoded bytes : List Nat}
-    (hDecode : decodeNonzero encoded = some bytes) :
-    encoded.length = 2 * bytes.length ∧
-      (∀ byte, byte ∈ bytes → ValidByte byte) ∧
-      (∀ nibble, nibble ∈ encoded → ValidEncodedNibble nibble) := by
-  have hMain : ∀ n encoded bytes,
-      encoded.length = n →
-      decodeNonzero encoded = some bytes →
-      encoded.length = 2 * bytes.length ∧
-        (∀ byte, byte ∈ bytes → ValidByte byte) ∧
-        (∀ nibble, nibble ∈ encoded → ValidEncodedNibble nibble) := by
-    intro n
-    induction n using Nat.strongRecOn with
-    | ind n ih =>
-        intro encoded bytes hLen hDecode
-        cases encoded with
-        | nil =>
-            simp [decodeNonzero] at hDecode
-            cases hDecode
-            simp
-        | cons hi tail =>
-            cases tail with
-            | nil =>
-                simp [decodeNonzero] at hDecode
-            | cons lo rest =>
-                simp [decodeNonzero] at hDecode
-                cases hByte : decodeByte hi lo with
-                | none =>
-                    simp [hByte] at hDecode
-                | some byte =>
-                    cases hRest : decodeNonzero rest with
-                    | none =>
-                        simp [hByte, hRest] at hDecode
-                    | some tailBytes =>
-                        simp [hByte, hRest] at hDecode
-                        cases hDecode
-                        have hRestLenLt : rest.length < n := by
-                          simp at hLen
-                          omega
-                        have hTailSound :=
-                          ih rest.length hRestLenLt rest tailBytes rfl hRest
-                        have hByteSound := decodeByte_sound hByte
-                        rcases hByteSound with ⟨hHi, hLo, hByteValid⟩
-                        rcases hTailSound with
-                          ⟨hLenRest, hTailValid, hEncodedValid⟩
-                        constructor
-                        · simp [hLenRest]
-                          omega
-                        constructor
-                        · intro candidate hMem
-                          simp at hMem
-                          rcases hMem with hEq | hTailMem
-                          · subst candidate
-                            exact hByteValid
-                          · exact hTailValid candidate hTailMem
-                        · intro nibble hMem
-                          simp at hMem
-                          rcases hMem with hEq | hEq | hTailMem
-                          · subst nibble
-                            exact hHi
-                          · subst nibble
-                            exact hLo
-                          · exact hEncodedValid nibble hTailMem
-  exact hMain encoded.length encoded bytes rfl hDecode
-
-theorem decodeNonzeroInto?_rejectsEncodedLengthMismatch
-    {byteLen : Nat}
-    {encoded : List Nat}
-    (hLen : encoded.length ≠ 2 * byteLen) :
-    decodeNonzeroInto? byteLen encoded = none := by
-  unfold decodeNonzeroInto?
-  cases hDecode : decodeNonzero encoded with
-  | none => rfl
-  | some bytes =>
-      have hSound := decodeNonzero_sound hDecode
-      by_cases hBytesLen : bytes.length = byteLen
-      · simp [hBytesLen]
-        exact False.elim (hLen (by rw [hSound.1, hBytesLen]))
-      · simp [hBytesLen]
-
-theorem decodeNonzeroInto?_some_sound
-    {byteLen : Nat}
-    {encoded bytes : List Nat}
-    (hDecode : decodeNonzeroInto? byteLen encoded = some bytes) :
-    encoded.length = 2 * byteLen ∧
-      bytes.length = byteLen ∧
-      (∀ byte, byte ∈ bytes → ValidByte byte) ∧
-      (∀ nibble, nibble ∈ encoded → ValidEncodedNibble nibble) := by
-  unfold decodeNonzeroInto? at hDecode
-  cases hNonzero : decodeNonzero encoded with
-  | none =>
-      simp [hNonzero] at hDecode
-  | some decoded =>
-      by_cases hLen : decoded.length = byteLen
-      · simp [hNonzero, hLen] at hDecode
-        cases hDecode
-        have hSound := decodeNonzero_sound hNonzero
-        exact
-          ⟨ by rw [hSound.1, hLen]
-          , hLen
-          , hSound.2.1
-          , hSound.2.2
-          ⟩
-      · simp [hNonzero, hLen] at hDecode
-
-theorem sealedRecordParts_validShape_of_length
-    {payloadLen : Nat}
-    {sealed : List Nat}
-    (hLen : sealed.length = sealedPlainLen payloadLen) :
-    (sealedRecordParts payloadLen sealed).ValidShape payloadLen := by
-  unfold SealedRecordParts.ValidShape sealedRecordParts
-  constructor
-  · simp [hLen, sealedPlainLen, sealedMagicLen, sealedNonceBytes,
-      sealedTagBytes]
-  constructor
-  · simp [hLen, sealedPlainLen, sealedMagicLen, sealedNonceBytes,
-      sealedTagBytes]
-  constructor
-  · simp [hLen, sealedPlainLen, sealedMagicLen, sealedNonceBytes,
-      sealedTagBytes]
-    omega
-  · simp [hLen, sealedPlainLen, sealedMagicLen, sealedNonceBytes,
-      sealedTagBytes]
-
-theorem sealedRecordParts_bytes_of_length
-    {payloadLen : Nat}
-    {sealed : List Nat}
-    (hLen : sealed.length = sealedPlainLen payloadLen) :
-    (sealedRecordParts payloadLen sealed).bytes = sealed := by
-  have hTake :
-      sealed.take (sealedPlainLen payloadLen) = sealed := by
-    rw [← hLen]
-    exact List.take_length
-  conv =>
-    rhs
-    rw [← hTake]
-  simp [SealedRecordParts.bytes, sealedRecordParts, sealedPlainLen,
-    sealedMagicLen, sealedNonceBytes, sealedTagBytes, List.take_add,
-    Nat.add_assoc, List.append_assoc]
-  rw [← List.append_assoc]
-  rw [← List.take_add (l := sealed) (i := 2) (j := 12)]
-
-theorem sealedRecordParts_bytes_valid_of_length
-    {payloadLen : Nat}
-    {sealed : List Nat}
-    (hLen : sealed.length = sealedPlainLen payloadLen)
-    (hSealedBytes : ∀ byte, byte ∈ sealed → ValidByte byte) :
-    ∀ byte,
-      byte ∈ (sealedRecordParts payloadLen sealed).bytes →
-        ValidByte byte := by
-  intro byte hMem
-  exact
-    hSealedBytes byte
-      (by
-        rw [sealedRecordParts_bytes_of_length hLen] at hMem
-        exact hMem)
-
-theorem SealedRecordParts.bytes_length_of_validShape
-    {payloadLen : Nat}
-    {parts : SealedRecordParts}
-    (hShape : parts.ValidShape payloadLen) :
-    parts.bytes.length = sealedPlainLen payloadLen := by
-  unfold SealedRecordParts.ValidShape at hShape
-  unfold SealedRecordParts.bytes
-  rcases hShape with ⟨hMagicLen, hNonceLen, hCiphertextLen, hTagLen⟩
-  simp [hMagicLen, hNonceLen, hCiphertextLen, hTagLen,
-    sealedPlainLen, sealedMagicLen, sealedNonceBytes, sealedTagBytes]
-  omega
-
-theorem sealedRecordParts_bytes_roundtrip
-    {payloadLen : Nat}
-    {parts : SealedRecordParts}
-    (hShape : parts.ValidShape payloadLen) :
-    sealedRecordParts payloadLen parts.bytes = parts := by
-  cases parts with
-  | mk magic nonce ciphertext tag =>
-      unfold SealedRecordParts.ValidShape at hShape
-      unfold SealedRecordParts.bytes
-      rcases hShape with
-        ⟨hMagicLen, hNonceLen, hCiphertextLen, hTagLen⟩
-      have hTagLenLe : tag.length ≤ 16 := by
-        have hTagLenEq : tag.length = 16 := by
-          simpa [sealedTagBytes] using hTagLen
-        omega
-      simp [sealedRecordParts, hMagicLen, hNonceLen, hCiphertextLen,
-        sealedMagicLen, sealedNonceBytes, sealedTagBytes,
-        List.take_of_length_le hTagLenLe]
-
-theorem splitSealedRecord_some_validShape
-    {payloadLen : Nat}
-    {sealed : List Nat}
-    {parts : SealedRecordParts}
-    (hSplit : splitSealedRecord? payloadLen sealed = some parts) :
-    sealed.length = sealedPlainLen payloadLen ∧
-      parts.ValidShape payloadLen := by
-  unfold splitSealedRecord? at hSplit
-  split at hSplit
-  · rename_i hLen
-    cases hSplit
-    exact ⟨hLen, sealedRecordParts_validShape_of_length hLen⟩
-  · contradiction
-
-theorem splitSealedRecord_some_bytes
-    {payloadLen : Nat}
-    {sealed : List Nat}
-    {parts : SealedRecordParts}
-    (hSplit : splitSealedRecord? payloadLen sealed = some parts) :
-    parts.bytes = sealed := by
-  unfold splitSealedRecord? at hSplit
-  split at hSplit
-  · rename_i hLen
-    cases hSplit
-    exact sealedRecordParts_bytes_of_length hLen
-  · contradiction
-
-theorem decodeSealedRecord_some_validOpenShape
-    {payloadLen : Nat}
-    {encoded : List Nat}
-    {parts : SealedRecordParts}
-    (hDecode : decodeSealedRecord? payloadLen encoded = some parts) :
-    encoded.length = sealedEncodedLen payloadLen ∧
-      parts.ValidOpenShape payloadLen := by
-  unfold decodeSealedRecord? at hDecode
-  cases hNonzero : decodeNonzero encoded with
-  | none =>
-      simp [hNonzero] at hDecode
-  | some sealed =>
-      cases hSplit : splitSealedRecord? payloadLen sealed with
-      | none =>
-          simp [hNonzero, hSplit] at hDecode
-      | some decodedParts =>
-          by_cases hMagic : decodedParts.magic = sealedMagic
-          · simp [hNonzero, hSplit, hMagic] at hDecode
-            cases hDecode
-            have hSplitShape := splitSealedRecord_some_validShape hSplit
-            have hDecodeSound := decodeNonzero_sound hNonzero
-            have hLen :
-                encoded.length = sealedEncodedLen payloadLen := by
-              rw [hDecodeSound.1, hSplitShape.1]
-              unfold sealedEncodedLen sealedPlainLen
-              omega
-            exact ⟨hLen, ⟨hSplitShape.2, hMagic⟩⟩
-          · simp [hNonzero, hSplit, hMagic] at hDecode
-
-theorem openBoxedPayloadShape?_some_payloadLen
-    {payloadLen : Nat}
-    {encoded : List Nat}
-    {parts : SealedRecordParts}
-    (hDecode : decodeSealedRecord? payloadLen encoded = some parts) :
-    openBoxedPayloadShape? payloadLen encoded = some payloadLen := by
-  unfold openBoxedPayloadShape?
-  rw [hDecode]
-  have hOpenShape := (decodeSealedRecord_some_validOpenShape hDecode).2
-  have hValidShape : parts.ValidShape payloadLen := hOpenShape.1
-  unfold SealedRecordParts.ValidShape at hValidShape
-  simp [hValidShape.2.2.1]
-
-theorem decodeSealedRecord_none_of_encoded_length_ne
-    {payloadLen : Nat}
-    {encoded : List Nat}
-    (hLen : encoded.length ≠ sealedEncodedLen payloadLen) :
-    decodeSealedRecord? payloadLen encoded = none := by
-  cases hDecode : decodeSealedRecord? payloadLen encoded with
-  | none => rfl
-  | some parts =>
-      have hLenEq := (decodeSealedRecord_some_validOpenShape hDecode).1
-      exact False.elim (hLen hLenEq)
-
-theorem decodeSealedRecord_some_transport_sound
-    {payloadLen : Nat}
-    {encoded : List Nat}
-    {parts : SealedRecordParts}
-    (hDecode : decodeSealedRecord? payloadLen encoded = some parts) :
-    encoded.length = sealedEncodedLen payloadLen ∧
-      parts.ValidOpenShape payloadLen ∧
-      (∀ nibble, nibble ∈ encoded → ValidEncodedNibble nibble) ∧
-      ∃ sealed,
-        decodeNonzero encoded = some sealed ∧
-          splitSealedRecord? payloadLen sealed = some parts ∧
-          parts.bytes = sealed ∧
-          sealed.length = sealedPlainLen payloadLen ∧
-          (∀ byte, byte ∈ sealed → ValidByte byte) ∧
-          (∀ byte, byte ∈ parts.bytes → ValidByte byte) := by
-  unfold decodeSealedRecord? at hDecode
-  cases hNonzero : decodeNonzero encoded with
-  | none =>
-      simp [hNonzero] at hDecode
-  | some sealed =>
-      cases hSplit : splitSealedRecord? payloadLen sealed with
-      | none =>
-          simp [hNonzero, hSplit] at hDecode
-      | some decodedParts =>
-          by_cases hMagic : decodedParts.magic = sealedMagic
-          · simp [hNonzero, hSplit, hMagic] at hDecode
-            cases hDecode
-            have hSplitShape := splitSealedRecord_some_validShape hSplit
-            have hPartsBytes := splitSealedRecord_some_bytes hSplit
-            have hDecodeSound := decodeNonzero_sound hNonzero
-            have hLen :
-                encoded.length = sealedEncodedLen payloadLen := by
-              rw [hDecodeSound.1, hSplitShape.1]
-              unfold sealedEncodedLen sealedPlainLen
-              omega
-            exact
-              ⟨ hLen
-              , ⟨hSplitShape.2, hMagic⟩
-              , hDecodeSound.2.2
-              , ⟨ sealed
-                , rfl
-                , hSplit
-                , hPartsBytes
-                , hSplitShape.1
-                , hDecodeSound.2.1
-                , fun byte hMem =>
-                    hDecodeSound.2.1 byte (by
-                      rw [hPartsBytes] at hMem
-                      exact hMem)
-                ⟩
-              ⟩
-          · simp [hNonzero, hSplit, hMagic] at hDecode
-
-theorem decodeSealedRecord_some_uoSlotCiphertextShape
-    {payloadLen : Nat}
-    {encoded : List Nat}
-    {parts : SealedRecordParts}
-    (hDecode : decodeSealedRecord? payloadLen encoded = some parts) :
-    UoStoreSlotCiphertextShape payloadLen encoded := by
-  have hSound := decodeSealedRecord_some_transport_sound hDecode
-  exact ⟨hSound.1, hSound.2.2.1⟩
-
-theorem decodeNonzero_sealedRecordShape
-    {payloadLen : Nat}
-    {encoded sealed : List Nat}
-    (hDecode : decodeNonzero encoded = some sealed)
-    (hEncodedLen : encoded.length = sealedEncodedLen payloadLen) :
-    sealed.length = sealedPlainLen payloadLen ∧
-      ∃ parts,
-        splitSealedRecord? payloadLen sealed = some parts ∧
-          parts.ValidShape payloadLen := by
-  have hDecodeLen := (decodeNonzero_sound hDecode).1
-  have hSealedLen : sealed.length = sealedPlainLen payloadLen := by
-    rw [hEncodedLen] at hDecodeLen
-    unfold sealedEncodedLen at hDecodeLen
-    unfold sealedPlainLen
-    omega
-  refine ⟨hSealedLen, sealedRecordParts payloadLen sealed, ?_, ?_⟩
-  · unfold splitSealedRecord?
-    simp [hSealedLen]
-  · exact sealedRecordParts_validShape_of_length hSealedLen
-
-theorem decodeNonzero_encodeNonzero
-    {bytes : List Nat}
-    (hBytes : ∀ byte, byte ∈ bytes → ValidByte byte) :
-    decodeNonzero (encodeNonzero bytes) = some bytes := by
-  induction bytes with
-  | nil => rfl
-  | cons byte bytes ih =>
-      have hByte : ValidByte byte := hBytes byte (by simp)
-      have hTail : ∀ tailByte, tailByte ∈ bytes → ValidByte tailByte := by
-        intro tailByte hTailByte
-        exact hBytes tailByte (by simp [hTailByte])
-      simp [encodeNonzero, encodeByte, decodeNonzero,
-        decodeByte_encodeByte hByte, ih hTail]
-
-theorem decodeNonzeroInto?_encodeNonzero
-    {bytes : List Nat}
-    (hBytes : ∀ byte, byte ∈ bytes → ValidByte byte) :
-    decodeNonzeroInto? bytes.length (encodeNonzero bytes) = some bytes := by
-  unfold decodeNonzeroInto?
-  rw [decodeNonzero_encodeNonzero hBytes]
-  simp
-
-theorem decodeSealedRecord_encodeSealedRecordParts
-    {payloadLen : Nat}
-    {parts : SealedRecordParts}
-    (hOpenShape : parts.ValidOpenShape payloadLen)
-    (hBytes : ∀ byte, byte ∈ parts.bytes → ValidByte byte) :
-    decodeSealedRecord? payloadLen (encodeNonzero parts.bytes) =
-      some parts := by
-  rcases hOpenShape with ⟨hShape, hMagic⟩
-  have hPlainLen := SealedRecordParts.bytes_length_of_validShape hShape
-  have hRoundtrip := sealedRecordParts_bytes_roundtrip hShape
-  unfold decodeSealedRecord?
-  rw [decodeNonzero_encodeNonzero hBytes]
-  unfold splitSealedRecord?
-  simp [hPlainLen, hRoundtrip, hMagic]
-
-theorem encodeSealedRecordParts_length
-    {payloadLen : Nat}
-    {parts : SealedRecordParts}
-    (hShape : parts.ValidShape payloadLen) :
-    (encodeNonzero parts.bytes).length = sealedEncodedLen payloadLen := by
-  rw [encodeNonzero_length]
-  rw [SealedRecordParts.bytes_length_of_validShape hShape]
-  unfold sealedEncodedLen sealedPlainLen
-  omega
-
-theorem encodeSealedRecordParts_uoSlotCiphertextShape
-    {payloadLen : Nat}
-    {parts : SealedRecordParts}
-    (hShape : parts.ValidShape payloadLen)
-    (hBytes : ∀ byte, byte ∈ parts.bytes → ValidByte byte) :
-    UoStoreSlotCiphertextShape payloadLen (encodeNonzero parts.bytes) := by
-  exact
-    ⟨ encodeSealedRecordParts_length hShape
-    , fun nibble hMem =>
-        encodeNonzero_validEncodedNibbles hBytes hMem
-    ⟩
-
-theorem decodeSealedRecord_encodeSealedRecordParts_wrong_magic_none
-    {payloadLen : Nat}
-    {parts : SealedRecordParts}
-    (hShape : parts.ValidShape payloadLen)
-    (hMagic : parts.magic ≠ sealedMagic)
-    (hBytes : ∀ byte, byte ∈ parts.bytes → ValidByte byte) :
-    decodeSealedRecord? payloadLen (encodeNonzero parts.bytes) = none := by
-  have hPlainLen := SealedRecordParts.bytes_length_of_validShape hShape
-  have hRoundtrip := sealedRecordParts_bytes_roundtrip hShape
-  unfold decodeSealedRecord?
-  rw [decodeNonzero_encodeNonzero hBytes]
-  unfold splitSealedRecord?
-  simp [hPlainLen, hRoundtrip, hMagic]
-
 theorem uoStoreUpdateWriteShape_accepted
     (object : String)
     (slotLen : Nat) :
@@ -835,9 +174,10 @@ runtime keeps the record a write replaces and fails the call unless
 `is_update_write` holds of the two (`crates/uo-core/src/trace.rs`,
 `reseal_payload_and_record_write` and `reseal_uo_store_slot_and_trace_write`
 in the generated helpers). This section states that check. The unit length
-is a parameter; the runtime uses 32 bytes, a storage word. That a fresh
-nonce makes every unit differ is not proved here: it holds except with
-negligible probability, and the check turns a failure into an error. -/
+is a parameter; the runtime uses 32 bytes, a storage word. That a sealed
+record written over a sealed record passes the check is proved in the next
+section (`isUpdateWrite_of_markers`): the two carry different markers in
+every unit, so it does not rest on the ciphertexts. -/
 
 /-- Whether every byte of a record is zero. -/
 def allZero (bytes : List Nat) : Bool :=
@@ -893,8 +233,8 @@ theorem unitsOf_ne_nil {unitLen : Nat} {bytes : List Nat}
   rw [hEq, List.range_succ_eq_map]
   simp
 
-/-- A record written over itself is not an update: a seal that repeats the
-nonce of the record it replaces, for the same value, is refused. -/
+/-- A record written over itself is not an update: a write that leaves a
+record as it was is refused. -/
 theorem isUpdateWrite_self_false {unitLen : Nat} (hUnit : 0 < unitLen)
     (record : List Nat) : isUpdateWrite unitLen record record = false := by
   cases hRecord : record with
@@ -916,10 +256,8 @@ theorem allZero_false_of_nonzero {bytes : List Nat}
         omega
       simp [allZero, hNe]
 
-/-- Two units without a zero byte, as every unit of a sealed record is
-(`encodeNonzero_validEncodedNibbles`), are a `Same` if they are equal and an
-`Update` otherwise. So a write of a sealed record over a sealed record can
-fail the check only in a unit that it leaves unchanged. -/
+/-- Two units without a zero byte are a `Same` if they are equal and an
+`Update` otherwise. -/
 theorem classifyWrite_of_nonzero {old new : List Nat}
     (hOld : old ≠ []) (hNew : new ≠ [])
     (hOldNonzero : ∀ byte ∈ old, 0 < byte) (hNewNonzero : ∀ byte ∈ new, 0 < byte) :
@@ -928,9 +266,77 @@ theorem classifyWrite_of_nonzero {old new : List Nat}
   simp [classifyWrite, allZero_false_of_nonzero hOld hOldNonzero,
     allZero_false_of_nonzero hNew hNewNonzero]
 
+/-- A unit that begins with a nonzero byte is not zero. -/
+theorem allZero_false_of_head {unit : List Nat} {marker : Nat}
+    (hHead : unit.head? = some marker) (hMarker : 0 < marker) :
+    allZero unit = false := by
+  cases unit with
+  | nil => simp at hHead
+  | cons first others =>
+      simp at hHead
+      subst hHead
+      have hNe : (first == 0) = false := by
+        simp
+        omega
+      simp [allZero, hNe]
+
+/-- Two units that begin with different nonzero bytes: the write of one over
+the other is an `Update`, whatever else they hold. -/
+theorem classifyWrite_update_of_heads {old new : List Nat} {oldMarker newMarker : Nat}
+    (hOld : old.head? = some oldMarker) (hNew : new.head? = some newMarker)
+    (hOldPos : 0 < oldMarker) (hNewPos : 0 < newMarker) (hNe : oldMarker ≠ newMarker) :
+    classifyWrite old new = StoreWriteClass.update := by
+  have hDiffer : old ≠ new := by
+    intro hEq
+    rw [hEq, hNew] at hOld
+    exact hNe (Option.some.inj hOld).symm
+  simp [classifyWrite, hDiffer, allZero_false_of_head hOld hOldPos,
+    allZero_false_of_head hNew hNewPos]
+
+theorem unitsOf_nil {unitLen : Nat} (hUnit : 0 < unitLen) :
+    unitsOf unitLen [] = [] := by
+  unfold unitsOf
+  have hCount : (([] : List Nat).length + unitLen - 1) / unitLen = 0 := by
+    apply Nat.div_eq_of_lt
+    simp
+    omega
+  rw [hCount]
+  rfl
+
+/-- The units of a record that begins with a whole unit. -/
+theorem unitsOf_append {unitLen : Nat} (hUnit : 0 < unitLen) {unit rest : List Nat}
+    (hLen : unit.length = unitLen) :
+    unitsOf unitLen (unit ++ rest) = unit :: unitsOf unitLen rest := by
+  unfold unitsOf
+  have hCount :
+      ((unit ++ rest).length + unitLen - 1) / unitLen =
+        (rest.length + unitLen - 1) / unitLen + 1 := by
+    rw [List.length_append, hLen]
+    have hSum :
+        unitLen + rest.length + unitLen - 1 = (rest.length + unitLen - 1) + unitLen := by
+      omega
+    rw [hSum, Nat.add_div_right _ hUnit]
+  rw [hCount, List.range_succ_eq_map]
+  simp only [List.map_cons, List.map_map]
+  congr 1
+  · simp [hLen]
+  · apply List.map_congr_left
+    intro index _
+    simp only [Function.comp]
+    have hIndex : (index + 1) * unitLen = unit.length + index * unitLen := by
+      rw [hLen, Nat.succ_mul]
+      omega
+    rw [hIndex, List.drop_append, List.drop_eq_nil_of_le (Nat.le_add_right _ _),
+      Nat.add_sub_cancel_left, List.nil_append]
+
 /-- The unit the storage observer classifies: a 32-byte word
 (`STORAGE_OBSERVER_UNIT_BYTES`). -/
 def storageObserverUnitBytes : Nat := 32
+
+/-- A sealed record's unit is the unit the observer classifies. -/
+theorem sealedUnitBytes_eq_storageObserverUnitBytes :
+    sealedUnitBytes = storageObserverUnitBytes := by
+  rfl
 
 example : isUpdateWrite 2 [1, 2, 3, 4, 5] [2, 3, 4, 5, 6] = true := by decide
 -- One unit unchanged, zero before or zero after: not an update, though the
@@ -941,16 +347,1125 @@ example : isUpdateWrite 2 [1, 2, 0, 0, 5] [2, 3, 4, 5, 6] = false := by decide
 example : isUpdateWrite 2 [1, 2, 3, 4, 5] [2, 3, 4, 5, 0] = false := by decide
 example : isUpdateWrite 2 [1, 2, 3, 4] [2, 3, 4, 5, 6] = false := by decide
 
+/-! ## The unit codec
+
+A record is a whole number of units of `unitLen` bytes. Each unit is one
+marker byte and `unitLen - 1` bytes of content; the content's last unit is
+filled with zeros. Every unit of a record carries the same marker, one of
+the two of `sealedMarkers`. A record that replaces none carries the first; a
+record written over another carries the one its predecessor does not
+(`next_marker`). So no unit of a record is zero, and no unit of a record
+equals the unit it replaces, whatever the content is: the write is an
+`Update` in every unit (`isUpdateWrite_of_markers`).
+
+The definitions model `write_units`, `read_units`, `record_marker` and
+`next_marker` of `runtime/uo-store/src/generated_codec.rs`. The unit length
+is a parameter of every statement, with `2 ≤ unitLen` where a unit must hold
+content; the runtime's is `sealedUnitBytes`. That the Rust functions compute
+these models is tested (`runtime/uo-store/src/codec.rs`), not proved. -/
+
+/-- One of the two markers. -/
+def ValidMarker (marker : Nat) : Prop :=
+  marker = 165 ∨ marker = 90
+
+instance (marker : Nat) : Decidable (ValidMarker marker) := by
+  unfold ValidMarker
+  infer_instance
+
+/-- `next_marker`: the marker of a record written over one that carries
+`marker`, the other of the two. -/
+def nextMarker? (marker : Nat) : Option Nat :=
+  if marker = 165 then some 90 else if marker = 90 then some 165 else none
+
+/-- The units of `contentLen` bytes of content: a unit holds its marker and
+`unitLen - 1` bytes, so this is `contentLen / (unitLen - 1)` rounded up. -/
+def unitCount (unitLen contentLen : Nat) : Nat :=
+  (contentLen + (unitLen - 2)) / (unitLen - 1)
+
+/-- `count` units: in each the marker, then the next `unitLen - 1` bytes. -/
+def frameUnits (unitLen marker : Nat) : Nat → List Nat → List Nat
+  | 0, _ => []
+  | count + 1, padded =>
+      marker :: padded.take (unitLen - 1) ++
+        frameUnits unitLen marker count (padded.drop (unitLen - 1))
+
+/-- The content with the zeros that fill its last unit. -/
+def padContent (unitLen : Nat) (content : List Nat) : List Nat :=
+  content ++
+    zeroedBytes ((unitLen - 1) * unitCount unitLen content.length - content.length)
+
+/-- `write_units`: the record of `content` under `marker`. -/
+def encodeUnits (unitLen marker : Nat) (content : List Nat) : List Nat :=
+  frameUnits unitLen marker (unitCount unitLen content.length) (padContent unitLen content)
+
+/-- The bytes that `count` units hold after their markers; `none` unless the
+record is `count` units that each begin with `marker`. -/
+def unframeUnits (unitLen marker : Nat) : Nat → List Nat → Option (List Nat)
+  | 0, encoded => if encoded = [] then some [] else none
+  | _ + 1, [] => none
+  | count + 1, head :: tail =>
+      if head = marker ∧ unitLen - 1 ≤ tail.length then
+        match unframeUnits unitLen marker count (tail.drop (unitLen - 1)) with
+        | none => none
+        | some rest => some (tail.take (unitLen - 1) ++ rest)
+      else none
+
+/-- `read_units`: the record's marker and its `contentLen` bytes of content.
+`none` unless the record has the units of that much content, its units carry
+one valid marker, and the bytes after the content are zero. -/
+def decodeUnitsInto? (unitLen contentLen : Nat) (encoded : List Nat) :
+    Option (Nat × List Nat) :=
+  match encoded.head? with
+  | none => none
+  | some marker =>
+      if ValidMarker marker then
+        match unframeUnits unitLen marker (unitCount unitLen contentLen) encoded with
+        | none => none
+        | some padded =>
+            if padded.drop contentLen = zeroedBytes (padded.length - contentLen) then
+              some (marker, padded.take contentLen)
+            else none
+      else none
+
+/-- Whether `bytes` is `count` units of `unitLen` bytes that each begin with
+`marker`. -/
+def unitsCarry (unitLen marker : Nat) : Nat → List Nat → Bool
+  | 0, bytes => bytes.isEmpty
+  | count + 1, bytes =>
+      bytes.head? == some marker && decide (unitLen ≤ bytes.length) &&
+        unitsCarry unitLen marker count (bytes.drop unitLen)
+
+/-- `record_marker`: the marker every unit of a record carries. `none` when
+the bytes are not a whole number of units, the first marker is neither of
+the two, or a unit carries another: a unit that is zero has no marker. -/
+def recordMarker? (unitLen : Nat) (encoded : List Nat) : Option Nat :=
+  match encoded.head? with
+  | none => none
+  | some marker =>
+      if ValidMarker marker ∧
+          unitsCarry unitLen marker (encoded.length / unitLen) encoded = true then
+        some marker
+      else none
+
+theorem validMarker_iff_mem (marker : Nat) :
+    ValidMarker marker ↔ marker ∈ sealedMarkers := by
+  simp [ValidMarker, sealedMarkers]
+
+theorem validMarker_pos {marker : Nat} (h : ValidMarker marker) : 0 < marker := by
+  unfold ValidMarker at h
+  omega
+
+theorem validMarker_validByte {marker : Nat} (h : ValidMarker marker) :
+    ValidByte marker := by
+  unfold ValidMarker at h
+  unfold ValidByte
+  omega
+
+/-- The next marker of a valid marker is the other valid one. -/
+theorem nextMarker?_some {marker next : Nat} (h : nextMarker? marker = some next) :
+    ValidMarker marker ∧ ValidMarker next ∧ marker ≠ next := by
+  unfold nextMarker? at h
+  unfold ValidMarker
+  by_cases h165 : marker = 165
+  · simp [h165] at h
+    omega
+  · by_cases h90 : marker = 90
+    · simp [h90] at h
+      omega
+    · simp [h165, h90] at h
+
+theorem nextMarker?_of_valid {marker : Nat} (h : ValidMarker marker) :
+    ∃ next, nextMarker? marker = some next := by
+  unfold ValidMarker at h
+  rcases h with h | h
+  · exact ⟨90, by simp [nextMarker?, h]⟩
+  · exact ⟨165, by simp [nextMarker?, h]⟩
+
+/-- The units of a record hold its content. -/
+theorem unitCount_covers {unitLen : Nat} (hUnit : 2 ≤ unitLen) (contentLen : Nat) :
+    contentLen ≤ (unitLen - 1) * unitCount unitLen contentLen := by
+  unfold unitCount
+  have hPos : 0 < unitLen - 1 := by omega
+  have h := Nat.lt_mul_div_succ (contentLen + (unitLen - 2)) hPos
+  rw [Nat.mul_add, Nat.mul_one] at h
+  generalize (unitLen - 1) * ((contentLen + (unitLen - 2)) / (unitLen - 1)) = product at h ⊢
+  omega
+
+theorem unitCount_pos {unitLen contentLen : Nat} (hUnit : 2 ≤ unitLen)
+    (hContent : 0 < contentLen) : 0 < unitCount unitLen contentLen := by
+  unfold unitCount
+  apply Nat.div_pos
+  · omega
+  · omega
+
+theorem padContent_length {unitLen : Nat} (hUnit : 2 ≤ unitLen) (content : List Nat) :
+    (padContent unitLen content).length =
+      (unitLen - 1) * unitCount unitLen content.length := by
+  have hCovers := unitCount_covers hUnit content.length
+  unfold padContent
+  rw [List.length_append, zeroedBytes_length]
+  omega
+
+theorem frameUnits_length {unitLen marker : Nat} (hUnit : 1 ≤ unitLen) :
+    ∀ (count : Nat) (padded : List Nat),
+      padded.length = (unitLen - 1) * count →
+        (frameUnits unitLen marker count padded).length = unitLen * count := by
+  intro count
+  induction count with
+  | zero =>
+      intro padded _
+      simp [frameUnits]
+  | succ count ih =>
+      intro padded hLen
+      rw [Nat.mul_succ] at hLen
+      have hRest : (padded.drop (unitLen - 1)).length = (unitLen - 1) * count := by
+        rw [List.length_drop]
+        omega
+      have hTake : (padded.take (unitLen - 1)).length = unitLen - 1 := by
+        rw [List.length_take]
+        omega
+      simp only [frameUnits, List.length_cons, List.length_append, hTake, ih _ hRest]
+      rw [Nat.mul_succ]
+      omega
+
+/-- A byte of framed units is the marker or a byte of what they hold. -/
+theorem mem_frameUnits {unitLen marker byte : Nat} :
+    ∀ (count : Nat) (padded : List Nat),
+      byte ∈ frameUnits unitLen marker count padded →
+        byte = marker ∨ byte ∈ padded := by
+  intro count
+  induction count with
+  | zero =>
+      intro padded hMem
+      simp [frameUnits] at hMem
+  | succ count ih =>
+      intro padded hMem
+      simp only [frameUnits, List.mem_append, List.mem_cons] at hMem
+      rcases hMem with (hMarker | hTake) | hRest
+      · exact Or.inl hMarker
+      · exact Or.inr (List.mem_of_mem_take hTake)
+      · rcases ih _ hRest with hMarker | hDrop
+        · exact Or.inl hMarker
+        · exact Or.inr (List.mem_of_mem_drop hDrop)
+
+theorem unitsCarry_length {unitLen marker : Nat} :
+    ∀ (count : Nat) (bytes : List Nat),
+      unitsCarry unitLen marker count bytes = true →
+        bytes.length = unitLen * count := by
+  intro count
+  induction count with
+  | zero =>
+      intro bytes h
+      simp [unitsCarry] at h
+      simp [h]
+  | succ count ih =>
+      intro bytes h
+      simp only [unitsCarry, Bool.and_eq_true, decide_eq_true_eq] at h
+      have hRest := ih _ h.2
+      rw [List.length_drop] at hRest
+      rw [Nat.mul_succ]
+      omega
+
+theorem unitsCarry_frameUnits {unitLen marker : Nat} (hUnit : 1 ≤ unitLen) :
+    ∀ (count : Nat) (padded : List Nat),
+      padded.length = (unitLen - 1) * count →
+        unitsCarry unitLen marker count (frameUnits unitLen marker count padded) = true := by
+  intro count
+  induction count with
+  | zero =>
+      intro padded _
+      simp [frameUnits, unitsCarry]
+  | succ count ih =>
+      intro padded hLen
+      rw [Nat.mul_succ] at hLen
+      have hRest : (padded.drop (unitLen - 1)).length = (unitLen - 1) * count := by
+        rw [List.length_drop]
+        omega
+      have hTake : (padded.take (unitLen - 1)).length = unitLen - 1 := by
+        rw [List.length_take]
+        omega
+      have hHead :
+          (marker :: padded.take (unitLen - 1)).length = unitLen := by
+        simp only [List.length_cons, hTake]
+        omega
+      have hDrop :
+          (marker :: padded.take (unitLen - 1) ++
+              frameUnits unitLen marker count (padded.drop (unitLen - 1))).drop unitLen =
+            frameUnits unitLen marker count (padded.drop (unitLen - 1)) := by
+        exact List.drop_left' hHead
+      simp only [unitsCarry, frameUnits, Bool.and_eq_true, decide_eq_true_eq]
+      refine ⟨⟨by simp, ?_⟩, ?_⟩
+      · simp only [List.length_cons, List.length_append, hTake]
+        omega
+      · rw [hDrop]
+        exact ih _ hRest
+
+theorem unframeUnits_frameUnits {unitLen marker : Nat} :
+    ∀ (count : Nat) (padded : List Nat),
+      padded.length = (unitLen - 1) * count →
+        unframeUnits unitLen marker count (frameUnits unitLen marker count padded) =
+          some padded := by
+  intro count
+  induction count with
+  | zero =>
+      intro padded hLen
+      have hNil : padded = [] := by
+        apply List.eq_nil_of_length_eq_zero
+        simpa using hLen
+      simp [frameUnits, unframeUnits, hNil]
+  | succ count ih =>
+      intro padded hLen
+      rw [Nat.mul_succ] at hLen
+      have hRest : (padded.drop (unitLen - 1)).length = (unitLen - 1) * count := by
+        rw [List.length_drop]
+        omega
+      have hTake : (padded.take (unitLen - 1)).length = unitLen - 1 := by
+        rw [List.length_take]
+        omega
+      have hLe :
+          unitLen - 1 ≤
+            (padded.take (unitLen - 1) ++
+              frameUnits unitLen marker count (padded.drop (unitLen - 1))).length := by
+        rw [List.length_append, hTake]
+        omega
+      have hDrop :
+          (padded.take (unitLen - 1) ++
+              frameUnits unitLen marker count (padded.drop (unitLen - 1))).drop (unitLen - 1) =
+            frameUnits unitLen marker count (padded.drop (unitLen - 1)) :=
+        List.drop_left' hTake
+      have hTakeLeft :
+          (padded.take (unitLen - 1) ++
+              frameUnits unitLen marker count (padded.drop (unitLen - 1))).take (unitLen - 1) =
+            padded.take (unitLen - 1) :=
+        List.take_left' hTake
+      simp only [frameUnits, unframeUnits, List.cons_append, true_and, hLe, if_true,
+        hDrop, hTakeLeft, ih _ hRest, List.take_append_drop]
+
+theorem unframeUnits_some {unitLen marker : Nat} :
+    ∀ (count : Nat) (encoded padded : List Nat),
+      unframeUnits unitLen marker count encoded = some padded →
+        padded.length = (unitLen - 1) * count ∧
+          encoded = frameUnits unitLen marker count padded := by
+  intro count
+  induction count with
+  | zero =>
+      intro encoded padded h
+      unfold unframeUnits at h
+      by_cases hNil : encoded = []
+      · simp [hNil] at h
+        subst h
+        simp [hNil, frameUnits]
+      · simp [hNil] at h
+  | succ count ih =>
+      intro encoded padded h
+      cases encoded with
+      | nil => simp [unframeUnits] at h
+      | cons head tail =>
+          unfold unframeUnits at h
+          by_cases hHead : head = marker ∧ unitLen - 1 ≤ tail.length
+          · rw [if_pos hHead] at h
+            cases hRest : unframeUnits unitLen marker count (tail.drop (unitLen - 1)) with
+            | none => simp [hRest] at h
+            | some rest =>
+                simp only [hRest, Option.some.injEq] at h
+                subst h
+                have hInner := ih _ _ hRest
+                have hTake : (tail.take (unitLen - 1)).length = unitLen - 1 := by
+                  rw [List.length_take]
+                  omega
+                refine ⟨?_, ?_⟩
+                · rw [List.length_append, hTake, hInner.1, Nat.mul_succ]
+                  omega
+                · have hDropLeft :
+                      (tail.take (unitLen - 1) ++ rest).drop (unitLen - 1) = rest :=
+                    List.drop_left' hTake
+                  have hTakeLeft :
+                      (tail.take (unitLen - 1) ++ rest).take (unitLen - 1) =
+                        tail.take (unitLen - 1) :=
+                    List.take_left' hTake
+                  simp only [frameUnits, hDropLeft, hTakeLeft]
+                  rw [← hInner.2, hHead.1, List.cons_append, List.take_append_drop]
+          · rw [if_neg hHead] at h
+            simp at h
+
+/-- A record's length is the public one: `unitLen` bytes for every
+`unitLen - 1` bytes of content, rounded up. -/
+theorem encodeUnits_length {unitLen : Nat} (hUnit : 2 ≤ unitLen) (marker : Nat)
+    (content : List Nat) :
+    (encodeUnits unitLen marker content).length =
+      unitLen * unitCount unitLen content.length := by
+  unfold encodeUnits
+  exact frameUnits_length (by omega) _ _ (padContent_length hUnit content)
+
+/-- A record of valid bytes under a valid marker is made of valid bytes. -/
+theorem encodeUnits_validBytes {unitLen marker : Nat} (hMarker : ValidMarker marker)
+    {content : List Nat} (hBytes : ∀ byte, byte ∈ content → ValidByte byte) :
+    ∀ byte, byte ∈ encodeUnits unitLen marker content → ValidByte byte := by
+  intro byte hMem
+  unfold encodeUnits at hMem
+  rcases mem_frameUnits _ _ hMem with hEq | hPadded
+  · rw [hEq]
+    exact validMarker_validByte hMarker
+  · unfold padContent at hPadded
+    rcases List.mem_append.mp hPadded with hContent | hZero
+    · exact hBytes byte hContent
+    · exact zeroedBytes_validBytes _ byte hZero
+
+theorem encodeUnits_head? {unitLen marker : Nat} (hUnit : 2 ≤ unitLen)
+    {content : List Nat} (hContent : content ≠ []) :
+    (encodeUnits unitLen marker content).head? = some marker := by
+  have hPos : 0 < unitCount unitLen content.length :=
+    unitCount_pos hUnit (List.length_pos_iff.mpr hContent)
+  obtain ⟨count, hCount⟩ : ∃ count, unitCount unitLen content.length = count + 1 :=
+    ⟨unitCount unitLen content.length - 1, by omega⟩
+  unfold encodeUnits
+  rw [hCount]
+  rfl
+
+theorem unitsCarry_encodeUnits {unitLen : Nat} (hUnit : 2 ≤ unitLen) (marker : Nat)
+    (content : List Nat) :
+    unitsCarry unitLen marker (unitCount unitLen content.length)
+        (encodeUnits unitLen marker content) = true := by
+  unfold encodeUnits
+  exact unitsCarry_frameUnits (by omega) _ _ (padContent_length hUnit content)
+
+/-- Round trip: decoding a record gives back its marker and its content. -/
+theorem decodeUnitsInto?_encodeUnits {unitLen marker : Nat} (hUnit : 2 ≤ unitLen)
+    (hMarker : ValidMarker marker) {content : List Nat} (hContent : content ≠ []) :
+    decodeUnitsInto? unitLen content.length (encodeUnits unitLen marker content) =
+      some (marker, content) := by
+  have hHead := encodeUnits_head? (marker := marker) hUnit hContent
+  have hUnframe :
+      unframeUnits unitLen marker (unitCount unitLen content.length)
+          (encodeUnits unitLen marker content) =
+        some (padContent unitLen content) := by
+    unfold encodeUnits
+    exact unframeUnits_frameUnits _ _ (padContent_length hUnit content)
+  have hDrop :
+      (padContent unitLen content).drop content.length =
+        zeroedBytes ((padContent unitLen content).length - content.length) := by
+    rw [padContent_length hUnit content]
+    unfold padContent
+    exact List.drop_left
+  have hTake : (padContent unitLen content).take content.length = content := by
+    unfold padContent
+    exact List.take_left
+  simp only [decodeUnitsInto?, hHead, if_pos hMarker, hUnframe, hDrop, if_true, hTake]
+
+/-- A record that decodes is the encoding of what it decodes to: its units
+carry one valid marker, and the bytes after the content are zero. -/
+theorem decodeUnitsInto?_some {unitLen contentLen marker : Nat} (hUnit : 2 ≤ unitLen)
+    {encoded content : List Nat}
+    (hDecode : decodeUnitsInto? unitLen contentLen encoded = some (marker, content)) :
+    ValidMarker marker ∧ content.length = contentLen ∧
+      encoded = encodeUnits unitLen marker content := by
+  cases hFirst : encoded.head? with
+  | none => simp [decodeUnitsInto?, hFirst] at hDecode
+  | some head =>
+      simp only [decodeUnitsInto?, hFirst] at hDecode
+      by_cases hValid : ValidMarker head
+      · rw [if_pos hValid] at hDecode
+        cases hUnframe :
+            unframeUnits unitLen head (unitCount unitLen contentLen) encoded with
+        | none => simp [hUnframe] at hDecode
+        | some padded =>
+            simp only [hUnframe] at hDecode
+            by_cases hZeros :
+                padded.drop contentLen = zeroedBytes (padded.length - contentLen)
+            · rw [if_pos hZeros] at hDecode
+              simp only [Option.some.injEq, Prod.mk.injEq] at hDecode
+              obtain ⟨hHead, hContent⟩ := hDecode
+              subst hHead
+              have hShape := unframeUnits_some _ _ _ hUnframe
+              have hCovers := unitCount_covers hUnit contentLen
+              have hLen : content.length = contentLen := by
+                rw [← hContent, List.length_take, hShape.1]
+                omega
+              refine ⟨hValid, hLen, ?_⟩
+              have hPadded : padded = padContent unitLen content := by
+                unfold padContent
+                rw [hLen, ← hShape.1, ← hZeros, ← hContent, List.take_append_drop]
+              rw [hShape.2]
+              unfold encodeUnits
+              rw [hLen, ← hPadded]
+            · rw [if_neg hZeros] at hDecode
+              simp at hDecode
+      · rw [if_neg hValid] at hDecode
+        simp at hDecode
+
+/-- A record whose length is not the public one does not decode. -/
+theorem decodeUnitsInto?_none_of_length_ne {unitLen contentLen : Nat}
+    (hUnit : 2 ≤ unitLen) {encoded : List Nat}
+    (hLen : encoded.length ≠ unitLen * unitCount unitLen contentLen) :
+    decodeUnitsInto? unitLen contentLen encoded = none := by
+  cases hDecode : decodeUnitsInto? unitLen contentLen encoded with
+  | none => rfl
+  | some result =>
+      obtain ⟨marker, content⟩ := result
+      have hSound := decodeUnitsInto?_some hUnit hDecode
+      exfalso
+      apply hLen
+      rw [hSound.2.2, encodeUnits_length hUnit, hSound.2.1]
+
+/-- The units of a record whose units carry `marker`: each begins with it. -/
+theorem unitsOf_of_unitsCarry {unitLen marker : Nat} (hUnit : 0 < unitLen) :
+    ∀ (count : Nat) (bytes : List Nat),
+      unitsCarry unitLen marker count bytes = true →
+        ∀ unit ∈ unitsOf unitLen bytes, unit.head? = some marker := by
+  intro count
+  induction count with
+  | zero =>
+      intro bytes h unit hMem
+      simp [unitsCarry] at h
+      rw [h, unitsOf_nil hUnit] at hMem
+      simp at hMem
+  | succ count ih =>
+      intro bytes h unit hMem
+      simp only [unitsCarry, Bool.and_eq_true, decide_eq_true_eq, beq_iff_eq] at h
+      obtain ⟨⟨hHead, hLe⟩, hRest⟩ := h
+      have hTake : (bytes.take unitLen).length = unitLen := by
+        rw [List.length_take]
+        omega
+      have hSplit : bytes = bytes.take unitLen ++ bytes.drop unitLen :=
+        (List.take_append_drop unitLen bytes).symm
+      rw [hSplit, unitsOf_append hUnit hTake] at hMem
+      rcases List.mem_cons.mp hMem with hEq | hTail
+      · rw [hEq]
+        cases bytes with
+        | nil => simp at hHead
+        | cons first others =>
+            obtain ⟨width, hWidth⟩ : ∃ width, unitLen = width + 1 := ⟨unitLen - 1, by omega⟩
+            rw [hWidth]
+            simpa using hHead
+      · exact ih _ hRest unit hTail
+
+theorem unitsCarry_all_update {unitLen oldMarker newMarker : Nat} (hUnit : 0 < unitLen)
+    (hOldPos : 0 < oldMarker) (hNewPos : 0 < newMarker) (hNe : oldMarker ≠ newMarker) :
+    ∀ (count : Nat) (old new : List Nat),
+      unitsCarry unitLen oldMarker count old = true →
+        unitsCarry unitLen newMarker count new = true →
+          (((unitsOf unitLen old).zip (unitsOf unitLen new)).all fun units =>
+            decide (classifyWrite units.1 units.2 = StoreWriteClass.update)) = true := by
+  intro count
+  induction count with
+  | zero =>
+      intro old new hOld hNew
+      simp [unitsCarry] at hOld hNew
+      rw [hOld, hNew, unitsOf_nil hUnit]
+      rfl
+  | succ count ih =>
+      intro old new hOld hNew
+      have hOldUnits := unitsOf_of_unitsCarry hUnit _ _ hOld
+      have hNewUnits := unitsOf_of_unitsCarry hUnit _ _ hNew
+      simp only [unitsCarry, Bool.and_eq_true, decide_eq_true_eq, beq_iff_eq] at hOld hNew
+      obtain ⟨⟨_, hOldLe⟩, hOldRest⟩ := hOld
+      obtain ⟨⟨_, hNewLe⟩, hNewRest⟩ := hNew
+      have hOldTake : (old.take unitLen).length = unitLen := by
+        rw [List.length_take]
+        omega
+      have hNewTake : (new.take unitLen).length = unitLen := by
+        rw [List.length_take]
+        omega
+      have hOldSplit : old = old.take unitLen ++ old.drop unitLen :=
+        (List.take_append_drop unitLen old).symm
+      have hNewSplit : new = new.take unitLen ++ new.drop unitLen :=
+        (List.take_append_drop unitLen new).symm
+      rw [hOldSplit, unitsOf_append hUnit hOldTake] at hOldUnits ⊢
+      rw [hNewSplit, unitsOf_append hUnit hNewTake] at hNewUnits ⊢
+      have hHead :
+          classifyWrite (old.take unitLen) (new.take unitLen) = StoreWriteClass.update :=
+        classifyWrite_update_of_heads
+          (hOldUnits _ (List.mem_cons_self))
+          (hNewUnits _ (List.mem_cons_self))
+          hOldPos hNewPos hNe
+      simp only [List.zip_cons_cons, List.all_cons, hHead, decide_true, Bool.true_and]
+      exact ih _ _ hOldRest hNewRest
+
+theorem recordMarker?_some {unitLen marker : Nat} {encoded : List Nat}
+    (h : recordMarker? unitLen encoded = some marker) :
+    ValidMarker marker ∧
+      unitsCarry unitLen marker (encoded.length / unitLen) encoded = true := by
+  cases hFirst : encoded.head? with
+  | none => simp [recordMarker?, hFirst] at h
+  | some head =>
+      simp only [recordMarker?, hFirst] at h
+      by_cases hCond :
+          ValidMarker head ∧
+            unitsCarry unitLen head (encoded.length / unitLen) encoded = true
+      · rw [if_pos hCond] at h
+        simp only [Option.some.injEq] at h
+        subst h
+        exact hCond
+      · rw [if_neg hCond] at h
+        simp at h
+
+/-- Every unit different from its predecessor: a record written over a record
+of the same length that carries the other marker is an `Update` in every
+unit, whatever the two records hold besides their markers. -/
+theorem isUpdateWrite_of_markers {unitLen oldMarker newMarker : Nat} (hUnit : 0 < unitLen)
+    {old new : List Nat}
+    (hOld : recordMarker? unitLen old = some oldMarker)
+    (hNew : recordMarker? unitLen new = some newMarker)
+    (hNe : oldMarker ≠ newMarker)
+    (hLen : old.length = new.length) :
+    isUpdateWrite unitLen old new = true := by
+  have hOldShape := recordMarker?_some hOld
+  have hNewShape := recordMarker?_some hNew
+  have hNonempty : new ≠ [] := by
+    intro hNil
+    rw [hNil] at hNew
+    simp [recordMarker?] at hNew
+  have hAll :=
+    unitsCarry_all_update hUnit (validMarker_pos hOldShape.1) (validMarker_pos hNewShape.1)
+      hNe (new.length / unitLen) old new (by rw [← hLen]; exact hOldShape.2) hNewShape.2
+  simp only [isUpdateWrite, Bool.and_eq_true, beq_iff_eq, Bool.not_eq_true',
+    List.isEmpty_eq_false_iff]
+  exact ⟨⟨hLen, hNonempty⟩, hAll⟩
+
+/-- The marker of an encoded record is the one it was written with. -/
+theorem recordMarker?_encodeUnits {unitLen marker : Nat} (hUnit : 2 ≤ unitLen)
+    (hMarker : ValidMarker marker) {content : List Nat} (hContent : content ≠ []) :
+    recordMarker? unitLen (encodeUnits unitLen marker content) = some marker := by
+  have hHead := encodeUnits_head? (marker := marker) hUnit hContent
+  have hCount :
+      (encodeUnits unitLen marker content).length / unitLen =
+        unitCount unitLen content.length := by
+    rw [encodeUnits_length hUnit]
+    exact Nat.mul_div_cancel_left _ (by omega)
+  have hCarry :
+      unitsCarry unitLen marker ((encodeUnits unitLen marker content).length / unitLen)
+          (encodeUnits unitLen marker content) = true := by
+    rw [hCount]
+    exact unitsCarry_encodeUnits hUnit marker content
+  simp only [recordMarker?, hHead, if_pos (And.intro hMarker hCarry)]
+
+/-- Every unit nonzero: each unit of an encoded record begins with the
+marker. -/
+theorem encodeUnits_units_nonzero {unitLen marker : Nat} (hUnit : 2 ≤ unitLen)
+    (hMarker : ValidMarker marker) (content : List Nat) :
+    ∀ unit ∈ unitsOf unitLen (encodeUnits unitLen marker content),
+      unit.head? = some marker ∧ allZero unit = false := by
+  intro unit hMem
+  have hHead :=
+    unitsOf_of_unitsCarry (by omega) _ _ (unitsCarry_encodeUnits hUnit marker content)
+      unit hMem
+  exact ⟨hHead, allZero_false_of_head hHead (validMarker_pos hMarker)⟩
+
+/-- A record with a zero unit has no marker. -/
+theorem recordMarker?_none_of_zero_unit {unitLen : Nat} (hUnit : 0 < unitLen)
+    {encoded unit : List Nat}
+    (hMem : unit ∈ unitsOf unitLen encoded) (hZero : allZero unit = true) :
+    recordMarker? unitLen encoded = none := by
+  cases hMarker : recordMarker? unitLen encoded with
+  | none => rfl
+  | some marker =>
+      have hShape := recordMarker?_some hMarker
+      have hHead := unitsOf_of_unitsCarry hUnit _ _ hShape.2 unit hMem
+      rw [allZero_false_of_head hHead (validMarker_pos hShape.1)] at hZero
+      cases hZero
+
+/-- A record with a zero unit does not decode. -/
+theorem decodeUnitsInto?_none_of_zero_unit {unitLen contentLen : Nat} (hUnit : 2 ≤ unitLen)
+    {encoded unit : List Nat}
+    (hMem : unit ∈ unitsOf unitLen encoded) (hZero : allZero unit = true) :
+    decodeUnitsInto? unitLen contentLen encoded = none := by
+  cases hDecode : decodeUnitsInto? unitLen contentLen encoded with
+  | none => rfl
+  | some result =>
+      obtain ⟨marker, content⟩ := result
+      have hSound := decodeUnitsInto?_some hUnit hDecode
+      rw [hSound.2.2] at hMem
+      have hNonzero := encodeUnits_units_nonzero hUnit hSound.1 content unit hMem
+      rw [hNonzero.2] at hZero
+      cases hZero
+
+/-- The reseal of a record: writing `content` over a record that has a
+marker, under the marker `next_marker` gives, is an `Update` in every unit. -/
+theorem isUpdateWrite_encodeUnits {unitLen oldMarker newMarker : Nat} (hUnit : 2 ≤ unitLen)
+    {old content : List Nat}
+    (hOld : recordMarker? unitLen old = some oldMarker)
+    (hNext : nextMarker? oldMarker = some newMarker)
+    (hContent : content ≠ [])
+    (hLen : old.length = unitLen * unitCount unitLen content.length) :
+    isUpdateWrite unitLen old (encodeUnits unitLen newMarker content) = true := by
+  have hNextShape := nextMarker?_some hNext
+  exact
+    isUpdateWrite_of_markers (by omega) hOld
+      (recordMarker?_encodeUnits hUnit hNextShape.2.1 hContent) hNextShape.2.2
+      (by rw [hLen, encodeUnits_length hUnit])
+
+example : unitCount 32 60 = 2 := by decide
+example : unitCount 32 93 = 3 := by decide
+example : encodeUnits 4 165 [1, 2, 3, 4] = [165, 1, 2, 3, 165, 4, 0, 0] := by decide
+example :
+    decodeUnitsInto? 4 4 [165, 1, 2, 3, 165, 4, 0, 0] = some (165, [1, 2, 3, 4]) := by
+  decide
+-- A zero unit, a unit with the other marker, and a byte after the content:
+-- none of them decodes.
+example : decodeUnitsInto? 4 4 [165, 1, 2, 3, 0, 0, 0, 0] = none := by decide
+example : decodeUnitsInto? 4 4 [165, 1, 2, 3, 90, 4, 0, 0] = none := by decide
+example : decodeUnitsInto? 4 4 [165, 1, 2, 3, 165, 4, 0, 7] = none := by decide
+-- The same content under the other marker: an update in both units.
+example :
+    isUpdateWrite 4 [165, 1, 2, 3, 165, 4, 0, 0] (encodeUnits 4 90 [1, 2, 3, 4]) = true := by
+  decide
+
+/-! ## Sealed records
+
+The content of a sealed record is the nonce, the ciphertext and the tag of
+one ChaCha20-Poly1305 seal; the record is the unit codec's encoding of that
+content at `sealedUnitBytes`. -/
+
+/-- The bytes of a sealed record besides its markers (`sealed_content_len`). -/
+def sealedContentLen (payloadLen : Nat) : Nat :=
+  sealedNonceBytes + payloadLen + sealedTagBytes
+
+/-- The units of a sealed record (`sealed_unit_count`). -/
+def sealedUnitCount (payloadLen : Nat) : Nat :=
+  unitCount sealedUnitBytes (sealedContentLen payloadLen)
+
+/-- The length of a sealed record (`sealed_encoded_len`): a function of the
+payload's length alone. -/
+def sealedEncodedLen (payloadLen : Nat) : Nat :=
+  sealedUnitBytes * sealedUnitCount payloadLen
+
+/-- What the storage observer finds in a sealed slot: the public length, and
+one marker in every unit. -/
+def UoStoreSlotCiphertextShape
+    (payloadLen : Nat)
+    (encoded : List Nat) : Prop :=
+  encoded.length = sealedEncodedLen payloadLen ∧
+    ∃ marker, recordMarker? sealedUnitBytes encoded = some marker
+
+structure SealedRecordParts where
+  marker : Nat
+  nonce : List Nat
+  ciphertext : List Nat
+  tag : List Nat
+deriving Repr, DecidableEq
+
+def SealedRecordParts.ValidShape
+    (payloadLen : Nat)
+    (parts : SealedRecordParts) : Prop :=
+  parts.nonce.length = sealedNonceBytes ∧
+    parts.ciphertext.length = payloadLen ∧
+    parts.tag.length = sealedTagBytes
+
+def SealedRecordParts.ValidOpenShape
+    (payloadLen : Nat)
+    (parts : SealedRecordParts) : Prop :=
+  parts.ValidShape payloadLen ∧
+    ValidMarker parts.marker
+
+/-- The content of the record: what its units hold after their markers. -/
+def SealedRecordParts.bytes
+    (parts : SealedRecordParts) : List Nat :=
+  parts.nonce ++ parts.ciphertext ++ parts.tag
+
+def sealedRecordParts
+    (payloadLen marker : Nat)
+    (content : List Nat) : SealedRecordParts :=
+  let afterNonce := content.drop sealedNonceBytes
+  { marker := marker
+  , nonce := content.take sealedNonceBytes
+  , ciphertext := afterNonce.take payloadLen
+  , tag := (afterNonce.drop payloadLen).take sealedTagBytes
+  }
+
+def splitSealedRecord?
+    (payloadLen marker : Nat)
+    (content : List Nat) : Option SealedRecordParts :=
+  if content.length = sealedContentLen payloadLen then
+    some (sealedRecordParts payloadLen marker content)
+  else
+    none
+
+/-- The record of a seal: its content in units under its marker. -/
+def encodeSealedRecord
+    (parts : SealedRecordParts) : List Nat :=
+  encodeUnits sealedUnitBytes parts.marker parts.bytes
+
+def decodeSealedRecord?
+    (payloadLen : Nat)
+    (encoded : List Nat) : Option SealedRecordParts :=
+  match decodeUnitsInto? sealedUnitBytes (sealedContentLen payloadLen) encoded with
+  | none => none
+  | some (marker, content) => splitSealedRecord? payloadLen marker content
+
+def sealAndWipeIntoSliceAccepted
+    (payloadLen outLen : Nat) : Prop :=
+  outLen = sealedEncodedLen payloadLen
+
+def openBoxedPayloadShape?
+    (payloadLen : Nat)
+    (encoded : List Nat) : Option Nat :=
+  match decodeSealedRecord? payloadLen encoded with
+  | none => none
+  | some parts => some parts.ciphertext.length
+
+theorem sealedUnitBytes_two_le : 2 ≤ sealedUnitBytes := by
+  decide
+
+theorem sealedEncodedLen_public_formula
+    (payloadLen : Nat) :
+    sealedEncodedLen payloadLen =
+      sealedUnitBytes *
+        unitCount sealedUnitBytes (sealedNonceBytes + payloadLen + sealedTagBytes) := by
+  rfl
+
+theorem sealedContentLen_public_formula
+    (payloadLen : Nat) :
+    sealedContentLen payloadLen =
+      sealedNonceBytes + payloadLen + sealedTagBytes := by
+  rfl
+
+theorem sealAndWipeIntoSliceAccepted_exactLength
+    (payloadLen : Nat) :
+    sealAndWipeIntoSliceAccepted payloadLen
+      (sealedEncodedLen payloadLen) := by
+  rfl
+
+theorem sealAndWipeIntoSliceAccepted_rejectsLengthMismatch
+    {payloadLen outLen : Nat}
+    (hLen : outLen ≠ sealedEncodedLen payloadLen) :
+    ¬ sealAndWipeIntoSliceAccepted payloadLen outLen := by
+  intro hAccepted
+  exact hLen hAccepted
+
+theorem sealedRecordParts_validShape_of_length
+    {payloadLen marker : Nat}
+    {content : List Nat}
+    (hLen : content.length = sealedContentLen payloadLen) :
+    (sealedRecordParts payloadLen marker content).ValidShape payloadLen := by
+  unfold SealedRecordParts.ValidShape sealedRecordParts
+  unfold sealedContentLen at hLen
+  simp only [List.length_take, List.length_drop, hLen]
+  omega
+
+theorem sealedRecordParts_bytes_of_length
+    {payloadLen marker : Nat}
+    {content : List Nat}
+    (hLen : content.length = sealedContentLen payloadLen) :
+    (sealedRecordParts payloadLen marker content).bytes = content := by
+  have hTag :
+      ((content.drop sealedNonceBytes).drop payloadLen).take sealedTagBytes =
+        (content.drop sealedNonceBytes).drop payloadLen := by
+    apply List.take_of_length_le
+    rw [List.length_drop, List.length_drop, hLen]
+    unfold sealedContentLen
+    omega
+  unfold SealedRecordParts.bytes sealedRecordParts
+  simp only [hTag]
+  rw [List.append_assoc, List.take_append_drop, List.take_append_drop]
+
+theorem sealedRecordParts_bytes_valid_of_length
+    {payloadLen marker : Nat}
+    {content : List Nat}
+    (hLen : content.length = sealedContentLen payloadLen)
+    (hContentBytes : ∀ byte, byte ∈ content → ValidByte byte) :
+    ∀ byte,
+      byte ∈ (sealedRecordParts payloadLen marker content).bytes →
+        ValidByte byte := by
+  intro byte hMem
+  exact
+    hContentBytes byte
+      (by
+        rw [sealedRecordParts_bytes_of_length hLen] at hMem
+        exact hMem)
+
+theorem SealedRecordParts.bytes_length_of_validShape
+    {payloadLen : Nat}
+    {parts : SealedRecordParts}
+    (hShape : parts.ValidShape payloadLen) :
+    parts.bytes.length = sealedContentLen payloadLen := by
+  unfold SealedRecordParts.ValidShape at hShape
+  unfold SealedRecordParts.bytes
+  rcases hShape with ⟨hNonceLen, hCiphertextLen, hTagLen⟩
+  simp only [List.length_append, hNonceLen, hCiphertextLen, hTagLen, sealedContentLen]
+
+theorem SealedRecordParts.bytes_ne_nil_of_validShape
+    {payloadLen : Nat}
+    {parts : SealedRecordParts}
+    (hShape : parts.ValidShape payloadLen) :
+    parts.bytes ≠ [] := by
+  intro hNil
+  have hLen := SealedRecordParts.bytes_length_of_validShape hShape
+  rw [hNil] at hLen
+  unfold sealedContentLen sealedNonceBytes at hLen
+  simp at hLen
+  omega
+
+theorem sealedRecordParts_bytes_roundtrip
+    {payloadLen : Nat}
+    {parts : SealedRecordParts}
+    (hShape : parts.ValidShape payloadLen) :
+    sealedRecordParts payloadLen parts.marker parts.bytes = parts := by
+  cases parts with
+  | mk marker nonce ciphertext tag =>
+      unfold SealedRecordParts.ValidShape at hShape
+      unfold SealedRecordParts.bytes
+      rcases hShape with ⟨hNonceLen, hCiphertextLen, hTagLen⟩
+      have hTagLenLe : tag.length ≤ 16 := by
+        have hTagLenEq : tag.length = 16 := by
+          simpa [sealedTagBytes] using hTagLen
+        omega
+      simp [sealedRecordParts, hNonceLen, hCiphertextLen,
+        sealedNonceBytes, sealedTagBytes,
+        List.take_of_length_le hTagLenLe]
+
+theorem splitSealedRecord_some_validShape
+    {payloadLen marker : Nat}
+    {content : List Nat}
+    {parts : SealedRecordParts}
+    (hSplit : splitSealedRecord? payloadLen marker content = some parts) :
+    content.length = sealedContentLen payloadLen ∧
+      parts.ValidShape payloadLen ∧
+      parts.marker = marker := by
+  unfold splitSealedRecord? at hSplit
+  split at hSplit
+  · rename_i hLen
+    cases hSplit
+    exact ⟨hLen, sealedRecordParts_validShape_of_length hLen, rfl⟩
+  · contradiction
+
+theorem splitSealedRecord_some_bytes
+    {payloadLen marker : Nat}
+    {content : List Nat}
+    {parts : SealedRecordParts}
+    (hSplit : splitSealedRecord? payloadLen marker content = some parts) :
+    parts.bytes = content := by
+  unfold splitSealedRecord? at hSplit
+  split at hSplit
+  · rename_i hLen
+    cases hSplit
+    exact sealedRecordParts_bytes_of_length hLen
+  · contradiction
+
+/-- A sealed record's length is the public one. -/
+theorem encodeSealedRecord_length
+    {payloadLen : Nat}
+    {parts : SealedRecordParts}
+    (hShape : parts.ValidShape payloadLen) :
+    (encodeSealedRecord parts).length = sealedEncodedLen payloadLen := by
+  unfold encodeSealedRecord
+  rw [encodeUnits_length sealedUnitBytes_two_le,
+    SealedRecordParts.bytes_length_of_validShape hShape]
+  rfl
+
+/-- A record that opens is the record of its parts, and its parts have the
+public lengths and a valid marker. -/
+theorem decodeSealedRecord_some_transport_sound
+    {payloadLen : Nat}
+    {encoded : List Nat}
+    {parts : SealedRecordParts}
+    (hDecode : decodeSealedRecord? payloadLen encoded = some parts) :
+    encoded.length = sealedEncodedLen payloadLen ∧
+      parts.ValidOpenShape payloadLen ∧
+      encoded = encodeSealedRecord parts ∧
+      decodeUnitsInto? sealedUnitBytes (sealedContentLen payloadLen) encoded =
+        some (parts.marker, parts.bytes) ∧
+      splitSealedRecord? payloadLen parts.marker parts.bytes = some parts ∧
+      parts.bytes.length = sealedContentLen payloadLen := by
+  unfold decodeSealedRecord? at hDecode
+  cases hUnits :
+      decodeUnitsInto? sealedUnitBytes (sealedContentLen payloadLen) encoded with
+  | none => simp [hUnits] at hDecode
+  | some result =>
+      obtain ⟨marker, content⟩ := result
+      simp only [hUnits] at hDecode
+      have hSound := decodeUnitsInto?_some sealedUnitBytes_two_le hUnits
+      have hSplitShape := splitSealedRecord_some_validShape hDecode
+      have hPartsBytes := splitSealedRecord_some_bytes hDecode
+      have hEncoded : encoded = encodeSealedRecord parts := by
+        unfold encodeSealedRecord
+        rw [hSplitShape.2.2, hPartsBytes]
+        exact hSound.2.2
+      have hShape : parts.ValidShape payloadLen := hSplitShape.2.1
+      refine ⟨?_, ⟨hShape, ?_⟩, hEncoded, ?_, ?_, ?_⟩
+      · rw [hEncoded]
+        exact encodeSealedRecord_length hShape
+      · rw [hSplitShape.2.2]
+        exact hSound.1
+      · rw [hSplitShape.2.2, hPartsBytes]
+      · rw [hSplitShape.2.2, hPartsBytes]
+        exact hDecode
+      · exact SealedRecordParts.bytes_length_of_validShape hShape
+
+theorem decodeSealedRecord_some_validOpenShape
+    {payloadLen : Nat}
+    {encoded : List Nat}
+    {parts : SealedRecordParts}
+    (hDecode : decodeSealedRecord? payloadLen encoded = some parts) :
+    encoded.length = sealedEncodedLen payloadLen ∧
+      parts.ValidOpenShape payloadLen := by
+  have hSound := decodeSealedRecord_some_transport_sound hDecode
+  exact ⟨hSound.1, hSound.2.1⟩
+
+theorem openBoxedPayloadShape?_some_payloadLen
+    {payloadLen : Nat}
+    {encoded : List Nat}
+    {parts : SealedRecordParts}
+    (hDecode : decodeSealedRecord? payloadLen encoded = some parts) :
+    openBoxedPayloadShape? payloadLen encoded = some payloadLen := by
+  unfold openBoxedPayloadShape?
+  rw [hDecode]
+  have hOpenShape := (decodeSealedRecord_some_validOpenShape hDecode).2
+  have hValidShape : parts.ValidShape payloadLen := hOpenShape.1
+  unfold SealedRecordParts.ValidShape at hValidShape
+  simp [hValidShape.2.1]
+
+theorem decodeSealedRecord_none_of_encoded_length_ne
+    {payloadLen : Nat}
+    {encoded : List Nat}
+    (hLen : encoded.length ≠ sealedEncodedLen payloadLen) :
+    decodeSealedRecord? payloadLen encoded = none := by
+  cases hDecode : decodeSealedRecord? payloadLen encoded with
+  | none => rfl
+  | some parts =>
+      have hLenEq := (decodeSealedRecord_some_validOpenShape hDecode).1
+      exact False.elim (hLen hLenEq)
+
+/-- The record of parts with the public lengths and a valid marker has the
+shape of a sealed slot. -/
+theorem encodeSealedRecord_uoSlotCiphertextShape
+    {payloadLen : Nat}
+    {parts : SealedRecordParts}
+    (hOpenShape : parts.ValidOpenShape payloadLen) :
+    UoStoreSlotCiphertextShape payloadLen (encodeSealedRecord parts) := by
+  rcases hOpenShape with ⟨hShape, hMarker⟩
+  exact
+    ⟨ encodeSealedRecord_length hShape
+    , parts.marker
+    , recordMarker?_encodeUnits sealedUnitBytes_two_le hMarker
+        (SealedRecordParts.bytes_ne_nil_of_validShape hShape)
+    ⟩
+
+theorem decodeSealedRecord_some_uoSlotCiphertextShape
+    {payloadLen : Nat}
+    {encoded : List Nat}
+    {parts : SealedRecordParts}
+    (hDecode : decodeSealedRecord? payloadLen encoded = some parts) :
+    UoStoreSlotCiphertextShape payloadLen encoded := by
+  have hSound := decodeSealedRecord_some_transport_sound hDecode
+  rw [hSound.2.2.1]
+  exact encodeSealedRecord_uoSlotCiphertextShape hSound.2.1
+
+/-- The content of a record that decodes at a sealed record's length splits
+into the parts of a seal. -/
+theorem decodeUnitsInto?_sealedRecordShape
+    {payloadLen marker : Nat}
+    {encoded content : List Nat}
+    (hDecode :
+      decodeUnitsInto? sealedUnitBytes (sealedContentLen payloadLen) encoded =
+        some (marker, content)) :
+    encoded.length = sealedEncodedLen payloadLen ∧
+      content.length = sealedContentLen payloadLen ∧
+      ∃ parts,
+        splitSealedRecord? payloadLen marker content = some parts ∧
+          parts.ValidOpenShape payloadLen := by
+  have hSound := decodeUnitsInto?_some sealedUnitBytes_two_le hDecode
+  have hShape :
+      (sealedRecordParts payloadLen marker content).ValidShape payloadLen :=
+    sealedRecordParts_validShape_of_length hSound.2.1
+  refine ⟨?_, hSound.2.1, sealedRecordParts payloadLen marker content, ?_, ⟨hShape, hSound.1⟩⟩
+  · rw [hSound.2.2, encodeUnits_length sealedUnitBytes_two_le, hSound.2.1]
+    rfl
+  · unfold splitSealedRecord?
+    simp [hSound.2.1]
+
+/-- Round trip of a sealed record. -/
+theorem decodeSealedRecord_encodeSealedRecord
+    {payloadLen : Nat}
+    {parts : SealedRecordParts}
+    (hOpenShape : parts.ValidOpenShape payloadLen) :
+    decodeSealedRecord? payloadLen (encodeSealedRecord parts) =
+      some parts := by
+  rcases hOpenShape with ⟨hShape, hMarker⟩
+  have hContentLen := SealedRecordParts.bytes_length_of_validShape hShape
+  have hRoundtrip := sealedRecordParts_bytes_roundtrip hShape
+  have hUnits :
+      decodeUnitsInto? sealedUnitBytes (sealedContentLen payloadLen)
+          (encodeSealedRecord parts) =
+        some (parts.marker, parts.bytes) := by
+    unfold encodeSealedRecord
+    rw [← hContentLen]
+    exact
+      decodeUnitsInto?_encodeUnits sealedUnitBytes_two_le hMarker
+        (SealedRecordParts.bytes_ne_nil_of_validShape hShape)
+  unfold decodeSealedRecord?
+  rw [hUnits]
+  simp [splitSealedRecord?, hContentLen, hRoundtrip]
+
+/-- A record whose units carry a byte that is not one of the two markers does
+not open. -/
+theorem decodeSealedRecord_encodeSealedRecord_wrong_marker_none
+    {payloadLen : Nat}
+    {parts : SealedRecordParts}
+    (hShape : parts.ValidShape payloadLen)
+    (hMarker : ¬ ValidMarker parts.marker) :
+    decodeSealedRecord? payloadLen (encodeSealedRecord parts) = none := by
+  cases hDecode : decodeSealedRecord? payloadLen (encodeSealedRecord parts) with
+  | none => rfl
+  | some decoded =>
+      exfalso
+      have hSound := decodeSealedRecord_some_transport_sound hDecode
+      have hHeadParts :
+          (encodeSealedRecord parts).head? = some parts.marker :=
+        encodeUnits_head? sealedUnitBytes_two_le
+          (SealedRecordParts.bytes_ne_nil_of_validShape hShape)
+      have hHeadDecoded :
+          (encodeSealedRecord decoded).head? = some decoded.marker :=
+        encodeUnits_head? sealedUnitBytes_two_le
+          (SealedRecordParts.bytes_ne_nil_of_validShape hSound.2.1.1)
+      rw [← hSound.2.2.1, hHeadParts] at hHeadDecoded
+      have hSame : parts.marker = decoded.marker := Option.some.inj hHeadDecoded
+      exact hMarker (hSame ▸ hSound.2.1.2)
+
+/-- A slot with a zero unit does not open. -/
+theorem decodeSealedRecord_none_of_zero_unit
+    {payloadLen : Nat}
+    {encoded unit : List Nat}
+    (hMem : unit ∈ unitsOf sealedUnitBytes encoded)
+    (hZero : allZero unit = true) :
+    decodeSealedRecord? payloadLen encoded = none := by
+  unfold decodeSealedRecord?
+  rw [decodeUnitsInto?_none_of_zero_unit sealedUnitBytes_two_le hMem hZero]
+
+/-- The reseal of a sealed slot: a record written over a slot that has the
+shape of a sealed one, under the marker `next_marker` gives for the slot's,
+is an `Update` in every unit the storage observer classifies. The parts are
+any of the public lengths: the claim does not rest on the nonce or on the
+ciphertext. -/
+theorem encodeSealedRecord_reseal_isUpdate
+    {payloadLen oldMarker : Nat}
+    {old : List Nat}
+    {parts : SealedRecordParts}
+    (hOldLen : old.length = sealedEncodedLen payloadLen)
+    (hOldMarker : recordMarker? sealedUnitBytes old = some oldMarker)
+    (hShape : parts.ValidShape payloadLen)
+    (hNext : nextMarker? oldMarker = some parts.marker) :
+    isUpdateWrite storageObserverUnitBytes old (encodeSealedRecord parts) = true := by
+  rw [← sealedUnitBytes_eq_storageObserverUnitBytes]
+  unfold encodeSealedRecord
+  refine
+    isUpdateWrite_encodeUnits sealedUnitBytes_two_le hOldMarker hNext
+      (SealedRecordParts.bytes_ne_nil_of_validShape hShape) ?_
+  rw [hOldLen, SealedRecordParts.bytes_length_of_validShape hShape]
+  rfl
+
+example : sealedEncodedLen 32 = 64 := by decide
+example : sealedEncodedLen 65 = 96 := by decide
+
 /-! ### W5.5: Concrete Rust StoreCipher surface obligations
 
 The theorems below pin obligations of the concrete Rust StoreCipher surface
 (`runtime/uo-store/src/generated_surface.rs`) at the Lean codec semantic
 level. They project the abstract codec model onto the structural facts the
-Rust seal/open implementation actually relies on (cipher-key length, magic
-constant length / byte validity, sealed-record component lengths, AAD shape).
-The probe `runtime_crypto_primitive_identity_pinned` static-drift check pins
-the Rust side; these Lean theorems pin the corresponding mathematical
-obligations referenced by the WP5 paper-facing claims. -/
+Rust seal/open implementation actually relies on (cipher-key length, marker
+values, sealed-record component lengths, AAD shape). The probe
+`runtime_crypto_primitive_identity_pinned` static-drift check pins the Rust
+side; these Lean theorems pin the corresponding mathematical obligations
+referenced by the WP5 paper-facing claims. -/
 
 /-- The Lean cipher-key-length constant matches the Rust `key: [u8; 32]`
 buffer pinned by the probe's crypto-primitive identity check. This makes the
@@ -960,48 +1475,31 @@ theorem cipherKeyBytes_value :
     cipherKeyBytes = 32 := by
   rfl
 
-/-- The sealed-record magic constant has length `sealedMagicLen = 2`,
-matching the Rust `SEALED_MAGIC: [u8; 2] = [0xA5, 0x5A]` constant pinned by
-the static-drift suite. -/
-theorem sealedMagic_length :
-    sealedMagic.length = sealedMagicLen := by
+/-- There are two markers, matching the Rust
+`SEALED_MARKERS: [u8; 2] = [0xA5, 0x5A]` constant pinned by the static-drift
+suite. -/
+theorem sealedMarkers_length :
+    sealedMarkers.length = 2 := by
   rfl
 
-/-- Each byte of the public sealed-record magic is a valid byte (`< 256`).
-This is what allows the magic to flow through `encodeNonzero` (which only
-accepts `ValidByte` inputs) without producing zero bytes in the transport
-record. -/
-theorem sealedMagic_validBytes :
-    ∀ byte, byte ∈ sealedMagic → ValidByte byte := by
-  intro byte hMem
-  unfold ValidByte
-  unfold sealedMagic at hMem
-  simp at hMem
-  rcases hMem with h | h
-  · subst h
-    decide
-  · subst h
-    decide
+/-- Each marker is a byte and is not zero. This is why no unit of a sealed
+record is zero. -/
+theorem sealedMarkers_validBytes :
+    ∀ marker, marker ∈ sealedMarkers → ValidByte marker ∧ 0 < marker := by
+  intro marker hMem
+  have hValid := (validMarker_iff_mem marker).mpr hMem
+  exact ⟨validMarker_validByte hValid, validMarker_pos hValid⟩
 
-/-- The transport-encoded sealed record is exactly twice the plain sealed
-record. Each plain byte is encoded as two non-zero nibble bytes (high and
-low), so `sealedEncodedLen = 2 * sealedPlainLen` for any payload size. This
-is the mathematical fact behind the Rust `seal_and_wipe_into_slice` cursor
-arithmetic. -/
-theorem sealedEncodedLen_eq_two_times_sealedPlainLen
+/-- A sealed record is `sealedUnitBytes` bytes for each of its units, and its
+units hold its content. This is the mathematical fact behind the lengths
+`seal_and_wipe_units` and `open_boxed` hand to `write_units` and
+`read_units`. -/
+theorem sealedEncodedLen_eq_unitBytes_times_unitCount
     (payloadLen : Nat) :
-    sealedEncodedLen payloadLen = 2 * sealedPlainLen payloadLen := by
-  rfl
-
-/-- A valid-shape sealed record's magic component has the public
-`sealedMagicLen` length. This is the structural projection from
-`SealedRecordParts.ValidShape` for the magic field. -/
-theorem SealedRecordParts.magic_length_of_validShape
-    {payloadLen : Nat}
-    {parts : SealedRecordParts}
-    (hShape : parts.ValidShape payloadLen) :
-    parts.magic.length = sealedMagicLen :=
-  hShape.1
+    sealedEncodedLen payloadLen = sealedUnitBytes * sealedUnitCount payloadLen ∧
+      sealedContentLen payloadLen ≤
+        (sealedUnitBytes - 1) * sealedUnitCount payloadLen := by
+  exact ⟨rfl, unitCount_covers sealedUnitBytes_two_le (sealedContentLen payloadLen)⟩
 
 /-- A valid-shape sealed record's nonce component has the public
 `sealedNonceBytes` length. This is the structural projection from
@@ -1012,7 +1510,7 @@ theorem SealedRecordParts.nonce_length_of_validShape
     {parts : SealedRecordParts}
     (hShape : parts.ValidShape payloadLen) :
     parts.nonce.length = sealedNonceBytes :=
-  hShape.2.1
+  hShape.1
 
 /-- A valid-shape sealed record's ciphertext component has length exactly
 equal to the payload length. Matches the Rust convention that ChaCha20-Poly1305
@@ -1023,7 +1521,7 @@ theorem SealedRecordParts.ciphertext_length_of_validShape
     {parts : SealedRecordParts}
     (hShape : parts.ValidShape payloadLen) :
     parts.ciphertext.length = payloadLen :=
-  hShape.2.2.1
+  hShape.2.1
 
 /-- A valid-shape sealed record's tag component has the public
 `sealedTagBytes` length. Matches the Rust `Tag::from_slice(tag_bytes)`
@@ -1034,29 +1532,27 @@ theorem SealedRecordParts.tag_length_of_validShape
     {parts : SealedRecordParts}
     (hShape : parts.ValidShape payloadLen) :
     parts.tag.length = sealedTagBytes :=
-  hShape.2.2.2
+  hShape.2.2
 
-/-- An open-shape sealed record's magic component is exactly the public
-`sealedMagic` constant. This is the magic-constant equality projection from
-`SealedRecordParts.ValidOpenShape`, mirroring the Rust open-path check
-`if magic != SEALED_MAGIC { return None; }`. -/
-theorem SealedRecordParts.magic_eq_of_validOpenShape
+/-- An open-shape sealed record's marker is one of the two. This is the
+projection from `SealedRecordParts.ValidOpenShape`, mirroring the check of
+`record_marker` on the open path. -/
+theorem SealedRecordParts.marker_valid_of_validOpenShape
     {payloadLen : Nat}
     {parts : SealedRecordParts}
     (hShape : parts.ValidOpenShape payloadLen) :
-    parts.magic = sealedMagic :=
+    ValidMarker parts.marker :=
   hShape.2
 
-/-- A successful `decodeSealedRecord?` outcome witnesses the magic-equality
-fact at the open-shape level. This is the named theorem capturing the
-Rust open-path invariant that an accepted sealed record always exhibits the
-public magic constant. -/
-theorem decodeSealedRecord_some_magic
+/-- A successful `decodeSealedRecord?` outcome witnesses a valid marker.
+This is the named theorem capturing the Rust open-path invariant that an
+accepted sealed record carries one of the two markers in every unit. -/
+theorem decodeSealedRecord_some_marker
     {payloadLen : Nat}
     {encoded : List Nat}
     {parts : SealedRecordParts}
     (hDecode : decodeSealedRecord? payloadLen encoded = some parts) :
-    parts.magic = sealedMagic :=
+    ValidMarker parts.marker :=
   (decodeSealedRecord_some_validOpenShape hDecode).2.2
 
 /-- A successful `decodeSealedRecord?` outcome witnesses the
@@ -1067,12 +1563,11 @@ theorem decodeSealedRecord_some_componentLengths
     {encoded : List Nat}
     {parts : SealedRecordParts}
     (hDecode : decodeSealedRecord? payloadLen encoded = some parts) :
-    parts.magic.length = sealedMagicLen ∧
-      parts.nonce.length = sealedNonceBytes ∧
+    parts.nonce.length = sealedNonceBytes ∧
       parts.ciphertext.length = payloadLen ∧
       parts.tag.length = sealedTagBytes := by
   have hShape := (decodeSealedRecord_some_validOpenShape hDecode).2.1
-  exact ⟨hShape.1, hShape.2.1, hShape.2.2.1, hShape.2.2.2⟩
+  exact ⟨hShape.1, hShape.2.1, hShape.2.2⟩
 
 /-- The store-slot AAD constructed by `uoStoreSlotAad` is the deterministic
 public concatenation `"uo_store:" ++ object`. This pins the AAD shape: the

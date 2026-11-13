@@ -87,36 +87,39 @@ mod tests {
     }
 
     #[test]
-    fn uo_store_fails_a_write_that_repeats_a_nonce() {
+    fn uo_store_write_that_repeats_a_nonce_is_still_an_update() {
         use crate::codec::StoreCipher;
         use rand::SeedableRng;
         use rand_chacha::ChaCha20Rng;
 
         // Two ciphers made from the same key material have one key, and
-        // each counts its seals from zero.
+        // each counts its seals from zero. With the count set back before
+        // every write, each write of the same value seals the same
+        // ciphertext under the same nonce. The slot's record still changes
+        // in every unit, since a record carries the marker that the record
+        // it replaces does not: the store's check of the write's bytes
+        // passes, and the observer sees an Update.
         let cipher = || StoreCipher::from_rng(&mut ChaCha20Rng::seed_from_u64(0xC1F3));
         let mut store = UoObjectStore::preinitialized([("slot".to_string(), 32)]).unwrap();
-        store.cipher = cipher();
-        store.write_cell("slot", &mut [5u8; 32]).unwrap();
-        store.write_cell("slot", &mut [5u8; 32]).unwrap();
-        assert_eq!(store.physical_writes().len(), 2);
-
-        // With the count set back the next seal repeats the first write's
-        // nonce. The same value under that nonce is the record the slot
-        // held after the first write, not the one it holds now: an Update.
-        store.cipher = cipher();
-        store.write_cell("slot", &mut [5u8; 32]).unwrap();
-        assert_eq!(store.physical_writes().len(), 3);
-        // Set back once more, the seal repeats the nonce of the record the
-        // slot holds, and the same value gives the same record: the
-        // observer would see a Same, and the store fails the write.
-        store.cipher = cipher();
-        let error = store.write_cell("slot", &mut [5u8; 32]).unwrap_err();
-        assert!(
-            format!("{error:#}").contains("is not an Update of the record it replaces"),
-            "{error:#}"
-        );
-        assert_eq!(store.physical_writes().len(), 3);
+        let mut records = Vec::new();
+        for _ in 0..4 {
+            store.cipher = cipher();
+            store.write_cell("slot", &mut [5u8; 32]).unwrap();
+            records.push(store.read_cell("slot").unwrap());
+        }
+        assert_eq!(store.physical_writes().len(), 4);
         store.ensure_update_only().unwrap();
+        for pair in records.windows(2) {
+            let (old, new) = (&pair[0], &pair[1]);
+            assert_eq!(old.len(), 64);
+            assert!(uo_core::is_update_write(old, new));
+            for (old_unit, new_unit) in old.chunks_exact(32).zip(new.chunks_exact(32)) {
+                assert_ne!(old_unit[0], new_unit[0]);
+                assert_eq!(old_unit[1..], new_unit[1..]);
+            }
+        }
+        // The record after two writes is the record before them.
+        assert_eq!(records[0], records[2]);
+        assert_eq!(records[1], records[3]);
     }
 }

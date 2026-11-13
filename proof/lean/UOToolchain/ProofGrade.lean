@@ -1197,8 +1197,8 @@ theorem proofGrade_compiler_correctness_supersedes_artifact_checker
 These facades expose the W5.5 codec-semantic alignment theorems on the
 paper-facing surface. They pin obligations of the concrete Rust
 `StoreCipher` surface (`runtime/uo-store/src/generated_surface.rs`) at the
-Lean codec level: cipher-key length, magic constant length / byte validity,
-sealed-record component lengths, and AAD shape. Each facade strengthens a
+Lean codec level: cipher-key length, marker values, sealed-record lengths and
+component lengths, the class of a reseal, and AAD shape. Each facade strengthens a
 paper-facing claim about the cryptographic-codec layer that
 `bucketEncryptionINDCPA` and `metadataEncryptionINDCPA` ultimately rest on.
 
@@ -1214,37 +1214,40 @@ theorem proofGrade_runtime_store_codec_cipher_key_bytes :
     RuntimeStoreCodecSemantics.cipherKeyBytes = 32 :=
   RuntimeStoreCodecSemantics.cipherKeyBytes_value
 
-/-- Paper-facing sealed-record-magic length facade. The public sealed-record
-magic constant has length `sealedMagicLen = 2`, matching the Rust
-`SEALED_MAGIC: [u8; 2] = [0xA5, 0x5A]` literal. -/
-theorem proofGrade_runtime_store_codec_sealed_magic_length :
-    RuntimeStoreCodecSemantics.sealedMagic.length =
-      RuntimeStoreCodecSemantics.sealedMagicLen :=
-  RuntimeStoreCodecSemantics.sealedMagic_length
+/-- Paper-facing sealed-record-marker count facade. A record's marker has two
+values, matching the Rust `SEALED_MARKERS: [u8; 2] = [0xA5, 0x5A]` literal. -/
+theorem proofGrade_runtime_store_codec_sealed_markers_length :
+    RuntimeStoreCodecSemantics.sealedMarkers.length = 2 :=
+  RuntimeStoreCodecSemantics.sealedMarkers_length
 
-/-- Paper-facing sealed-record-magic byte-validity facade. Each byte of the
-public magic is a valid byte (`< 256`). This is what allows the magic to
-flow through the non-zero transport encoder without producing zero bytes. -/
-theorem proofGrade_runtime_store_codec_sealed_magic_validBytes :
-    ∀ byte,
-      byte ∈ RuntimeStoreCodecSemantics.sealedMagic →
-        RuntimeStoreCodecSemantics.ValidByte byte :=
-  RuntimeStoreCodecSemantics.sealedMagic_validBytes
+/-- Paper-facing sealed-record-marker byte facade. Each marker is a valid
+byte (`< 256`) and is not zero. This is why no unit of a sealed record is
+zero: every unit begins with the record's marker. -/
+theorem proofGrade_runtime_store_codec_sealed_markers_validBytes :
+    ∀ marker,
+      marker ∈ RuntimeStoreCodecSemantics.sealedMarkers →
+        RuntimeStoreCodecSemantics.ValidByte marker ∧ 0 < marker :=
+  RuntimeStoreCodecSemantics.sealedMarkers_validBytes
 
-/-- Paper-facing transport-encoded-length facade. The transport-encoded
-sealed record is exactly twice the plain sealed record. This is the
-mathematical fact behind the Rust `seal_and_wipe_into_slice` cursor
-arithmetic. -/
-theorem proofGrade_runtime_store_codec_sealed_encoded_len_doubles_plain_len
+/-- Paper-facing sealed-record-length facade. A sealed record is a whole
+number of units of `sealedUnitBytes` bytes, and its units hold its content:
+each has one marker byte and `sealedUnitBytes - 1` bytes of nonce,
+ciphertext and tag. This is the mathematical fact behind the lengths the
+Rust seal and open paths hand to `write_units` and `read_units`. -/
+theorem proofGrade_runtime_store_codec_sealed_encoded_len_whole_units
     (payloadLen : Nat) :
     RuntimeStoreCodecSemantics.sealedEncodedLen payloadLen =
-      2 * RuntimeStoreCodecSemantics.sealedPlainLen payloadLen :=
-  RuntimeStoreCodecSemantics.sealedEncodedLen_eq_two_times_sealedPlainLen
+        RuntimeStoreCodecSemantics.sealedUnitBytes *
+          RuntimeStoreCodecSemantics.sealedUnitCount payloadLen ∧
+      RuntimeStoreCodecSemantics.sealedContentLen payloadLen ≤
+        (RuntimeStoreCodecSemantics.sealedUnitBytes - 1) *
+          RuntimeStoreCodecSemantics.sealedUnitCount payloadLen :=
+  RuntimeStoreCodecSemantics.sealedEncodedLen_eq_unitBytes_times_unitCount
     payloadLen
 
 /-- Paper-facing sealed-record component-length facade. A successful
 `decodeSealedRecord?` outcome witnesses the structural decomposition fact:
-the magic, nonce, ciphertext, and tag components have their pinned public
+the nonce, ciphertext, and tag components have their pinned public
 lengths. This is the named theorem capturing the Rust open-path component
 slicing. -/
 theorem proofGrade_runtime_store_codec_decoded_sealed_record_component_lengths
@@ -1254,25 +1257,49 @@ theorem proofGrade_runtime_store_codec_decoded_sealed_record_component_lengths
     (hDecode :
       RuntimeStoreCodecSemantics.decodeSealedRecord? payloadLen encoded =
         some parts) :
-    parts.magic.length = RuntimeStoreCodecSemantics.sealedMagicLen ∧
-      parts.nonce.length = RuntimeStoreCodecSemantics.sealedNonceBytes ∧
+    parts.nonce.length = RuntimeStoreCodecSemantics.sealedNonceBytes ∧
       parts.ciphertext.length = payloadLen ∧
       parts.tag.length = RuntimeStoreCodecSemantics.sealedTagBytes :=
   RuntimeStoreCodecSemantics.decodeSealedRecord_some_componentLengths hDecode
 
-/-- Paper-facing sealed-record magic-equality facade. A successful
-`decodeSealedRecord?` outcome implies the decoded magic component is
-exactly the public `sealedMagic` constant, mirroring the Rust open-path
-check `if magic != SEALED_MAGIC { return None; }`. -/
-theorem proofGrade_runtime_store_codec_decoded_sealed_record_magic
+/-- Paper-facing sealed-record marker facade. A successful
+`decodeSealedRecord?` outcome implies the record's units carry one of the
+two markers, mirroring the Rust open-path check of `record_marker`. -/
+theorem proofGrade_runtime_store_codec_decoded_sealed_record_marker
     {payloadLen : Nat}
     {encoded : List Nat}
     {parts : RuntimeStoreCodecSemantics.SealedRecordParts}
     (hDecode :
       RuntimeStoreCodecSemantics.decodeSealedRecord? payloadLen encoded =
         some parts) :
-    parts.magic = RuntimeStoreCodecSemantics.sealedMagic :=
-  RuntimeStoreCodecSemantics.decodeSealedRecord_some_magic hDecode
+    RuntimeStoreCodecSemantics.ValidMarker parts.marker :=
+  RuntimeStoreCodecSemantics.decodeSealedRecord_some_marker hDecode
+
+/-- Paper-facing reseal facade. A sealed record written over a slot that
+has the public length and a marker, under the marker `next_marker` gives
+for the slot's, is an `Update` in every unit the storage observer
+classifies: every unit of both is nonzero, and no unit of the new record
+equals the unit it replaces. The parts are any of the public lengths, so
+the fact does not rest on the nonce or on the ciphertext. -/
+theorem proofGrade_runtime_store_codec_reseal_is_update
+    {payloadLen oldMarker : Nat}
+    {old : List Nat}
+    {parts : RuntimeStoreCodecSemantics.SealedRecordParts}
+    (hOldLen :
+      old.length = RuntimeStoreCodecSemantics.sealedEncodedLen payloadLen)
+    (hOldMarker :
+      RuntimeStoreCodecSemantics.recordMarker?
+          RuntimeStoreCodecSemantics.sealedUnitBytes old =
+        some oldMarker)
+    (hShape : parts.ValidShape payloadLen)
+    (hNext :
+      RuntimeStoreCodecSemantics.nextMarker? oldMarker = some parts.marker) :
+    RuntimeStoreCodecSemantics.isUpdateWrite
+        RuntimeStoreCodecSemantics.storageObserverUnitBytes old
+        (RuntimeStoreCodecSemantics.encodeSealedRecord parts) =
+      true :=
+  RuntimeStoreCodecSemantics.encodeSealedRecord_reseal_isUpdate
+    hOldLen hOldMarker hShape hNext
 
 /-- Paper-facing AAD shape facade. The store-slot AAD constructed by
 `uoStoreSlotAad` is the deterministic public concatenation

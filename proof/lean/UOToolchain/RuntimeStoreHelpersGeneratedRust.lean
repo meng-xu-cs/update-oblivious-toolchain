@@ -283,7 +283,7 @@ def generatedRust : String :=
     , ") -> Result<()> {"
     , "    if !cipher.seal_and_wipe_into_slice(aad.as_bytes(), value, rng, slot) {"
     , "        return Err(anyhow!("
-    , "            \"sealed slot buffer for {aad} fell below required public ciphertext size\""
+    , "            \"sealed slot buffer for {aad} does not hold a sealed record of the required public size\""
     , "        ));"
     , "    }"
     , "    Ok(())"

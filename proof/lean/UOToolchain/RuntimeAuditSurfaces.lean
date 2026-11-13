@@ -152,7 +152,7 @@ def runtimeHostVisibleOutcomeTaxonomy :
     , hostPayloadRule :=
         "AEAD/open failures are integrity failures under the stated crypto assumptions and never release plaintext failure payloads"
     , normalizationRule :=
-        "sealed-record open paths split magic, nonce, ciphertext, and tag by public lengths before authenticated open"
+        "sealed-record open paths check the marker of every unit, then split nonce, ciphertext, and tag by public lengths before authenticated open"
     , theoremAnchor :=
         "pathOramLocalPosmapV1_cryptoProvenance"
     , probeAnchor :=

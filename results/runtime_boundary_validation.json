@@ -1627,7 +1627,7 @@
       "owner": "runtime/uo-evm/src/oram.rs"
     },
     {
-      "boundary": "direct seal/open stays in codec; the deterministic nonzero transport helpers live in a Lean-generated codec fragment, the exact-size plaintext staging and wipe-on-drop shell now live in the Lean-generated surface fragment, and the handwritten codec shell is reduced to key lifecycle plus public delegating methods; the fixed-size raw/UO slot stores keep their ciphertext cells in boxed buffers via Lean-generated raw-slot allocation and copy-and-wipe helpers while the UO bootstrap/write path is forced through Lean-generated boxed-filler and seal-into helpers and records only public update-shape write evidence rather than cloning ciphertext snapshots",
+      "boundary": "direct seal/open stays in codec; the deterministic unit codec helpers (one nonzero marker byte in each 32-byte unit of a record) live in a Lean-generated codec fragment, the exact-size plaintext staging and wipe-on-drop shell now live in the Lean-generated surface fragment, and the handwritten codec shell is reduced to key lifecycle plus public delegating methods; the fixed-size raw/UO slot stores keep their ciphertext cells in boxed buffers via Lean-generated raw-slot allocation and copy-and-wipe helpers while the UO bootstrap/write path is forced through Lean-generated boxed-filler and seal-into helpers and records only public update-shape write evidence rather than cloning ciphertext snapshots",
       "checked": true,
       "name": "StoreCipher and plaintext staging",
       "owner": "runtime/uo-store/src/codec.rs, runtime/uo-store/src/generated_codec.rs, runtime/uo-store/src/generated_store_helpers.rs, and runtime/uo-store/src/store.rs"

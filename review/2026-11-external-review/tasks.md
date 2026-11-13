@@ -518,6 +518,11 @@ record as a whole (`is_update_write`): a record can change as a whole while
 one word of it stays as it was. It sits where a record is sealed in place:
 one function for the objects and the ORAM write log, one for the store.
 
+Since Issue 35 a repeated nonce no longer fails the check, because a record
+carries the marker its predecessor does not. The tests that force a repeated
+nonce now see an `Update`. What the check rejects is covered by the tests of
+`is_update_write` and by the tamper scenarios that remove it.
+
 #### Acceptance criteria
 
 - A test that forces a repeated nonce sees the failure.
@@ -599,6 +604,46 @@ Change `RuntimeStoreCodecSemantics.lean` (round trip, fixed public length,
 every unit nonzero, every unit different from its predecessor), its
 generator, the ORAM bucket and page codecs, and the sizes in the manifests
 and resource bounds. Keep the unit size a parameter of the Lean statement.
+
+As built. A record is a whole number of 32-byte units
+(`SEALED_UNIT_BYTES` in `runtime/uo-store/src/generated_codec.rs`). A unit
+is one marker byte and 31 bytes of content: the nonce, the ciphertext and
+the tag, with zeros after the tag in the last unit. The marker is one per
+record, not one per unit: every unit of a record carries it. A record that
+replaces none carries the first of two values, `0xA5`, and a record sealed
+in place over another carries the other one, so the marker is the parity of
+the record's write count. The in-place seal reads the marker of the record
+it replaces (`record_marker`) and refuses a slot that holds no record: a
+slot with a zero unit, a foreign marker, two markers or another length. A
+256-bit value takes 64 bytes and a map record 96.
+
+The Lean file states the codec with the unit length a parameter of every
+statement (`encodeUnits`, `decodeUnitsInto?`, `recordMarker?`,
+`nextMarker?`): the round trip; that a record which decodes is the encoding
+of what it decodes to, so the markers and the padding are checked; the
+public length; that every unit begins with the marker; that a record with a
+zero unit has no marker and does not decode; and
+`isUpdateWrite_of_markers`, that a record written over a record of the same
+length with the other marker is an `Update` in every unit, whatever else the
+two hold. The sealed record is the codec at 32 bytes
+(`encodeSealedRecord_reseal_isUpdate`). Nineteen facts go through the five
+boundary layers, where there were seventeen: `storeSealedRecordRejectsZeroUnit`
+and `storeSealedRecordResealIsUpdate` are new, and four are renamed
+(`storeCodecResealIsUpdate`, `storeCodecDecodeRejectsZeroUnit`,
+`storeSealedContentLen`, `storeSealedRecordRejectsWrongMarker`).
+
+The ORAM bucket and page records are sealed by the same two functions and
+take their lengths from the sealed slots, so their codecs needed no change
+of their own. The manifests and the resource bounds count records, not
+bytes, and hold no size that depends on the encoding; the probe's static
+storage summary computes sealed lengths and has the new formula. The
+modeled cost charges a record, not a unit, as before.
+
+Issue 33's tests forced a repeated nonce and saw the write fail. They now
+see it pass as an `Update`, with records that differ in their markers
+alone. The in-place seal's error says that the buffer does not hold a
+sealed record of the required public size, since that is what it can now
+find.
 
 #### Acceptance criteria
 

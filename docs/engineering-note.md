@@ -11,8 +11,11 @@ details:
 ## Exact-UO
 
 `UOCell`, `UOArray`, and full-scan `UOMap` preinitialize confidential regions
-with nonzero filler, encode logical zeros as marker-free records, and
-rerandomize physical rewrites. Normalized `M+` traces therefore collapse to
+with sealed filler records, seal a logical zero as they seal any other
+value, and seal again on every physical rewrite. A sealed record is a whole
+number of 32-byte units; each unit begins with one of two nonzero marker
+bytes, and a rewrite carries the marker that the record it replaces does
+not. No unit is zero and none repeats, so normalized `M+` traces collapse to
 public-determined update schedules after initialization.
 
 A call reads every exact object it accesses once: it opens every slot when
