@@ -1,6 +1,5 @@
 use crate::codec::StoreCipher;
 use anyhow::Result;
-use rand_chacha::ChaCha20Rng;
 use serde::{Deserialize, Serialize};
 use uo_core::trace::{LogicalEvent, PhysicalWriteEvent};
 
@@ -41,7 +40,6 @@ pub struct UoObjectStore {
     physical_writes: StorePhysicalWriteTrace,
     logical_events: StoreLogicalEventTrace,
     metrics: StoreExecutionMetrics,
-    rng: ChaCha20Rng,
     cipher: StoreCipher,
 }
 

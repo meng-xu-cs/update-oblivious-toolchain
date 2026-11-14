@@ -10744,8 +10744,8 @@ fn run_tamper_validation() -> Result<JsonValue> {
         tampered_runtime_implementation_object_boxed_seal_shell
             .generated_object_helpers_source
             .replace(
-                "seal_boxed_payload_with_optional_guard(aad, payload, cipher, rng, None)",
-                "filler_boxed_payload(aad, payload.len(), cipher, rng)",
+                "seal_boxed_payload_with_optional_guard(aad, payload, cipher, None)",
+                "filler_boxed_payload(aad, payload.len(), cipher)",
             );
     scenarios.push(validate_tampered_json_case(
         "runtime_implementation_interface/object_boxed_seal_helper_drift",
@@ -11786,8 +11786,8 @@ fn run_tamper_validation() -> Result<JsonValue> {
         tampered_runtime_implementation_handwritten_oram_secret_work
             .oram_source
             .replacen(
-                "run_path_get(self, spec, key, allocator, leaf_coins, rng)",
-                "Value::confidential_eq(&lhs, &rhs);\n            run_path_get(self, spec, key, allocator, leaf_coins, rng)",
+                "run_path_get(self, spec, key, allocator, leaf_coins)",
+                "Value::confidential_eq(&lhs, &rhs);\n            run_path_get(self, spec, key, allocator, leaf_coins)",
                 1,
             );
     scenarios.push(validate_tampered_json_case(
@@ -12357,7 +12357,7 @@ fn run_tamper_validation() -> Result<JsonValue> {
     tampered_runtime_implementation_oram_fresh_leaf
         .generated_oram_codecs_source
         .push_str(
-        "\n.unwrap_or_else(|| leaf_coins.take_leaf(&spec.name, self.parameters.leaf_count(), rng))\n(Some(_), true, false, _) => Some(leaf_coins.take_leaf(&spec.name, leaf_count, rng)?)\n",
+        "\n.unwrap_or_else(|| leaf_coins.take_leaf(&spec.name, self.parameters.leaf_count()))\n(Some(_), true, false, _) => Some(leaf_coins.take_leaf(&spec.name, leaf_count)?)\n",
     );
     scenarios.push(validate_tampered_json_case(
         "runtime_implementation_interface/path_oram_fresh_leaf_schedule_drift",
@@ -13105,8 +13105,8 @@ fn run_tamper_validation() -> Result<JsonValue> {
         tampered_runtime_implementation_oram_boxed_seal_shell
             .generated_object_helpers_source
             .replace(
-                "seal_boxed_payload_with_optional_guard(aad, payload, cipher, rng, allocator)",
-                "Ok(filler_boxed_payload(aad, payload.len(), cipher, rng))",
+                "seal_boxed_payload_with_optional_guard(aad, payload, cipher, allocator)",
+                "Ok(filler_boxed_payload(aad, payload.len(), cipher))",
             );
     scenarios.push(validate_tampered_json_case(
         "runtime_implementation_interface/oram_boxed_seal_helper_drift",
@@ -13224,8 +13224,8 @@ fn run_tamper_validation() -> Result<JsonValue> {
         tampered_runtime_implementation_oram_boxed_filler_shell
             .generated_object_helpers_source
             .replace(
-                "filler_boxed_payload(aad, payload_len, cipher, rng)",
-                "filler_boxed_payload(aad, payload_len + 1, cipher, rng)",
+                "filler_boxed_payload(aad, payload_len, cipher)",
+                "filler_boxed_payload(aad, payload_len + 1, cipher)",
             );
     scenarios.push(validate_tampered_json_case(
         "runtime_implementation_interface/oram_boxed_filler_helper_drift",
@@ -13550,8 +13550,8 @@ fn run_tamper_validation() -> Result<JsonValue> {
         tampered_runtime_implementation_store_boxed_filler_shell
             .generated_store_helpers_source
             .replace(
-                "cipher.filler_boxed(aad.as_bytes(), logical_len, rng)",
-                "cipher.filler_boxed(aad.as_bytes(), logical_len + 1, rng)",
+                "cipher.filler_boxed(aad.as_bytes(), logical_len)",
+                "cipher.filler_boxed(aad.as_bytes(), logical_len + 1)",
             );
     scenarios.push(validate_tampered_json_case(
         "runtime_implementation_interface/store_boxed_filler_helper_drift",
@@ -13671,8 +13671,8 @@ fn run_tamper_validation() -> Result<JsonValue> {
         tampered_runtime_implementation_store_seal_into_shell
             .generated_store_helpers_source
             .replace(
-                "cipher.seal_and_wipe_into_slice(aad.as_bytes(), value, rng, slot)",
-                "cipher.seal_and_wipe_into_slice(aad.as_bytes(), value, rng, &mut [])",
+                "cipher.seal_and_wipe_into_slice(aad.as_bytes(), value, slot)",
+                "cipher.seal_and_wipe_into_slice(aad.as_bytes(), value, &mut [])",
             );
     scenarios.push(validate_tampered_json_case(
         "runtime_implementation_interface/store_seal_into_helper_drift",
@@ -28179,7 +28179,7 @@ fn check_sealed_writes_are_classified_from_their_bytes(
         // Objects and ORAM maps: one function seals in place, and it records
         // the write only after the check.
         && helpers.contains(
-            "    let replaced: Box<[u8]> = (&*physical).into();\n    if !cipher.seal_and_wipe_into_slice(aad.as_bytes(), payload, rng, physical) {",
+            "    let replaced: Box<[u8]> = (&*physical).into();\n    if !cipher.seal_and_wipe_into_slice(aad.as_bytes(), payload, physical) {",
         )
         && helpers.contains(
             "    if !is_update_write(&replaced, physical) {\n        bail!(\n            \"internal error: the sealed write of {} is not an Update of the record it replaces\",\n            location\n        );\n    }\n    // The record crosses the storage boundary here: the store takes it in\n    // place of the record it keeps at this location, and classifies the\n    // write from its own bytes.\n    cipher.store_sealed_record(location, physical)?;\n    record_write(physical.len())\n}",
@@ -28214,7 +28214,7 @@ fn check_sealed_writes_are_classified_from_their_bytes(
         && !oram_production_source.contains("WriteClass::")
         // The store: its one in-place seal is checked before its event.
         && store.contains(
-            "    let replaced: Box<[u8]> = (&*slot).into();\n    reseal_uo_store_slot_in_place(&aad, value, cipher, rng, slot)?;\n    if !is_update_write(&replaced, slot) {\n        bail!(\n            \"internal error: the sealed write of {} is not an Update of the record it replaces\",\n            object\n        );\n    }\n    Ok(PhysicalWriteEvent::from_shape(",
+            "    let replaced: Box<[u8]> = (&*slot).into();\n    reseal_uo_store_slot_in_place(&aad, value, cipher, slot)?;\n    if !is_update_write(&replaced, slot) {\n        bail!(\n            \"internal error: the sealed write of {} is not an Update of the record it replaces\",\n            object\n        );\n    }\n    Ok(PhysicalWriteEvent::from_shape(",
         )
         && store.matches("seal_and_wipe_into_slice(").count() == 1
         && store.matches("reseal_uo_store_slot_in_place(").count() == 2
@@ -30284,9 +30284,9 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && objects_source.contains(".unwrap_or_else(|| cold_zero_value(&object.spec.value_type));")
         && !objects_production_source.contains("Value::zero_for_type(")
         && !objects_production_source.contains("MapEntry::new(")
-        && objects_source.contains("physical: seal_value(&aad, &logical, &cipher, &mut rng)?,")
-        && objects_source.contains("physical_slots.push(seal_value(&aad, &zero_value, &cipher, &mut rng)?)?;")
-        && objects_source.contains("physical_slots.push(seal_map_record(&aad, &zero_entry, &cipher, &mut rng)?)?;")
+        && objects_source.contains("physical: seal_value(&aad, &logical, &cipher)?,")
+        && objects_source.contains("physical_slots.push(seal_value(&aad, &zero_value, &cipher)?)?;")
+        && objects_source.contains("physical_slots.push(seal_map_record(&aad, &zero_entry, &cipher)?)?;")
         && objects_source.contains("decode_cell_value_from_storage(")
         && objects_source.contains("decode_array_values_from_storage(")
         && objects_source.contains("decode_small_map_entries_from_storage(")
@@ -30334,7 +30334,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && !objects_source.contains("array_committed_cache_is_cold(")
         && !objects_source.contains("small_map_committed_cache_is_cold(")
         && !objects_source.contains("object.oram.is_cold()")
-        && !objects_source.contains("cipher.seal_and_wipe_boxed(aad.as_bytes(), payload, rng)")
+        && !objects_source.contains("cipher.seal_and_wipe_boxed(aad.as_bytes(), payload)")
         && !objects_source
             .contains(".with_opened_payload(aad.as_bytes(), payload_len, physical, open)")
         && !objects_source
@@ -30350,7 +30350,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && generated_object_helpers_source
             .contains("allocator.reserve_guard(ScratchRegion::IoScratch, payload.len())?;")
         && generated_object_helpers_source
-            .contains("cipher.seal_and_wipe_into_slice(aad.as_bytes(), payload, rng, physical)")
+            .contains("cipher.seal_and_wipe_into_slice(aad.as_bytes(), payload, physical)")
         && generated_object_helpers_source.contains("pub(super) fn with_opened_object_payload<T, F>(")
         && generated_object_helpers_source.contains("pub(super) fn seal_boxed_object_payload(")
         && generated_object_helpers_source.contains(
@@ -30503,19 +30503,18 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             .contains("let aad = format!(\"small_map:{}:{index}\", spec.name);")
         && generated_object_helpers_source.contains("format!(\"{}#{index}\", spec.name),");
     let objects_runtime_uses_shared_boxed_seal_helper = objects_source
-        .contains("physical: seal_value(&aad, &logical, &cipher, &mut rng)?,")
+        .contains("physical: seal_value(&aad, &logical, &cipher)?,")
         && objects_source
-            .contains("physical_slots.push(seal_value(&aad, &zero_value, &cipher, &mut rng)?)?;")
-        && objects_source.contains(
-            "physical_slots.push(seal_map_record(&aad, &zero_entry, &cipher, &mut rng)?)?;",
-        )
+            .contains("physical_slots.push(seal_value(&aad, &zero_value, &cipher)?)?;")
+        && objects_source
+            .contains("physical_slots.push(seal_map_record(&aad, &zero_entry, &cipher)?)?;")
         && !objects_source.contains("fn seal_boxed_object_payload(")
         && !objects_source.contains("fn seal_value(")
         && !objects_source.contains("fn seal_map_record(")
         && !objects_source.contains("physical_slots.push(seal_boxed_object_payload(")
         && !objects_source.contains("physical_slots.push(cipher.seal_and_wipe_boxed(")
-        && !objects_source.contains("cipher.seal_and_wipe_boxed(aad, &mut payload, rng)")
-        && !objects_source.contains("cipher.seal_and_wipe_boxed(aad.as_bytes(), payload, rng)")
+        && !objects_source.contains("cipher.seal_and_wipe_boxed(aad, &mut payload)")
+        && !objects_source.contains("cipher.seal_and_wipe_boxed(aad.as_bytes(), payload)")
         && generated_object_helpers_source.contains("fn seal_boxed_payload_with_optional_guard(")
         && generated_object_helpers_source.contains("pub(super) fn seal_boxed_object_payload(")
         && generated_object_helpers_source.contains(
@@ -30531,11 +30530,11 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             .contains("let mut payload = value.canonical_bytes_boxed()?;")
         && generated_object_helpers_source.contains("let mut payload = map_record_bytes(entry)?;")
         && generated_object_helpers_source
-            .contains("seal_boxed_object_payload(aad, payload.as_mut(), cipher, rng)")
+            .contains("seal_boxed_object_payload(aad, payload.as_mut(), cipher)")
         && generated_object_helpers_source
-            .contains("seal_boxed_payload_with_optional_guard(aad, payload, cipher, rng, None)")
+            .contains("seal_boxed_payload_with_optional_guard(aad, payload, cipher, None)")
         && generated_object_helpers_source
-            .contains("cipher.seal_and_wipe_boxed(aad.as_bytes(), payload, rng)");
+            .contains("cipher.seal_and_wipe_boxed(aad.as_bytes(), payload)");
     let oram_runtime_consumes_generated_object_helpers = oram_source
         .contains("#[path = \"generated_object_helpers.rs\"]")
         && oram_source.contains("mod generated_object_helpers;")
@@ -30576,7 +30575,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && !oram_source.contains("fn filler_boxed_oram_payload(")
         && !oram_source.contains("fn reseal_oram_payload_and_record_write(")
         && !oram_source.contains("fn record_oram_write(")
-        && !oram_source.contains("cipher.seal_and_wipe_boxed(aad.as_bytes(), payload, rng)")
+        && !oram_source.contains("cipher.seal_and_wipe_boxed(aad.as_bytes(), payload)")
         && !oram_source
             .contains(".with_opened_payload(aad.as_bytes(), payload_len, physical, open)")
         && generated_object_helpers_source.contains(
@@ -30683,22 +30682,22 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && oram_source.contains("refresh_path_state_from_storage(")
         && oram_source.contains("clone_boxed_map_entries(&self.entries)")
         && oram_source
-            .contains("run_path_commit_put(self, spec, put, aborted, allocator, leaf_coins, rng)")
+            .contains("run_path_commit_put(self, spec, put, aborted, allocator, leaf_coins)")
         && !oram_source.contains("restore_oram_storage_from_old")
         && oram_source.contains("let directory_pages = encode_path_metadata_pages(")
         && oram_source.contains("let entries = repeat_boxed_map_entries(parameters.capacity, &empty_entry)?;")
         && oram_source.contains("run_surrogate_get(self, spec, key)")
         && oram_source.contains("run_surrogate_put(self, spec, key, value, apply)")
-        && oram_source.contains("run_path_get(self, spec, key, allocator, leaf_coins, rng)")
-        && oram_source.contains("run_path_put(self, spec, key, value, apply, allocator, leaf_coins, rng)")
+        && oram_source.contains("run_path_get(self, spec, key, allocator, leaf_coins)")
+        && oram_source.contains("run_path_put(self, spec, key, value, apply, allocator, leaf_coins)")
         && oram_source.contains("let mut cloned = cold_clone_oram_state(spec, self)?;")
         && oram_source.contains("cold_clone_oram_state(spec, self)")
         && oram_source.contains("path_position_map_witness_leaves(")
         && oram_source.contains("cold_commit_oram_state(")
         && oram_source.contains("bootstrap_surrogate_directory_pages(")
-        && oram_source.contains("bootstrap_filler_buckets(spec, &parameters, &cipher, rng)?;")
-        && oram_source.contains("bootstrap_empty_path_buckets(spec, &parameters, &cipher, rng)?;")
-        && oram_source.contains("bootstrap_oram_counter_slot(spec, &cipher, rng)?")
+        && oram_source.contains("bootstrap_filler_buckets(spec, &parameters, &cipher)?;")
+        && oram_source.contains("bootstrap_empty_path_buckets(spec, &parameters, &cipher)?;")
+        && oram_source.contains("bootstrap_oram_counter_slot(spec, &cipher)?")
         && oram_source.contains("rewrite_surrogate_directory_pages_in_place(")
         && oram_source.contains("rewrite_oram_counter_in_place(")
         && oram_source.contains("rewrite_surrogate_bucket_window_in_place(")
@@ -30895,7 +30894,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && generated_oram_codecs_source.contains("pub(super) fn surrogate_access_transcript(")
         && generated_oram_codecs_source.contains("pub(super) fn path_access_transcript(")
         && generated_oram_codecs_source.contains(
-            "seal_boxed_oram_payload(&oram_counter_aad(spec), &mut payload, cipher, rng, None)",
+            "seal_boxed_oram_payload(&oram_counter_aad(spec), &mut payload, cipher, None)",
         )
         && generated_oram_codecs_source.contains("pub(super) fn rewrite_oram_counter_in_place(")
         && generated_oram_codecs_source
@@ -31258,7 +31257,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && generated_oram_codecs_source.contains("directory_page_entries(position_map, page),")
         && generated_oram_codecs_source.contains("directory_page_entries(stash, page),")
         && generated_oram_codecs_source
-            .contains("seal_boxed_oram_payload(&aad, payload.as_mut(), cipher, rng, Some(allocator))?;")
+            .contains("seal_boxed_oram_payload(&aad, payload.as_mut(), cipher, Some(allocator))?;")
         && generated_oram_codecs_source
             .contains("pub(super) fn rewrite_path_metadata_pages_in_place(")
         && generated_oram_codecs_source.contains("reseal_oram_payload_and_record_write(")
@@ -31487,33 +31486,32 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         );
     let oram_runtime_uses_shared_boxed_seal_helper = oram_source
         .contains("bootstrap_surrogate_directory_pages(")
-        && oram_source.contains("bootstrap_empty_path_buckets(spec, &parameters, &cipher, rng)?;")
-        && oram_source.contains("bootstrap_oram_counter_slot(spec, &cipher, rng)?")
+        && oram_source.contains("bootstrap_empty_path_buckets(spec, &parameters, &cipher)?;")
+        && oram_source.contains("bootstrap_oram_counter_slot(spec, &cipher)?")
         && generated_oram_codecs_source.contains(
-            "seal_boxed_oram_payload(&oram_counter_aad(spec), &mut payload, cipher, rng, None)",
+            "seal_boxed_oram_payload(&oram_counter_aad(spec), &mut payload, cipher, None)",
         )
         && source_contains_compact(
             &generated_oram_codecs_source,
-            "pages.push(seal_boxed_oram_payload(&aad, payload.as_mut(), cipher, rng, None,)?)?;",
+            "pages.push(seal_boxed_oram_payload(&aad, payload.as_mut(), cipher, None,)?)?;",
         )
         && source_contains_compact(
             &generated_oram_codecs_source,
-            "buckets.push(seal_boxed_oram_payload(&aad, payload.as_mut(), cipher, rng, None,)?)?;",
+            "buckets.push(seal_boxed_oram_payload(&aad, payload.as_mut(), cipher, None,)?)?;",
         )
         && source_contains_compact(
             &generated_oram_codecs_source,
-            "seal_boxed_oram_payload(&aad, payload.as_mut(), cipher, rng, Some(allocator))?;",
+            "seal_boxed_oram_payload(&aad, payload.as_mut(), cipher, Some(allocator))?;",
         )
         && !oram_source.contains("fn seal_boxed_oram_payload(")
         && !oram_source.contains("directory_pages.push(cipher.seal_and_wipe_boxed(")
         && !oram_source.contains("buckets.push(cipher.seal_and_wipe_boxed(")
         && generated_object_helpers_source.contains("fn seal_boxed_payload_with_optional_guard(")
         && generated_object_helpers_source.contains("pub(super) fn seal_boxed_oram_payload(")
-        && generated_object_helpers_source.contains(
-            "seal_boxed_payload_with_optional_guard(aad, payload, cipher, rng, allocator)",
-        );
+        && generated_object_helpers_source
+            .contains("seal_boxed_payload_with_optional_guard(aad, payload, cipher, allocator)");
     let oram_runtime_uses_shared_boxed_filler_helper = oram_source
-        .contains("bootstrap_filler_buckets(spec, &parameters, &cipher, rng)?;")
+        .contains("bootstrap_filler_buckets(spec, &parameters, &cipher)?;")
         && !oram_source.contains("fn filler_boxed_oram_payload(")
         && !oram_source.contains("buckets.push(cipher.filler_boxed(")
         && generated_oram_codecs_source.contains("pub(super) fn bootstrap_filler_buckets(")
@@ -31526,7 +31524,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && generated_object_helpers_source.contains("fn filler_boxed_payload(")
         && generated_object_helpers_source.contains("pub(super) fn filler_boxed_oram_payload(")
         && generated_object_helpers_source
-            .contains("filler_boxed_payload(aad, payload_len, cipher, rng)");
+            .contains("filler_boxed_payload(aad, payload_len, cipher)");
     let store_runtime_consumes_generated_store_helpers = store_store_source
         .contains("#[path = \"generated_store_helpers.rs\"]")
         && store_store_source.contains("mod generated_store_helpers;")
@@ -31564,9 +31562,9 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             .contains("pub fn preinitialized(objects: impl IntoIterator<Item = (String, usize)>) -> Result<Self> {")
         && !store_store_source.contains("pub fn ensure_update_only(&self) -> Result<()> {")
         && !store_store_source.contains("store.slots.insert(object, zeroed_boxed_raw_store_slot(32)?);")
-        && !store_store_source.contains("cipher.filler_boxed(aad.as_bytes(), logical_len, rng)")
+        && !store_store_source.contains("cipher.filler_boxed(aad.as_bytes(), logical_len)")
         && !store_store_source
-            .contains("cipher.seal_and_wipe_into_slice(aad.as_bytes(), value, rng, slot)")
+            .contains("cipher.seal_and_wipe_into_slice(aad.as_bytes(), value, slot)")
         && !store_store_source.contains("vec![0u8; 32].into_boxed_slice()")
         && !store_store_source.contains("vec![0u8; value.len()].into_boxed_slice()")
         && !store_store_source.contains("value.to_vec().into_boxed_slice();")
@@ -31576,7 +31574,6 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && generated_store_helpers_source.contains(
             "// @generated by proof/lean/GenerateRuntimeStoreHelpersRust.lean; do not edit by hand.",
         )
-        && generated_store_helpers_source.contains("use rand::SeedableRng;")
         && generated_store_helpers_source
             .contains("use super::{ObjectStore, RawObjectStore, StoreExecutionMetrics, UoObjectStore};")
         && generated_store_helpers_source.contains("use uo_core::FixedBoxBuilder;")
@@ -31664,21 +31661,19 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && generated_store_helpers_source.contains("fn uo_store_slot_aad(object: &str) -> String {")
         && generated_store_helpers_source.contains("pub(super) fn filler_boxed_uo_store_slot(")
         && generated_store_helpers_source
-            .contains("cipher.filler_boxed(aad.as_bytes(), logical_len, rng)")
+            .contains("cipher.filler_boxed(aad.as_bytes(), logical_len)")
         && generated_store_helpers_source.contains("pub(super) fn reseal_uo_store_slot_in_place(")
         && generated_store_helpers_source
-            .contains("cipher.seal_and_wipe_into_slice(aad.as_bytes(), value, rng, slot)")
+            .contains("cipher.seal_and_wipe_into_slice(aad.as_bytes(), value, slot)")
         && generated_store_helpers_source.contains("pub(super) fn bootstrap_uo_store_slot(")
         && generated_store_helpers_source
-            .contains("filler_boxed_uo_store_slot(&aad, logical_len, cipher, rng)")
+            .contains("filler_boxed_uo_store_slot(&aad, logical_len, cipher)")
         && generated_store_helpers_source.contains("impl UoObjectStore {")
         && generated_store_helpers_source
             .contains("pub fn preinitialized<I>(objects: I) -> Result<Self>")
-        && generated_store_helpers_source
-            .contains("let mut rng = ChaCha20Rng::seed_from_u64(0x5EED);")
         && generated_store_helpers_source.contains("let cipher = StoreCipher::random();")
         && generated_store_helpers_source
-            .contains("let slots = StoreSlotTable::with_bootstrapped_uo_slots(objects, &cipher, &mut rng)?;")
+            .contains("let slots = StoreSlotTable::with_bootstrapped_uo_slots(objects, &cipher)?;")
         && generated_store_helpers_source.contains("impl ObjectStore for UoObjectStore {")
         && generated_store_helpers_source
             .contains("let physical_write =\n            reseal_uo_store_slot_and_trace_write(")
@@ -31686,7 +31681,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && generated_store_helpers_source
             .contains("pub(super) fn reseal_uo_store_slot_and_trace_write(")
         && generated_store_helpers_source
-            .contains("reseal_uo_store_slot_in_place(&aad, value, cipher, rng, slot)?;")
+            .contains("reseal_uo_store_slot_in_place(&aad, value, cipher, slot)?;")
         && generated_store_helpers_source.contains("Ok(PhysicalWriteEvent::from_shape(")
         && !generated_store_helpers_source.contains("use std::collections::BTreeMap;")
         && !generated_store_helpers_source.contains("slots: BTreeMap::new(),")
@@ -31827,12 +31822,12 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && generated_store_surface_source.contains("pub fn clone_for_runtime_state(&self) -> Self {")
         && generated_store_surface_source.contains("pub fn seal_and_wipe_boxed(")
         && generated_store_surface_source
-            .contains("self::seal_and_wipe_boxed(self, aad, payload, rng)")
+            .contains("self::seal_and_wipe_boxed(self, aad, payload)")
         && generated_store_surface_source.contains("pub fn seal_and_wipe_into_slice(")
         && generated_store_surface_source
-            .contains("self::seal_and_wipe_into_slice(self, aad, payload, rng, out)")
+            .contains("self::seal_and_wipe_into_slice(self, aad, payload, out)")
         && generated_store_surface_source.contains("pub fn filler_boxed(")
-        && generated_store_surface_source.contains("self::filler_boxed(self, aad, len, rng)")
+        && generated_store_surface_source.contains("self::filler_boxed(self, aad, len)")
         && generated_store_surface_source.contains("pub fn with_opened_payload<T>(")
         && generated_store_surface_source
             .contains("self::with_opened_payload(self, aad, payload_len, encoded, f)")
@@ -31844,7 +31839,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             .contains("let required_len = generated_sealed_encoded_len(payload.as_slice().len());")
         && generated_store_surface_source.contains("Some(SEALED_MARKERS[0]),")
         && generated_store_surface_source.contains("let marker = record_marker(out).and_then(next_marker);")
-        && generated_store_surface_source.contains("seal_and_wipe_units(cipher, aad, payload, rng, marker, out)")
+        && generated_store_surface_source.contains("seal_and_wipe_units(cipher, aad, payload, marker, out)")
         && generated_store_surface_source.contains("fn seal_and_wipe_units(")
         && generated_store_surface_source.contains("let Some(marker) = marker else {")
         && generated_store_surface_source.contains("if out.len() != required_len {")
@@ -43412,7 +43407,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && generated_oram_codecs_source
             .contains("let mut payload = zeroed_boxed_bytes(parameters.directory_page_bytes)?;")
         && generated_oram_codecs_source
-            .contains("seal_boxed_oram_payload(&aad, payload.as_mut(), cipher, rng, Some(allocator))?")
+            .contains("seal_boxed_oram_payload(&aad, payload.as_mut(), cipher, Some(allocator))?")
         && generated_oram_codecs_source.contains("if next_page != pages.len() {")
         && generated_oram_codecs_source
             .contains("path metadata page rewrite initialized {} pages, expected {}")
@@ -45198,11 +45193,11 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && generated_object_helpers_source
             .contains("let mut payload = value.canonical_bytes_boxed()?;")
         && generated_object_helpers_source
-            .contains("seal_boxed_object_payload(aad, payload.as_mut(), cipher, rng)")
+            .contains("seal_boxed_object_payload(aad, payload.as_mut(), cipher)")
         && generated_object_helpers_source
             .contains("pub(super) fn map_record_bytes(entry: &MapEntry) -> Result<Box<[u8]>> {")
         && generated_object_helpers_source
-            .contains("cipher.seal_and_wipe_boxed(aad.as_bytes(), payload, rng)")
+            .contains("cipher.seal_and_wipe_boxed(aad.as_bytes(), payload)")
         && !objects_source.contains("fn seal_boxed_object_payload(")
         && !objects_source.contains("fn map_record_bytes(")
         && !objects_source.contains("vec![Value::zero_for_type(&spec.value_type); capacity]")
@@ -45714,12 +45709,12 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && generated_store_surface_source.contains("pub fn clone_for_runtime_state(&self) -> Self {")
         && generated_store_surface_source.contains("pub fn seal_and_wipe_boxed(")
         && generated_store_surface_source
-            .contains("self::seal_and_wipe_boxed(self, aad, payload, rng)")
+            .contains("self::seal_and_wipe_boxed(self, aad, payload)")
         && generated_store_surface_source.contains("pub fn seal_and_wipe_into_slice(")
         && generated_store_surface_source
-            .contains("self::seal_and_wipe_into_slice(self, aad, payload, rng, out)")
+            .contains("self::seal_and_wipe_into_slice(self, aad, payload, out)")
         && generated_store_surface_source.contains("pub fn filler_boxed(")
-        && generated_store_surface_source.contains("self::filler_boxed(self, aad, len, rng)")
+        && generated_store_surface_source.contains("self::filler_boxed(self, aad, len)")
         && generated_store_surface_source.contains("pub fn with_opened_payload<T>(")
         && generated_store_surface_source
             .contains("self::with_opened_payload(self, aad, payload_len, encoded, f)")
@@ -45727,7 +45722,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             .contains("let mut encoded = zeroed_boxed_bytes(generated_sealed_encoded_len(payload.len()))?;")
         && generated_store_surface_source.contains("Some(SEALED_MARKERS[0]),")
         && generated_store_surface_source.contains("let marker = record_marker(out).and_then(next_marker);")
-        && generated_store_surface_source.contains("seal_and_wipe_units(cipher, aad, payload, rng, marker, out)")
+        && generated_store_surface_source.contains("seal_and_wipe_units(cipher, aad, payload, marker, out)")
         && generated_store_surface_source.contains("fn seal_and_wipe_units(")
         && generated_store_surface_source.contains("let Some(marker) = marker else {")
         && generated_store_surface_source.contains("if out.len() != required_len {")
@@ -46646,9 +46641,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             .contains("pub(super) fn reseal_oram_payload_and_record_write(")
         && generated_object_helpers_source
             .contains("allocator.reserve_guard(ScratchRegion::IoScratch, payload.len())?;")
-        && generated_object_helpers_source.contains(
-            "if !cipher.seal_and_wipe_into_slice(aad.as_bytes(), payload, rng, physical)",
-        )
+        && generated_object_helpers_source
+            .contains("if !cipher.seal_and_wipe_into_slice(aad.as_bytes(), payload, physical)")
         && generated_object_helpers_source
             .contains("|physical_len| writes.push_update(location, physical_len),");
     let oram_runtime_uses_shared_open_decode_helper = oram_source
@@ -46691,33 +46685,32 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         );
     let oram_runtime_uses_shared_boxed_seal_helper = oram_source
         .contains("bootstrap_surrogate_directory_pages(")
-        && oram_source.contains("bootstrap_empty_path_buckets(spec, &parameters, &cipher, rng)?;")
-        && oram_source.contains("bootstrap_oram_counter_slot(spec, &cipher, rng)?")
+        && oram_source.contains("bootstrap_empty_path_buckets(spec, &parameters, &cipher)?;")
+        && oram_source.contains("bootstrap_oram_counter_slot(spec, &cipher)?")
         && !oram_source.contains("fn seal_boxed_oram_payload(")
         && !oram_source.contains("directory_pages.push(cipher.seal_and_wipe_boxed(")
         && !oram_source.contains("buckets.push(cipher.seal_and_wipe_boxed(")
         && generated_object_helpers_source.contains("fn seal_boxed_payload_with_optional_guard(")
         && generated_object_helpers_source.contains("pub(super) fn seal_boxed_oram_payload(")
         && generated_oram_codecs_source.contains(
-            "seal_boxed_oram_payload(&oram_counter_aad(spec), &mut payload, cipher, rng, None)",
+            "seal_boxed_oram_payload(&oram_counter_aad(spec), &mut payload, cipher, None)",
         )
         && source_contains_compact(
             &generated_oram_codecs_source,
-            "pages.push(seal_boxed_oram_payload(&aad, payload.as_mut(), cipher, rng, None,)?)?;",
+            "pages.push(seal_boxed_oram_payload(&aad, payload.as_mut(), cipher, None,)?)?;",
         )
         && source_contains_compact(
             &generated_oram_codecs_source,
-            "buckets.push(seal_boxed_oram_payload(&aad, payload.as_mut(), cipher, rng, None,)?)?;",
+            "buckets.push(seal_boxed_oram_payload(&aad, payload.as_mut(), cipher, None,)?)?;",
         )
         && source_contains_compact(
             &generated_oram_codecs_source,
-            "seal_boxed_oram_payload(&aad, payload.as_mut(), cipher, rng, Some(allocator))?;",
+            "seal_boxed_oram_payload(&aad, payload.as_mut(), cipher, Some(allocator))?;",
         )
-        && generated_object_helpers_source.contains(
-            "seal_boxed_payload_with_optional_guard(aad, payload, cipher, rng, allocator)",
-        );
+        && generated_object_helpers_source
+            .contains("seal_boxed_payload_with_optional_guard(aad, payload, cipher, allocator)");
     let oram_runtime_uses_shared_boxed_filler_helper = oram_source
-        .contains("bootstrap_filler_buckets(spec, &parameters, &cipher, rng)?;")
+        .contains("bootstrap_filler_buckets(spec, &parameters, &cipher)?;")
         && !oram_source.contains("fn filler_boxed_oram_payload(")
         && !oram_source.contains("buckets.push(cipher.filler_boxed(")
         && generated_oram_codecs_source.contains("pub(super) fn bootstrap_filler_buckets(")
@@ -46730,7 +46723,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && generated_object_helpers_source.contains("fn filler_boxed_payload(")
         && generated_object_helpers_source.contains("pub(super) fn filler_boxed_oram_payload(")
         && generated_object_helpers_source
-            .contains("filler_boxed_payload(aad, payload_len, cipher, rng)");
+            .contains("filler_boxed_payload(aad, payload_len, cipher)");
     let map_entry_fields_private = oram_source.contains(
         "pub(crate) struct MapEntry {\n    occupied: bool,\n    key: Value,\n    value: Value,\n}",
     );
@@ -47171,11 +47164,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && generated_store_surface_source.contains("pub fn with_opened_payload<T>(")
         && generated_store_surface_source.contains("fn open_boxed(")
         && !generated_store_surface_source.contains("pub(super) fn open_boxed(")
+        && generated_store_surface_source.contains("self::seal_and_wipe_boxed(self, aad, payload)")
         && generated_store_surface_source
-            .contains("self::seal_and_wipe_boxed(self, aad, payload, rng)")
-        && generated_store_surface_source
-            .contains("self::seal_and_wipe_into_slice(self, aad, payload, rng, out)")
-        && generated_store_surface_source.contains("self::filler_boxed(self, aad, len, rng)")
+            .contains("self::seal_and_wipe_into_slice(self, aad, payload, out)")
+        && generated_store_surface_source.contains("self::filler_boxed(self, aad, len)")
         && generated_store_surface_source
             .contains("self::with_opened_payload(self, aad, payload_len, encoded, f)")
         && !store_codec_source.contains("pub fn seal_and_wipe_boxed(")
@@ -47197,14 +47189,11 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !store_store_source.contains("let aad = format!(\"uo_store:{object}\");")
         && !store_store_source
             .contains("pub fn preinitialized(objects: impl IntoIterator<Item = (String, usize)>) -> Self {")
-        && !store_store_source.contains("cipher.filler_boxed(aad.as_bytes(), logical_len, rng)")
-        && !store_store_source
-            .contains("cipher.filler_boxed(aad.as_bytes(), logical_len, &mut rng)")
+        && !store_store_source.contains("cipher.filler_boxed(aad.as_bytes(), logical_len)")
         && !store_store_source.contains("impl ObjectStore for UoObjectStore {")
         && generated_store_helpers_source.contains(
             "// @generated by proof/lean/GenerateRuntimeStoreHelpersRust.lean; do not edit by hand.",
         )
-        && generated_store_helpers_source.contains("use rand::SeedableRng;")
         && generated_store_helpers_source
             .contains("use super::{ObjectStore, RawObjectStore, StoreExecutionMetrics, UoObjectStore};")
         && generated_store_helpers_source.contains("pub(super) struct StoreSlotTable {")
@@ -47216,13 +47205,11 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && generated_store_helpers_source.contains("impl UoObjectStore {")
         && generated_store_helpers_source
             .contains("pub fn preinitialized<I>(objects: I) -> Result<Self>")
-        && generated_store_helpers_source
-            .contains("let mut rng = ChaCha20Rng::seed_from_u64(0x5EED);")
         && generated_store_helpers_source.contains("let cipher = StoreCipher::random();")
         && generated_store_helpers_source
-            .contains("let slots = StoreSlotTable::with_bootstrapped_uo_slots(objects, &cipher, &mut rng)?;")
+            .contains("let slots = StoreSlotTable::with_bootstrapped_uo_slots(objects, &cipher)?;")
         && generated_store_helpers_source
-            .contains("filler_boxed_uo_store_slot(&aad, logical_len, cipher, rng)")
+            .contains("filler_boxed_uo_store_slot(&aad, logical_len, cipher)")
         && generated_store_helpers_source.contains("Ok(Self {")
         && !generated_store_helpers_source.contains("use std::collections::BTreeMap;")
         && !generated_store_helpers_source.contains("slots.insert(object, slot);");
@@ -47236,9 +47223,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !store_store_source.contains("fn reseal_uo_store_slot_in_place(")
         && !store_store_source.contains("reseal_uo_store_slot_in_place(")
         && !store_store_source
-            .contains("cipher.seal_and_wipe_into_slice(aad.as_bytes(), value, rng, slot)")
-        && !store_store_source
-            .contains(".seal_and_wipe_into_slice(aad.as_bytes(), value, &mut self.rng, slot)")
+            .contains("cipher.seal_and_wipe_into_slice(aad.as_bytes(), value, slot)")
         && !store_store_source.contains("let aad = format!(\"uo_store:{object}\");")
         && generated_store_helpers_source.contains(
             "// @generated by proof/lean/GenerateRuntimeStoreHelpersRust.lean; do not edit by hand.",
@@ -47252,9 +47237,9 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             .contains("pub(super) fn reseal_uo_store_slot_and_trace_write(")
         && generated_store_helpers_source.contains("let aad = uo_store_slot_aad(object);")
         && generated_store_helpers_source
-            .contains("reseal_uo_store_slot_in_place(&aad, value, cipher, rng, slot)?;")
+            .contains("reseal_uo_store_slot_in_place(&aad, value, cipher, slot)?;")
         && generated_store_helpers_source
-            .contains("cipher.seal_and_wipe_into_slice(aad.as_bytes(), value, rng, slot)");
+            .contains("cipher.seal_and_wipe_into_slice(aad.as_bytes(), value, slot)");
     let runtime_store_uo_writes_emit_public_update_shape = generated_store_helpers_source
         .contains("impl ObjectStore for UoObjectStore {")
         && generated_store_helpers_source
@@ -57470,8 +57455,8 @@ mod tests {
         ));
         // A cipher whose count can be set back.
         let resettable = surface.replace(
-            "    pub fn seal_and_wipe_boxed(\n        &self,",
-            "    pub fn reset(&self) {\n        self.seals.store(0, Ordering::SeqCst);\n    }\n\n    pub fn seal_and_wipe_boxed(\n        &self,",
+            "    pub fn seal_and_wipe_boxed(&self, aad: &[u8], payload: &mut [u8]) -> Result<Box<[u8]>> {",
+            "    pub fn reset(&self) {\n        self.seals.store(0, Ordering::SeqCst);\n    }\n\n    pub fn seal_and_wipe_boxed(&self, aad: &[u8], payload: &mut [u8]) -> Result<Box<[u8]>> {",
         );
         assert_ne!(resettable, surface);
         assert!(!check_seal_nonces_come_from_the_seal_count(
@@ -57665,15 +57650,15 @@ mod tests {
         // A check against the record after the seal, which always differs
         // from nothing.
         let late = helpers.replace(
-            "    let replaced: Box<[u8]> = (&*physical).into();\n    if !cipher.seal_and_wipe_into_slice(aad.as_bytes(), payload, rng, physical) {",
-            "    if !cipher.seal_and_wipe_into_slice(aad.as_bytes(), payload, rng, physical) {",
+            "    let replaced: Box<[u8]> = (&*physical).into();\n    if !cipher.seal_and_wipe_into_slice(aad.as_bytes(), payload, physical) {",
+            "    if !cipher.seal_and_wipe_into_slice(aad.as_bytes(), payload, physical) {",
         );
         assert_ne!(late, helpers);
         assert!(!ok(&trace, &late, &codecs, &oram, &store));
         // A second seal in place beside the checked one.
         let second_seal = helpers.replace(
             "pub(super) fn with_opened_object_payload<T, F>(",
-            "fn reseal_unchecked(aad: &str, payload: &mut [u8], physical: &mut [u8], cipher: &StoreCipher, rng: &mut ChaCha20Rng) -> bool {\n    cipher.seal_and_wipe_into_slice(aad.as_bytes(), payload, rng, physical)\n}\n\npub(super) fn with_opened_object_payload<T, F>(",
+            "fn reseal_unchecked(aad: &str, payload: &mut [u8], physical: &mut [u8], cipher: &StoreCipher) -> bool {\n    cipher.seal_and_wipe_into_slice(aad.as_bytes(), payload, physical)\n}\n\npub(super) fn with_opened_object_payload<T, F>(",
         );
         assert_ne!(second_seal, helpers);
         assert!(!ok(&trace, &second_seal, &codecs, &oram, &store));

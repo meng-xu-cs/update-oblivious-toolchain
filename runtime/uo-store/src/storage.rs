@@ -1200,19 +1200,13 @@ impl StorageHandle {
 mod tests {
     use super::*;
     use crate::StoreCipher;
-    use rand::SeedableRng;
-    use rand_chacha::ChaCha20Rng;
     use std::sync::atomic::{AtomicU32, Ordering};
-
-    fn rng() -> ChaCha20Rng {
-        ChaCha20Rng::seed_from_u64(7)
-    }
 
     /// A record of `payload` that replaces none.
     fn sealed(cipher: &StoreCipher, payload: &[u8]) -> Box<[u8]> {
         let mut payload = payload.to_vec();
         cipher
-            .seal_and_wipe_boxed(b"object:slot", &mut payload, &mut rng())
+            .seal_and_wipe_boxed(b"object:slot", &mut payload)
             .unwrap()
     }
 
@@ -1220,12 +1214,7 @@ mod tests {
     fn resealed(cipher: &StoreCipher, record: &[u8], payload: &[u8]) -> Box<[u8]> {
         let mut out: Box<[u8]> = record.into();
         let mut payload = payload.to_vec();
-        assert!(cipher.seal_and_wipe_into_slice(
-            b"object:slot",
-            &mut payload,
-            &mut rng(),
-            &mut out
-        ));
+        assert!(cipher.seal_and_wipe_into_slice(b"object:slot", &mut payload, &mut out));
         out
     }
 

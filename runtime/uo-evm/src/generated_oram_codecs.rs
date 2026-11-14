@@ -608,7 +608,6 @@ impl PathOramLeafCoinSource {
         object_name: &str,
         access_counter: u64,
         leaf_count: usize,
-        rng: &mut ChaCha20Rng,
     ) -> Result<usize> {
         match self {
             Self::Random { seed, next_index } => {
@@ -623,7 +622,6 @@ impl PathOramLeafCoinSource {
                 *next_index = next_index.checked_add(1).ok_or_else(|| {
                     anyhow!("path ORAM fresh-leaf counter overflow for {object_name}")
                 })?;
-                let _ = rng;
                 Ok(leaf)
             }
             Self::Injected { coins, next_index } => {
@@ -884,10 +882,9 @@ pub(super) fn oram_counter_aad(spec: &StateObject) -> String {
 pub(super) fn bootstrap_oram_counter_slot(
     spec: &StateObject,
     cipher: &StoreCipher,
-    rng: &mut ChaCha20Rng,
 ) -> Result<Box<[u8]>> {
     let mut payload = 0u64.to_be_bytes();
-    seal_boxed_oram_payload(&oram_counter_aad(spec), &mut payload, cipher, rng, None)
+    seal_boxed_oram_payload(&oram_counter_aad(spec), &mut payload, cipher, None)
 }
 
 pub(super) fn read_oram_counter_from_storage(
@@ -913,7 +910,6 @@ pub(super) fn bootstrap_surrogate_directory_pages(
     cipher: &StoreCipher,
     entries: &[MapEntry],
     empty_entry: &MapEntry,
-    rng: &mut ChaCha20Rng,
 ) -> Result<Box<[Box<[u8]>]>> {
     let mut pages = FixedBoxBuilder::new(parameters.metadata_pages);
     for page in 0..parameters.metadata_pages {
@@ -928,7 +924,6 @@ pub(super) fn bootstrap_surrogate_directory_pages(
             &aad,
             payload.as_mut(),
             cipher,
-            rng,
             None,
         )?)?;
     }
@@ -939,7 +934,6 @@ pub(super) fn bootstrap_filler_buckets(
     spec: &StateObject,
     parameters: &OramParameters,
     cipher: &StoreCipher,
-    rng: &mut ChaCha20Rng,
 ) -> Result<Box<[Box<[u8]>]>> {
     let mut buckets = FixedBoxBuilder::new(parameters.bucket_count);
     for index in 0..parameters.bucket_count {
@@ -948,7 +942,6 @@ pub(super) fn bootstrap_filler_buckets(
             &aad,
             parameters.bucket_size,
             cipher,
-            rng,
         )?)?;
     }
     buckets.finish()
@@ -958,7 +951,6 @@ pub(super) fn bootstrap_empty_path_buckets(
     spec: &StateObject,
     parameters: &OramParameters,
     cipher: &StoreCipher,
-    rng: &mut ChaCha20Rng,
 ) -> Result<Box<[Box<[u8]>]>> {
     let mut buckets = FixedBoxBuilder::new(parameters.bucket_count);
     for index in 0..parameters.bucket_count {
@@ -969,7 +961,6 @@ pub(super) fn bootstrap_empty_path_buckets(
             &aad,
             payload.as_mut(),
             cipher,
-            rng,
             None,
         )?)?;
     }
@@ -981,7 +972,6 @@ pub(super) fn rewrite_oram_counter_in_place(
     next_counter: u64,
     cipher: &StoreCipher,
     allocator: &mut AllocatorSession,
-    rng: &mut ChaCha20Rng,
     access_counter_slot: &mut [u8],
     writes: &mut OramWriteLog,
 ) -> Result<()> {
@@ -993,7 +983,6 @@ pub(super) fn rewrite_oram_counter_in_place(
         &mut payload,
         access_counter_slot,
         cipher,
-        rng,
         allocator,
     )
 }
@@ -1005,7 +994,6 @@ pub(super) fn rewrite_surrogate_directory_pages_in_place(
     entries: &[MapEntry],
     empty_entry: &MapEntry,
     allocator: &mut AllocatorSession,
-    rng: &mut ChaCha20Rng,
     directory_pages: &mut [SealedPage],
     writes: &mut OramWriteLog,
 ) -> Result<()> {
@@ -1038,7 +1026,6 @@ pub(super) fn rewrite_surrogate_directory_pages_in_place(
             payload.as_mut(),
             directory_page,
             cipher,
-            rng,
             allocator,
         )?;
     }
@@ -1052,7 +1039,6 @@ pub(super) fn rewrite_surrogate_bucket_window_in_place(
     entries: &[MapEntry],
     access_counter: u64,
     allocator: &mut AllocatorSession,
-    rng: &mut ChaCha20Rng,
     buckets: &mut [SealedPage],
     writes: &mut OramWriteLog,
 ) -> Result<()> {
@@ -1085,7 +1071,6 @@ pub(super) fn rewrite_surrogate_bucket_window_in_place(
                 payload.as_mut(),
                 sealed_bucket,
                 cipher,
-                rng,
                 allocator,
             )?;
             Ok::<(), anyhow::Error>(())
@@ -1772,11 +1757,9 @@ pub(super) fn run_path_get(
     key: &Value,
     allocator: &mut AllocatorSession,
     leaf_coins: &mut PathOramLeafCoinSource,
-    rng: &mut ChaCha20Rng,
 ) -> Result<(Value, OramTranscript, bool)> {
     let leaf_count = state.parameters.leaf_count();
-    let fresh_leaf =
-        leaf_coins.take_leaf(spec.id, &spec.name, state.access_counter, leaf_count, rng)?;
+    let fresh_leaf = leaf_coins.take_leaf(spec.id, &spec.name, state.access_counter, leaf_count)?;
     let access_leaf = access_leaf_for_key(&state.entries, &state.position_map, key, fresh_leaf);
     let slot = slot_for_key(&state.entries, key);
     let slot_present = slot.is_some();
@@ -1790,8 +1773,7 @@ pub(super) fn run_path_get(
         spec,
         access_leaf,
         allocator,
-        rng,
-        |_entries, position_map, stash, _rng| {
+        |_entries, position_map, stash| {
             // The map's values live only in its blocks: the key's block is
             // in the stash once its path has been read.
             let (value, block_failed) =
@@ -1828,14 +1810,13 @@ pub(super) fn run_path_put(
     apply: bool,
     allocator: &mut AllocatorSession,
     leaf_coins: &mut PathOramLeafCoinSource,
-    rng: &mut ChaCha20Rng,
 ) -> Result<(OramTranscript, bool)> {
     let leaf_count = state.parameters.leaf_count();
     let slot = slot_for_key(&state.entries, &key);
     let slot_present = slot.is_some();
     let prior_leaf = select_position_map_leaf(&state.position_map, &slot);
     let miss_access_leaf =
-        leaf_coins.take_leaf(spec.id, &spec.name, state.access_counter, leaf_count, rng)?;
+        leaf_coins.take_leaf(spec.id, &spec.name, state.access_counter, leaf_count)?;
     let access_leaf = masked_select_usize(
         prior_leaf.is_some(),
         prior_leaf.unwrap_or(0),
@@ -1855,7 +1836,7 @@ pub(super) fn run_path_put(
     let insert_new = apply & !slot_present & !value_is_zero & insert_slot_present;
     let keep_existing = !apply & slot_present;
     let next_leaf_value =
-        leaf_coins.take_leaf(spec.id, &spec.name, state.access_counter, leaf_count, rng)?;
+        leaf_coins.take_leaf(spec.id, &spec.name, state.access_counter, leaf_count)?;
     let selected_next_leaf = MaskedUsizeOption::some(next_leaf_value);
     let no_next_leaf = MaskedUsizeOption::none();
     let next_leaf = masked_select_option_usize(
@@ -1898,8 +1879,7 @@ pub(super) fn run_path_put(
         spec,
         access_leaf,
         allocator,
-        rng,
-        |entries, position_map, stash, _rng| {
+        |entries, position_map, stash| {
             apply_path_put_update(
                 spec,
                 entries,
@@ -1927,7 +1907,6 @@ pub(super) fn run_path_commit_put(
     aborted: bool,
     allocator: &mut AllocatorSession,
     leaf_coins: &mut PathOramLeafCoinSource,
-    rng: &mut ChaCha20Rng,
 ) -> Result<OramTranscript> {
     // A write of an aborted call is masked off but still makes its access,
     // so the call leaves the trace of a committed one and needs no rollback.
@@ -1940,7 +1919,6 @@ pub(super) fn run_path_commit_put(
         apply,
         allocator,
         leaf_coins,
-        rng,
     )?;
     // The pending view applied the same writes to the same contents and
     // found no overflow, or the call aborted and every write is masked off;
@@ -2576,7 +2554,6 @@ pub(super) fn encode_path_metadata_pages(
     entries: &[MapEntry],
     stash: &[OramBlock],
     allocator: &mut AllocatorSession,
-    rng: &mut ChaCha20Rng,
 ) -> Result<Box<[Box<[u8]>]>> {
     let mut pages = repeat_boxed_empty_byte_boxes(parameters.metadata_pages)?;
     let mut next_page = 0usize;
@@ -2597,7 +2574,7 @@ pub(super) fn encode_path_metadata_pages(
                 spec.name
             )
         })?;
-        *page_slot = seal_boxed_oram_payload(&aad, payload.as_mut(), cipher, rng, Some(allocator))?;
+        *page_slot = seal_boxed_oram_payload(&aad, payload.as_mut(), cipher, Some(allocator))?;
         next_page += 1;
     }
     let empty_block = empty_oram_block(spec)?;
@@ -2618,7 +2595,7 @@ pub(super) fn encode_path_metadata_pages(
                 spec.name
             )
         })?;
-        *page_slot = seal_boxed_oram_payload(&aad, payload.as_mut(), cipher, rng, Some(allocator))?;
+        *page_slot = seal_boxed_oram_payload(&aad, payload.as_mut(), cipher, Some(allocator))?;
         next_page += 1;
     }
     if next_page != pages.len() {
@@ -2639,7 +2616,6 @@ pub(super) fn rewrite_path_metadata_pages_in_place(
     entries: &[MapEntry],
     stash: &[OramBlock],
     allocator: &mut AllocatorSession,
-    rng: &mut ChaCha20Rng,
     directory_pages: &mut [SealedPage],
     writes: &mut OramWriteLog,
 ) -> Result<()> {
@@ -2674,7 +2650,6 @@ pub(super) fn rewrite_path_metadata_pages_in_place(
             payload.as_mut(),
             directory_page,
             cipher,
-            rng,
             allocator,
         )?;
     }
@@ -2702,7 +2677,6 @@ pub(super) fn rewrite_path_metadata_pages_in_place(
             payload.as_mut(),
             directory_page,
             cipher,
-            rng,
             allocator,
         )?;
     }
@@ -2926,7 +2900,6 @@ pub(super) fn rebuild_path_buckets_from_stash(
     buckets: &mut [SealedPage],
     access_leaf: usize,
     allocator: &mut AllocatorSession,
-    rng: &mut ChaCha20Rng,
     writes: &mut OramWriteLog,
     stash: &mut FixedStash,
 ) -> Result<()> {
@@ -2963,7 +2936,6 @@ pub(super) fn rebuild_path_buckets_from_stash(
                     payload.as_mut(),
                     sealed_bucket,
                     cipher,
-                    rng,
                     allocator,
                 )?;
                 Ok(())
@@ -2978,16 +2950,10 @@ pub(super) fn rewrite_path_for_access<F>(
     spec: &StateObject,
     access_leaf: usize,
     allocator: &mut AllocatorSession,
-    rng: &mut ChaCha20Rng,
     update: F,
 ) -> Result<(OramWriteBatch, bool)>
 where
-    F: FnOnce(
-        &mut [MapEntry],
-        &mut [MaskedUsizeOption],
-        &mut FixedStash,
-        &mut ChaCha20Rng,
-    ) -> Result<bool>,
+    F: FnOnce(&mut [MapEntry], &mut [MaskedUsizeOption], &mut FixedStash) -> Result<bool>,
 {
     let mut writes = oram_write_log_with_capacity(oram_write_log_capacity(&state.parameters)?)?;
     let mut working_entries = std::mem::take(&mut state.entries);
@@ -3016,7 +2982,6 @@ where
         &mut working_entries,
         &mut working_position_map,
         &mut working_stash,
-        rng,
     )?;
     // A stash that holds more blocks than its bound is an overflow: the
     // access stops with an error, so the call that made it is dropped and
@@ -3032,7 +2997,6 @@ where
         &mut state.storage.buckets,
         access_leaf,
         allocator,
-        rng,
         &mut writes,
         &mut working_stash,
     )?;
@@ -3051,7 +3015,6 @@ where
         &working_entries,
         working_stash.as_slice(),
         allocator,
-        rng,
         &mut state.storage.directory_pages,
         &mut writes,
     )?;
@@ -3062,7 +3025,6 @@ where
         next_counter,
         &state.cipher,
         allocator,
-        rng,
         &mut state.storage.access_counter_slot,
         &mut writes,
     )?;
@@ -5246,7 +5208,6 @@ pub(super) fn bootstrap_tree_storage(
             &oram_bucket_aad(spec, index),
             payload.as_mut(),
             cipher,
-            rng,
             None,
         )?)?;
     }
@@ -5257,7 +5218,6 @@ pub(super) fn bootstrap_tree_storage(
         &oram_meta_aad(spec, 0),
         page_payload.as_mut(),
         cipher,
-        rng,
         None,
     )?)?;
     for page in 1..parameters.metadata_pages {
@@ -5266,7 +5226,6 @@ pub(super) fn bootstrap_tree_storage(
             &oram_meta_aad(spec, page),
             page_payload.as_mut(),
             cipher,
-            rng,
             None,
         )?)?;
     }
@@ -5346,7 +5305,6 @@ pub(super) struct SealedTreeStore<'a> {
     access_counter: &'a mut u64,
     allocator: &'a mut AllocatorSession,
     leaf_coins: &'a mut PathOramLeafCoinSource,
-    rng: &'a mut ChaCha20Rng,
     shape: TreeShape,
     accesses: usize,
     begun: usize,
@@ -5366,7 +5324,6 @@ impl<'a> SealedTreeStore<'a> {
         access_counter: &'a mut u64,
         allocator: &'a mut AllocatorSession,
         leaf_coins: &'a mut PathOramLeafCoinSource,
-        rng: &'a mut ChaCha20Rng,
         shape: &TreeShape,
         accesses: usize,
     ) -> Result<Self> {
@@ -5386,7 +5343,6 @@ impl<'a> SealedTreeStore<'a> {
             access_counter,
             allocator,
             leaf_coins,
-            rng,
             shape: clone_tree_shape(shape),
             accesses,
             begun: 0,
@@ -5424,7 +5380,6 @@ impl TreePathStore for SealedTreeStore<'_> {
             &self.spec.name,
             *self.access_counter,
             self.shape.leaf_count,
-            self.rng,
         )
     }
 
@@ -5539,7 +5494,6 @@ impl TreePathStore for SealedTreeStore<'_> {
             self.payload.as_mut(),
             sealed,
             self.cipher,
-            self.rng,
             self.allocator,
         )
     }
@@ -5578,7 +5532,6 @@ impl TreePathStore for SealedTreeStore<'_> {
                 self.page_payload.as_mut(),
                 sealed,
                 self.cipher,
-                self.rng,
                 self.allocator,
             )?;
         }
@@ -5599,7 +5552,6 @@ impl TreePathStore for SealedTreeStore<'_> {
             next_counter,
             self.cipher,
             self.allocator,
-            self.rng,
             &mut self.storage.access_counter_slot,
             &mut trace.writes,
         )?;
@@ -5655,7 +5607,6 @@ pub(super) fn run_tree_get(
     key: &Value,
     allocator: &mut AllocatorSession,
     leaf_coins: &mut PathOramLeafCoinSource,
-    rng: &mut ChaCha20Rng,
 ) -> Result<(Value, bool, Box<[OramTranscript]>, bool)> {
     let tree = state
         .tree
@@ -5669,7 +5620,6 @@ pub(super) fn run_tree_get(
         &mut state.access_counter,
         allocator,
         leaf_coins,
-        rng,
         &tree.shape,
         tree_get_accesses(tree.shape.avl_height),
     )?;
@@ -5694,7 +5644,6 @@ pub(super) fn run_tree_put(
     apply: bool,
     allocator: &mut AllocatorSession,
     leaf_coins: &mut PathOramLeafCoinSource,
-    rng: &mut ChaCha20Rng,
 ) -> Result<(Box<[OramTranscript]>, bool, bool)> {
     let tree = state
         .tree
@@ -5708,7 +5657,6 @@ pub(super) fn run_tree_put(
         &mut state.access_counter,
         allocator,
         leaf_coins,
-        rng,
         &tree.shape,
         tree_put_accesses(tree.shape.avl_height),
     )?;

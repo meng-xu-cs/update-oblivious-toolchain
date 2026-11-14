@@ -3,7 +3,6 @@
 #![allow(dead_code)]
 
 use anyhow::{anyhow, bail, Result};
-use rand_chacha::ChaCha20Rng;
 use uo_allocator::{AllocatorSession, ScratchRegion};
 use uo_core::ir::StateObject;
 use uo_core::trace::{is_update_write, PhysicalWriteEvent, WriteClass};
@@ -41,24 +40,18 @@ fn seal_boxed_payload_with_optional_guard(
     aad: &str,
     payload: &mut [u8],
     cipher: &StoreCipher,
-    rng: &mut ChaCha20Rng,
     allocator: Option<&mut AllocatorSession>,
 ) -> Result<Box<[u8]>> {
     if let Some(allocator) = allocator {
         let _io_guard = allocator.reserve_guard(ScratchRegion::IoScratch, payload.len())?;
-        cipher.seal_and_wipe_boxed(aad.as_bytes(), payload, rng)
+        cipher.seal_and_wipe_boxed(aad.as_bytes(), payload)
     } else {
-        cipher.seal_and_wipe_boxed(aad.as_bytes(), payload, rng)
+        cipher.seal_and_wipe_boxed(aad.as_bytes(), payload)
     }
 }
 
-fn filler_boxed_payload(
-    aad: &str,
-    payload_len: usize,
-    cipher: &StoreCipher,
-    rng: &mut ChaCha20Rng,
-) -> Result<Box<[u8]>> {
-    cipher.filler_boxed(aad.as_bytes(), payload_len, rng)
+fn filler_boxed_payload(aad: &str, payload_len: usize, cipher: &StoreCipher) -> Result<Box<[u8]>> {
+    cipher.filler_boxed(aad.as_bytes(), payload_len)
 }
 
 pub(super) fn repeated_boxed_bytes(len: usize, byte: u8) -> Result<Box<[u8]>> {
@@ -161,7 +154,6 @@ fn reseal_payload_and_record_write<F>(
     payload: &mut [u8],
     physical: &mut [u8],
     cipher: &StoreCipher,
-    rng: &mut ChaCha20Rng,
     allocator: &mut AllocatorSession,
     record_write: F,
 ) -> Result<()>
@@ -170,7 +162,7 @@ where
 {
     let _io_guard = allocator.reserve_guard(ScratchRegion::IoScratch, payload.len())?;
     let replaced: Box<[u8]> = (&*physical).into();
-    if !cipher.seal_and_wipe_into_slice(aad.as_bytes(), payload, rng, physical) {
+    if !cipher.seal_and_wipe_into_slice(aad.as_bytes(), payload, physical) {
         bail!(
             "sealed payload buffer for {} does not hold a sealed record of the required public size",
             location
@@ -216,9 +208,8 @@ pub(super) fn seal_boxed_object_payload(
     aad: &str,
     payload: &mut [u8],
     cipher: &StoreCipher,
-    rng: &mut ChaCha20Rng,
 ) -> Result<Box<[u8]>> {
-    seal_boxed_payload_with_optional_guard(aad, payload, cipher, rng, None)
+    seal_boxed_payload_with_optional_guard(aad, payload, cipher, None)
 }
 
 pub(super) fn encode_map_record_into(entry: &MapEntry, out: &mut [u8]) -> Result<()> {
@@ -404,24 +395,18 @@ pub(super) fn decode_oram_directory_page_into_slice(
     Ok(decoded_len)
 }
 
-pub(super) fn seal_value(
-    aad: &str,
-    value: &Value,
-    cipher: &StoreCipher,
-    rng: &mut ChaCha20Rng,
-) -> Result<Box<[u8]>> {
+pub(super) fn seal_value(aad: &str, value: &Value, cipher: &StoreCipher) -> Result<Box<[u8]>> {
     let mut payload = value.canonical_bytes_boxed()?;
-    seal_boxed_object_payload(aad, payload.as_mut(), cipher, rng)
+    seal_boxed_object_payload(aad, payload.as_mut(), cipher)
 }
 
 pub(super) fn seal_map_record(
     aad: &str,
     entry: &MapEntry,
     cipher: &StoreCipher,
-    rng: &mut ChaCha20Rng,
 ) -> Result<Box<[u8]>> {
     let mut payload = map_record_bytes(entry)?;
-    seal_boxed_object_payload(aad, payload.as_mut(), cipher, rng)
+    seal_boxed_object_payload(aad, payload.as_mut(), cipher)
 }
 
 pub(super) fn reseal_payload_and_trace_write(
@@ -431,7 +416,6 @@ pub(super) fn reseal_payload_and_trace_write(
     payload: Box<[u8]>,
     physical: &mut Box<[u8]>,
     cipher: &StoreCipher,
-    rng: &mut ChaCha20Rng,
     trace: &mut CallRecorder,
     allocator: &mut AllocatorSession,
 ) -> Result<()> {
@@ -443,7 +427,6 @@ pub(super) fn reseal_payload_and_trace_write(
         payload.as_mut(),
         physical.as_mut(),
         cipher,
-        rng,
         allocator,
         |physical_len| {
             trace.physical_write(PhysicalWriteEvent::from_shape(
@@ -464,7 +447,6 @@ pub(super) fn seal_canonical_value_commit_slot(
     value: &Value,
     physical: &mut Box<[u8]>,
     cipher: &StoreCipher,
-    rng: &mut ChaCha20Rng,
     trace: &mut CallRecorder,
     allocator: &mut AllocatorSession,
 ) -> Result<()> {
@@ -476,7 +458,6 @@ pub(super) fn seal_canonical_value_commit_slot(
         payload,
         physical,
         cipher,
-        rng,
         trace,
         allocator,
     )
@@ -489,7 +470,6 @@ pub(super) fn seal_map_record_commit_slot(
     entry: &MapEntry,
     physical: &mut Box<[u8]>,
     cipher: &StoreCipher,
-    rng: &mut ChaCha20Rng,
     trace: &mut CallRecorder,
     allocator: &mut AllocatorSession,
 ) -> Result<()> {
@@ -501,7 +481,6 @@ pub(super) fn seal_map_record_commit_slot(
         payload,
         physical,
         cipher,
-        rng,
         trace,
         allocator,
     )
@@ -722,19 +701,17 @@ pub(super) fn seal_boxed_oram_payload(
     aad: &str,
     payload: &mut [u8],
     cipher: &StoreCipher,
-    rng: &mut ChaCha20Rng,
     allocator: Option<&mut AllocatorSession>,
 ) -> Result<Box<[u8]>> {
-    seal_boxed_payload_with_optional_guard(aad, payload, cipher, rng, allocator)
+    seal_boxed_payload_with_optional_guard(aad, payload, cipher, allocator)
 }
 
 pub(super) fn filler_boxed_oram_payload(
     aad: &str,
     payload_len: usize,
     cipher: &StoreCipher,
-    rng: &mut ChaCha20Rng,
 ) -> Result<Box<[u8]>> {
-    filler_boxed_payload(aad, payload_len, cipher, rng)
+    filler_boxed_payload(aad, payload_len, cipher)
 }
 
 pub(super) fn reseal_oram_payload_and_record_write(
@@ -744,7 +721,6 @@ pub(super) fn reseal_oram_payload_and_record_write(
     payload: &mut [u8],
     physical: &mut [u8],
     cipher: &StoreCipher,
-    rng: &mut ChaCha20Rng,
     allocator: &mut AllocatorSession,
 ) -> Result<()> {
     let location_for_error = location.clone();
@@ -754,7 +730,6 @@ pub(super) fn reseal_oram_payload_and_record_write(
         payload,
         physical,
         cipher,
-        rng,
         allocator,
         |physical_len| writes.push_update(location, physical_len),
     )

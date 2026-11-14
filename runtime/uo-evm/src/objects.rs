@@ -6,8 +6,6 @@ use crate::oram::{
 };
 use crate::secret::ObjectSecret;
 use anyhow::{anyhow, bail, Result};
-use rand::SeedableRng;
-use rand_chacha::ChaCha20Rng;
 use serde_json::json;
 use std::collections::BTreeMap;
 use uo_allocator::AllocatorSession;
@@ -51,7 +49,6 @@ pub(crate) struct CellObject {
     // cell until its commit: what the commit keeps if the call aborted.
     // `None` while `value` is still the loaded one.
     loaded_value: Option<Value>,
-    rng: ChaCha20Rng,
 }
 
 impl CellObject {
@@ -64,7 +61,6 @@ impl CellObject {
             accessed: false,
             written: false,
             loaded_value: None,
-            rng: self.rng.clone(),
         }
     }
 
@@ -73,7 +69,6 @@ impl CellObject {
         wipe_loaded_cell_value(&mut self.loaded_value);
         self.accessed = false;
         self.written = false;
-        self.rng = ChaCha20Rng::from_seed([0u8; 32]);
     }
 
     fn decode_value_from_storage(&self, allocator: &mut AllocatorSession) -> Result<Value> {
@@ -107,7 +102,6 @@ impl CellObject {
             accessed: false,
             written: false,
             loaded_value: None,
-            rng: self.rng.clone(),
         })
     }
 
@@ -138,7 +132,6 @@ pub(crate) struct ArrayObject {
     // array until its commit: what the commit keeps if the call aborted.
     // `None` while `values` are still the loaded ones.
     loaded_values: Option<Box<[Value]>>,
-    rng: ChaCha20Rng,
 }
 
 impl ArrayObject {
@@ -151,7 +144,6 @@ impl ArrayObject {
             accessed: false,
             written_slots: boxed_false_flags(self.physical_slots.len()),
             loaded_values: None,
-            rng: self.rng.clone(),
         }
     }
 
@@ -160,7 +152,6 @@ impl ArrayObject {
         wipe_loaded_array_values(&mut self.loaded_values);
         self.accessed = false;
         clear_written_slots(&mut self.written_slots);
-        self.rng = ChaCha20Rng::from_seed([0u8; 32]);
     }
 
     fn decode_values_from_storage(&self, allocator: &mut AllocatorSession) -> Result<Box<[Value]>> {
@@ -194,7 +185,6 @@ impl ArrayObject {
             accessed: false,
             written_slots: boxed_false_flags(self.physical_slots.len()),
             loaded_values: None,
-            rng: self.rng.clone(),
         })
     }
 
@@ -302,7 +292,6 @@ pub(crate) struct SmallMapObject {
     // `None` while `entries` are still the loaded ones. An entry wipes
     // itself when it is dropped.
     loaded_entries: Option<Box<[MapEntry]>>,
-    rng: ChaCha20Rng,
 }
 
 impl SmallMapObject {
@@ -311,7 +300,6 @@ impl SmallMapObject {
         self.loaded_entries = None;
         self.accessed = false;
         self.dirty = false;
-        self.rng = ChaCha20Rng::from_seed([0u8; 32]);
     }
 
     fn decode_entries_from_storage(
@@ -347,7 +335,6 @@ impl SmallMapObject {
             accessed: false,
             dirty: false,
             loaded_entries: None,
-            rng: self.rng.clone(),
         })
     }
 
@@ -379,7 +366,6 @@ pub(crate) struct OramMapObject {
     dirty: bool,
     leaf_coin_seed: PathOramLeafSeed,
     leaf_coin_source: PathOramLeafCoinSource,
-    rng: ChaCha20Rng,
     // Path ORAM schemes: the call's writes, which reach the ORAM at commit,
     // and the map's contents with those writes applied, which later reads in
     // the call return.
@@ -406,7 +392,6 @@ impl OramMapObject {
         self.accessed = false;
         self.dirty = false;
         self.clear_pending();
-        self.rng = ChaCha20Rng::from_seed([0u8; 32]);
     }
 
     fn cold_commit(&mut self) -> Result<()> {
@@ -494,7 +479,6 @@ impl RuntimeObject {
                     accessed: false,
                     written: false,
                     loaded_value: None,
-                    rng,
                 }))
             }
             (ContainerKind::Cell, _) => {
@@ -503,13 +487,12 @@ impl RuntimeObject {
                 let aad = cell_slot_aad(&spec.name);
                 Ok(Self::UoCell(CellObject {
                     spec: spec.clone(),
-                    physical: seal_value(&aad, &logical, &cipher, &mut rng)?,
+                    physical: seal_value(&aad, &logical, &cipher)?,
                     value: logical,
                     cipher,
                     accessed: false,
                     written: false,
                     loaded_value: None,
-                    rng,
                 }))
             }
             (ContainerKind::Array, BackendKind::Raw) => {
@@ -531,7 +514,6 @@ impl RuntimeObject {
                     accessed: false,
                     written_slots: boxed_false_flags(capacity),
                     loaded_values: None,
-                    rng,
                 }))
             }
             (ContainerKind::Array, _) => {
@@ -544,7 +526,7 @@ impl RuntimeObject {
                 let mut physical_slots = FixedBoxBuilder::new(capacity);
                 for index in 0..capacity {
                     let aad = array_slot_aad(&spec.name, index);
-                    physical_slots.push(seal_value(&aad, &zero_value, &cipher, &mut rng)?)?;
+                    physical_slots.push(seal_value(&aad, &zero_value, &cipher)?)?;
                 }
                 Ok(Self::UoArray(ArrayObject {
                     spec: spec.clone(),
@@ -554,7 +536,6 @@ impl RuntimeObject {
                     accessed: false,
                     written_slots: boxed_false_flags(capacity),
                     loaded_values: None,
-                    rng,
                 }))
             }
             (ContainerKind::Map, BackendKind::Raw) => Ok(Self::RawMap(RawMapObject {
@@ -577,7 +558,7 @@ impl RuntimeObject {
                 let mut physical_slots = FixedBoxBuilder::new(capacity);
                 for index in 0..capacity {
                     let aad = small_map_slot_aad(&spec.name, index);
-                    physical_slots.push(seal_map_record(&aad, &zero_entry, &cipher, &mut rng)?)?;
+                    physical_slots.push(seal_map_record(&aad, &zero_entry, &cipher)?)?;
                 }
                 Ok(Self::UoSmallMap(SmallMapObject {
                     spec: spec.clone(),
@@ -587,7 +568,6 @@ impl RuntimeObject {
                     accessed: false,
                     dirty: false,
                     loaded_entries: None,
-                    rng,
                 }))
             }
             (ContainerKind::Map, BackendKind::Oram) => {
@@ -599,7 +579,6 @@ impl RuntimeObject {
                     dirty: false,
                     leaf_coin_source: PathOramLeafCoinSource::from_domain_seed(&leaf_coin_seed),
                     leaf_coin_seed,
-                    rng,
                     pending_view: None,
                     pending_puts: Vec::new(),
                     presence_plan: Box::default(),
@@ -792,7 +771,6 @@ impl RuntimeObject {
                 dirty: false,
                 leaf_coin_seed: object.leaf_coin_seed.duplicate(),
                 leaf_coin_source: PathOramLeafCoinSource::from_domain_seed(&object.leaf_coin_seed),
-                rng: object.rng.clone(),
                 pending_view: None,
                 pending_puts: Vec::with_capacity(object.oram.parameters().accesses_per_call),
                 presence_plan: Box::default(),
@@ -1210,7 +1188,6 @@ impl RuntimeObject {
                     key,
                     allocator,
                     &mut object.leaf_coin_source,
-                    &mut object.rng,
                 )?;
                 record_tree_transcripts(trace, &object.spec, &object.oram, transcripts)?;
                 // A later write of the same key may reuse the presence.
@@ -1221,13 +1198,10 @@ impl RuntimeObject {
             Self::UoOramMap(object) => {
                 object.accessed = true;
                 trace.record_oram_access(object.spec.id, object.oram.parameters());
-                let (value, transcript, update_failed) = object.oram.get(
-                    &object.spec,
-                    key,
-                    allocator,
-                    &mut object.leaf_coin_source,
-                    &mut object.rng,
-                )?;
+                let (value, transcript, update_failed) =
+                    object
+                        .oram
+                        .get(&object.spec, key, allocator, &mut object.leaf_coin_source)?;
                 record_oram_transcript(
                     trace,
                     &object.spec,
@@ -1311,7 +1285,6 @@ impl RuntimeObject {
                         &key,
                         allocator,
                         &mut object.leaf_coin_source,
-                        &mut object.rng,
                     )?;
                     record_tree_transcripts(trace, &object.spec, &object.oram, transcripts)?;
                     (found, update_failed)
@@ -1377,7 +1350,6 @@ impl RuntimeObject {
                     apply,
                     allocator,
                     &mut object.leaf_coin_source,
-                    &mut object.rng,
                 )?;
                 record_oram_transcript(
                     trace,
@@ -1436,7 +1408,6 @@ impl RuntimeObject {
                         false,
                         allocator,
                         &mut object.leaf_coin_source,
-                        &mut object.rng,
                     )?;
                 }
                 object.dirty = true;
@@ -1452,7 +1423,6 @@ impl RuntimeObject {
                         false,
                         allocator,
                         &mut object.leaf_coin_source,
-                        &mut object.rng,
                     )?;
                 }
                 object.dirty = true;
@@ -1505,7 +1475,6 @@ impl RuntimeObject {
                 let loaded_value = next.loaded_value.take();
                 let spec_name = next.spec.name.clone();
                 let cipher = &next.cipher;
-                let rng = &mut next.rng;
                 let physical = &mut next.physical;
                 trace.begin_exact_rewrite(&spec_name, ExactObjectKind::Cell);
                 reconcile_cell_commit_value(
@@ -1521,7 +1490,6 @@ impl RuntimeObject {
                             committed_value,
                             physical,
                             cipher,
-                            rng,
                             trace,
                             allocator,
                         )
@@ -1593,7 +1561,6 @@ impl RuntimeObject {
                 let loaded_values = next.loaded_values.take();
                 let spec_name = next.spec.name.clone();
                 let cipher = &next.cipher;
-                let rng = &mut next.rng;
                 let physical_slots = &mut next.physical_slots;
                 trace.begin_exact_rewrite(&spec_name, ExactObjectKind::Array);
                 reconcile_array_commit_values(
@@ -1617,7 +1584,6 @@ impl RuntimeObject {
                             value,
                             physical,
                             cipher,
-                            rng,
                             trace,
                             allocator,
                         )
@@ -1666,7 +1632,6 @@ impl RuntimeObject {
                 let loaded_entries = next.loaded_entries.take();
                 let spec_name = next.spec.name.clone();
                 let cipher = &next.cipher;
-                let rng = &mut next.rng;
                 let physical_slots = &mut next.physical_slots;
                 trace.begin_exact_rewrite(&spec_name, ExactObjectKind::Map);
                 reconcile_small_map_commit_entries(
@@ -1690,7 +1655,6 @@ impl RuntimeObject {
                             entry,
                             physical,
                             cipher,
-                            rng,
                             trace,
                             allocator,
                         )
@@ -1715,7 +1679,6 @@ impl RuntimeObject {
                                 aborted,
                                 allocator,
                                 &mut next.leaf_coin_source,
-                                &mut next.rng,
                             )?;
                             record_tree_transcripts(trace, &next.spec, &next.oram, transcripts)?;
                         }
@@ -1736,7 +1699,6 @@ impl RuntimeObject {
                                 aborted,
                                 allocator,
                                 &mut next.leaf_coin_source,
-                                &mut next.rng,
                             )?;
                             record_oram_transcript(
                                 trace,
@@ -1749,13 +1711,8 @@ impl RuntimeObject {
                     } else {
                         let shadow_oram =
                             std::mem::replace(&mut next.oram, OramState::placeholder());
-                        let commit = shadow_oram.commit(
-                            &next.spec,
-                            &old.oram,
-                            aborted,
-                            allocator,
-                            &mut next.rng,
-                        )?;
+                        let commit =
+                            shadow_oram.commit(&next.spec, &old.oram, aborted, allocator)?;
                         let (next_oram, writes, zero_writes) = commit.into_object_commit_parts();
                         writes.for_each_write(|write| {
                             trace.physical_write(write.with_object(&next.spec.name));

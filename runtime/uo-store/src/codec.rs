@@ -38,11 +38,10 @@ mod tests {
     use std::collections::BTreeSet;
 
     /// Seal `payload` and return the nonce the sealed record carries.
-    fn sealed_nonce(cipher: &StoreCipher, rng_seed: u64, payload: &[u8]) -> Vec<u8> {
-        let mut rng = ChaCha20Rng::seed_from_u64(rng_seed);
+    fn sealed_nonce(cipher: &StoreCipher, payload: &[u8]) -> Vec<u8> {
         let mut payload_for_seal = payload.to_vec();
         let encoded = cipher
-            .seal_and_wipe_boxed(b"object:slot", &mut payload_for_seal, &mut rng)
+            .seal_and_wipe_boxed(b"object:slot", &mut payload_for_seal)
             .unwrap();
         let mut content = vec![0u8; generated_sealed_content_len(payload.len())];
         read_units(&encoded, &mut content).unwrap();
@@ -51,10 +50,9 @@ mod tests {
 
     /// A record of `payload` that replaces none.
     fn fresh_record(cipher: &StoreCipher, payload: &[u8]) -> Vec<u8> {
-        let mut rng = ChaCha20Rng::seed_from_u64(0);
         let mut payload = payload.to_vec();
         cipher
-            .seal_and_wipe_boxed(b"object:slot", &mut payload, &mut rng)
+            .seal_and_wipe_boxed(b"object:slot", &mut payload)
             .unwrap()
             .into_vec()
     }
@@ -91,12 +89,11 @@ mod tests {
     #[test]
     fn each_seal_under_a_key_carries_the_next_counter() {
         let cipher = StoreCipher::random();
-        assert_eq!(sealed_nonce(&cipher, 11, &[1, 2, 3]), seal_nonce(0));
-        assert_eq!(sealed_nonce(&cipher, 11, &[1, 2, 3]), seal_nonce(1));
-        assert_eq!(sealed_nonce(&cipher, 97, &[]), seal_nonce(2));
-        let mut rng = ChaCha20Rng::seed_from_u64(11);
-        cipher.filler_boxed(b"object:slot", 8, &mut rng).unwrap();
-        assert_eq!(sealed_nonce(&cipher, 11, &[9; 40]), seal_nonce(4));
+        assert_eq!(sealed_nonce(&cipher, &[1, 2, 3]), seal_nonce(0));
+        assert_eq!(sealed_nonce(&cipher, &[1, 2, 3]), seal_nonce(1));
+        assert_eq!(sealed_nonce(&cipher, &[]), seal_nonce(2));
+        cipher.filler_boxed(b"object:slot", 8).unwrap();
+        assert_eq!(sealed_nonce(&cipher, &[9; 40]), seal_nonce(4));
     }
 
     /// A copy of the cipher shares its seal count. A staged call seals with
@@ -104,15 +101,15 @@ mod tests {
     #[test]
     fn a_dropped_copy_of_the_cipher_does_not_return_its_nonces() {
         let committed = StoreCipher::random();
-        assert_eq!(sealed_nonce(&committed, 1, &[7]), seal_nonce(0));
+        assert_eq!(sealed_nonce(&committed, &[7]), seal_nonce(0));
         let staged = committed.clone_for_runtime_state();
         assert_eq!(staged, committed);
         let nested = staged.clone_for_runtime_state();
-        assert_eq!(sealed_nonce(&staged, 1, &[8]), seal_nonce(1));
-        assert_eq!(sealed_nonce(&nested, 1, &[8]), seal_nonce(2));
+        assert_eq!(sealed_nonce(&staged, &[8]), seal_nonce(1));
+        assert_eq!(sealed_nonce(&nested, &[8]), seal_nonce(2));
         drop(nested);
         drop(staged);
-        assert_eq!(sealed_nonce(&committed, 1, &[8]), seal_nonce(3));
+        assert_eq!(sealed_nonce(&committed, &[8]), seal_nonce(3));
     }
 
     /// Two keys count their seals separately.
@@ -121,9 +118,9 @@ mod tests {
         let lhs = StoreCipher::random();
         let rhs = StoreCipher::random();
         assert_ne!(lhs, rhs);
-        assert_eq!(sealed_nonce(&lhs, 1, &[7]), seal_nonce(0));
-        assert_eq!(sealed_nonce(&lhs, 1, &[7]), seal_nonce(1));
-        assert_eq!(sealed_nonce(&rhs, 1, &[7]), seal_nonce(0));
+        assert_eq!(sealed_nonce(&lhs, &[7]), seal_nonce(0));
+        assert_eq!(sealed_nonce(&lhs, &[7]), seal_nonce(1));
+        assert_eq!(sealed_nonce(&rhs, &[7]), seal_nonce(0));
     }
 
     /// The last counter is never handed out: once the count cannot grow, a
@@ -132,8 +129,7 @@ mod tests {
     fn a_seal_fails_once_the_seal_count_is_exhausted() {
         let cipher = StoreCipher::random();
         cipher.set_seal_count_for_test(u64::MAX - 1);
-        assert_eq!(sealed_nonce(&cipher, 1, &[7]), seal_nonce(u64::MAX - 1));
-        let mut rng = ChaCha20Rng::seed_from_u64(1);
+        assert_eq!(sealed_nonce(&cipher, &[7]), seal_nonce(u64::MAX - 1));
         // The record the failed seals would have replaced: the last one the
         // key sealed.
         let record = {
@@ -143,24 +139,19 @@ mod tests {
         for _ in 0..2 {
             let mut payload = vec![5u8, 6u8];
             let mut encoded = record.clone();
-            assert!(!cipher.seal_and_wipe_into_slice(
-                b"object:slot",
-                &mut payload,
-                &mut rng,
-                &mut encoded,
-            ));
+            assert!(!cipher.seal_and_wipe_into_slice(b"object:slot", &mut payload, &mut encoded));
             assert_eq!(payload, vec![0u8; 2]);
             assert_eq!(encoded, record);
             let mut payload = vec![5u8, 6u8];
             assert!(cipher
-                .seal_and_wipe_boxed(b"object:slot", &mut payload, &mut rng)
+                .seal_and_wipe_boxed(b"object:slot", &mut payload)
                 .is_err());
-            assert!(cipher.filler_boxed(b"object:slot", 2, &mut rng).is_err());
+            assert!(cipher.filler_boxed(b"object:slot", 2).is_err());
         }
         let copy = cipher.clone_for_runtime_state();
         let mut payload = vec![5u8, 6u8];
         assert!(copy
-            .seal_and_wipe_boxed(b"object:slot", &mut payload, &mut rng)
+            .seal_and_wipe_boxed(b"object:slot", &mut payload)
             .is_err());
     }
 
@@ -257,7 +248,6 @@ mod tests {
         // here the key is made again for each seal, which repeats the nonce,
         // and the payload is the same, so that the ciphertexts are equal.
         let cipher = || StoreCipher::from_rng(&mut ChaCha20Rng::seed_from_u64(0x35));
-        let mut rng = ChaCha20Rng::seed_from_u64(1);
         let payload = [0x11u8; 65];
         let mut record = fresh_record(&cipher(), &payload);
         assert_eq!(record_marker(&record), Some(SEALED_MARKERS[0]));
@@ -267,8 +257,7 @@ mod tests {
             assert!(cipher().seal_and_wipe_into_slice(
                 b"object:slot",
                 &mut payload_for_seal,
-                &mut rng,
-                &mut record,
+                &mut record
             ));
             assert_eq!(record_marker(&record), Some(SEALED_MARKERS[round % 2]));
             assert_eq!(record.len(), previous.len());
@@ -286,8 +275,7 @@ mod tests {
             assert!(!cipher().seal_and_wipe_into_slice(
                 b"object:slot",
                 &mut payload_for_seal,
-                &mut rng,
-                &mut not_a_record,
+                &mut not_a_record
             ));
             assert_eq!(payload_for_seal, vec![0u8; 65]);
             assert_eq!(not_a_record, before);
@@ -297,11 +285,10 @@ mod tests {
     #[test]
     fn sealed_codec_roundtrips_payload() {
         let cipher = StoreCipher::random();
-        let mut rng = ChaCha20Rng::seed_from_u64(11);
         let payload = [0u8, 0xAB, 0xCD, 0xEF];
         let mut payload_for_seal = payload.to_vec();
         let encoded = cipher
-            .seal_and_wipe_boxed(b"object:slot", &mut payload_for_seal, &mut rng)
+            .seal_and_wipe_boxed(b"object:slot", &mut payload_for_seal)
             .unwrap()
             .into_vec();
         let reopened =
@@ -314,10 +301,9 @@ mod tests {
     #[test]
     fn sealed_codec_rejects_tampering() {
         let cipher = StoreCipher::random();
-        let mut rng = ChaCha20Rng::seed_from_u64(29);
         let mut payload = vec![1u8, 2u8, 3u8];
         let encoded = cipher
-            .seal_and_wipe_boxed(b"object:slot", &mut payload, &mut rng)
+            .seal_and_wipe_boxed(b"object:slot", &mut payload)
             .unwrap()
             .into_vec();
         let mut tampered = encoded.clone();
@@ -330,10 +316,9 @@ mod tests {
     #[test]
     fn sealed_codec_wipes_owned_payload_buffer() {
         let cipher = StoreCipher::random();
-        let mut rng = ChaCha20Rng::seed_from_u64(37);
         let mut payload = vec![5u8, 6u8, 7u8, 8u8];
         let encoded = cipher
-            .seal_and_wipe_boxed(b"object:slot", &mut payload, &mut rng)
+            .seal_and_wipe_boxed(b"object:slot", &mut payload)
             .unwrap();
         assert_eq!(payload, vec![0u8; 4]);
         let reopened =
@@ -344,18 +329,12 @@ mod tests {
     #[test]
     fn sealed_codec_seal_into_slice_reuses_fixed_output_buffer_and_wipes_payload() {
         let cipher = StoreCipher::random();
-        let mut rng = ChaCha20Rng::seed_from_u64(43);
         let mut payload = vec![5u8, 6u8, 7u8, 8u8];
         let mut encoded = fresh_record(&cipher, &[0u8; 4]);
         assert_eq!(encoded.len(), generated_sealed_encoded_len(payload.len()));
         let encoded_ptr = encoded.as_ptr();
 
-        assert!(cipher.seal_and_wipe_into_slice(
-            b"object:slot",
-            &mut payload,
-            &mut rng,
-            &mut encoded,
-        ));
+        assert!(cipher.seal_and_wipe_into_slice(b"object:slot", &mut payload, &mut encoded));
         assert_eq!(payload, vec![0u8; 4]);
         assert_eq!(encoded.as_ptr(), encoded_ptr);
         let reopened =
@@ -366,11 +345,10 @@ mod tests {
     #[test]
     fn sealed_codec_with_opened_payload_roundtrips() {
         let cipher = StoreCipher::random();
-        let mut rng = ChaCha20Rng::seed_from_u64(53);
         let payload = [9u8, 10u8, 11u8, 12u8];
         let mut payload_for_seal = payload.to_vec();
         let encoded = cipher
-            .seal_and_wipe_boxed(b"object:slot", &mut payload_for_seal, &mut rng)
+            .seal_and_wipe_boxed(b"object:slot", &mut payload_for_seal)
             .unwrap()
             .into_vec();
         let reopened =
@@ -388,11 +366,11 @@ mod tests {
         let mut payload_lhs = payload.to_vec();
         let mut payload_rhs = payload.to_vec();
         let encoded_lhs = cipher_lhs
-            .seal_and_wipe_boxed(b"object:slot", &mut payload_lhs, &mut lhs)
+            .seal_and_wipe_boxed(b"object:slot", &mut payload_lhs)
             .unwrap()
             .into_vec();
         let encoded_rhs = cipher_rhs
-            .seal_and_wipe_boxed(b"object:slot", &mut payload_rhs, &mut rhs)
+            .seal_and_wipe_boxed(b"object:slot", &mut payload_rhs)
             .unwrap()
             .into_vec();
         assert_eq!(encoded_lhs, encoded_rhs);

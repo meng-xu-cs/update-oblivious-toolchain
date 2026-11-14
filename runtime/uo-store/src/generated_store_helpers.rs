@@ -4,8 +4,6 @@
 
 use crate::codec::StoreCipher;
 use anyhow::{anyhow, bail, Result};
-use rand::SeedableRng;
-use rand_chacha::ChaCha20Rng;
 use uo_core::trace::{is_update_write, LogicalEvent, PhysicalWriteEvent, WriteClass};
 use uo_core::FixedBoxBuilder;
 use zeroize::Zeroize;
@@ -124,11 +122,7 @@ impl StoreSlotTable {
         })
     }
 
-    pub(super) fn with_bootstrapped_uo_slots<I>(
-        objects: I,
-        cipher: &StoreCipher,
-        rng: &mut ChaCha20Rng,
-    ) -> Result<Self>
+    pub(super) fn with_bootstrapped_uo_slots<I>(objects: I, cipher: &StoreCipher) -> Result<Self>
     where
         I: IntoIterator<Item = (String, usize)>,
         I::IntoIter: ExactSizeIterator,
@@ -136,7 +130,7 @@ impl StoreSlotTable {
         let objects = objects.into_iter();
         let mut slots = FixedBoxBuilder::new(objects.len());
         for (object, logical_len) in objects {
-            let value = bootstrap_uo_store_slot(&object, logical_len, cipher, rng)?;
+            let value = bootstrap_uo_store_slot(&object, logical_len, cipher)?;
             slots.push(StoreSlot { object, value })?;
         }
         Ok(Self {
@@ -265,19 +259,17 @@ pub(super) fn filler_boxed_uo_store_slot(
     aad: &str,
     logical_len: usize,
     cipher: &StoreCipher,
-    rng: &mut ChaCha20Rng,
 ) -> Result<Box<[u8]>> {
-    cipher.filler_boxed(aad.as_bytes(), logical_len, rng)
+    cipher.filler_boxed(aad.as_bytes(), logical_len)
 }
 
 pub(super) fn reseal_uo_store_slot_in_place(
     aad: &str,
     value: &mut [u8],
     cipher: &StoreCipher,
-    rng: &mut ChaCha20Rng,
     slot: &mut [u8],
 ) -> Result<()> {
-    if !cipher.seal_and_wipe_into_slice(aad.as_bytes(), value, rng, slot) {
+    if !cipher.seal_and_wipe_into_slice(aad.as_bytes(), value, slot) {
         return Err(anyhow!(
             "sealed slot buffer for {aad} does not hold a sealed record of the required public size"
         ));
@@ -289,22 +281,20 @@ pub(super) fn bootstrap_uo_store_slot(
     object: &str,
     logical_len: usize,
     cipher: &StoreCipher,
-    rng: &mut ChaCha20Rng,
 ) -> Result<Box<[u8]>> {
     let aad = uo_store_slot_aad(object);
-    filler_boxed_uo_store_slot(&aad, logical_len, cipher, rng)
+    filler_boxed_uo_store_slot(&aad, logical_len, cipher)
 }
 
 pub(super) fn reseal_uo_store_slot_and_trace_write(
     object: &str,
     value: &mut [u8],
     cipher: &StoreCipher,
-    rng: &mut ChaCha20Rng,
     slot: &mut [u8],
 ) -> Result<PhysicalWriteEvent> {
     let aad = uo_store_slot_aad(object);
     let replaced: Box<[u8]> = (&*slot).into();
-    reseal_uo_store_slot_in_place(&aad, value, cipher, rng, slot)?;
+    reseal_uo_store_slot_in_place(&aad, value, cipher, slot)?;
     if !is_update_write(&replaced, slot) {
         bail!(
             "internal error: the sealed write of {} is not an Update of the record it replaces",
@@ -325,15 +315,13 @@ impl UoObjectStore {
         I: IntoIterator<Item = (String, usize)>,
         I::IntoIter: ExactSizeIterator,
     {
-        let mut rng = ChaCha20Rng::seed_from_u64(0x5EED);
         let cipher = StoreCipher::random();
-        let slots = StoreSlotTable::with_bootstrapped_uo_slots(objects, &cipher, &mut rng)?;
+        let slots = StoreSlotTable::with_bootstrapped_uo_slots(objects, &cipher)?;
         Ok(Self {
             slots,
             physical_writes: StorePhysicalWriteTrace::new(),
             logical_events: StoreLogicalEventTrace::new(),
             metrics: StoreExecutionMetrics::default(),
-            rng,
             cipher,
         })
     }
@@ -370,7 +358,7 @@ impl ObjectStore for UoObjectStore {
             .ok_or_else(|| anyhow!("unknown UO object: {object}"))?;
         let value_len = value.len();
         let physical_write =
-            reseal_uo_store_slot_and_trace_write(object, value, &self.cipher, &mut self.rng, slot)?;
+            reseal_uo_store_slot_and_trace_write(object, value, &self.cipher, slot)?;
         self.logical_events.push(LogicalEvent {
             kind: "uo_cell_set".into(),
             object: object.into(),

@@ -1335,7 +1335,7 @@
   },
   "provenance": {
     "restart": "a seeded deployment restarts from a store in files; the sync policy is off, so the report times no device",
-    "toolchain_manifest_sha256": "8a9bd2cbc5247628d22639c196bdb1a44cabffda0ae4c9b694bae94f89521552"
+    "toolchain_manifest_sha256": "5efca88a614f46422956e5489133fca9afcf884e698227ad18cb36f92162cd21"
   },
   "restarts": [
     {

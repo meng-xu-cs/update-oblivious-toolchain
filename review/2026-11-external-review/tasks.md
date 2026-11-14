@@ -1600,6 +1600,24 @@ Acceptance: no seal takes a generator, no object keeps one after
 deployment, and the reports regenerate with only their source identities
 changed.
 
+As built. `StoreCipher::seal_and_wipe_boxed`, `seal_and_wipe_into_slice`
+and `filler_boxed` take no generator, nor do the helpers above them: the
+store's slot helpers, the object helpers' seals and reseals, and the ORAM
+codecs' seals, rewrites and accesses, with the ORAM state's `get`, `put`
+and `commit`, the tree store and `take_leaf`, which also discarded the one
+it was given. Their four Lean generators emit the changed files byte for
+byte. `UoObjectStore` neither keeps a generator nor seeds one from a
+constant. A runtime object no longer holds a generator: deployment draws
+the object's storage key, and a Path ORAM map's initial placement, from a
+generator seeded from the object's secret, and drops it. The generator is
+now read only there: by `StoreCipher::from_rng` and, for the private
+scheme, by `bootstrap_tree_storage`, which draws its nodes' first leaves.
+The pins that named the generator, 62 in the probe and in the Lean
+implementation interface, name the calls as they are; three that required
+a generator to be seeded or discarded are gone. The tests that sealed with
+a generator, so as to show that the nonce does not depend on it, seal
+without one.
+
 ### Issue 52 — Make the seal count of a dropped call a function of its entrypoint
 
 Source: Issue 24. Size: M. Depends on: Issue 24.

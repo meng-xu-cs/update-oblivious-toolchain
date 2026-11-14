@@ -7,7 +7,6 @@ use chacha20poly1305::aead::AeadInPlace;
 use chacha20poly1305::{ChaCha20Poly1305, KeyInit, Nonce, Tag};
 use rand::rngs::OsRng;
 use rand::RngCore;
-use rand_chacha::ChaCha20Rng;
 use std::fmt;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -210,27 +209,16 @@ impl StoreCipher {
         self.seals.store(seals, Ordering::SeqCst);
     }
 
-    pub fn seal_and_wipe_boxed(
-        &self,
-        aad: &[u8],
-        payload: &mut [u8],
-        rng: &mut ChaCha20Rng,
-    ) -> Result<Box<[u8]>> {
-        self::seal_and_wipe_boxed(self, aad, payload, rng)
+    pub fn seal_and_wipe_boxed(&self, aad: &[u8], payload: &mut [u8]) -> Result<Box<[u8]>> {
+        self::seal_and_wipe_boxed(self, aad, payload)
     }
 
-    pub fn seal_and_wipe_into_slice(
-        &self,
-        aad: &[u8],
-        payload: &mut [u8],
-        rng: &mut ChaCha20Rng,
-        out: &mut [u8],
-    ) -> bool {
-        self::seal_and_wipe_into_slice(self, aad, payload, rng, out)
+    pub fn seal_and_wipe_into_slice(&self, aad: &[u8], payload: &mut [u8], out: &mut [u8]) -> bool {
+        self::seal_and_wipe_into_slice(self, aad, payload, out)
     }
 
-    pub fn filler_boxed(&self, aad: &[u8], len: usize, rng: &mut ChaCha20Rng) -> Result<Box<[u8]>> {
-        self::filler_boxed(self, aad, len, rng)
+    pub fn filler_boxed(&self, aad: &[u8], len: usize) -> Result<Box<[u8]>> {
+        self::filler_boxed(self, aad, len)
     }
 
     pub fn with_opened_payload<T>(
@@ -248,18 +236,10 @@ pub(super) fn seal_and_wipe_boxed(
     cipher: &StoreCipher,
     aad: &[u8],
     payload: &mut [u8],
-    rng: &mut ChaCha20Rng,
 ) -> Result<Box<[u8]>> {
     let mut encoded = zeroed_boxed_bytes(generated_sealed_encoded_len(payload.len()))?;
     // A record that replaces none carries the first marker.
-    let sealed = seal_and_wipe_units(
-        cipher,
-        aad,
-        payload,
-        rng,
-        Some(SEALED_MARKERS[0]),
-        &mut encoded,
-    );
+    let sealed = seal_and_wipe_units(cipher, aad, payload, Some(SEALED_MARKERS[0]), &mut encoded);
     if !sealed {
         bail!("exact-size sealed output buffer did not fit");
     }
@@ -275,18 +255,16 @@ pub(super) fn seal_and_wipe_into_slice(
     cipher: &StoreCipher,
     aad: &[u8],
     payload: &mut [u8],
-    rng: &mut ChaCha20Rng,
     out: &mut [u8],
 ) -> bool {
     let marker = record_marker(out).and_then(next_marker);
-    seal_and_wipe_units(cipher, aad, payload, rng, marker, out)
+    seal_and_wipe_units(cipher, aad, payload, marker, out)
 }
 
 fn seal_and_wipe_units(
     cipher: &StoreCipher,
     aad: &[u8],
     payload: &mut [u8],
-    rng: &mut ChaCha20Rng,
     marker: Option<u8>,
     out: &mut [u8],
 ) -> bool {
@@ -298,9 +276,8 @@ fn seal_and_wipe_units(
     if out.len() != required_len {
         return false;
     }
-    // The nonce is the count of the seals under the key, not a draw from
-    // `rng`: a count cannot repeat, and 96 random bits can.
-    let _ = rng;
+    // The nonce is the count of the seals under the key, not a random draw:
+    // a count cannot repeat, and 96 random bits can.
     let Some(nonce_bytes) = cipher.next_seal_nonce() else {
         return false;
     };
@@ -321,14 +298,9 @@ fn seal_and_wipe_units(
     )
 }
 
-pub(super) fn filler_boxed(
-    cipher: &StoreCipher,
-    aad: &[u8],
-    len: usize,
-    rng: &mut ChaCha20Rng,
-) -> Result<Box<[u8]>> {
+pub(super) fn filler_boxed(cipher: &StoreCipher, aad: &[u8], len: usize) -> Result<Box<[u8]>> {
     let mut filler = zeroed_boxed_bytes(len)?;
-    seal_and_wipe_boxed(cipher, aad, &mut filler, rng)
+    seal_and_wipe_boxed(cipher, aad, &mut filler)
 }
 
 fn open_boxed(

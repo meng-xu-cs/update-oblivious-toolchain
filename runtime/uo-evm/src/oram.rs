@@ -706,7 +706,7 @@ impl OramState {
                 storage: OramStorage {
                     directory_pages: SealedPage::from_records(directory_pages)?,
                     buckets: SealedPage::from_records(buckets)?,
-                    access_counter_slot: bootstrap_oram_counter_slot(spec, &cipher, rng)?,
+                    access_counter_slot: bootstrap_oram_counter_slot(spec, &cipher)?,
                 },
                 access_counter: 0,
                 cipher,
@@ -723,9 +723,8 @@ impl OramState {
                 &cipher,
                 entries.as_ref(),
                 &empty_entry,
-                rng,
             )?;
-            let buckets = bootstrap_filler_buckets(spec, &parameters, &cipher, rng)?;
+            let buckets = bootstrap_filler_buckets(spec, &parameters, &cipher)?;
             let mut state = Self {
                 parameters,
                 empty_entry,
@@ -739,7 +738,7 @@ impl OramState {
                 storage: OramStorage {
                     directory_pages: SealedPage::from_records(directory_pages)?,
                     buckets: SealedPage::from_records(buckets)?,
-                    access_counter_slot: bootstrap_oram_counter_slot(spec, &cipher, rng)?,
+                    access_counter_slot: bootstrap_oram_counter_slot(spec, &cipher)?,
                 },
                 access_counter: 0,
                 cipher,
@@ -771,10 +770,9 @@ impl OramState {
                 entries.as_ref(),
                 stash.as_slice(),
                 &mut bootstrap_allocator,
-                rng,
             )?;
             bootstrap_allocator.finish()?;
-            let buckets = bootstrap_empty_path_buckets(spec, &parameters, &cipher, rng)?;
+            let buckets = bootstrap_empty_path_buckets(spec, &parameters, &cipher)?;
             let mut state = Self {
                 parameters,
                 empty_entry,
@@ -785,7 +783,7 @@ impl OramState {
                 storage: OramStorage {
                     directory_pages: SealedPage::from_records(directory_pages)?,
                     buckets: SealedPage::from_records(buckets)?,
-                    access_counter_slot: bootstrap_oram_counter_slot(spec, &cipher, rng)?,
+                    access_counter_slot: bootstrap_oram_counter_slot(spec, &cipher)?,
                 },
                 access_counter: 0,
                 cipher,
@@ -847,12 +845,11 @@ impl OramState {
         key: &Value,
         allocator: &mut AllocatorSession,
         leaf_coins: &mut PathOramLeafCoinSource,
-        rng: &mut ChaCha20Rng,
     ) -> Result<(Value, OramTranscript, bool)> {
         if self.parameters.is_surrogate() {
             run_surrogate_get(self, spec, key)
         } else {
-            self.path_get(spec, key, allocator, leaf_coins, rng)
+            self.path_get(spec, key, allocator, leaf_coins)
         }
     }
 
@@ -864,12 +861,11 @@ impl OramState {
         apply: bool,
         allocator: &mut AllocatorSession,
         leaf_coins: &mut PathOramLeafCoinSource,
-        rng: &mut ChaCha20Rng,
     ) -> Result<(OramTranscript, bool)> {
         if self.parameters.is_surrogate() {
             run_surrogate_put(self, spec, key, value, apply)
         } else {
-            self.path_put(spec, key, value, apply, allocator, leaf_coins, rng)
+            self.path_put(spec, key, value, apply, allocator, leaf_coins)
         }
     }
 
@@ -879,7 +875,6 @@ impl OramState {
         old: &Self,
         aborted: bool,
         allocator: &mut AllocatorSession,
-        rng: &mut ChaCha20Rng,
     ) -> Result<OramCommit> {
         if self.parameters.is_surrogate() {
             let mut next = self;
@@ -912,7 +907,6 @@ impl OramState {
                 next.entries.as_ref(),
                 &empty_entry,
                 allocator,
-                rng,
                 &mut next.storage.directory_pages,
                 &mut writes,
             )?;
@@ -922,7 +916,6 @@ impl OramState {
                 next_counter,
                 &next.cipher,
                 allocator,
-                rng,
                 &mut next.storage.access_counter_slot,
                 &mut writes,
             )?;
@@ -933,7 +926,6 @@ impl OramState {
                 next.entries.as_ref(),
                 old.access_counter,
                 allocator,
-                rng,
                 &mut next.storage.buckets,
                 &mut writes,
             )?;
@@ -946,7 +938,7 @@ impl OramState {
             // A Path ORAM map's writes reach the ORAM through `commit_put`,
             // one access each, and an aborted call masks them off rather than
             // rolling back, so nothing is left to do here.
-            let _ = (spec, old, aborted, allocator, rng);
+            let _ = (spec, old, aborted, allocator);
             Ok(OramCommit {
                 next: self,
                 writes: OramWriteBatch::empty(),
@@ -962,9 +954,8 @@ impl OramState {
         key: &Value,
         allocator: &mut AllocatorSession,
         leaf_coins: &mut PathOramLeafCoinSource,
-        rng: &mut ChaCha20Rng,
     ) -> Result<(Value, bool, Box<[OramTranscript]>, bool)> {
-        run_tree_get(self, spec, key, allocator, leaf_coins, rng)
+        run_tree_get(self, spec, key, allocator, leaf_coins)
     }
 
     /// The presence a write to the private scheme's tree reuses from the
@@ -1011,7 +1002,6 @@ impl OramState {
         aborted: bool,
         allocator: &mut AllocatorSession,
         leaf_coins: &mut PathOramLeafCoinSource,
-        rng: &mut ChaCha20Rng,
     ) -> Result<Box<[OramTranscript]>> {
         let (transcripts, overflowed, failed) = run_tree_put(
             self,
@@ -1021,7 +1011,6 @@ impl OramState {
             put.apply & !aborted,
             allocator,
             leaf_coins,
-            rng,
         )?;
         // The call decided every write's overflow with the map's pending
         // size, so a write that overflows or fails here means the decision
@@ -1042,9 +1031,8 @@ impl OramState {
         aborted: bool,
         allocator: &mut AllocatorSession,
         leaf_coins: &mut PathOramLeafCoinSource,
-        rng: &mut ChaCha20Rng,
     ) -> Result<OramTranscript> {
-        run_path_commit_put(self, spec, put, aborted, allocator, leaf_coins, rng)
+        run_path_commit_put(self, spec, put, aborted, allocator, leaf_coins)
     }
 
     fn path_get(
@@ -1053,9 +1041,8 @@ impl OramState {
         key: &Value,
         allocator: &mut AllocatorSession,
         leaf_coins: &mut PathOramLeafCoinSource,
-        rng: &mut ChaCha20Rng,
     ) -> Result<(Value, OramTranscript, bool)> {
-        run_path_get(self, spec, key, allocator, leaf_coins, rng)
+        run_path_get(self, spec, key, allocator, leaf_coins)
     }
 
     fn path_put(
@@ -1066,9 +1053,8 @@ impl OramState {
         apply: bool,
         allocator: &mut AllocatorSession,
         leaf_coins: &mut PathOramLeafCoinSource,
-        rng: &mut ChaCha20Rng,
     ) -> Result<(OramTranscript, bool)> {
-        run_path_put(self, spec, key, value, apply, allocator, leaf_coins, rng)
+        run_path_put(self, spec, key, value, apply, allocator, leaf_coins)
     }
 }
 
@@ -1221,7 +1207,6 @@ mod tests {
                 &state.entries,
                 &stash,
                 &mut allocator,
-                &mut rng,
             )
             .unwrap(),
         )
@@ -1261,9 +1246,7 @@ mod tests {
         position_map: &[Option<usize>],
         directory: &[(usize, Value)],
         stash: &[OramBlock],
-        seed: u64,
     ) {
-        let mut rng = ChaCha20Rng::seed_from_u64(seed);
         let mut allocator = allocator_for_path_oram(&state.parameters);
         let masked_position_map = masked_position_map_from_options(position_map);
         let mut entries =
@@ -1281,7 +1264,6 @@ mod tests {
                 &entries,
                 stash,
                 &mut allocator,
-                &mut rng,
             )
             .unwrap(),
         )
@@ -1397,7 +1379,6 @@ mod tests {
 
         let mut allocator = allocator_for_path_oram(&state.parameters);
         let mut leaf_coins = PathOramLeafCoinSource::random();
-        let mut rng = ChaCha20Rng::seed_from_u64(0xC1A1);
         state
             .put(
                 &spec,
@@ -1406,7 +1387,6 @@ mod tests {
                 true,
                 &mut allocator,
                 &mut leaf_coins,
-                &mut rng,
             )
             .unwrap();
         allocator.finish().unwrap();
@@ -1466,7 +1446,6 @@ mod tests {
                 &Value::Address([0xEE; 20]),
                 &mut allocator,
                 &mut leaf_coins,
-                &mut rng,
             )
             .unwrap_err()
             .to_string();
@@ -1563,9 +1542,8 @@ mod tests {
         };
 
         let mut commit_allocator = allocator_for_path_oram(&new.parameters);
-        let mut commit_rng = ChaCha20Rng::seed_from_u64(0x9191);
         let commit = new
-            .commit(&spec, &old, true, &mut commit_allocator, &mut commit_rng)
+            .commit(&spec, &old, true, &mut commit_allocator)
             .unwrap();
         commit_allocator.finish().unwrap();
 
@@ -1639,7 +1617,6 @@ mod tests {
                 &Value::Address([0x22; 20]),
                 &mut allocator,
                 &mut leaf_coins,
-                &mut rng,
             )
             .unwrap()
             .0;
@@ -1668,7 +1645,6 @@ mod tests {
                 false,
                 &mut allocator,
                 &mut leaf_coins,
-                &mut rng,
             )
             .unwrap();
         allocator.finish().unwrap();
@@ -1821,7 +1797,6 @@ mod tests {
     fn path_oram_metadata_decode_rejects_stash_overflow() {
         let spec = path_oram_spec();
         let parameters = OramParameters::for_spec(&spec).unwrap();
-        let mut rng = ChaCha20Rng::seed_from_u64(0x5EED);
         let cipher = StoreCipher::random();
         let mut encode_allocator = AllocatorSession::new(AllocatorPlan {
             arena_bytes: 0,
@@ -1853,7 +1828,6 @@ mod tests {
             &directory,
             &stash,
             &mut encode_allocator,
-            &mut rng,
         )
         .unwrap();
         let mut decode_allocator = AllocatorSession::new(AllocatorPlan {
@@ -1883,7 +1857,6 @@ mod tests {
         let spec = path_oram_spec();
         let parameters = OramParameters::for_spec(&spec).unwrap();
         assert!(parameters.stash_pages() > 1);
-        let mut rng = ChaCha20Rng::seed_from_u64(0xD1CE7A11);
         let cipher = StoreCipher::random();
         let mut encode_allocator = AllocatorSession::new(AllocatorPlan {
             arena_bytes: 0,
@@ -1908,7 +1881,6 @@ mod tests {
             &directory,
             &stash,
             &mut encode_allocator,
-            &mut rng,
         )
         .unwrap();
         assert_eq!(pages.len(), parameters.metadata_pages);
@@ -1990,8 +1962,6 @@ mod tests {
         let mut second_allocator = allocator_for_path_oram(&second.parameters);
         let mut first_leaf_coins = PathOramLeafCoinSource::random();
         let mut second_leaf_coins = PathOramLeafCoinSource::random();
-        let mut first_rng = ChaCha20Rng::seed_from_u64(0xD3117E);
-        let mut second_rng = ChaCha20Rng::seed_from_u64(0xD3117E);
 
         let (first_transcript, first_overflowed) = first
             .put(
@@ -2001,7 +1971,6 @@ mod tests {
                 true,
                 &mut first_allocator,
                 &mut first_leaf_coins,
-                &mut first_rng,
             )
             .unwrap();
         let (second_transcript, second_overflowed) = second
@@ -2012,7 +1981,6 @@ mod tests {
                 true,
                 &mut second_allocator,
                 &mut second_leaf_coins,
-                &mut second_rng,
             )
             .unwrap();
 
@@ -2089,7 +2057,6 @@ mod tests {
             &position_map,
             &[(3, Value::Address([0x77; 20]))],
             &[],
-            0x7A1F,
         );
         let leaf_bucket = state.parameters.leaf_count() - 1 + leaf;
         let bucket = oram_bucket_with_live_blocks(&spec, 0, leaf_bucket, 1, &[block]).unwrap();
@@ -2097,7 +2064,7 @@ mod tests {
         let mut payload = oram_bucket_bytes(&bucket, &spec).unwrap();
         state.storage.buckets[leaf_bucket] = state
             .cipher
-            .seal_and_wipe_boxed(aad.as_bytes(), &mut payload, &mut rng)
+            .seal_and_wipe_boxed(aad.as_bytes(), &mut payload)
             .unwrap()
             .into();
 
@@ -2110,7 +2077,6 @@ mod tests {
                 &Value::Address([0x77; 20]),
                 &mut allocator,
                 &mut leaf_coins,
-                &mut rng,
             )
             .unwrap();
         allocator.finish().unwrap();
@@ -2142,14 +2108,13 @@ mod tests {
             &position_map,
             &[(0, Value::Address([0x44; 20]))],
             std::slice::from_ref(&duplicate),
-            0xBAD5EED,
         );
         let bucket = oram_bucket_with_live_blocks(&spec, 0, 0, 1, &[duplicate]).unwrap();
         let aad = oram_bucket_aad(&spec, 0);
         let mut payload = oram_bucket_bytes(&bucket, &spec).unwrap();
         state.storage.buckets[0] = state
             .cipher
-            .seal_and_wipe_boxed(aad.as_bytes(), &mut payload, &mut rng)
+            .seal_and_wipe_boxed(aad.as_bytes(), &mut payload)
             .unwrap()
             .into();
 
@@ -2162,7 +2127,6 @@ mod tests {
                 &Value::Address([0x44; 20]),
                 &mut allocator,
                 &mut leaf_coins,
-                &mut rng,
             )
             .unwrap();
         assert!(failed);
@@ -2191,7 +2155,6 @@ mod tests {
             &position_map,
             &[(0, Value::Address([0x55; 20]))],
             std::slice::from_ref(&block),
-            0xBADC0DE,
         );
 
         let mut allocator = allocator_for_path_oram(&state.parameters);
@@ -2203,7 +2166,6 @@ mod tests {
                 &Value::Address([0x55; 20]),
                 &mut allocator,
                 &mut leaf_coins,
-                &mut rng,
             )
             .unwrap();
         assert!(failed);
@@ -2233,7 +2195,6 @@ mod tests {
             &position_map,
             &[(0, Value::Address([0x66; 20]))],
             &[],
-            0xFACE123,
         );
         let off_path_bucket = 1usize;
         assert!(!bucket_on_leaf_path(
@@ -2246,7 +2207,7 @@ mod tests {
         let mut payload = oram_bucket_bytes(&bucket, &spec).unwrap();
         state.storage.buckets[off_path_bucket] = state
             .cipher
-            .seal_and_wipe_boxed(aad.as_bytes(), &mut payload, &mut rng)
+            .seal_and_wipe_boxed(aad.as_bytes(), &mut payload)
             .unwrap()
             .into();
 
@@ -2262,7 +2223,6 @@ mod tests {
                 &Value::Address([0x99; 20]),
                 &mut allocator,
                 &mut leaf_coins,
-                &mut rng,
             )
             .unwrap_err();
         assert!(err
