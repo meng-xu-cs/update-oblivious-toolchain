@@ -363,13 +363,15 @@ proved.
   [`path-oram.md`](./path-oram.md).
 - On both Path ORAM schemes, a call reads only the paths it accesses. It
   starts from the map's counter and metadata pages, which its first access
-  also reads, and rebuilds each slot's leaf and key and the stash in the
+  also names, and rebuilds each slot's leaf and key and the stash in the
   enclave; a read takes the key's value from the key's block once its path is
   read. The call-start reads follow a public pattern and are not in the
-  trace, so the leakage claim is unaffected; `results/overheads.json` lists
-  them beside the traced counts (`call_start_reads`). Every access rewrites
-  every metadata page, and its trace reads them all, so its cost is linear in
-  the map's capacity.
+  trace as such, so the leakage claim is unaffected; `results/overheads.json`
+  lists them beside the traced counts (`call_start_reads`). The call holds
+  those records, so its later accesses open none of them again, though the
+  trace names them at each (see The Storage Boundary below). Every access
+  rewrites every metadata page, and its trace reads them all, so its cost is
+  linear in the map's capacity.
 - Legacy/surrogate ORAM paths remain available for benchmarking and historical
   comparison, not for the strengthened proof-grade claim.
 - Executable insecure raw baselines (the `insecure-eval-raw` evaluation feature,
@@ -419,6 +421,65 @@ The components are interpreted as follows:
 
 The concrete SGX/TEE observer pins live in
 [`runtime/tee-observer.md`](./runtime/tee-observer.md).
+
+### The Storage Boundary
+
+`storage_trace` is written by the runtime's call recorder, which the code
+that performs an access calls. A second account of a call's storage comes
+from the other side. A deployed contract keeps its sealed records in a
+storage adapter (`StorageAdapter` in `runtime/uo-store/src/storage.rs`, in
+memory or in files). The runtime names to it every record it opens and
+hands it every record it seals, and the adapter logs the read with the
+record it keeps and the write with the class it computes from the record it
+kept and the one it is handed (invariant 18 of
+[`runtime/secret-state.md`](./runtime/secret-state.md)).
+
+`results/storage_boundary.json` runs every benchmark on every sealed
+backend, 14 pairs and 47 calls, and compares the adapter's log of each call
+with the call's trace:
+
+- The adapter's writes are the trace's writes of sealed objects, one for
+  one and in order (4,395), and the adapter classifies each as an `Update`.
+- The adapter's reads of an exact object (a cell, an array, a full-scan
+  map) are the trace's reads of it.
+- The adapter's reads of a Path ORAM map are the trace's reads of it but
+  for the map's counter and metadata pages. The runtime opens those once,
+  when the call loads the map, and holds them through the call. The trace
+  names the counter at every access, and the metadata pages at every access
+  of the local scheme and every operation of the tree. The adapter sees
+  each once. Over the 47 calls the trace names 4,517 reads of sealed
+  objects and the adapter sees 3,862; the other 655 name a counter or a
+  page again.
+
+So every read the adapter sees is one the trace names, and the trace names
+more reads of a Path ORAM map than cross the boundary. The reads it names
+again are at positions the public parameters fix, so what the adapter sees
+is a function of the trace, and the leakage claim, which is about the
+trace, covers it. The modeled cost charges the reads the trace names: for a
+call that makes several accesses to a map of the local scheme it charges up
+to twice the bytes that cross (103,680 against 51,712 for ERC20Lite
+`transferFrom`). Tracing a map's counter and metadata pages once per call,
+as the runtime reads them, is Issue 57 of the external review. This
+comparison is empirical, over the benchmarks; the places where a record
+crosses are source-frozen (`sealed_records_cross_the_storage_boundary` in
+`runtime_boundary_validation.json`, and three scenarios of
+`tamper_validation.json`). No Lean statement is about the adapter.
+
+A call's records are pending in the adapter until the call is committed
+there, with the commit metadata: the freshness counters, whether the
+contract is initialized and the digest of the public state, under a tag
+whose key derives from the master secret. A call that is dropped leaves the
+adapter as it was. The adapter takes a sealed record only under a nonce it
+has reserved for the record's key, and a reservation is durable before it
+takes effect, so a runtime that restarts from the adapter's files, at the
+counts they reserve, repeats no nonce. The report restarts each benchmark
+from files and checks that its reads answer as before and that no nonce
+repeats. A restart assumes the files are the ones the runtime wrote last:
+the rollback resistance of the TEE deployment assumptions. A sealed record
+is authenticated with its location, not its version, so a record replaced
+by an older record of its location is not detected (a digest tree over the
+records is Issue 44). Only a seeded deployment, which exists in test and
+diagnostics builds, can restart.
 
 ### The Kernel's Operators
 
@@ -609,6 +670,9 @@ This repository does not claim:
   electromagnetic, or wall-clock obliviousness
 - value-level equality between the Lean mock hash and real runtime Keccak
   outputs
+- a restart of a deployment from OS randomness, whose master secret is in
+  memory alone, or the detection of a store that was rolled back or holds
+  an older record of a location (see The Storage Boundary)
 - Solidity 0.8 checked-arithmetic, division/modulo-by-zero, ABI, revert, or
   context-variable semantics beyond the admitted public environment fields
   (`msg.sender`, `tx.origin`, `block.number`, `block.timestamp`, and

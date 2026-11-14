@@ -43,7 +43,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Instant;
 use uo_core::{CompiledArtifact, ExecutionTrace, ProgramMode, Value};
-use uo_evm::{ContractInstance, InstrumentationTotals};
+use uo_evm::{ContractInstance, FileStorage, InstrumentationTotals, SharedStorage, SyncPolicy};
 
 pub(crate) const CAPACITY_SWEEP_SCHEMA: &str = "uo-capacity-sweep-v4";
 
@@ -122,8 +122,92 @@ impl OccupancyLevel {
     }
 }
 
+/// Where the sweep's maps keep their sealed records.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SweepStorage {
+    /// In memory: a commit persists nothing.
+    Memory,
+    /// In files: a commit appends the call's records to a journal, and
+    /// syncs it or leaves that to the operating system.
+    Files { synced: bool },
+}
+
+/// The journal length at which a file-backed sweep store writes a snapshot.
+const SWEEP_CHECKPOINT_BYTES: u64 = 64 << 20;
+
+impl SweepStorage {
+    /// `UO_SWEEP_STORAGE` is `memory`, `files` or `files_synced`. The quick
+    /// profile keeps its records in memory; the full profile, whose
+    /// latencies a claim rests on, keeps them in files and syncs every
+    /// commit, so that a call's latency includes its persistence.
+    fn from_env(quick: bool) -> Self {
+        match std::env::var("UO_SWEEP_STORAGE").ok().as_deref() {
+            Some("memory") => Self::Memory,
+            Some("files") => Self::Files { synced: false },
+            Some("files_synced") => Self::Files { synced: true },
+            _ if quick => Self::Memory,
+            _ => Self::Files { synced: true },
+        }
+    }
+
+    fn description(self) -> &'static str {
+        match self {
+            Self::Memory => "the maps keep their sealed records in memory; a commit persists nothing",
+            Self::Files { synced: false } => {
+                "the maps keep their sealed records in files; a commit appends the call's records to a journal, and the device is left to the operating system"
+            }
+            Self::Files { synced: true } => {
+                "the maps keep their sealed records in files; a commit appends the call's records to a journal and syncs it before the call returns"
+            }
+        }
+    }
+}
+
+/// The store of one map of the sweep, and the directory that holds it if it
+/// is in files, which goes when the map does.
+struct SweepStore {
+    storage: SharedStorage,
+    directory: Option<PathBuf>,
+}
+
+impl SweepStore {
+    fn create(storage: SweepStorage, label: &str, capacity: usize) -> Result<Self> {
+        let SweepStorage::Files { synced } = storage else {
+            return Ok(Self {
+                storage: SharedStorage::memory(),
+                directory: None,
+            });
+        };
+        let directory = std::env::temp_dir().join(format!(
+            "uo-capacity-sweep-{}-{label}-{capacity}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&directory);
+        let sync = if synced {
+            SyncPolicy::Always
+        } else {
+            SyncPolicy::Never
+        };
+        let files =
+            FileStorage::create(&directory, sync)?.with_checkpoint_bytes(SWEEP_CHECKPOINT_BYTES);
+        Ok(Self {
+            storage: SharedStorage::new(files),
+            directory: Some(directory),
+        })
+    }
+}
+
+impl Drop for SweepStore {
+    fn drop(&mut self) {
+        if let Some(directory) = self.directory.as_ref() {
+            let _ = fs::remove_dir_all(directory);
+        }
+    }
+}
+
 struct SweepParameters {
     profile: SweepProfile,
+    storage: SweepStorage,
     capacities: Vec<usize>,
     /// The shares of its capacity a map is filled to, after its two keys.
     occupancy_percents: Vec<u64>,
@@ -150,6 +234,7 @@ impl SweepParameters {
         let largest = capacities.iter().copied().max().unwrap_or(0);
         Self {
             profile,
+            storage: SweepStorage::from_env(quick),
             occupancy_percents: env_usize_list("UO_SWEEP_OCCUPANCY_PERCENTS", &[25, 50, 90, 100])
                 .into_iter()
                 .filter(|percent| (1..=100).contains(percent))
@@ -553,6 +638,8 @@ struct SweepSample {
     receipt_json_bytes: usize,
     latency_ns: u128,
     totals: InstrumentationTotals,
+    /// Bytes the call's commit appended to the store's files.
+    persisted_bytes: u64,
     /// Serializing the call's trace to JSON, after the call.
     json_ns: u128,
     rss_before_kb: u64,
@@ -561,11 +648,12 @@ struct SweepSample {
 }
 
 impl SweepSample {
-    /// The call without its witnesses and proof objects: the runtime's own
-    /// work, staging and loading included.
+    /// The call without its witnesses, its proof objects and the store's
+    /// commit: the runtime's own work, staging and loading included.
     fn runtime_ns(&self) -> u128 {
-        self.latency_ns
-            .saturating_sub(self.totals.witness_ns + self.totals.proof_objects_ns)
+        self.latency_ns.saturating_sub(
+            self.totals.witness_ns + self.totals.proof_objects_ns + self.totals.storage_commit_ns,
+        )
     }
 
     /// The runtime's own work without staging and loading.
@@ -637,10 +725,12 @@ fn run_sweep_call(
     uo_evm::take_instrumentation_totals();
     reset_peak_rss();
     let rss_before_kb = read_rss_kb();
+    let persisted_before = instance.storage_stats().persisted_bytes;
     let started = Instant::now();
     let result = instance.call(entrypoint, plan.args)?;
     let latency_ns = started.elapsed().as_nanos();
     let totals = uo_evm::take_instrumentation_totals();
+    let persisted_bytes = instance.storage_stats().persisted_bytes - persisted_before;
     let peak_rss_kb = read_max_rss_kb().unwrap_or(0);
 
     let aborts = operation == SweepOperation::Abort;
@@ -696,6 +786,7 @@ fn run_sweep_call(
         receipt_json_bytes,
         latency_ns,
         totals,
+        persisted_bytes,
         json_ns,
         rss_before_kb,
         peak_rss_kb,
@@ -888,6 +979,14 @@ fn operation_row(
         (
             "p50_json_serialization_ns",
             median(&|sample| sample.json_ns),
+        ),
+        (
+            "p50_persistence_ns",
+            median(&|sample| sample.totals.storage_commit_ns),
+        ),
+        (
+            "p50_persisted_bytes",
+            median(&|sample| u128::from(sample.persisted_bytes)),
         ),
         (
             "p50_rss_before_bytes",
@@ -1156,7 +1255,12 @@ fn sweep_backend_capacity(
         "timing": { "compile_ms": compile_ms },
     }));
 
-    let mut instance = ContractInstance::deploy_with_seed(artifact.clone(), PROBE_DEPLOY_SEED)?;
+    let store = SweepStore::create(parameters.storage, label, capacity)?;
+    let mut instance = ContractInstance::deploy_with_seed_and_storage(
+        artifact.clone(),
+        PROBE_DEPLOY_SEED,
+        store.storage.clone(),
+    )?;
     // The first call would decode the witness the runtime keeps; do it now.
     instance.keep_decoded_position_map_witness()?;
     let mut keys = SweepKeys::new(capacity);
@@ -1505,6 +1609,7 @@ fn sweep_with_parameters(parameters: &SweepParameters) -> Result<JsonValue> {
         "provenance": {
             "toolchain_manifest_sha256": toolchain_manifest_sha256,
             "peak_rss": peak_rss_scope,
+            "storage": parameters.storage.description(),
         },
     });
     let digest = counts_sha256(&report);
@@ -1641,7 +1746,7 @@ mod tests {
     use super::{
         bootstrap_ci95, capacity_sweep_break_even, counts_sha256, mean_statistic, median_statistic,
         plan_sweep_call, workload_schedule, OccupancyLevel, SplitMix64, SweepCost, SweepCosts,
-        SweepEffect, SweepKeys, SweepOperation, SweepParameters, SweepProfile,
+        SweepEffect, SweepKeys, SweepOperation, SweepParameters, SweepProfile, SweepStorage,
     };
     use serde_json::json;
 
@@ -1699,8 +1804,9 @@ mod tests {
 
     #[test]
     fn the_counts_of_a_sweep_repeat_between_runs() {
-        let parameters = SweepParameters {
+        let parameters = |storage: SweepStorage| SweepParameters {
             profile: SweepProfile::Quick,
+            storage,
             capacities: vec![4, 16],
             occupancy_percents: vec![50, 100],
             occupancy_capacity_limit: 16,
@@ -1711,10 +1817,26 @@ mod tests {
             // No Lean check: the test needs no built checker.
             lean_capacities: Vec::new(),
         };
-        let first = super::sweep_with_parameters(&parameters).unwrap();
-        let second = super::sweep_with_parameters(&parameters).unwrap();
+        let first = super::sweep_with_parameters(&parameters(SweepStorage::Memory)).unwrap();
+        let second = super::sweep_with_parameters(&parameters(SweepStorage::Memory)).unwrap();
         assert_eq!(first["schema"], json!("uo-capacity-sweep-v4"));
         assert_eq!(first["counts_sha256"], second["counts_sha256"]);
+        // Where the maps keep their records changes no count: only a
+        // commit's persistence, which is under `timing`.
+        let on_files =
+            super::sweep_with_parameters(&parameters(SweepStorage::Files { synced: false }))
+                .unwrap();
+        assert_eq!(first["counts_sha256"], on_files["counts_sha256"]);
+        let persisted = |report: &serde_json::Value| -> u64 {
+            report["rows"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|row| row["timing"]["p50_persisted_bytes"].as_u64().unwrap())
+                .sum()
+        };
+        assert_eq!(persisted(&first), 0);
+        assert!(persisted(&on_files) > 0);
         assert_eq!(first["counts_sha256"], json!(counts_sha256(&first)));
         for check in [
             "every_cell_measured",
@@ -1850,6 +1972,7 @@ mod tests {
 
         let parameters = |limit: usize| SweepParameters {
             profile: SweepProfile::Quick,
+            storage: SweepStorage::Memory,
             capacities: vec![4, 64],
             occupancy_percents: vec![25, 50, 90, 100],
             occupancy_capacity_limit: limit,

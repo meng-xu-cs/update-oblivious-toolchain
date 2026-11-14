@@ -11,8 +11,11 @@ use rand_chacha::ChaCha20Rng;
 use std::fmt;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use uo_core::trace::WriteClass;
 use uo_core::FixedBoxBuilder;
 use zeroize::Zeroize;
+
+use crate::storage::StorageHandle;
 
 use super::{
     generated_sealed_content_len, generated_sealed_encoded_len, next_marker, read_units,
@@ -21,10 +24,13 @@ use super::{
 
 /// A storage key and the count of the seals made under it. Every copy of the
 /// cipher shares the count, so the nonce of a seal, which is the count, is
-/// never used twice under the key.
+/// never used twice under the key. Once its object is deployed with a store,
+/// the cipher also holds the object's part of that store: the records sealed
+/// under the key cross to the store, and come back from it, here.
 pub struct StoreCipher {
     key: [u8; 32],
     seals: Arc<AtomicU64>,
+    storage: Option<StorageHandle>,
 }
 
 impl PartialEq for StoreCipher {
@@ -108,6 +114,7 @@ impl StoreCipher {
         Self {
             key,
             seals: Arc::new(AtomicU64::new(0)),
+            storage: None,
         }
     }
 
@@ -120,7 +127,70 @@ impl StoreCipher {
         Self {
             key: self.key,
             seals: Arc::clone(&self.seals),
+            storage: self.storage.clone(),
         }
+    }
+
+    /// Keep the records sealed under this key in `storage` from now on.
+    pub fn attach_storage(&mut self, storage: StorageHandle) {
+        self.storage = Some(storage);
+    }
+
+    /// The store that keeps the records sealed under this key, if the
+    /// cipher's object was deployed with one.
+    pub fn storage(&self) -> Option<&StorageHandle> {
+        self.storage.as_ref()
+    }
+
+    /// The count of the seals made under this key.
+    pub fn seal_count(&self) -> u64 {
+        self.seals.load(Ordering::SeqCst)
+    }
+
+    /// Make no seal with a count below `count`. A runtime that restarts
+    /// resumes at the count its store has reserved, so it repeats no nonce.
+    pub fn resume_seal_count(&self, count: u64) {
+        self.seals.fetch_max(count, Ordering::SeqCst);
+    }
+
+    /// The runtime is about to open `record`, its copy of the record at
+    /// `location`. The store must keep the same bytes there, and it logs
+    /// the read.
+    pub fn check_stored_record(&self, location: &str, record: &[u8]) -> Result<()> {
+        match &self.storage {
+            Some(storage) => storage.read(location, record),
+            None => Ok(()),
+        }
+    }
+
+    /// Hand the store `record`, which was sealed under this key over the
+    /// record at `location`. The store has reserved the counts of the seals
+    /// made so far before it is handed the record. It classifies the write
+    /// from the record it kept, and the write must be an `Update` there too.
+    pub fn store_sealed_record(&self, location: &str, record: &[u8]) -> Result<()> {
+        let Some(storage) = &self.storage else {
+            return Ok(());
+        };
+        storage.reserve_seals(self.seal_count())?;
+        let class = storage.write(location, record)?;
+        if class != WriteClass::Update {
+            bail!(
+                "internal error: the store classifies the sealed write of {} as {} and not as an Update",
+                location,
+                class.as_refinement_label()
+            );
+        }
+        Ok(())
+    }
+
+    /// Hand the store `record` as the first record of `location`, with the
+    /// counts of the seals made so far reserved before.
+    pub fn store_first_record(&self, location: &str, record: &[u8]) -> Result<()> {
+        let Some(storage) = &self.storage else {
+            return Ok(());
+        };
+        storage.reserve_seals(self.seal_count())?;
+        storage.create(location, record)
     }
 
     /// The nonce of the next seal under this key, or `None` once the count

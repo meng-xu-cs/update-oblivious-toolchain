@@ -22,6 +22,7 @@ use uo_kernel_runtime::{
     RuntimeKernelConfidentialStore, RuntimeKernelMachine as PublicRuntimeKernel,
     RuntimeKernelObjectStore, RuntimeKernelStatementTrace,
 };
+use uo_store::SharedStorage;
 
 const CIPHERTEXT_STORE_DIGEST_DOMAIN: &[u8] = b"uo-runtime/ciphertext-store/v1";
 
@@ -446,12 +447,18 @@ impl RuntimeObjectTable {
 }
 
 impl ContractRuntime {
+    /// The runtime of a contract's objects behind `storage`. A deployment
+    /// instantiates each object and hands the store its records. A restart
+    /// (`restore`) instantiates each object from the same secret and gives
+    /// it the state the store keeps for it.
     pub(in crate::runtime) fn deploy(
         contract_state: &[StateObject],
         master: &RuntimeMasterSecret,
+        storage: &SharedStorage,
+        restore: bool,
     ) -> Result<Self> {
         Ok(Self {
-            committed: CommittedRuntimeState::deploy(contract_state, master)?,
+            committed: CommittedRuntimeState::deploy(contract_state, master, storage, restore)?,
             #[cfg(any(test, feature = "diagnostics"))]
             kept_witness: None,
             #[cfg(any(test, feature = "diagnostics"))]
@@ -859,14 +866,23 @@ impl ContractRuntime {
 }
 
 impl CommittedRuntimeState {
-    fn deploy(contract_state: &[StateObject], master: &RuntimeMasterSecret) -> Result<Self> {
+    fn deploy(
+        contract_state: &[StateObject],
+        master: &RuntimeMasterSecret,
+        storage: &SharedStorage,
+        restore: bool,
+    ) -> Result<Self> {
         let mut objects = FixedBoxBuilder::new(contract_state.len());
         for spec in contract_state {
             let secret = master.object_secret(spec.id, &spec.name)?;
-            objects.push(RuntimeObjectEntry::new(
-                spec.id,
-                RuntimeObject::instantiate(spec, &secret)?,
-            ))?;
+            let mut object = RuntimeObject::instantiate(spec, &secret)?;
+            if restore {
+                let mut allocator = public_state_snapshot_allocator()?;
+                object.restore_from_storage(storage, &mut allocator)?;
+            } else {
+                object.deploy_into_storage(storage)?;
+            }
+            objects.push(RuntimeObjectEntry::new(spec.id, object))?;
         }
         let mut objects = objects.finish()?;
         objects.sort_by_key(|entry| entry.object_id);

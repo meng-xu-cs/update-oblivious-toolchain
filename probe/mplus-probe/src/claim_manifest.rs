@@ -222,6 +222,27 @@ const CLAIM_ENTRIES: &[ClaimEntry] = &[
         validation_command: "cargo run -q -p mplus-probe -- --only runtime-boundary-validation --out-dir results",
     },
     ClaimEntry {
+        id: "storage-boundary-log",
+        category: "claim",
+        text: "Every sealed record the runtime opens or seals crosses to a storage adapter, which logs the read with the record it keeps and the write with the class it computes from its own records. On every benchmark and sealed backend the adapter's writes are the trace's writes of sealed objects, each an Update, and its reads are the trace's reads, except that a Path ORAM map's counter and metadata pages cross once per call where the trace names them at every access or operation. A runtime restarted from the adapter's files answers as before and repeats no nonce. Empirically tested over the benchmarks; the places where a record crosses are source-frozen.",
+        status: STATUS_EMPIRICAL,
+        doc_anchor: "storage adapter",
+        source_files: &["runtime/uo-store/src/storage.rs"],
+        lean_modules: &["proof/lean/UOToolchain/RuntimeImplementationInterface.lean"],
+        runtime_compiler_files: &[
+            "runtime/uo-store/src/generated_surface.rs",
+            "runtime/uo-evm/src/generated_object_helpers.rs",
+            "runtime/uo-evm/src/engine.rs",
+            "runtime/uo-evm/src/store_meta.rs",
+        ],
+        benchmark_result_files: &[
+            "results/storage_boundary.json",
+            "results/runtime_boundary_validation.json",
+        ],
+        validation_command:
+            "cargo run -q -p mplus-probe -- --only storage-boundary --out-dir results",
+    },
+    ClaimEntry {
         id: "dsl-admission-subset",
         category: "claim",
         text: "uo-solc admits the uo-solidity-like-dsl-v1 subset and rejects every unsupported feature with a diagnostic that names it; admission is empirically exercised, not a semantic proof.",
@@ -351,6 +372,19 @@ const CLAIM_ENTRIES: &[ClaimEntry] = &[
         validation_command: "scripts/lean_assumption_budget.sh",
     },
     // ---------------------------------- Non-claims ----------------------------------
+    ClaimEntry {
+        id: "nonclaim-production-restart-and-store-rollback",
+        category: "non_claim",
+        text: "Not claimed: a restart of a deployment from OS randomness, whose master secret is in memory alone, or the detection of a store that was rolled back or holds an older record of a location. A restart relies on the rollback resistance of the TEE deployment assumptions.",
+        status: STATUS_NON_CLAIM,
+        doc_anchor: "a restart of a deployment from OS randomness",
+        source_files: &["docs/claim-boundary.md"],
+        lean_modules: &[],
+        runtime_compiler_files: &["runtime/uo-evm/src/engine.rs"],
+        benchmark_result_files: &["results/storage_boundary.json"],
+        validation_command:
+            "cargo run -q -p mplus-probe -- --only storage-boundary --out-dir results",
+    },
     ClaimEntry {
         id: "nonclaim-machine-code-equivalence",
         category: "non_claim",

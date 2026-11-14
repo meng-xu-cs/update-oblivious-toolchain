@@ -12,6 +12,21 @@ use generated_codec::{
     SEALED_NONCE_BYTES, SEALED_TAG_BYTES,
 };
 
+/// The count a sealed record's nonce carries: how many records were sealed
+/// under its key before it. `None` if the bytes are not a sealed record. The
+/// count is in the clear, as the nonce is.
+pub fn sealed_record_seal_count(record: &[u8]) -> Option<u64> {
+    record_marker(record)?;
+    let nonce = record.get(1..1 + SEALED_NONCE_BYTES)?;
+    let (zeros, counter) = nonce.split_at(SEALED_NONCE_BYTES - 8);
+    if zeros.iter().any(|byte| *byte != 0) {
+        return None;
+    }
+    let mut count = [0u8; 8];
+    count.copy_from_slice(counter);
+    Some(u64::from_be_bytes(count))
+}
+
 #[cfg(test)]
 mod tests {
     use super::{

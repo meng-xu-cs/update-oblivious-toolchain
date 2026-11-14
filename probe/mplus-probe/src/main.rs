@@ -34,6 +34,7 @@ enum ReportKind {
     CapacitySweepFull,
     StashOccupancy,
     StashOccupancyFull,
+    StorageBoundary,
     PathOramAvlMapReplay,
     AbortRollback,
     AdmissionMatrix,
@@ -271,6 +272,15 @@ fn main() -> Result<()> {
                 &cli.out_dir,
                 "stash_occupancy_full.json",
                 "stash_occupancy_full",
+                &report,
+            )?;
+        }
+        Some(ReportKind::StorageBoundary) => {
+            let report = mplus_probe::run_storage_boundary_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "storage_boundary.json",
+                "storage_boundary",
                 &report,
             )?;
         }

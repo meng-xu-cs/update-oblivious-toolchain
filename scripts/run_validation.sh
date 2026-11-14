@@ -81,6 +81,11 @@ cargo run -q --release -p mplus-probe -- --only capacity-sweep "${PROBE_ARGS[@]}
 # a minute). This is its quick profile; scripts/run_stash_occupancy_full.sh
 # makes the ten million node accesses of stash_occupancy_full.json.
 cargo run -q --release -p mplus-probe -- --only stash-occupancy "${PROBE_ARGS[@]}"
+# The storage boundary (Issue 41): every benchmark on every sealed backend,
+# with the store's own log of the records the runtime opens and seals
+# compared with each call's trace, and a runtime restarted from a store in
+# files. Its counts are a function of its seed (about a minute).
+cargo run -q -p mplus-probe -- --only storage-boundary "${PROBE_ARGS[@]}"
 cargo run -q -p mplus-probe -- --only path-oram-avl-map-replay "${PROBE_ARGS[@]}"
 cargo run -q -p mplus-probe -- --only abort-rollback "${PROBE_ARGS[@]}"
 # Compiler admission matrix (Issue 20): compile-and-run every accepted DSL

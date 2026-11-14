@@ -17,7 +17,7 @@ use uo_core::{
     RuntimeOramAccessCounterWitness, RuntimePathOramPositionMapWitness,
     RuntimePathOramTransitionWitness,
 };
-use uo_store::StoreCipher;
+use uo_store::{StorageHandle, StoreCipher};
 
 #[path = "generated_object_helpers.rs"]
 mod generated_object_helpers;
@@ -164,6 +164,27 @@ impl OramParameters {
             0
         }
     }
+}
+
+/// The record a store keeps at `location`, which must have the public
+/// length `len` of the record it stands for.
+pub(crate) fn stored_record(
+    storage: &StorageHandle,
+    location: &str,
+    len: usize,
+) -> Result<Box<[u8]>> {
+    let record = storage
+        .record(location)
+        .ok_or_else(|| anyhow!("the store holds no record at {location}"))?;
+    if record.len() != len {
+        bail!(
+            "the store's record at {} has {} bytes where the object has {}",
+            location,
+            record.len(),
+            len
+        );
+    }
+    Ok(record)
 }
 
 #[derive(Debug)]
@@ -480,6 +501,69 @@ impl OramState {
             "access_counter": self.access_counter,
             "entries": entries,
         }))
+    }
+
+    /// Put the map behind a store. The map's cipher keeps the handle, so
+    /// every record the map opens or seals from now on crosses to the store,
+    /// and the store takes the map's records as their first, under the
+    /// names the map's accesses read and write them by.
+    pub(crate) fn deploy_into_storage(
+        &mut self,
+        spec: &StateObject,
+        storage: StorageHandle,
+    ) -> Result<()> {
+        self.cipher.attach_storage(storage);
+        for (page, record) in self.storage.directory_pages.iter().enumerate() {
+            self.cipher
+                .store_first_record(&format!("{}@meta{page}", spec.name), record)?;
+        }
+        for (index, record) in self.storage.buckets.iter().enumerate() {
+            self.cipher
+                .store_first_record(&format!("{}@bucket{index}", spec.name), record)?;
+        }
+        self.cipher.store_first_record(
+            &format!("{}@counter", spec.name),
+            &self.storage.access_counter_slot,
+        )
+    }
+
+    /// Take the map's records from a store that a deployment of the same
+    /// contract and secret left: how a runtime that restarts finds the map.
+    /// The cipher resumes at the seal count the store has reserved, so it
+    /// repeats no nonce of a record the store was handed.
+    pub(crate) fn restore_from_storage(
+        &mut self,
+        spec: &StateObject,
+        storage: StorageHandle,
+        allocator: &mut AllocatorSession,
+    ) -> Result<()> {
+        for (page, record) in self.storage.directory_pages.iter_mut().enumerate() {
+            let stored =
+                stored_record(&storage, &format!("{}@meta{page}", spec.name), record.len())?;
+            *record = SealedPage::from(stored);
+        }
+        for (index, record) in self.storage.buckets.iter_mut().enumerate() {
+            let stored = stored_record(
+                &storage,
+                &format!("{}@bucket{index}", spec.name),
+                record.len(),
+            )?;
+            *record = SealedPage::from(stored);
+        }
+        self.storage.access_counter_slot = stored_record(
+            &storage,
+            &format!("{}@counter", spec.name),
+            self.storage.access_counter_slot.len(),
+        )?;
+        self.cipher.resume_seal_count(storage.reserved_seals());
+        self.cipher.attach_storage(storage);
+        self.access_counter = read_oram_counter_from_storage(
+            spec,
+            &self.cipher,
+            allocator,
+            &self.storage.access_counter_slot,
+        )?;
+        Ok(())
     }
 
     /// Hand each sealed record the map holds in storage to `visit`: its

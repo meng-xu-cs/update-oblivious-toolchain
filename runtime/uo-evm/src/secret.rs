@@ -24,6 +24,8 @@ const OBJECT_SECRET_LABEL: &[u8] = b"uo-runtime/object-secret/v1";
 const OBJECT_RNG_SEED_LABEL: &[u8] = b"uo-runtime/object-rng-seed/v1";
 const PATH_ORAM_LEAF_SEED_LABEL: &[u8] = b"uo-runtime/path-oram-leaf-seed/v1";
 const PATH_ORAM_LEAF_LABEL: &[u8] = b"uo-runtime/path-oram-leaf/v1";
+const STORE_META_KEY_LABEL: &[u8] = b"uo-runtime/store-meta-key/v1";
+const STORE_META_TAG_LABEL: &[u8] = b"uo-runtime/store-meta-tag/v1";
 #[cfg(any(test, feature = "diagnostics"))]
 const DIAGNOSTIC_MASTER_SECRET_LABEL: &[u8] = b"uo-runtime/diagnostic-master-secret/v1";
 #[cfg(test)]
@@ -100,6 +102,38 @@ impl RuntimeMasterSecret {
             OBJECT_SECRET_LABEL,
             &[&object_id.to_be_bytes(), object_name.as_bytes()],
         )?))
+    }
+
+    pub(crate) fn store_meta_key(&self) -> Result<StoreMetaKey> {
+        Ok(StoreMetaKey(derive(&self.0, STORE_META_KEY_LABEL, &[])?))
+    }
+}
+
+/// The key under which a deployment authenticates the public metadata it
+/// leaves in its store with every commit: its freshness counters and the
+/// digest of its public state. A runtime that restarts from the store
+/// derives the key again and takes metadata only with its tag. It has no
+/// `Clone` and no serialization, its `Debug` form shows nothing, and it is
+/// wiped on drop.
+pub(crate) struct StoreMetaKey([u8; SECRET_BYTES]);
+
+impl Drop for StoreMetaKey {
+    fn drop(&mut self) {
+        self.0.zeroize();
+    }
+}
+
+impl fmt::Debug for StoreMetaKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("StoreMetaKey(<redacted>)")
+    }
+}
+
+impl StoreMetaKey {
+    /// The tag of `meta`: an HKDF-SHA256 expansion of the key over it, which
+    /// is a pseudo-random function of the metadata.
+    pub(crate) fn tag(&self, meta: &[u8]) -> Result<[u8; SECRET_BYTES]> {
+        derive(&self.0, STORE_META_TAG_LABEL, &[meta])
     }
 }
 

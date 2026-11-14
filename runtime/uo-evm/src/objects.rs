@@ -1,8 +1,8 @@
 use crate::controller::CallRecorder;
 use crate::freshness::PathOramLeafSeed;
 use crate::oram::{
-    select_pending_put_value, MapEntry, OramState, OramTranscript, PathOramLeafCoinSource,
-    PendingOramPut,
+    select_pending_put_value, stored_record, MapEntry, OramState, OramTranscript,
+    PathOramLeafCoinSource, PendingOramPut,
 };
 use crate::secret::ObjectSecret;
 use anyhow::{anyhow, bail, Result};
@@ -19,7 +19,7 @@ use uo_core::Value;
 use uo_core::{
     FixedBoxBuilder, RuntimeOramAccessCounterWitness, RuntimePathOramPositionMapWitness,
 };
-use uo_store::StoreCipher;
+use uo_store::{SharedStorage, StorageHandle, StoreCipher};
 
 #[path = "generated_object_helpers.rs"]
 mod generated_object_helpers;
@@ -247,6 +247,9 @@ pub(crate) struct RawMapObject {
     spec: StateObject,
     entries: BTreeMap<String, RawMapEntry>,
     staged: BTreeMap<String, (Value, Value)>,
+    // The store that keeps the map's public values, once the map is
+    // deployed with one.
+    storage: Option<StorageHandle>,
 }
 
 impl RawMapObject {
@@ -259,6 +262,7 @@ impl RawMapObject {
                 .map(|(key, entry)| (key.clone(), entry.clone_committed_public()))
                 .collect(),
             staged: BTreeMap::new(),
+            storage: self.storage.clone(),
         }
     }
 
@@ -557,6 +561,7 @@ impl RuntimeObject {
                 spec: spec.clone(),
                 entries: BTreeMap::new(),
                 staged: BTreeMap::new(),
+                storage: None,
             })),
             (ContainerKind::Map, BackendKind::FullScan) => {
                 let capacity = spec
@@ -609,6 +614,155 @@ impl RuntimeObject {
     #[cfg(test)]
     pub fn instantiate_with_seed(spec: &StateObject, seed: u64) -> Result<Self> {
         Self::instantiate(spec, &ObjectSecret::from_diagnostic_seed(seed))
+    }
+
+    /// Put a newly instantiated object behind its contract's store. A
+    /// sealed object's cipher keeps its part of the store, so every record
+    /// the object opens or seals from now on crosses to the store, and the
+    /// store takes the object's records as their first, under the names a
+    /// call's trace gives them. A public object keeps its part of the store
+    /// for the values a call commits.
+    pub(in crate::runtime) fn deploy_into_storage(
+        &mut self,
+        storage: &SharedStorage,
+    ) -> Result<()> {
+        let handle = storage.handle(self.name());
+        match self {
+            Self::UoCell(object) => {
+                object.cipher.attach_storage(handle);
+                object
+                    .cipher
+                    .store_first_record(&object.spec.name, &object.physical)
+            }
+            Self::UoArray(object) => {
+                object.cipher.attach_storage(handle);
+                let slots = ExactObjectSlots::none_of(&object.spec.name, ExactObjectKind::Array);
+                for (index, slot) in object.physical_slots.iter().enumerate() {
+                    object
+                        .cipher
+                        .store_first_record(&slots.location(index), slot)?;
+                }
+                Ok(())
+            }
+            Self::UoSmallMap(object) => {
+                object.cipher.attach_storage(handle);
+                let slots = ExactObjectSlots::none_of(&object.spec.name, ExactObjectKind::Map);
+                for (index, slot) in object.physical_slots.iter().enumerate() {
+                    object
+                        .cipher
+                        .store_first_record(&slots.location(index), slot)?;
+                }
+                Ok(())
+            }
+            Self::UoOramMap(object) => object.oram.deploy_into_storage(&object.spec, handle),
+            Self::RawCell(object) => {
+                object.cipher.attach_storage(handle);
+                Ok(())
+            }
+            Self::RawArray(object) => {
+                object.cipher.attach_storage(handle);
+                Ok(())
+            }
+            Self::RawMap(object) => {
+                object.storage = Some(handle);
+                Ok(())
+            }
+        }
+    }
+
+    /// Give a newly instantiated object the state a store keeps for it: how
+    /// a runtime that restarts finds the object a deployment of the same
+    /// contract and secret left. A sealed object takes the store's records
+    /// in place of its own, and its cipher resumes at the seal count the
+    /// store has reserved, so it repeats no nonce of a record the store was
+    /// handed. A public object takes the values the store keeps.
+    pub(in crate::runtime) fn restore_from_storage(
+        &mut self,
+        storage: &SharedStorage,
+        allocator: &mut AllocatorSession,
+    ) -> Result<()> {
+        let handle = storage.handle(self.name());
+        match self {
+            Self::UoCell(object) => {
+                object.physical = stored_record(&handle, &object.spec.name, object.physical.len())?;
+                object.cipher.resume_seal_count(handle.reserved_seals());
+                object.cipher.attach_storage(handle);
+            }
+            Self::UoArray(object) => {
+                let slots = ExactObjectSlots::none_of(&object.spec.name, ExactObjectKind::Array);
+                for (index, slot) in object.physical_slots.iter_mut().enumerate() {
+                    *slot = stored_record(&handle, &slots.location(index), slot.len())?;
+                }
+                object.cipher.resume_seal_count(handle.reserved_seals());
+                object.cipher.attach_storage(handle);
+            }
+            Self::UoSmallMap(object) => {
+                let slots = ExactObjectSlots::none_of(&object.spec.name, ExactObjectKind::Map);
+                for (index, slot) in object.physical_slots.iter_mut().enumerate() {
+                    *slot = stored_record(&handle, &slots.location(index), slot.len())?;
+                }
+                object.cipher.resume_seal_count(handle.reserved_seals());
+                object.cipher.attach_storage(handle);
+            }
+            Self::UoOramMap(object) => {
+                object
+                    .oram
+                    .restore_from_storage(&object.spec, handle, allocator)?;
+            }
+            Self::RawCell(object) => {
+                for (location, value) in handle.public_records() {
+                    if location != object.spec.name {
+                        bail!("the store keeps a value at {location} that is no slot of a cell");
+                    }
+                    let value: Value = serde_json::from_slice(&value)?;
+                    object.physical = raw_encode_value(&value)?;
+                    object.value = value;
+                }
+                object.cipher.attach_storage(handle);
+            }
+            Self::RawArray(object) => {
+                for (location, value) in handle.public_records() {
+                    let index = location
+                        .strip_prefix(object.spec.name.as_str())
+                        .and_then(|rest| rest.strip_prefix('['))
+                        .and_then(|rest| rest.strip_suffix(']'))
+                        .and_then(|index| index.parse::<usize>().ok())
+                        .filter(|index| *index < object.values.len())
+                        .ok_or_else(|| {
+                            anyhow!(
+                                "the store keeps a value at {location} that is no slot of an array"
+                            )
+                        })?;
+                    let value: Value = serde_json::from_slice(&value)?;
+                    if let (Some(slot), Some(physical)) = (
+                        object.values.get_mut(index),
+                        object.physical_slots.get_mut(index),
+                    ) {
+                        *physical = raw_encode_value(&value)?;
+                        *slot = value;
+                    }
+                }
+                object.cipher.attach_storage(handle);
+            }
+            Self::RawMap(object) => {
+                let prefix = format!("{}::", object.spec.name);
+                for (location, value) in handle.public_records() {
+                    let key_name = location.strip_prefix(prefix.as_str()).ok_or_else(|| {
+                        anyhow!("the store keeps a value at {location} that is no entry of a map")
+                    })?;
+                    let value: Value = serde_json::from_slice(&value)?;
+                    let physical = raw_encode_value(&value)?;
+                    reconcile_raw_map_committed_entry(
+                        &mut object.entries,
+                        key_name,
+                        &value,
+                        physical,
+                    );
+                }
+                object.storage = Some(handle);
+            }
+        }
+        Ok(())
     }
 
     /// Load the object for a call. An exact object (a cell, an array or a
@@ -1340,6 +1494,7 @@ impl RuntimeObject {
                     );
                     next.value = new.value.clone();
                     next.physical = new_physical;
+                    keep_public_value(next.cipher.storage(), &next.spec.name, &next.value)?;
                 }
                 next.accessed = false;
                 next.written = false;
@@ -1422,6 +1577,11 @@ impl RuntimeObject {
                             })?;
                         *next_value = new_value.clone();
                         *next_physical = new_physical;
+                        keep_public_value(
+                            next.cipher.storage(),
+                            &format!("{}[{index}]", new.spec.name),
+                            new_value,
+                        )?;
                     }
                 }
                 next.accessed = false;
@@ -1491,6 +1651,11 @@ impl RuntimeObject {
                             value,
                             new_physical,
                         );
+                        keep_public_value(
+                            next.storage.as_ref(),
+                            &format!("{}::{key_name}", next.spec.name),
+                            value,
+                        )?;
                     }
                 }
                 next.staged.clear();
@@ -1748,6 +1913,16 @@ fn record_oram_transcript(
         Ok(())
     })?;
     trace.add_zero_writes(zero_writes);
+    Ok(())
+}
+
+/// Leave the value a call committed to a public object with the object's
+/// store, so that a runtime that restarts finds it. A public object is not
+/// sealed, and the store does not log its values.
+fn keep_public_value(storage: Option<&StorageHandle>, location: &str, value: &Value) -> Result<()> {
+    if let Some(storage) = storage {
+        storage.put_public(location, &serde_json::to_vec(value)?)?;
+    }
     Ok(())
 }
 

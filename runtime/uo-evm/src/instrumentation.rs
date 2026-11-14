@@ -2,7 +2,8 @@
 //! that a measurement tells apart from the call's own work: staging the
 //! call on the committed state, loading the call's objects from it, the
 //! hidden position-map witnesses of the call's start and end,
-//! and the execution trace with the proof bundles it builds and checks. The
+//! the execution trace with the proof bundles it builds and checks, and the
+//! store's commit of the call's records. The
 //! runtime keeps the witness from call to call and moves it by each call's
 //! leaf transitions; it decodes one from storage for the first call, after a
 //! load that no call made, and for an audit, which compares the kept witness
@@ -35,6 +36,10 @@ pub struct InstrumentationTotals {
     pub witness_ns: u128,
     /// Building and checking the execution trace and its proof bundles.
     pub proof_objects_ns: u128,
+    /// The store's commit of a call's records: nothing to speak of for a
+    /// store in memory, and the append to the journal, with its sync, for
+    /// one in files.
+    pub storage_commit_ns: u128,
     /// Sealed records the decodes of position-map witnesses opened.
     pub witness_records_opened: u64,
 }
@@ -47,6 +52,7 @@ thread_local! {
             load_ns: 0,
             witness_ns: 0,
             proof_objects_ns: 0,
+            storage_commit_ns: 0,
             witness_records_opened: 0,
         })
     };
@@ -143,6 +149,18 @@ pub(crate) fn time_proof_objects<T>(f: impl FnOnce() -> T) -> T {
     #[cfg(feature = "diagnostics")]
     {
         timed(f, |total, elapsed| total.proof_objects_ns += elapsed)
+    }
+    #[cfg(not(feature = "diagnostics"))]
+    {
+        f()
+    }
+}
+
+/// Run `f`, the store's commit of a call's records.
+pub(crate) fn time_store_persistence<T>(f: impl FnOnce() -> T) -> T {
+    #[cfg(feature = "diagnostics")]
+    {
+        timed(f, |total, elapsed| total.storage_commit_ns += elapsed)
     }
     #[cfg(not(feature = "diagnostics"))]
     {

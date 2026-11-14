@@ -6,10 +6,11 @@ directory holds the response.
 | File | Content |
 | --- | --- |
 | [`validation.md`](./validation.md) | every factual claim of the review checked against the code, and a position on each recommendation |
-| [`tasks.md`](./tasks.md) | Issues 22 to 56: description, fix and acceptance criteria |
+| [`tasks.md`](./tasks.md) | Issues 22 to 59: description, fix and acceptance criteria |
 | [`capacity_sweep_baseline.json`](./capacity_sweep_baseline.json) | the capacity sweep's full profile as Issue 27 measured it, before any optimization: what Issues 30 to 38 compare their savings with |
 | [`capacity_sweep_control_before_wave4.json`](./capacity_sweep_control_before_wave4.json), [`capacity_sweep_control_after_wave4.json`](./capacity_sweep_control_after_wave4.json) | a control for Issues 36 to 38: the full profile's rounds on the maps of 4,096, 8,192 and 16,384 entries at 2 keys, on the code before those issues (`cb92f8c`) and on the code after them (`9d93471`), one run after the other on one machine |
 | [`capacity_sweep_control_before_cap152.json`](./capacity_sweep_control_before_cap152.json), [`capacity_sweep_control_after_cap152.json`](./capacity_sweep_control_after_cap152.json) | the same control for the stash cap of Issue 40: on the code before it (`ece1167`, a cap of 114) and on the code after it (`305c1a2`, a cap of 152) |
+| [`capacity_sweep_control_before_store.json`](./capacity_sweep_control_before_store.json), [`capacity_sweep_control_after_store_memory.json`](./capacity_sweep_control_after_store_memory.json), [`capacity_sweep_control_after_store_files.json`](./capacity_sweep_control_after_store_files.json), [`capacity_sweep_control_after_store_files_synced.json`](./capacity_sweep_control_after_store_files_synced.json) | the same control for the storage adapter of Issue 41: on the code before it (`b6b9fce`), and on the code after it with the maps' records in memory, in files, and in files with every commit synced |
 | this file | the positions in brief, the order of work, and the tracker |
 
 The review text is not in the repository; `validation.md` restates each
@@ -84,10 +85,14 @@ Issue 22 has the options and the reasoning.
 6. **Wave 5, theorem coverage** (Issues 39 and 40). Done; the full profile
    was run again with the stash cap of 152, and a control measures what the
    cap costs a tree access: 13% to 17% of its own work.
-7. **Wave 6, evidence at a storage boundary** (Issues 41 and 42).
+7. **Wave 6, evidence at a storage boundary** (Issues 41 and 42). Issue 41
+   is done: the storage adapter's log agrees with the traces' writes and
+   with their reads of exact objects, and shows that a trace names a Path
+   ORAM map's counter and metadata pages more often than they are read
+   (Issue 57).
 
 The research issues (43 to 46) start once the issues they depend on are
-done. The backlog (47 to 56) is not scheduled.
+done. The backlog (47 to 59) is not scheduled.
 
 This differs from the review's sequence in two ways. The measurement work
 comes before the optimizations, not after. And incremental state is split:
@@ -116,7 +121,7 @@ its engineering part is Wave 4, its certified part is research.
 | 38 | Compress scan schedules in traces and proof objects | 4 | M to L | 31, 32 | done | `9d93471` |
 | 39 | Admit encrypted returns in the kernel theorems | 5 | M | | done | `ece1167` |
 | 40 | Give the stash bound a lifetime budget and test deferred write-back | 5 | M | | done | `305c1a2` |
-| 41 | Put storage behind an adapter that keeps its own I/O log | 6 | M to L | 24, 31, 32 | todo | |
+| 41 | Put storage behind an adapter that keeps its own I/O log | 6 | M to L | 24, 31, 32 | done | |
 | 42 | Widen the runtime-versus-model tests of the tree and the tape substitution | 6 | M | | todo | |
 | 43 | Prove a store operation's post-state and its write class together | research | R | 33, 35 | todo | |
 | 44 | Certify state transitions incrementally | research | R | 36, 37, 41 | todo | |
@@ -132,6 +137,9 @@ its engineering part is Wave 4, its certified part is research.
 | 54 | Compare a runtime trace with the exact encoding in Lean | backlog | M | 38 | todo | |
 | 55 | Take the public-state snapshot once for each object a call changes | backlog | M | 37 | todo | |
 | 56 | Slice production sources with a lexer | backlog | S to M | | todo | |
+| 57 | Trace the reads of a Path ORAM map that cross the storage boundary | backlog | L | 41 | todo | |
+| 58 | Seal the master secret so that a production deployment can restart | backlog | M | 41, 53 | todo | |
+| 59 | Keep sealed records in the store alone | backlog | L | 41 | todo | |
 
 Sizes are relative, not a schedule: S a day or less, M several days, L one
 to two weeks, R research with no fixed end.

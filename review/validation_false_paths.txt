@@ -753,6 +753,7 @@ top_level_booleans:
   runtime_trusted_kernel_bundle_nonclone: true
   runtime_trusted_kernel_slot_rechecks_statement_trace: true
   seal_nonces_come_from_the_seal_count: true
+  sealed_records_cross_the_storage_boundary: true
   sealed_writes_are_classified_from_their_bytes: true
   seeded_runtime_paper_main_family_bundle_api_is_explicit: true
   seeded_runtime_paper_main_family_bundle_fields_private: true

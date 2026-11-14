@@ -46,7 +46,16 @@ only. Commit opens nothing: it reseals the objects the program may write,
 with the copy the object kept at its first write if the call aborted
 (`keep_loaded_*` and `reconcile_*_commit_*` in the generated object
 helpers). A Path ORAM map reads its counter and metadata pages when it is
-loaded, outside the trace, and its paths as it is accessed.
+loaded, and its paths as it is accessed. It holds the counter and the
+metadata pages open through the call, so it reads each once, where the
+trace names them again at every access or operation.
+
+Every sealed record a call opens or seals crosses to the contract's store,
+a `StorageAdapter` that keeps the records in memory or in files and logs
+what crosses from its own side (invariant 18 of
+[`secret-state.md`](./secret-state.md)). A call is committed in the store,
+with its commit metadata, before the runtime takes the call's state, and a
+runtime can start again from a store in files.
 
 Committed state changes only through a call, with one exception that a
 production build does not have: `ContractInstance::bulk_load_map_for_diagnostics`

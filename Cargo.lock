@@ -1053,6 +1053,7 @@ dependencies = [
  "rand_chacha",
  "serde",
  "serde_json",
+ "sha2",
  "thiserror",
  "uo-core",
  "zeroize",

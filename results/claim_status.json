@@ -102,6 +102,16 @@
       "ok": true
     },
     {
+      "detail": "doc_anchor \"storage adapter\" for storage-boundary-log appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:storage-boundary-log",
+      "ok": true
+    },
+    {
+      "detail": "storage-boundary-log declares an allowed status (empirically-tested)",
+      "name": "status-allowed:storage-boundary-log",
+      "ok": true
+    },
+    {
       "detail": "doc_anchor \"uo-solidity-like-dsl-v1\" for dsl-admission-subset appears in docs/claim-boundary.md",
       "name": "anchor-in-doc:dsl-admission-subset",
       "ok": true
@@ -199,6 +209,16 @@
     {
       "detail": "assumption-real-keccak-equivalence declares an allowed status (trusted)",
       "name": "status-allowed:assumption-real-keccak-equivalence",
+      "ok": true
+    },
+    {
+      "detail": "doc_anchor \"a restart of a deployment from OS randomness\" for nonclaim-production-restart-and-store-rollback appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:nonclaim-production-restart-and-store-rollback",
+      "ok": true
+    },
+    {
+      "detail": "nonclaim-production-restart-and-store-rollback declares an allowed status (non-claim)",
+      "name": "status-allowed:nonclaim-production-restart-and-store-rollback",
       "ok": true
     },
     {
@@ -462,12 +482,17 @@
       "ok": true
     },
     {
+      "detail": "non-claim \"a restart of a deployment from OS randomness, whose master secret is in\" is covered by the manifest",
+      "name": "nonclaim-covered:a restart of a deployment from OS random",
+      "ok": true
+    },
+    {
       "detail": "non-claim \"Solidity 0.8 checked-arithmetic, division/modulo-by-zero, ABI, revert, or\" is covered by the manifest",
       "name": "nonclaim-covered:Solidity 0.8 checked-arithmetic, divisio",
       "ok": true
     },
     {
-      "detail": "12 manifest entries in category claim",
+      "detail": "13 manifest entries in category claim",
       "name": "category-present:claim",
       "ok": true
     },
@@ -477,7 +502,7 @@
       "ok": true
     },
     {
-      "detail": "6 manifest entries in category non_claim",
+      "detail": "7 manifest entries in category non_claim",
       "name": "category-present:non_claim",
       "ok": true
     },
@@ -742,6 +767,36 @@
       "ok": true
     },
     {
+      "detail": "artifact runtime/uo-store/src/storage.rs referenced by storage-boundary-log exists",
+      "name": "file-exists:storage-boundary-log:runtime/uo-store/src/storage.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact proof/lean/UOToolchain/RuntimeImplementationInterface.lean referenced by storage-boundary-log exists",
+      "name": "file-exists:storage-boundary-log:proof/lean/UOToolchain/RuntimeImplementationInterface.lean",
+      "ok": true
+    },
+    {
+      "detail": "artifact runtime/uo-store/src/generated_surface.rs referenced by storage-boundary-log exists",
+      "name": "file-exists:storage-boundary-log:runtime/uo-store/src/generated_surface.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact runtime/uo-evm/src/generated_object_helpers.rs referenced by storage-boundary-log exists",
+      "name": "file-exists:storage-boundary-log:runtime/uo-evm/src/generated_object_helpers.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact runtime/uo-evm/src/engine.rs referenced by storage-boundary-log exists",
+      "name": "file-exists:storage-boundary-log:runtime/uo-evm/src/engine.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact runtime/uo-evm/src/store_meta.rs referenced by storage-boundary-log exists",
+      "name": "file-exists:storage-boundary-log:runtime/uo-evm/src/store_meta.rs",
+      "ok": true
+    },
+    {
       "detail": "artifact docs/supported-subset.md referenced by dsl-admission-subset exists",
       "name": "file-exists:dsl-admission-subset:docs/supported-subset.md",
       "ok": true
@@ -877,6 +932,16 @@
       "ok": true
     },
     {
+      "detail": "artifact docs/claim-boundary.md referenced by nonclaim-production-restart-and-store-rollback exists",
+      "name": "file-exists:nonclaim-production-restart-and-store-rollback:docs/claim-boundary.md",
+      "ok": true
+    },
+    {
+      "detail": "artifact runtime/uo-evm/src/engine.rs referenced by nonclaim-production-restart-and-store-rollback exists",
+      "name": "file-exists:nonclaim-production-restart-and-store-rollback:runtime/uo-evm/src/engine.rs",
+      "ok": true
+    },
+    {
       "detail": "artifact docs/claim-boundary.md referenced by nonclaim-machine-code-equivalence exists",
       "name": "file-exists:nonclaim-machine-code-equivalence:docs/claim-boundary.md",
       "ok": true
@@ -992,7 +1057,7 @@
       "ok": true
     }
   ],
-  "claim_count": 35,
+  "claim_count": 37,
   "claims": [
     {
       "category": "claim",
@@ -1066,6 +1131,13 @@
     },
     {
       "category": "claim",
+      "id": "storage-boundary-log",
+      "status": "empirically-tested",
+      "text": "Every sealed record the runtime opens or seals crosses to a storage adapter, which logs the read with the record it keeps and the write with the class it computes from its own records. On every benchmark and sealed backend the adapter's writes are the trace's writes of sealed objects, each an Update, and its reads are the trace's reads, except that a Path ORAM map's counter and metadata pages cross once per call where the trace names them at every access or operation. A runtime restarted from the adapter's files answers as before and repeats no nonce. Empirically tested over the benchmarks; the places where a record crosses are source-frozen.",
+      "validation_command": "cargo run -q -p mplus-probe -- --only storage-boundary --out-dir results"
+    },
+    {
+      "category": "claim",
       "id": "dsl-admission-subset",
       "status": "empirically-tested",
       "text": "uo-solc admits the uo-solidity-like-dsl-v1 subset and rejects every unsupported feature with a diagnostic that names it; admission is empirically exercised, not a semantic proof.",
@@ -1133,6 +1205,13 @@
       "status": "trusted",
       "text": "Real Keccak equivalence: connects runtime tiny_keccak Keccak::v256() to the Lean mock-hash abstraction; not yet proved, Lean preservation uses the shared abstraction.",
       "validation_command": "scripts/lean_assumption_budget.sh"
+    },
+    {
+      "category": "non_claim",
+      "id": "nonclaim-production-restart-and-store-rollback",
+      "status": "non-claim",
+      "text": "Not claimed: a restart of a deployment from OS randomness, whose master secret is in memory alone, or the detection of a store that was rolled back or holds an older record of a location. A restart relies on the rollback resistance of the TEE deployment assumptions.",
+      "validation_command": "cargo run -q -p mplus-probe -- --only storage-boundary --out-dir results"
     },
     {
       "category": "non_claim",
@@ -1245,10 +1324,10 @@
   "source_of_truth": "docs/claim-boundary.md",
   "status_counts": {
     "Lean-proved": 5,
-    "empirically-tested": 1,
+    "empirically-tested": 2,
     "experimental": 1,
     "generated-and-checked": 4,
-    "non-claim": 6,
+    "non-claim": 7,
     "source-frozen": 1,
     "trusted": 17
   }

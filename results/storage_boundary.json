@@ -1,0 +1,1655 @@
+{
+  "accepted": true,
+  "benchmarks": [
+    {
+      "backend": "full_scan",
+      "benchmark": "FixedSlotClassifier/classify",
+      "calls": [
+        {
+          "aborted": false,
+          "entrypoint": "classify(uint256)",
+          "held_unit_bytes_named_again": 0,
+          "held_unit_reads_named_again": 0,
+          "role": "target",
+          "store": {
+            "read_bytes": 64,
+            "reads": 1,
+            "writes": 1,
+            "written_bytes": 64
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 64,
+            "sealed_reads": 1,
+            "sealed_writes": 1,
+            "sealed_written_bytes": 64
+          }
+        },
+        {
+          "aborted": false,
+          "entrypoint": "peek()",
+          "held_unit_bytes_named_again": 0,
+          "held_unit_reads_named_again": 0,
+          "role": "getter",
+          "store": {
+            "read_bytes": 64,
+            "reads": 1,
+            "writes": 0,
+            "written_bytes": 0
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 64,
+            "sealed_reads": 1,
+            "sealed_writes": 0,
+            "sealed_written_bytes": 0
+          }
+        }
+      ],
+      "sealed_objects": [
+        "last"
+      ],
+      "store_log_agrees_with_trace": true
+    },
+    {
+      "backend": "full_scan",
+      "benchmark": "AuthScan/auth",
+      "calls": [
+        {
+          "aborted": false,
+          "entrypoint": "seed(uint256,bytes32)",
+          "held_unit_bytes_named_again": 0,
+          "held_unit_reads_named_again": 0,
+          "role": "setup",
+          "store": {
+            "read_bytes": 256,
+            "reads": 4,
+            "writes": 4,
+            "written_bytes": 256
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 256,
+            "sealed_reads": 4,
+            "sealed_writes": 4,
+            "sealed_written_bytes": 256
+          }
+        },
+        {
+          "aborted": false,
+          "entrypoint": "seed(uint256,bytes32)",
+          "held_unit_bytes_named_again": 0,
+          "held_unit_reads_named_again": 0,
+          "role": "setup",
+          "store": {
+            "read_bytes": 256,
+            "reads": 4,
+            "writes": 4,
+            "written_bytes": 256
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 256,
+            "sealed_reads": 4,
+            "sealed_writes": 4,
+            "sealed_written_bytes": 256
+          }
+        },
+        {
+          "aborted": false,
+          "entrypoint": "auth(bytes32)",
+          "held_unit_bytes_named_again": 0,
+          "held_unit_reads_named_again": 0,
+          "role": "target",
+          "store": {
+            "read_bytes": 320,
+            "reads": 5,
+            "writes": 1,
+            "written_bytes": 64
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 320,
+            "sealed_reads": 5,
+            "sealed_writes": 1,
+            "sealed_written_bytes": 64
+          }
+        },
+        {
+          "aborted": false,
+          "entrypoint": "readLast()",
+          "held_unit_bytes_named_again": 0,
+          "held_unit_reads_named_again": 0,
+          "role": "getter",
+          "store": {
+            "read_bytes": 64,
+            "reads": 1,
+            "writes": 0,
+            "written_bytes": 0
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 64,
+            "sealed_reads": 1,
+            "sealed_writes": 0,
+            "sealed_written_bytes": 0
+          }
+        }
+      ],
+      "sealed_objects": [
+        "TOKENS",
+        "lastAuth"
+      ],
+      "store_log_agrees_with_trace": true
+    },
+    {
+      "backend": "full_scan",
+      "benchmark": "ConfidentialMixer/deposit",
+      "calls": [
+        {
+          "aborted": false,
+          "entrypoint": "deposit(bytes32,uint256)",
+          "held_unit_bytes_named_again": 0,
+          "held_unit_reads_named_again": 0,
+          "role": "target",
+          "store": {
+            "read_bytes": 832,
+            "reads": 9,
+            "writes": 9,
+            "written_bytes": 832
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 832,
+            "sealed_reads": 9,
+            "sealed_writes": 9,
+            "sealed_written_bytes": 832
+          }
+        }
+      ],
+      "sealed_objects": [
+        "balances",
+        "total"
+      ],
+      "store_log_agrees_with_trace": true
+    },
+    {
+      "backend": "full_scan_64",
+      "benchmark": "ConfidentialMixer/deposit",
+      "calls": [
+        {
+          "aborted": false,
+          "entrypoint": "deposit(bytes32,uint256)",
+          "held_unit_bytes_named_again": 0,
+          "held_unit_reads_named_again": 0,
+          "role": "target",
+          "store": {
+            "read_bytes": 6208,
+            "reads": 65,
+            "writes": 65,
+            "written_bytes": 6208
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 6208,
+            "sealed_reads": 65,
+            "sealed_writes": 65,
+            "sealed_written_bytes": 6208
+          }
+        }
+      ],
+      "sealed_objects": [
+        "balances",
+        "total"
+      ],
+      "store_log_agrees_with_trace": true
+    },
+    {
+      "backend": "oram",
+      "benchmark": "ConfidentialMixer/deposit",
+      "calls": [
+        {
+          "aborted": false,
+          "entrypoint": "deposit(bytes32,uint256)",
+          "held_unit_bytes_named_again": 11328,
+          "held_unit_reads_named_again": 17,
+          "role": "target",
+          "store": {
+            "read_bytes": 18112,
+            "reads": 32,
+            "writes": 49,
+            "written_bytes": 29440
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 29440,
+            "sealed_reads": 49,
+            "sealed_writes": 49,
+            "sealed_written_bytes": 29440
+          }
+        }
+      ],
+      "sealed_objects": [
+        "balances",
+        "total"
+      ],
+      "store_log_agrees_with_trace": true
+    },
+    {
+      "backend": "oram_private_posmap",
+      "benchmark": "ConfidentialMixer/deposit",
+      "calls": [
+        {
+          "aborted": false,
+          "entrypoint": "deposit(bytes32,uint256)",
+          "held_unit_bytes_named_again": 27616,
+          "held_unit_reads_named_again": 69,
+          "role": "target",
+          "store": {
+            "read_bytes": 297088,
+            "reads": 432,
+            "writes": 501,
+            "written_bytes": 324704
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 324704,
+            "sealed_reads": 501,
+            "sealed_writes": 501,
+            "sealed_written_bytes": 324704
+          }
+        }
+      ],
+      "sealed_objects": [
+        "balances",
+        "total"
+      ],
+      "store_log_agrees_with_trace": true
+    },
+    {
+      "backend": "full_scan",
+      "benchmark": "ConfidentialMixer/withdraw",
+      "calls": [
+        {
+          "aborted": false,
+          "entrypoint": "deposit(bytes32,uint256)",
+          "held_unit_bytes_named_again": 0,
+          "held_unit_reads_named_again": 0,
+          "role": "setup",
+          "store": {
+            "read_bytes": 832,
+            "reads": 9,
+            "writes": 9,
+            "written_bytes": 832
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 832,
+            "sealed_reads": 9,
+            "sealed_writes": 9,
+            "sealed_written_bytes": 832
+          }
+        },
+        {
+          "aborted": false,
+          "entrypoint": "withdraw(bytes32,uint256)",
+          "held_unit_bytes_named_again": 0,
+          "held_unit_reads_named_again": 0,
+          "role": "target",
+          "store": {
+            "read_bytes": 832,
+            "reads": 9,
+            "writes": 9,
+            "written_bytes": 832
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 832,
+            "sealed_reads": 9,
+            "sealed_writes": 9,
+            "sealed_written_bytes": 832
+          }
+        },
+        {
+          "aborted": false,
+          "entrypoint": "balanceOf(bytes32)",
+          "held_unit_bytes_named_again": 0,
+          "held_unit_reads_named_again": 0,
+          "role": "getter",
+          "store": {
+            "read_bytes": 768,
+            "reads": 8,
+            "writes": 0,
+            "written_bytes": 0
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 768,
+            "sealed_reads": 8,
+            "sealed_writes": 0,
+            "sealed_written_bytes": 0
+          }
+        },
+        {
+          "aborted": false,
+          "entrypoint": "totalValue()",
+          "held_unit_bytes_named_again": 0,
+          "held_unit_reads_named_again": 0,
+          "role": "getter",
+          "store": {
+            "read_bytes": 64,
+            "reads": 1,
+            "writes": 0,
+            "written_bytes": 0
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 64,
+            "sealed_reads": 1,
+            "sealed_writes": 0,
+            "sealed_written_bytes": 0
+          }
+        }
+      ],
+      "sealed_objects": [
+        "balances",
+        "total"
+      ],
+      "store_log_agrees_with_trace": true
+    },
+    {
+      "backend": "full_scan_64",
+      "benchmark": "ConfidentialMixer/withdraw",
+      "calls": [
+        {
+          "aborted": false,
+          "entrypoint": "deposit(bytes32,uint256)",
+          "held_unit_bytes_named_again": 0,
+          "held_unit_reads_named_again": 0,
+          "role": "setup",
+          "store": {
+            "read_bytes": 6208,
+            "reads": 65,
+            "writes": 65,
+            "written_bytes": 6208
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 6208,
+            "sealed_reads": 65,
+            "sealed_writes": 65,
+            "sealed_written_bytes": 6208
+          }
+        },
+        {
+          "aborted": false,
+          "entrypoint": "withdraw(bytes32,uint256)",
+          "held_unit_bytes_named_again": 0,
+          "held_unit_reads_named_again": 0,
+          "role": "target",
+          "store": {
+            "read_bytes": 6208,
+            "reads": 65,
+            "writes": 65,
+            "written_bytes": 6208
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 6208,
+            "sealed_reads": 65,
+            "sealed_writes": 65,
+            "sealed_written_bytes": 6208
+          }
+        },
+        {
+          "aborted": false,
+          "entrypoint": "balanceOf(bytes32)",
+          "held_unit_bytes_named_again": 0,
+          "held_unit_reads_named_again": 0,
+          "role": "getter",
+          "store": {
+            "read_bytes": 6144,
+            "reads": 64,
+            "writes": 0,
+            "written_bytes": 0
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 6144,
+            "sealed_reads": 64,
+            "sealed_writes": 0,
+            "sealed_written_bytes": 0
+          }
+        },
+        {
+          "aborted": false,
+          "entrypoint": "totalValue()",
+          "held_unit_bytes_named_again": 0,
+          "held_unit_reads_named_again": 0,
+          "role": "getter",
+          "store": {
+            "read_bytes": 64,
+            "reads": 1,
+            "writes": 0,
+            "written_bytes": 0
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 64,
+            "sealed_reads": 1,
+            "sealed_writes": 0,
+            "sealed_written_bytes": 0
+          }
+        }
+      ],
+      "sealed_objects": [
+        "balances",
+        "total"
+      ],
+      "store_log_agrees_with_trace": true
+    },
+    {
+      "backend": "oram",
+      "benchmark": "ConfidentialMixer/withdraw",
+      "calls": [
+        {
+          "aborted": false,
+          "entrypoint": "deposit(bytes32,uint256)",
+          "held_unit_bytes_named_again": 11328,
+          "held_unit_reads_named_again": 17,
+          "role": "setup",
+          "store": {
+            "read_bytes": 18112,
+            "reads": 32,
+            "writes": 49,
+            "written_bytes": 29440
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 29440,
+            "sealed_reads": 49,
+            "sealed_writes": 49,
+            "sealed_written_bytes": 29440
+          }
+        },
+        {
+          "aborted": false,
+          "entrypoint": "withdraw(bytes32,uint256)",
+          "held_unit_bytes_named_again": 11328,
+          "held_unit_reads_named_again": 17,
+          "role": "target",
+          "store": {
+            "read_bytes": 18112,
+            "reads": 32,
+            "writes": 49,
+            "written_bytes": 29440
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 29440,
+            "sealed_reads": 49,
+            "sealed_writes": 49,
+            "sealed_written_bytes": 29440
+          }
+        },
+        {
+          "aborted": false,
+          "entrypoint": "balanceOf(bytes32)",
+          "held_unit_bytes_named_again": 0,
+          "held_unit_reads_named_again": 0,
+          "role": "getter",
+          "store": {
+            "read_bytes": 14688,
+            "reads": 24,
+            "writes": 24,
+            "written_bytes": 14688
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 14688,
+            "sealed_reads": 24,
+            "sealed_writes": 24,
+            "sealed_written_bytes": 14688
+          }
+        },
+        {
+          "aborted": false,
+          "entrypoint": "totalValue()",
+          "held_unit_bytes_named_again": 0,
+          "held_unit_reads_named_again": 0,
+          "role": "getter",
+          "store": {
+            "read_bytes": 64,
+            "reads": 1,
+            "writes": 0,
+            "written_bytes": 0
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 64,
+            "sealed_reads": 1,
+            "sealed_writes": 0,
+            "sealed_written_bytes": 0
+          }
+        }
+      ],
+      "sealed_objects": [
+        "balances",
+        "total"
+      ],
+      "store_log_agrees_with_trace": true
+    },
+    {
+      "backend": "oram_private_posmap",
+      "benchmark": "ConfidentialMixer/withdraw",
+      "calls": [
+        {
+          "aborted": false,
+          "entrypoint": "deposit(bytes32,uint256)",
+          "held_unit_bytes_named_again": 27616,
+          "held_unit_reads_named_again": 69,
+          "role": "setup",
+          "store": {
+            "read_bytes": 297088,
+            "reads": 432,
+            "writes": 501,
+            "written_bytes": 324704
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 324704,
+            "sealed_reads": 501,
+            "sealed_writes": 501,
+            "sealed_written_bytes": 324704
+          }
+        },
+        {
+          "aborted": false,
+          "entrypoint": "withdraw(bytes32,uint256)",
+          "held_unit_bytes_named_again": 27616,
+          "held_unit_reads_named_again": 69,
+          "role": "target",
+          "store": {
+            "read_bytes": 297088,
+            "reads": 432,
+            "writes": 501,
+            "written_bytes": 324704
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 324704,
+            "sealed_reads": 501,
+            "sealed_writes": 501,
+            "sealed_written_bytes": 324704
+          }
+        },
+        {
+          "aborted": false,
+          "entrypoint": "balanceOf(bytes32)",
+          "held_unit_bytes_named_again": 640,
+          "held_unit_reads_named_again": 10,
+          "role": "getter",
+          "store": {
+            "read_bytes": 91392,
+            "reads": 125,
+            "writes": 135,
+            "written_bytes": 92032
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 92032,
+            "sealed_reads": 135,
+            "sealed_writes": 135,
+            "sealed_written_bytes": 92032
+          }
+        },
+        {
+          "aborted": false,
+          "entrypoint": "totalValue()",
+          "held_unit_bytes_named_again": 0,
+          "held_unit_reads_named_again": 0,
+          "role": "getter",
+          "store": {
+            "read_bytes": 64,
+            "reads": 1,
+            "writes": 0,
+            "written_bytes": 0
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 64,
+            "sealed_reads": 1,
+            "sealed_writes": 0,
+            "sealed_written_bytes": 0
+          }
+        }
+      ],
+      "sealed_objects": [
+        "balances",
+        "total"
+      ],
+      "store_log_agrees_with_trace": true
+    },
+    {
+      "backend": "full_scan",
+      "benchmark": "ERC20Lite/transferFrom",
+      "calls": [
+        {
+          "aborted": false,
+          "entrypoint": "mint(address,uint256)",
+          "held_unit_bytes_named_again": 0,
+          "held_unit_reads_named_again": 0,
+          "role": "setup",
+          "store": {
+            "read_bytes": 768,
+            "reads": 8,
+            "writes": 8,
+            "written_bytes": 768
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 768,
+            "sealed_reads": 8,
+            "sealed_writes": 8,
+            "sealed_written_bytes": 768
+          }
+        },
+        {
+          "aborted": false,
+          "entrypoint": "approve(address,address,uint256)",
+          "held_unit_bytes_named_again": 0,
+          "held_unit_reads_named_again": 0,
+          "role": "setup",
+          "store": {
+            "read_bytes": 1536,
+            "reads": 16,
+            "writes": 16,
+            "written_bytes": 1536
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 1536,
+            "sealed_reads": 16,
+            "sealed_writes": 16,
+            "sealed_written_bytes": 1536
+          }
+        },
+        {
+          "aborted": false,
+          "entrypoint": "transferFrom(address,address,address,uint256)",
+          "held_unit_bytes_named_again": 0,
+          "held_unit_reads_named_again": 0,
+          "role": "target",
+          "store": {
+            "read_bytes": 2304,
+            "reads": 24,
+            "writes": 24,
+            "written_bytes": 2304
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 2304,
+            "sealed_reads": 24,
+            "sealed_writes": 24,
+            "sealed_written_bytes": 2304
+          }
+        },
+        {
+          "aborted": false,
+          "entrypoint": "balanceOf(address)",
+          "held_unit_bytes_named_again": 0,
+          "held_unit_reads_named_again": 0,
+          "role": "getter",
+          "store": {
+            "read_bytes": 768,
+            "reads": 8,
+            "writes": 0,
+            "written_bytes": 0
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 768,
+            "sealed_reads": 8,
+            "sealed_writes": 0,
+            "sealed_written_bytes": 0
+          }
+        },
+        {
+          "aborted": false,
+          "entrypoint": "balanceOf(address)",
+          "held_unit_bytes_named_again": 0,
+          "held_unit_reads_named_again": 0,
+          "role": "getter",
+          "store": {
+            "read_bytes": 768,
+            "reads": 8,
+            "writes": 0,
+            "written_bytes": 0
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 768,
+            "sealed_reads": 8,
+            "sealed_writes": 0,
+            "sealed_written_bytes": 0
+          }
+        },
+        {
+          "aborted": false,
+          "entrypoint": "allowanceOf(address,address)",
+          "held_unit_bytes_named_again": 0,
+          "held_unit_reads_named_again": 0,
+          "role": "getter",
+          "store": {
+            "read_bytes": 1536,
+            "reads": 16,
+            "writes": 0,
+            "written_bytes": 0
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 1536,
+            "sealed_reads": 16,
+            "sealed_writes": 0,
+            "sealed_written_bytes": 0
+          }
+        }
+      ],
+      "sealed_objects": [
+        "allowances",
+        "balances"
+      ],
+      "store_log_agrees_with_trace": true
+    },
+    {
+      "backend": "oram",
+      "benchmark": "ERC20Lite/transferFrom",
+      "calls": [
+        {
+          "aborted": false,
+          "entrypoint": "mint(address,uint256)",
+          "held_unit_bytes_named_again": 9792,
+          "held_unit_reads_named_again": 17,
+          "role": "setup",
+          "store": {
+            "read_bytes": 15616,
+            "reads": 31,
+            "writes": 48,
+            "written_bytes": 25408
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 25408,
+            "sealed_reads": 48,
+            "sealed_writes": 48,
+            "sealed_written_bytes": 25408
+          }
+        },
+        {
+          "aborted": false,
+          "entrypoint": "approve(address,address,uint256)",
+          "held_unit_bytes_named_again": 0,
+          "held_unit_reads_named_again": 0,
+          "role": "setup",
+          "store": {
+            "read_bytes": 26432,
+            "reads": 41,
+            "writes": 41,
+            "written_bytes": 26432
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 26432,
+            "sealed_reads": 41,
+            "sealed_writes": 41,
+            "sealed_written_bytes": 26432
+          }
+        },
+        {
+          "aborted": false,
+          "entrypoint": "transferFrom(address,address,address,uint256)",
+          "held_unit_bytes_named_again": 51968,
+          "held_unit_reads_named_again": 84,
+          "role": "target",
+          "store": {
+            "read_bytes": 51712,
+            "reads": 94,
+            "writes": 178,
+            "written_bytes": 103680
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 103680,
+            "sealed_reads": 178,
+            "sealed_writes": 178,
+            "sealed_written_bytes": 103680
+          }
+        },
+        {
+          "aborted": false,
+          "entrypoint": "balanceOf(address)",
+          "held_unit_bytes_named_again": 0,
+          "held_unit_reads_named_again": 0,
+          "role": "getter",
+          "store": {
+            "read_bytes": 12704,
+            "reads": 24,
+            "writes": 24,
+            "written_bytes": 12704
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 12704,
+            "sealed_reads": 24,
+            "sealed_writes": 24,
+            "sealed_written_bytes": 12704
+          }
+        },
+        {
+          "aborted": false,
+          "entrypoint": "balanceOf(address)",
+          "held_unit_bytes_named_again": 0,
+          "held_unit_reads_named_again": 0,
+          "role": "getter",
+          "store": {
+            "read_bytes": 12704,
+            "reads": 24,
+            "writes": 24,
+            "written_bytes": 12704
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 12704,
+            "sealed_reads": 24,
+            "sealed_writes": 24,
+            "sealed_written_bytes": 12704
+          }
+        },
+        {
+          "aborted": false,
+          "entrypoint": "allowanceOf(address,address)",
+          "held_unit_bytes_named_again": 0,
+          "held_unit_reads_named_again": 0,
+          "role": "getter",
+          "store": {
+            "read_bytes": 26432,
+            "reads": 41,
+            "writes": 41,
+            "written_bytes": 26432
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 26432,
+            "sealed_reads": 41,
+            "sealed_writes": 41,
+            "sealed_written_bytes": 26432
+          }
+        }
+      ],
+      "sealed_objects": [
+        "allowances",
+        "balances"
+      ],
+      "store_log_agrees_with_trace": true
+    },
+    {
+      "backend": "oram_private_posmap",
+      "benchmark": "ERC20Lite/transferFrom",
+      "calls": [
+        {
+          "aborted": false,
+          "entrypoint": "mint(address,uint256)",
+          "held_unit_bytes_named_again": 25216,
+          "held_unit_reads_named_again": 69,
+          "role": "setup",
+          "store": {
+            "read_bytes": 268704,
+            "reads": 431,
+            "writes": 500,
+            "written_bytes": 293920
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 293920,
+            "sealed_reads": 500,
+            "sealed_writes": 500,
+            "sealed_written_bytes": 293920
+          }
+        },
+        {
+          "aborted": false,
+          "entrypoint": "approve(address,address,uint256)",
+          "held_unit_bytes_named_again": 0,
+          "held_unit_reads_named_again": 0,
+          "role": "setup",
+          "store": {
+            "read_bytes": 26432,
+            "reads": 41,
+            "writes": 41,
+            "written_bytes": 26432
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 26432,
+            "sealed_reads": 41,
+            "sealed_writes": 41,
+            "sealed_written_bytes": 26432
+          }
+        },
+        {
+          "aborted": false,
+          "entrypoint": "transferFrom(address,address,address,uint256)",
+          "held_unit_bytes_named_again": 95488,
+          "held_unit_reads_named_again": 197,
+          "role": "target",
+          "store": {
+            "read_bytes": 545216,
+            "reads": 885,
+            "writes": 1082,
+            "written_bytes": 640704
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 640704,
+            "sealed_reads": 1082,
+            "sealed_writes": 1082,
+            "sealed_written_bytes": 640704
+          }
+        },
+        {
+          "aborted": false,
+          "entrypoint": "balanceOf(address)",
+          "held_unit_bytes_named_again": 640,
+          "held_unit_reads_named_again": 10,
+          "role": "getter",
+          "store": {
+            "read_bytes": 82656,
+            "reads": 125,
+            "writes": 135,
+            "written_bytes": 83296
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 83296,
+            "sealed_reads": 135,
+            "sealed_writes": 135,
+            "sealed_written_bytes": 83296
+          }
+        },
+        {
+          "aborted": false,
+          "entrypoint": "balanceOf(address)",
+          "held_unit_bytes_named_again": 640,
+          "held_unit_reads_named_again": 10,
+          "role": "getter",
+          "store": {
+            "read_bytes": 82656,
+            "reads": 125,
+            "writes": 135,
+            "written_bytes": 83296
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 83296,
+            "sealed_reads": 135,
+            "sealed_writes": 135,
+            "sealed_written_bytes": 83296
+          }
+        },
+        {
+          "aborted": false,
+          "entrypoint": "allowanceOf(address,address)",
+          "held_unit_bytes_named_again": 0,
+          "held_unit_reads_named_again": 0,
+          "role": "getter",
+          "store": {
+            "read_bytes": 26432,
+            "reads": 41,
+            "writes": 41,
+            "written_bytes": 26432
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 26432,
+            "sealed_reads": 41,
+            "sealed_writes": 41,
+            "sealed_written_bytes": 26432
+          }
+        }
+      ],
+      "sealed_objects": [
+        "allowances",
+        "balances"
+      ],
+      "store_log_agrees_with_trace": true
+    },
+    {
+      "backend": "full_scan",
+      "benchmark": "RegistryCRUD/clearIfMatch",
+      "calls": [
+        {
+          "aborted": false,
+          "entrypoint": "upsert(bytes32,uint256)",
+          "held_unit_bytes_named_again": 0,
+          "held_unit_reads_named_again": 0,
+          "role": "setup",
+          "store": {
+            "read_bytes": 768,
+            "reads": 8,
+            "writes": 8,
+            "written_bytes": 768
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 768,
+            "sealed_reads": 8,
+            "sealed_writes": 8,
+            "sealed_written_bytes": 768
+          }
+        },
+        {
+          "aborted": false,
+          "entrypoint": "clearIfMatch(bytes32,uint256)",
+          "held_unit_bytes_named_again": 0,
+          "held_unit_reads_named_again": 0,
+          "role": "target",
+          "store": {
+            "read_bytes": 768,
+            "reads": 8,
+            "writes": 8,
+            "written_bytes": 768
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 768,
+            "sealed_reads": 8,
+            "sealed_writes": 8,
+            "sealed_written_bytes": 768
+          }
+        },
+        {
+          "aborted": false,
+          "entrypoint": "read(bytes32)",
+          "held_unit_bytes_named_again": 0,
+          "held_unit_reads_named_again": 0,
+          "role": "getter",
+          "store": {
+            "read_bytes": 768,
+            "reads": 8,
+            "writes": 0,
+            "written_bytes": 0
+          },
+          "store_classifies_every_write_as_update": true,
+          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_writes_equal_traced_writes": true,
+          "trace": {
+            "public_reads": 0,
+            "public_writes": 0,
+            "sealed_read_bytes": 768,
+            "sealed_reads": 8,
+            "sealed_writes": 0,
+            "sealed_written_bytes": 0
+          }
+        }
+      ],
+      "sealed_objects": [
+        "records"
+      ],
+      "store_log_agrees_with_trace": true
+    }
+  ],
+  "checks": {
+    "a_dropped_call_leaves_the_store_as_it_was": true,
+    "a_record_reaches_the_store_only_under_a_reserved_nonce": true,
+    "every_restart_continues_its_deployment": true,
+    "store_log_agrees_with_trace_in_every_call": true,
+    "store_reads_and_reads_named_again_are_the_traced_reads": true,
+    "store_writes_are_the_traced_writes": true
+  },
+  "coverage": {
+    "benchmark_backend_pairs": 14,
+    "calls": 47
+  },
+  "dropped_calls": [
+    {
+      "backend": "full_scan",
+      "call_failed": true,
+      "entrypoint": "mint(address,uint256)",
+      "holds": true,
+      "records_handed_to_the_store": 8,
+      "store_commits_the_next_call": true,
+      "store_holds_what_it_held": true
+    },
+    {
+      "backend": "oram",
+      "call_failed": true,
+      "entrypoint": "mint(address,uint256)",
+      "holds": true,
+      "records_handed_to_the_store": 48,
+      "store_commits_the_next_call": true,
+      "store_holds_what_it_held": true
+    },
+    {
+      "backend": "oram_private_posmap",
+      "call_failed": true,
+      "entrypoint": "mint(address,uint256)",
+      "holds": true,
+      "records_handed_to_the_store": 500,
+      "store_commits_the_next_call": true,
+      "store_holds_what_it_held": true
+    }
+  ],
+  "held_units": "a call opens the counter and the metadata pages of a Path ORAM map once, when it loads the map; the trace names the counter at every access, and the metadata pages at every access of the local scheme and every operation of the tree; the store sees each once",
+  "nonce_reservation": {
+    "a_deployment_reserves_before_it_hands_over_a_record": true,
+    "holds": true,
+    "location": "allowances#0",
+    "object": "allowances",
+    "record_refused_at_the_reserved_count": true,
+    "record_refused_with_nothing_reserved": true,
+    "record_taken_once_its_count_is_reserved": true
+  },
+  "provenance": {
+    "restart": "a seeded deployment restarts from a store in files; the sync policy is off, so the report times no device",
+    "toolchain_manifest_sha256": "5d85324efdafaf8b5d10066c7b0bcc4354ab5a0d2f00f02044dbcd11ee397610"
+  },
+  "restarts": [
+    {
+      "backend": "full_scan",
+      "benchmark": "FixedSlotClassifier/classify",
+      "deployment_bytes": 450,
+      "files_hold_the_last_commit": true,
+      "journal_bytes_by_call": [
+        {
+          "bytes": 389,
+          "entrypoint": "classify(uint256)"
+        }
+      ],
+      "no_nonce_repeats_after_restart": true,
+      "other_deployment_secret_refused": true,
+      "public_state_restored": true,
+      "reads_answer_as_before_the_restart": true,
+      "records_sealed_after_restart": 0,
+      "stale_attested_counter_refused": true
+    },
+    {
+      "backend": "full_scan",
+      "benchmark": "AuthScan/auth",
+      "deployment_bytes": 889,
+      "files_hold_the_last_commit": true,
+      "journal_bytes_by_call": [
+        {
+          "bytes": 669,
+          "entrypoint": "seed(uint256,bytes32)"
+        },
+        {
+          "bytes": 669,
+          "entrypoint": "seed(uint256,bytes32)"
+        },
+        {
+          "bytes": 397,
+          "entrypoint": "auth(bytes32)"
+        }
+      ],
+      "no_nonce_repeats_after_restart": true,
+      "other_deployment_secret_refused": true,
+      "public_state_restored": true,
+      "reads_answer_as_before_the_restart": true,
+      "records_sealed_after_restart": 0,
+      "stale_attested_counter_refused": true
+    },
+    {
+      "backend": "full_scan",
+      "benchmark": "ConfidentialMixer/deposit",
+      "deployment_bytes": 1526,
+      "files_hold_the_last_commit": true,
+      "journal_bytes_by_call": [
+        {
+          "bytes": 1399,
+          "entrypoint": "deposit(bytes32,uint256)"
+        }
+      ],
+      "no_nonce_repeats_after_restart": true,
+      "other_deployment_secret_refused": true,
+      "public_state_restored": true,
+      "reads_answer_as_before_the_restart": true,
+      "records_sealed_after_restart": 0,
+      "stale_attested_counter_refused": true
+    },
+    {
+      "backend": "full_scan_64",
+      "benchmark": "ConfidentialMixer/deposit",
+      "deployment_bytes": 8636,
+      "files_hold_the_last_commit": true,
+      "journal_bytes_by_call": [
+        {
+          "bytes": 8509,
+          "entrypoint": "deposit(bytes32,uint256)"
+        }
+      ],
+      "no_nonce_repeats_after_restart": true,
+      "other_deployment_secret_refused": true,
+      "public_state_restored": true,
+      "reads_answer_as_before_the_restart": true,
+      "records_sealed_after_restart": 0,
+      "stale_attested_counter_refused": true
+    },
+    {
+      "backend": "oram",
+      "benchmark": "ConfidentialMixer/deposit",
+      "deployment_bytes": 78108,
+      "files_hold_the_last_commit": true,
+      "journal_bytes_by_call": [
+        {
+          "bytes": 18506,
+          "entrypoint": "deposit(bytes32,uint256)"
+        }
+      ],
+      "no_nonce_repeats_after_restart": true,
+      "other_deployment_secret_refused": true,
+      "public_state_restored": true,
+      "reads_answer_as_before_the_restart": true,
+      "records_sealed_after_restart": 0,
+      "stale_attested_counter_refused": true
+    },
+    {
+      "backend": "oram_private_posmap",
+      "benchmark": "ConfidentialMixer/deposit",
+      "deployment_bytes": 388983,
+      "files_hold_the_last_commit": true,
+      "journal_bytes_by_call": [
+        {
+          "bytes": 148904,
+          "entrypoint": "deposit(bytes32,uint256)"
+        }
+      ],
+      "no_nonce_repeats_after_restart": true,
+      "other_deployment_secret_refused": true,
+      "public_state_restored": true,
+      "reads_answer_as_before_the_restart": true,
+      "records_sealed_after_restart": 0,
+      "stale_attested_counter_refused": true
+    },
+    {
+      "backend": "full_scan",
+      "benchmark": "ConfidentialMixer/withdraw",
+      "deployment_bytes": 1526,
+      "files_hold_the_last_commit": true,
+      "journal_bytes_by_call": [
+        {
+          "bytes": 1399,
+          "entrypoint": "deposit(bytes32,uint256)"
+        },
+        {
+          "bytes": 1399,
+          "entrypoint": "withdraw(bytes32,uint256)"
+        }
+      ],
+      "no_nonce_repeats_after_restart": true,
+      "other_deployment_secret_refused": true,
+      "public_state_restored": true,
+      "reads_answer_as_before_the_restart": true,
+      "records_sealed_after_restart": 0,
+      "stale_attested_counter_refused": true
+    },
+    {
+      "backend": "full_scan_64",
+      "benchmark": "ConfidentialMixer/withdraw",
+      "deployment_bytes": 8636,
+      "files_hold_the_last_commit": true,
+      "journal_bytes_by_call": [
+        {
+          "bytes": 8509,
+          "entrypoint": "deposit(bytes32,uint256)"
+        },
+        {
+          "bytes": 8509,
+          "entrypoint": "withdraw(bytes32,uint256)"
+        }
+      ],
+      "no_nonce_repeats_after_restart": true,
+      "other_deployment_secret_refused": true,
+      "public_state_restored": true,
+      "reads_answer_as_before_the_restart": true,
+      "records_sealed_after_restart": 0,
+      "stale_attested_counter_refused": true
+    },
+    {
+      "backend": "oram",
+      "benchmark": "ConfidentialMixer/withdraw",
+      "deployment_bytes": 78108,
+      "files_hold_the_last_commit": true,
+      "journal_bytes_by_call": [
+        {
+          "bytes": 18506,
+          "entrypoint": "deposit(bytes32,uint256)"
+        },
+        {
+          "bytes": 17987,
+          "entrypoint": "withdraw(bytes32,uint256)"
+        }
+      ],
+      "no_nonce_repeats_after_restart": true,
+      "other_deployment_secret_refused": true,
+      "public_state_restored": true,
+      "reads_answer_as_before_the_restart": true,
+      "records_sealed_after_restart": 24,
+      "stale_attested_counter_refused": true
+    },
+    {
+      "backend": "oram_private_posmap",
+      "benchmark": "ConfidentialMixer/withdraw",
+      "deployment_bytes": 388983,
+      "files_hold_the_last_commit": true,
+      "journal_bytes_by_call": [
+        {
+          "bytes": 148904,
+          "entrypoint": "deposit(bytes32,uint256)"
+        },
+        {
+          "bytes": 142513,
+          "entrypoint": "withdraw(bytes32,uint256)"
+        }
+      ],
+      "no_nonce_repeats_after_restart": true,
+      "other_deployment_secret_refused": true,
+      "public_state_restored": true,
+      "reads_answer_as_before_the_restart": true,
+      "records_sealed_after_restart": 83,
+      "stale_attested_counter_refused": true
+    },
+    {
+      "backend": "full_scan",
+      "benchmark": "ERC20Lite/transferFrom",
+      "deployment_bytes": 3531,
+      "files_hold_the_last_commit": true,
+      "journal_bytes_by_call": [
+        {
+          "bytes": 1313,
+          "entrypoint": "mint(address,uint256)"
+        },
+        {
+          "bytes": 2391,
+          "entrypoint": "approve(address,address,uint256)"
+        },
+        {
+          "bytes": 3399,
+          "entrypoint": "transferFrom(address,address,address,uint256)"
+        }
+      ],
+      "no_nonce_repeats_after_restart": true,
+      "other_deployment_secret_refused": true,
+      "public_state_restored": true,
+      "reads_answer_as_before_the_restart": true,
+      "records_sealed_after_restart": 0,
+      "stale_attested_counter_refused": true
+    },
+    {
+      "backend": "oram",
+      "benchmark": "ERC20Lite/transferFrom",
+      "deployment_bytes": 225233,
+      "files_hold_the_last_commit": true,
+      "journal_bytes_by_call": [
+        {
+          "bytes": 16116,
+          "entrypoint": "mint(address,uint256)"
+        },
+        {
+          "bytes": 28342,
+          "entrypoint": "approve(address,address,uint256)"
+        },
+        {
+          "bytes": 48703,
+          "entrypoint": "transferFrom(address,address,address,uint256)"
+        }
+      ],
+      "no_nonce_repeats_after_restart": true,
+      "other_deployment_secret_refused": true,
+      "public_state_restored": true,
+      "reads_answer_as_before_the_restart": true,
+      "records_sealed_after_restart": 66,
+      "stale_attested_counter_refused": true
+    },
+    {
+      "backend": "oram_private_posmap",
+      "benchmark": "ERC20Lite/transferFrom",
+      "deployment_bytes": 510668,
+      "files_hold_the_last_commit": true,
+      "journal_bytes_by_call": [
+        {
+          "bytes": 135346,
+          "entrypoint": "mint(address,uint256)"
+        },
+        {
+          "bytes": 28342,
+          "entrypoint": "approve(address,address,uint256)"
+        },
+        {
+          "bytes": 216106,
+          "entrypoint": "transferFrom(address,address,address,uint256)"
+        }
+      ],
+      "no_nonce_repeats_after_restart": true,
+      "other_deployment_secret_refused": true,
+      "public_state_restored": true,
+      "reads_answer_as_before_the_restart": true,
+      "records_sealed_after_restart": 162,
+      "stale_attested_counter_refused": true
+    },
+    {
+      "backend": "full_scan",
+      "benchmark": "RegistryCRUD/clearIfMatch",
+      "deployment_bytes": 1361,
+      "files_hold_the_last_commit": true,
+      "journal_bytes_by_call": [
+        {
+          "bytes": 1297,
+          "entrypoint": "upsert(bytes32,uint256)"
+        },
+        {
+          "bytes": 1297,
+          "entrypoint": "clearIfMatch(bytes32,uint256)"
+        }
+      ],
+      "no_nonce_repeats_after_restart": true,
+      "other_deployment_secret_refused": true,
+      "public_state_restored": true,
+      "reads_answer_as_before_the_restart": true,
+      "records_sealed_after_restart": 0,
+      "stale_attested_counter_refused": true
+    }
+  ],
+  "schema": "uo-storage-boundary-v1",
+  "totals": {
+    "held_unit_reads_named_again": 655,
+    "store_reads": 3862,
+    "store_writes": 4395,
+    "traced_sealed_reads": 4517,
+    "traced_sealed_writes": 4395
+  },
+  "what_is_compared": "the log a storage adapter keeps of the sealed records the runtime opens and seals, against the physical reads and writes of sealed objects in the call's trace"
+}

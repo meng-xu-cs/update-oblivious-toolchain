@@ -64,22 +64,33 @@ The Lean development states more than it currently proves for Path ORAM:
   finds its key's slot (`encode_path_position_map_page_into`). A call starts
   from the map's counter and metadata pages, the units its first access
   reads, and rebuilds the directory and the stash in the enclave
-  (`refresh_path_state_from_storage`); it reads no bucket. An access reads its
+  (`refresh_path_state_from_storage`); it reads no bucket. It holds those
+  records through the call, and no access opens them again. An access reads its
   path into the stash and takes the key's value from the key's block there
   (`select_stash_value_for_slot`): the enclave keeps no copy of the map's
   values, and a write held until commit is read back from the call's pending
   writes. Each block a path read loads is checked (slot and leaf in range,
   its bucket on the path to its leaf), and the accessed slot must have exactly
-  one block, on its prior leaf and with its key. The call-start reads are not
-  in the trace; they follow a fixed pattern set by the public parameters, so
-  they reveal nothing. ERC20Lite `transferFrom` on the local route makes 178
-  traced reads and 50 call-start reads (a capacity-64 map: the counter and 16
-  pages; a capacity-128 map: the counter and 32 pages), and decrypts 94
-  payloads in all; reading every bucket at call start, as calls did before,
-  added the 382 buckets of the two maps.
+  one block, on its prior leaf and with its key. The trace does not have the
+  call-start reads as such. It names the counter and the metadata pages at
+  every access of the local scheme, and on the tree the counter at every node
+  access and the metadata pages at every operation. Those reads follow a
+  fixed pattern set by the public parameters, so they reveal nothing, and the
+  trace names more of them than cross the storage boundary: the store that
+  keeps a map's records sees its counter and each of its pages once in a
+  call, and every bucket read (`results/storage_boundary.json`; see The
+  Storage Boundary in [`claim-boundary.md`](./claim-boundary.md)). ERC20Lite
+  `transferFrom` on the local route traces 178 reads of 103,680 bytes. Its
+  store sees 94 reads of 51,712 bytes: the 50 call-start reads (a capacity-64
+  map: the counter and 16 pages; a capacity-128 map: the counter and 32
+  pages) and 44 buckets. The other 84 traced reads name a counter or a page
+  again. Reading every bucket at call start, as calls did before, added the
+  382 buckets of the two maps.
   `results/overheads.json` reports the call-start reads next to the traced
   counts of every ORAM row (`call_start_reads`, `call_start_bytes`,
-  `physical_reads_with_call_start`, `bytes_read_with_call_start`). On the
+  `physical_reads_with_call_start`, `bytes_read_with_call_start`). The two
+  sums count a call-start read and the traced read that names the same
+  record, so they are more than the store sees. On the
   local scheme every access still rewrites every metadata page (the flat
   position map with its keys, linear in the capacity, and the stash, at most
   16 pages), and its trace reads them all, so an access's cost grows linearly
@@ -366,9 +377,12 @@ even mix and 8 for writes alone, and costs less gas from 128, 32 and 16, but
 moves more bytes at every capacity it admits, and up to its 128 entries it
 costs less than the tree on every metric.
 
-Beside the traced counts the report gives the work that no trace records. A
-call on a Path ORAM map reads the map's counter and metadata pages when it
-starts: 29 reads of 27,840 bytes on the tree at 16,384 entries. An
+Beside the traced counts the report gives the work that no trace records as
+such. A call on a Path ORAM map reads the map's counter and metadata pages
+when it starts, 29 reads of 27,840 bytes on the tree at 16,384 entries, and
+holds them through the call. The trace names them at the call's accesses
+instead, so the store sees fewer reads than the trace names: 314 for a read
+on that tree, whose trace names 332. An
 instrumented call exports the position maps before and after it as a
 witness. It once decoded them from storage, every bucket and metadata page
 of the tree twice: 65,590 sealed records at 16,384 entries, where a read
@@ -390,18 +404,22 @@ trace of a call on a full-scan map does not grow with the map.
 The latencies are wall-clock times of a release build on one machine. The
 validation script runs a quick profile of the sweep, whose latencies are a
 smoke test: one warmup round and two measured rounds, workloads of five
-calls, and maps above 256 entries left at 2 keys. The figures below come
-from the full profile (`scripts/run_capacity_sweep_full.sh`,
-`results/capacity_sweep_full.json`): 30 measured rounds of every kind of
-call after 5 warmup rounds, at every occupancy level of every map, and a
-workload of 20 calls at each read fraction. Each figure is a median with its
-95% bootstrap interval. A call's time splits into staging the call on the
-committed state, loading the call's objects, the rest of the runtime's own
-work, the position-map witness, and the proof bundles of the trace; the
-report also times the JSON serialization of the trace and Lean's check of
-one call of each kind, and gives the peak resident memory. The profile was
-run when Issues 30 to 40 of the external review were in, so with the stash
-cap of 152.
+calls, maps above 256 entries left at 2 keys, and the maps' records kept in
+memory. The figures below come from the full profile
+(`scripts/run_capacity_sweep_full.sh`, `results/capacity_sweep_full.json`):
+30 measured rounds of every kind of call after 5 warmup rounds, at every
+occupancy level of every map, and a workload of 20 calls at each read
+fraction, with the maps' sealed records kept in files and every commit
+synced. Each figure is a median with its 95% bootstrap interval. A call's
+time splits into staging the call on the committed state, loading the
+call's objects, the rest of the runtime's own work, the position-map
+witness, the proof bundles of the trace, and the store's commit of the
+records the call wrote; the report also times the JSON serialization of the
+trace and Lean's check of one call of each kind, and gives the peak
+resident memory. The profile was run when Issues 30 to 41 of the external
+review were in, so with the stash cap of 152 and with every sealed record
+crossing to a storage adapter (see The Storage Boundary in
+[`claim-boundary.md`](./claim-boundary.md)).
 `review/2026-11-external-review/capacity_sweep_baseline.json` is the same
 profile as it was measured before them, and
 `scripts/compare_capacity_sweep.py` compares two reports.
@@ -409,89 +427,129 @@ profile as it was measured before them, and
 Two profiles compare only if one machine in one state measured both, and the
 machine's speed changed when it restarted. The baseline and the profile
 after it, which was run when Issues 30 to 35 were in, were measured in one
-state. The two profiles since, the one run when Issues 36 to 38 were in and
-this one, were measured on a machine about a fifth slower: the code of the
-profile of Issues 30 to 35, measured again beside the first of them, takes
-47.1 ms for a full-scan read at 16,384 entries, for which its own profile
-has 39.9 ms. The full scan, which no issue has changed since, takes 41.8 ms
-for that read in the control beside the first of them and 41.5 ms in the one
-beside this profile. So what an issue saved or cost since is read off a
-control and not off two profiles. A control is the full profile's rounds on
-the three largest maps at 2 keys, run on the code before the change and then
-on the code after it, one run after the other. The review directory has two:
-`capacity_sweep_control_before_wave4.json` and
-`capacity_sweep_control_after_wave4.json` for Issues 36 to 38, and
+state. The three profiles since, those run when Issues 36 to 38, Issues 39
+and 40 and Issue 41 were in, were measured on a machine about a fifth
+slower: the code of the profile of Issues 30 to 35, measured again beside
+the first of them, takes 47.1 ms for a full-scan read at 16,384 entries, for
+which its own profile has 39.9 ms. The full scan, which no issue changed
+between them, takes 41.8 ms for that read in the control beside the first
+of them, 41.5 ms in the one beside the second and 42.6 ms in the first run
+of the one beside this profile. So what an issue saved or cost since is
+read off a control and not off two profiles. A control is the full
+profile's rounds on the three largest maps at 2 keys, run on the code
+before the change and then on the code after it, one run after the other.
+The review directory has three: `capacity_sweep_control_before_wave4.json`
+and `capacity_sweep_control_after_wave4.json` for Issues 36 to 38,
 `capacity_sweep_control_before_cap152.json` and
-`capacity_sweep_control_after_cap152.json` for the stash cap of Issue 40.
+`capacity_sweep_control_after_cap152.json` for the stash cap of Issue 40,
+and `capacity_sweep_control_before_store.json` with three runs after it for
+the storage adapter of Issue 41
+(`capacity_sweep_control_after_store_memory.json`,
+`capacity_sweep_control_after_store_files.json` and
+`capacity_sweep_control_after_store_files_synced.json`).
 
-On its own work, the call without the witness and the proof bundles, the
-full scan is the faster backend up to 4,096 entries, and the tree is the
-faster one for reads from 8,192 entries and for writes at 16,384. A read
-takes 10.2 ms [10.2, 10.4] on the full scan and 13.2 ms [13.0, 13.3] on the
-tree at 4,096 entries, 21.2 ms [20.7, 21.4] and 16.9 ms [16.5, 17.4] at
-8,192, and 43.7 ms [43.0, 44.4] and 19.8 ms [19.4, 20.0] at 16,384. A write
-on the tree takes 1.5 times as long as one on the full scan at 8,192
-entries (63.8 ms [63.1, 64.6] against 41.7 ms [41.3, 42.5] for an
-overwrite) and seven eighths as long at 16,384 (74.2 ms [73.2, 78.2]
-against 85.5 ms [84.4, 87.3]). The medians have this order at every
-occupancy level, and from 4,096 entries on the intervals of a read and of
-an overwrite separate at every level. The executed workloads cost what the
-computed mixes say, to the byte and the physical operation in every
-workload, and 39 units of modeled gas more for each write behind the guard,
-an entrypoint the mixes do not have. Their mean latencies give the same
-order where the two backends separate. At 16,384 entries the tree is the
-faster backend in 22 of the 30 combinations of a read fraction and an
-occupancy level, and in the other eight the intervals overlap: one read in
-four and an even mix at the four levels above 2 keys. On full maps reads
-alone take 21.1 ms a call [20.3, 22.4] on the tree against 43.3 ms [42.8,
-43.7], an even mix 48.3 ms [35.8, 60.4] against 70.7 ms [59.7, 80.9], and
-writes alone 79.3 ms [77.4, 81.9] against 87.3 ms [86.2, 88.6]; a mix's
-calls are of two kinds, so its intervals are wide. At 8,192 entries reads
-alone are faster on the tree at every level, writes alone and one read in
-four on the full scan, and the mixes with more reads do not separate.
-Occupancy does not move the counts and moves the latencies little: from
-4,096 entries on, a kind's median spreads by 9% at most over the five
-levels, and a tree read at 16,384 entries takes 19.8 ms with 2 keys stored
-and 20.2 ms on a full map. A write that aborts does the work of one that
-commits: 85.7 ms [83.7, 88.4] on the full scan at 16,384 entries, where an
-insert takes 85.1 ms [83.3, 88.6].
+On its own work, the call without the witness, the proof bundles and the
+store's commit, the full scan is the faster backend up to 4,096 entries, and
+the tree is the faster one for reads from 8,192 entries and for writes at
+16,384. A read takes 12.6 ms [11.7, 13.6] on the full scan and 14.4 ms
+[14.1, 15.1] on the tree at 4,096 entries, 25.5 ms [24.4, 26.7] and 18.0 ms
+[17.6, 18.5] at 8,192, and 49.4 ms [48.5, 51.8] and 22.2 ms [21.9, 23.0] at
+16,384. A write on the tree takes 1.3 times as long as one on the full scan
+at 8,192 entries (67.5 ms [67.0, 68.6] against 52.9 ms [50.0, 55.0] for an
+overwrite) and four fifths as long at 16,384 (79.6 ms [78.7, 80.9] against
+100.0 ms [97.7, 102.1]). The medians have this order at every occupancy
+level. The intervals of a read and of an overwrite separate at every level
+from 8,192 entries on; at 4,096 entries those of a read overlap on maps half
+full and nine tenths full. The executed workloads cost what the computed
+mixes say, to the byte and the physical operation in every workload, and 39
+units of modeled gas more for each write behind the guard, an entrypoint the
+mixes do not have. Their mean latencies give the same order where the two
+backends separate. At 16,384 entries the tree is the faster backend in 26 of
+the 30 combinations of a read fraction and an occupancy level, and in the
+other four the intervals overlap: an even mix at 2 keys and at nine tenths
+full, and one read in four on maps half full and nine tenths full. On full
+maps reads alone take 22.0 ms a call [21.3, 22.7] on the tree against 52.4
+ms [50.0, 55.5], an even mix 50.7 ms [38.8, 62.0] against 79.0 ms [66.1,
+90.7], and writes alone 82.4 ms [78.7, 86.9] against 107.9 ms [103.6,
+112.4]; a mix's calls are of two kinds, so its intervals are wide. At 8,192
+entries reads alone are faster on the tree at every level and writes alone
+on the full scan, and most mixes between them do not separate. Occupancy
+does not move the counts and moves the latencies little: from 4,096 entries
+on, a kind's median spreads by 24% at most over the five levels (a full-scan
+read that misses at 4,096 entries, 11.0 ms to 13.6 ms), and a tree read at
+16,384 entries takes 22.2 ms with 2 keys stored and 21.4 ms on a full map. A
+write that aborts does the work of one that commits: 101.1 ms [100.0, 105.8]
+on the full scan at 16,384 entries, where an insert takes 101.6 ms [100.5,
+103.3].
 
 Whole calls on the tree are slower at every capacity and for every mix
-(87.1 ms [85.9, 89.3] against 44.1 ms [43.3, 44.7] for a read at 16,384
-entries, and 265.2 ms [259.4, 270.0] against 85.5 ms [83.7, 89.1] for an
+(104.4 ms [101.4, 108.2] against 50.4 ms [49.8, 53.0] for a read at 16,384
+entries, and 286.9 ms [281.8, 296.4] against 111.2 ms [109.9, 113.1] for an
 insert). What a measured call adds to its own work is the proof bundles of
-its trace. They take 66.9 ms of that tree read, whose trace has 664 storage
-events, and 188.8 ms of the insert, whose trace has 2,576. On the full scan
-they take 0.3 ms, since the trace holds the scan of the map as one item. Of
-the full scan's own 43.7 ms, 39.6 ms load the map, which decrypts every
-slot; of the tree's 19.8 ms, 0.7 ms load the map, and the rest is its node
-accesses. Staging the call takes a microsecond on either backend, and the
-tree's witness 0.15 ms. Serializing the trace takes another 0.06 ms for the
-full-scan read and 3.7 ms for the tree's, and Lean checks the witness of
-the call in 91 ms on either. The probe's resident memory at 16,384 entries
-is 84 MB on the full scan and 101 MB on the tree, and a call does not raise
-it. These are calls of the diagnostics build, which the sweep runs. A
-production call builds no proof bundle and keeps no witness. It issues a
-receipt, and the receipt's digest of the ciphertext reads every sealed
-record of a Path ORAM map that the call wrote, which every call on the map
-does: the sweep does not measure that.
+its trace and the store's commit. The bundles take 78.8 ms of that tree
+read, whose trace has 664 storage events, and 201.5 ms of the insert, whose
+trace has 2,576. On the full scan they take 0.4 ms, since the trace holds
+the scan of the map as one item. The commit appends the records the call
+wrote to the store's journal, with the commit metadata, and syncs it. It
+takes 0.9 ms of the full-scan read, which wrote no record (309 bytes), and
+9.2 ms of the full-scan insert, which wrote every slot (2.1 MB). On the tree
+it takes 2.2 ms of the read, which wrote its paths back (174 KB), and 3.1 ms
+of the insert (512 KB). Of the full scan's own 49.4 ms, 44.9 ms load the
+map, which decrypts every slot; of the tree's 22.2 ms, 0.8 ms load the map,
+and the rest is its node accesses. Staging the call takes a microsecond on
+either backend, and the tree's witness 0.1 ms to 1.1 ms. Serializing the
+trace takes another 0.06 ms for the full-scan read and 4.4 ms for the
+tree's, and Lean checks the witness of the call in 117 ms and 130 ms. The
+probe's resident memory at 16,384 entries is 122 MB on the full scan and 153
+MB on the tree, and a call does not raise it; the store keeps a copy of
+every sealed record beside the runtime's (Issue 59 of the review). These are
+calls of the diagnostics build, which the sweep runs. A production call
+builds no proof bundle and keeps no witness. It issues a receipt, and the
+receipt's digest of the ciphertext reads every sealed record of a Path ORAM
+map that the call wrote, which every call on the map does: the sweep does
+not measure that.
 
-The stash cap of 152 costs a tree access about a seventh of its own work. In
-its control, with the cap of 114, a tree read took 11.2 ms at 4,096 entries,
-14.1 ms at 8,192 and 16.8 ms at 16,384, and with the cap of 152 it takes
-12.7 ms, 16.3 ms and 19.6 ms; an overwrite took 42.7 ms, 52.9 ms and 61.6 ms
-and takes 48.2 ms, 61.7 ms and 70.8 ms. That is 13% to 17% more, where the
-call traces 2% more storage operations at most. A node access scans its
-stash for the node it wants, for each bucket of the path it writes back and
-for each block of the path it read, and the stash of a map of 16,384 entries
-has 210 slots where it had 172. The proof bundles of the trace grew as much
-(44.2 ms to 52.3 ms for the read at 16,384 entries, 153.0 ms to 179.8 ms for
-the overwrite), so a whole measured call did too: 61.3 ms to 72.0 ms and
-214.6 ms to 253.9 ms. The full scan has no stash, and its calls moved by 3%
-at most between the two runs. The cap moved neither break-even past a
-capacity that the sweep measures: by the median of a kind of call, the
-profile before this one, with the cap of 114, has the two backends in the
-order this one has them in, at every capacity and occupancy level.
+The storage adapter costs a call some of its own work, and persistence a
+commit. In the adapter's control, the first run is the code before Issue 41
+and the others the code after it, with the records in memory, in files, and
+in files with every commit synced. With the records in memory a full-scan
+read's own work rose from 20.6 ms to 22.0 ms at 8,192 entries and from 42.6
+ms to 45.0 ms at 16,384, and an overwrite's from 41.2 ms to 44.7 ms and from
+84.8 ms to 92.7 ms: 6% to 9%, for the store's comparison of each record the
+call opens and its copy of each record the call seals. A tree overwrite's
+rose from 60.6 ms to 65.6 ms and from 71.1 ms to 77.8 ms, and a tree read's
+from 16.2 ms to 17.4 ms and from 19.3 ms to 23.1 ms; in the two runs in
+files the tree read at 16,384 entries took 20.4 ms and 21.0 ms. The runs
+after the change have wider intervals than the run before it, and at 4,096
+entries they are too wide to say more than that the medians keep their
+order there. At 16,384 entries a commit to files without a sync
+takes 0.03 ms for a full-scan read and 5.2 ms for a full-scan overwrite, 0.5
+ms for a tree read and 1.0 ms for a tree overwrite; with the sync it takes
+0.8 ms, 8.2 ms, 1.5 ms and 2.5 ms. The profile's own work is above the
+control's in memory (49.4 ms against 45.0 ms for the full-scan read at
+16,384 entries). A call that follows a synced commit may start with colder
+caches; the control does not separate that from the profile's larger
+state. Where the records are kept changes no count: the control's four runs
+have one digest of their counts, and this profile has that of the profile
+before it.
+
+The stash cap of 152 costs a tree access about a seventh of its own work.
+In its control, with the cap of 114, a tree read took 11.2 ms at 4,096
+entries, 14.1 ms at 8,192 and 16.8 ms at 16,384, and with the cap of 152 it
+takes 12.7 ms, 16.3 ms and 19.6 ms; an overwrite took 42.7 ms, 52.9 ms and
+61.6 ms and takes 48.2 ms, 61.7 ms and 70.8 ms. That is 13% to 17% more,
+where the call traces 2% more storage operations at most. A node access
+scans its stash for the node it wants, for each bucket of the path it
+writes back and for each block of the path it read, and the stash of a map
+of 16,384 entries has 210 slots where it had 172. The proof bundles of the
+trace grew as much (44.2 ms to 52.3 ms for the read at 16,384 entries, 153.0
+ms to 179.8 ms for the overwrite), so a whole measured call did too: 61.3 ms
+to 72.0 ms and 214.6 ms to 253.9 ms. The full scan has no stash, and its
+calls moved by 3% at most between the two runs. Neither the cap nor the
+storage adapter moved a break-even past a capacity that the sweep measures:
+by the median of a kind of call, the two backends have one order at every
+capacity and occupancy level in the three profiles since Issue 38, with the
+cap of 114, with the cap of 152, and with the records in files.
 
 Issues 36 to 38 of the review took out of a call three costs that grew with
 the store: the witness snapshots, the copy of the store, and a trace event

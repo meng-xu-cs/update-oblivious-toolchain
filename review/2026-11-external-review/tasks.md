@@ -1250,6 +1250,8 @@ that was run again with the cap are under Wave 5 above.
 
 ## Wave 6: evidence at a storage boundary
 
+Issue 41 is done; Issue 42 is next.
+
 ### Issue 41 — Put storage behind an adapter that keeps its own I/O log
 
 Source: F4, F8 (§5, §9). Size: M to L. Depends on: Issues 24, 31 and 32.
@@ -1275,6 +1277,120 @@ length, and the class of each write from its old and new bytes). The runtime
 loads and commits through it. A probe report compares the adapter's log with
 the trace and counts untraced I/O separately. Measure persistence and a cold
 restart from files with a freshness snapshot.
+
+As built. `runtime/uo-store/src/storage.rs` has the `StorageAdapter` trait
+with `MemoryStorage` and `FileStorage`. A deployed contract has one (in
+memory unless it is deployed with another), which keeps a copy of every
+sealed record under the location name a trace gives it. The runtime's
+objects keep their own copies as they did, and every record crosses to the
+adapter at the two functions that all opens and all seals in place already
+went through (`with_opened_payload` and `reseal_payload_and_record_write`
+in the generated object helpers), by way of the object's cipher, which
+holds its object's part of the store. An open names the record to the
+adapter, which compares the runtime's copy with its own, fails the call on
+a difference and logs the read. A seal hands the adapter the new record,
+and the adapter classifies the write from the record it kept, logs it, and
+the call fails unless the class is `Update`. The runtime's copies are thus
+a cache that every open checks, and the log is the adapter's own. The
+exact objects' opens now carry the location names of the trace
+(`name[i]`, `name#i`), which they did not need before.
+
+The adapter is transactional as a call is: `begin`, then the call's reads
+and writes, then `commit` with the commit metadata or `abandon`, which puts
+back what the call replaced. The engine commits in the adapter before it
+takes the call's state (`commit_staged` can now fail), and a staged call
+that is dropped abandons (`StagedStore` in `runtime/uo-evm/src/store_meta.rs`).
+`FileStorage` keeps a snapshot and a journal: a commit is one journal entry
+with a SHA-256, appended and synced as its policy says, an entry cut short
+is dropped when the directory is opened, and a journal past a set length
+is replaced by a snapshot.
+
+What the comparison found, which the issue did not expect. The issue took
+the counter and metadata pages a Path ORAM map reads at a call's start for
+I/O beside the traced reads. They are not beside them. The runtime opens a
+map's counter and metadata pages once, when the call loads the map, and
+holds them; the trace names the counter at every access, and the metadata
+pages at every access of the local scheme and every operation of the tree.
+So the adapter sees every bucket read the trace names and sees the counter
+and each page once: fewer reads than the trace names, and none the trace
+does not name. Writes agree one for one, and exact objects agree in reads
+too. `results/storage_boundary.json` (`--only storage-boundary`, in the
+validation script and in CI) runs every benchmark on every sealed backend,
+14 pairs and 47 calls: 4,395 writes on both sides, each classified
+`Update` by the adapter; 4,517 traced reads against 3,862 at the adapter,
+the other 655 naming a counter or a page again. ERC20Lite `transferFrom`
+on the local scheme traces 178 reads of 103,680 bytes where 94 reads of
+51,712 bytes cross. The first acceptance criterion is therefore met for
+writes and for exact objects, and for Path ORAM reads in this weaker form,
+which the report checks exactly: per object, the adapter's reads are the
+trace's with each counter and page at its first read only. The modeled
+cost charges the reads the trace names. Making the trace name what crosses
+is Issue 57. The second kind of untraced read the issue names, the
+public-state digest of a public object on a sealed backend, would show at
+the adapter as reads the trace does not name and fail the report; no
+benchmark declares such an object.
+
+Nonces. A sealed record carries its seal count in the clear. The adapter
+takes a record only if that count is below the count it has reserved for
+the record's object; the cipher reserves the counts made so far, and a step
+of `2^20` beyond, before it hands a record over; a reservation is never
+undone, and `FileStorage` journals it before it takes effect. A restart
+resumes each key's count at its reservation. So no ciphertext reaches the
+adapter before the state that fixes its nonce is durable, and a restart
+repeats no nonce, also not one of a call that was dropped or cut off.
+
+Restart. `ContractInstance::restart_with_seed` (test and diagnostics
+builds) rebuilds an instance from a store in files: it opens the commit
+metadata, which carries a tag under a key derived from the master secret
+(`StoreMetaKey`), compares its rollback counter with an attested one
+(`RuntimeFreshnessState::recover`, which existed and had no caller),
+instantiates each object from the secret and gives it the store's records,
+and compares the digest of the restored public state with the metadata's.
+Public (raw) objects are not sealed and not logged; a commit leaves their
+changed values with the adapter so that a restart finds them. The report
+restarts every benchmark on every sealed backend after its workload's
+writes: the reads answer and trace as they did on a runtime that never
+restarted, a stale attested counter and another deployment's secret are
+refused, and no record sealed after the restart carries a nonce from
+before. What a restart does not do: it does not detect a store rolled back
+together with the attested counter (the rollback resistance of the
+deployment assumptions), nor a record replaced by an older record of its
+location (a digest tree, Issue 44); a deployment from OS randomness has
+its master secret in memory alone and cannot restart (Issue 58); and it
+instantiates each object, sealing its initial records, before it takes the
+store's, which a restart need not do (Issue 59).
+
+Cost. The capacity sweep can keep its maps' records in files
+(`UO_SWEEP_STORAGE`), and its full profile does, with every commit synced:
+each row has the commit's time and bytes (`p50_persistence_ns`,
+`p50_persisted_bytes`), and a call's own work leaves the commit out, as it
+leaves out the witness and the proof bundles. The full profile was run
+again (68 minutes; its counts are those of the profile before it), and
+`docs/path-oram.md` has its figures. At 16,384 entries a synced commit
+takes 0.9 ms of a full-scan read, which writes no record, 9.2 ms of a
+full-scan insert (2.1 MB), 2.2 ms of a tree read (174 KB) and 3.1 ms of a
+tree insert (512 KB). The control
+([`capacity_sweep_control_before_store.json`](./capacity_sweep_control_before_store.json),
+the code before this issue, and three runs after it with the records in
+[memory](./capacity_sweep_control_after_store_memory.json), in
+[files](./capacity_sweep_control_after_store_files.json) and in
+[files with every commit synced](./capacity_sweep_control_after_store_files_synced.json))
+gives the adapter's cost inside a call: 6% to 9% of a full-scan call's own
+work from 8,192 entries (42.6 ms to 45.0 ms for a read at 16,384 entries,
+84.8 ms to 92.7 ms for an overwrite), and 2% to 9% of a tree write's; a
+tree read at 16,384 entries rose from 19.3 ms to between 20.4 ms and 23.1
+ms over the three runs. The backends keep their order by the median of a
+kind of call in all 525 cells of the profile. The probe's resident memory
+at 16,384 entries rose from 84 MB to 122 MB on the full scan and from 101
+MB to 153 MB on the tree. The store keeps a copy of every record beside
+the runtime's (Issue 59).
+
+Checks. Invariant 18 of `docs/runtime/secret-state.md`; the boundary bit
+`sealed_records_cross_the_storage_boundary`, whose unit test applies
+twelve drifts; pins in three definitions of the Lean implementation
+interface; three tamper scenarios the Lean checker rejects (422 in all);
+a claim and a non-claim in the claim manifest; tests of the store, of the
+engine and of the report's comparison.
 
 #### Acceptance criteria
 
@@ -1523,3 +1639,72 @@ item, and reject a `#[cfg(test)]` that is not on a module or a function.
 Acceptance: the slice of every pinned file is the file without its test
 items, tested on files with braces in strings; no check splits its needles
 to avoid its own text.
+
+### Issue 57 — Trace the reads of a Path ORAM map that cross the storage boundary
+
+Source: Issue 41. Size: L. Depends on: Issue 41.
+
+A call opens the counter and the metadata pages of a Path ORAM map once,
+when it loads the map, and holds them. Its trace names the counter at
+every access, and the metadata pages at every access of the local scheme
+and every operation of the tree. `results/storage_boundary.json` counts
+the difference: 655 of the 4,517 traced reads of the benchmarks' calls
+cross no boundary. The leakage claim is about the trace and covers what
+crosses, since the reads named again are at public positions. The modeled
+cost is not what crosses: it charges up to twice the bytes read for a call
+that makes several accesses to a map of the local scheme.
+
+Trace what the runtime reads: the counter and the metadata pages of a map
+once per call, where the call loads the map, and the buckets at each
+access. The schedule of a call changes, and with it the manifest's read
+bounds and the cost model in the compiler, the per-access trace shape and
+the controller's page budgets in `uo-core` and in the Lean ORAM models,
+the checkers that match a leaf schedule against storage events, and every
+count in the Path ORAM reports. The other way round, opening the counter
+and the pages again at every access, would make the trace true by doing
+work that serves nothing.
+
+Acceptance: the storage-boundary report compares reads one for one, with
+no held unit; `call_start_reads` and the `*_with_call_start` sums leave the
+overhead report; the Path ORAM theorems and checkers hold on the new
+schedule; `docs/path-oram.md` has the new counts and break-evens.
+
+### Issue 58 — Seal the master secret so that a production deployment can restart
+
+Source: Issue 41. Size: M. Depends on: Issues 41 and 53.
+
+Only a seeded deployment can restart from its store, and a seeded
+deployment exists in test and diagnostics builds. A deployment from OS
+randomness keeps its master secret in memory alone, so its store in files
+outlives it and nothing can read it. A production restart needs the master
+secret sealed to the platform (an SGX sealing key or its like), a restart
+entry point on `ProductionContractInstance` that takes the sealed secret
+and the attested rollback counter, the receipt chain carried over the
+restart (the last receipt is in memory too), and a place in the deployment
+assumptions for the sealing. None of it changes a call.
+
+Acceptance: a production instance restarts from files in the build a
+production runtime uses, its first receipt after the restart follows the
+last before it, and the restart is refused with a stale counter, another
+platform's sealed secret or a changed store.
+
+### Issue 59 — Keep sealed records in the store alone
+
+Source: Issue 41. Size: L. Depends on: Issue 41.
+
+The store keeps a copy of every sealed record, and the runtime's objects
+keep theirs, which every open compares with the store's. The comparison
+makes the second copy harmless, and the memory of a deployment is twice
+its ciphertext. A restart also instantiates each object, sealing its
+initial records, before it replaces them with the store's.
+
+Let an object hold no sealed record: load reads the records it opens from
+the store, commit hands over the ones it seals, and the copy-on-write
+sharing of Path ORAM pages (Issue 37) moves into the store's pending
+state. A restart then builds objects without sealing anything. The digest
+of the ciphertext that a production receipt names becomes the store's.
+
+Acceptance: a deployment holds each sealed record once; the capacity
+sweep's resident memory at 16,384 entries falls by about the size of the
+map's ciphertext; a restart seals no record; the storage-boundary report
+is unchanged.

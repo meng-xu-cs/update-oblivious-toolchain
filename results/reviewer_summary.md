@@ -4,75 +4,75 @@
 
 | Report | Milliseconds |
 | --- | ---: |
-| `total_probe_ms` | `2157129` |
-| `tamper_validation` | `918790` |
-| `canonical_pathoram_pair_validation` | `214441` |
-| `overheads` | `171648` |
-| `trace_equivalence` | `95225` |
-| `runtime_implementation_kernel_meeting_confinement_boundary_validation` | `79667` |
-| `mutual_information` | `76485` |
-| `leakage_auc` | `74330` |
-| `fresh_coin_validation` | `73783` |
-| `runtime_implementation_confinement_boundary_validation` | `43403` |
-| `runtime_implementation_kernel_machine_confinement_boundary_validation` | `42222` |
-| `runtime_implementation_shared_kernel_refinement_boundary_validation` | `41657` |
-| `runtime_implementation_shared_kernel_machine_refinement_boundary_validation` | `41151` |
-| `runtime_implementation_kernel_meeting_boundary_validation` | `40301` |
-| `runtime_implementation_small_confidential_kernel_machine_refinement_boundary_validation` | `38444` |
-| `runtime_implementation_public_bridge_observer_refinement_boundary_validation` | `26964` |
-| `runtime_implementation_residual_helper_shell_machine_refinement_boundary_validation` | `25335` |
-| `pathoram_pair_validation` | `10852` |
-| `seeded_witness_validation` | `8013` |
-| `kernel_model_alignment_validation` | `7550` |
-| `runtime_implementation_confidential_statement_trace_bridge_refinement_boundary_validation` | `4020` |
-| `runtime_implementation_slot_adapter_machine_refinement_boundary_validation` | `3523` |
-| `runtime_implementation_interface_validation` | `3149` |
-| `confidential_proof_family_finish_slot_boundary_validation` | `3141` |
-| `confidential_proof_family_assurance_validation` | `3064` |
-| `confidential_proof_family_slot_assurance_validation` | `3023` |
-| `runtime_small_confidential_kernel_boundary_validation` | `3006` |
-| `confidential_proof_family_validation` | `3002` |
-| `confidential_proof_family_refinement_boundary_validation` | `2997` |
-| `confidential_proof_family_kernel_interface_validation` | `2939` |
-| `confidential_core_lowering_validation` | `2936` |
-| `confidential_core_validation` | `2920` |
-| `runtime_shared_confidential_kernel_boundary_validation` | `2903` |
-| `confidential_proof_family_boundary_validation` | `2874` |
-| `confidential_proof_family_slot_boundary_validation` | `2851` |
-| `confidential_core_slot_validation` | `2841` |
-| `confidential_core_kernel_interface_slot_finish_boundary_validation` | `2831` |
-| `shell_boundary_validation` | `2802` |
-| `confidential_core_kernel_interface_slot_validation` | `2800` |
-| `confidential_core_shell_boundary_slot_validation` | `2791` |
-| `runtime_kernel_machine_finish_boundary_validation` | `2787` |
-| `shell_boundary_slot_validation` | `2783` |
-| `kernel_slot_dsl_validation` | `2776` |
-| `kernel_slot_boundary_validation` | `2761` |
-| `trusted_kernel_validation` | `2760` |
-| `controller_observer_validation` | `2744` |
-| `confidential_core_shell_boundary_lowering_validation` | `2710` |
-| `kernel_refinement_validation` | `2710` |
+| `total_probe_ms` | `2255898` |
+| `tamper_validation` | `972685` |
+| `canonical_pathoram_pair_validation` | `222952` |
+| `overheads` | `178632` |
+| `trace_equivalence` | `96594` |
+| `runtime_implementation_kernel_meeting_confinement_boundary_validation` | `81872` |
+| `fresh_coin_validation` | `78328` |
+| `leakage_auc` | `75889` |
+| `mutual_information` | `74779` |
+| `runtime_implementation_confinement_boundary_validation` | `44210` |
+| `runtime_implementation_kernel_machine_confinement_boundary_validation` | `44002` |
+| `runtime_implementation_shared_kernel_machine_refinement_boundary_validation` | `42814` |
+| `runtime_implementation_shared_kernel_refinement_boundary_validation` | `42607` |
+| `runtime_implementation_kernel_meeting_boundary_validation` | `42365` |
+| `runtime_implementation_small_confidential_kernel_machine_refinement_boundary_validation` | `41838` |
+| `runtime_implementation_public_bridge_observer_refinement_boundary_validation` | `29075` |
+| `runtime_implementation_residual_helper_shell_machine_refinement_boundary_validation` | `28058` |
+| `pathoram_pair_validation` | `10994` |
+| `seeded_witness_validation` | `8289` |
+| `kernel_model_alignment_validation` | `8151` |
+| `runtime_implementation_confidential_statement_trace_bridge_refinement_boundary_validation` | `4331` |
+| `runtime_implementation_slot_adapter_machine_refinement_boundary_validation` | `3927` |
+| `runtime_shared_confidential_kernel_boundary_validation` | `3299` |
+| `confidential_proof_family_boundary_validation` | `3158` |
+| `kernel_validation` | `3148` |
+| `confidential_proof_family_finish_slot_boundary_validation` | `3122` |
+| `confidential_proof_family_validation` | `3121` |
+| `runtime_implementation_interface_validation` | `3113` |
+| `confidential_proof_family_kernel_interface_validation` | `3111` |
+| `confidential_proof_family_slot_assurance_validation` | `3090` |
+| `confidential_proof_family_assurance_validation` | `3086` |
+| `confidential_proof_family_refinement_boundary_validation` | `3049` |
+| `kernel_lowering_validation` | `3046` |
+| `confidential_core_lowering_validation` | `3022` |
+| `kernel_dsl_validation` | `2952` |
+| `kernel_slot_boundary_validation` | `2951` |
+| `confidential_proof_family_slot_boundary_validation` | `2949` |
+| `shell_boundary_slot_validation` | `2922` |
+| `runtime_small_confidential_kernel_boundary_validation` | `2893` |
+| `shell_boundary_validation` | `2856` |
+| `confidential_core_kernel_interface_slot_validation` | `2853` |
+| `confidential_core_shell_boundary_lowering_validation` | `2841` |
+| `confidential_core_kernel_interface_slot_finish_boundary_validation` | `2811` |
+| `kernel_refinement_validation` | `2758` |
+| `correctness` | `2756` |
+| `runtime_kernel_machine_finish_boundary_validation` | `2755` |
+| `confidential_core_kernel_finish_slot_validation` | `2749` |
+| `trusted_kernel_validation` | `2736` |
+| `runtime_kernel_machine_finish_witness_validation` | `2724` |
+| `kernel_slot_dsl_validation` | `2715` |
 | `shell_boundary_lowering_validation` | `2705` |
-| `kernel_lowering_validation` | `2699` |
-| `runtime_kernel_machine_finish_witness_validation` | `2694` |
-| `confidential_core_kernel_finish_slot_validation` | `2677` |
-| `kernel_dsl_validation` | `2674` |
-| `correctness` | `2664` |
-| `static_checks` | `2660` |
-| `kernel_validation` | `2656` |
-| `kernel_interface_confinement_boundary_validation` | `2367` |
-| `witness_validation` | `2195` |
-| `kernel_refinement_boundary_validation` | `2177` |
-| `kernel_interface_validation` | `2130` |
-| `kernel_interface_singleton_boundary_validation` | `2125` |
-| `kernel_confinement_boundary_validation` | `2081` |
-| `pathoram_hidden_validation` | `2078` |
-| `kernel_finish_boundary_validation` | `2029` |
-| `runtime_residual_helper_shell_boundary_validation` | `1962` |
-| `runtime_boundary_validation` | `1519` |
-| `runtime_public_bridge_boundary_validation` | `794` |
-| `runtime_slot_adapter_boundary_validation` | `634` |
-| `runtime_confidential_statement_trace_bridge_boundary_validation` | `619` |
+| `confidential_core_shell_boundary_slot_validation` | `2687` |
+| `confidential_core_slot_validation` | `2676` |
+| `confidential_core_validation` | `2664` |
+| `kernel_finish_boundary_validation` | `2653` |
+| `static_checks` | `2622` |
+| `controller_observer_validation` | `2615` |
+| `kernel_interface_validation` | `2494` |
+| `kernel_refinement_boundary_validation` | `2460` |
+| `kernel_confinement_boundary_validation` | `2383` |
+| `kernel_interface_singleton_boundary_validation` | `2279` |
+| `kernel_interface_confinement_boundary_validation` | `2269` |
+| `pathoram_hidden_validation` | `2217` |
+| `witness_validation` | `2178` |
+| `runtime_residual_helper_shell_boundary_validation` | `2023` |
+| `runtime_boundary_validation` | `1692` |
+| `runtime_public_bridge_boundary_validation` | `747` |
+| `runtime_confidential_statement_trace_bridge_boundary_validation` | `674` |
+| `runtime_slot_adapter_boundary_validation` | `617` |
 | `confidential_fragment_validation` | `0` |
 | `paper_main_family_boundary_validation` | `0` |
 | `paper_main_slot_boundary_validation` | `0` |
@@ -89,18 +89,18 @@
 | `overheads.cases[4].variants[4].trace_json_bytes` | `5786348` |
 | `overheads.matrix[18].trace_json_bytes` | `5786348` |
 | `canonical_pathoram_pair_validation.scenarios[0].certificate_json_bytes` | `5252718` |
-| `tamper_validation.scenarios[410].artifact_json_bytes` | `5252718` |
-| `tamper_validation.scenarios[411].artifact_json_bytes` | `5252718` |
+| `tamper_validation.scenarios[413].artifact_json_bytes` | `5252718` |
+| `tamper_validation.scenarios[414].artifact_json_bytes` | `5252718` |
 | `canonical_pathoram_pair_validation.scenarios[4].theorem_input_json_bytes` | `4881412` |
-| `tamper_validation.scenarios[413].artifact_json_bytes` | `4881412` |
+| `tamper_validation.scenarios[416].artifact_json_bytes` | `4881412` |
 | `overheads.cases[4].oram_private_posmap.trace_json_bytes` | `3349480` |
 | `overheads.cases[4].variants[3].trace_json_bytes` | `3349480` |
 | `overheads.matrix[17].trace_json_bytes` | `3349480` |
 | `fresh_coin_validation.scenarios[0].witness_family_json_bytes` | `2623334` |
-| `tamper_validation.scenarios[407].artifact_json_bytes` | `2623334` |
-| `runtime_implementation_kernel_meeting_boundary_validation.scenarios[15].boundary_json_bytes` | `1730690` |
-| `runtime_implementation_kernel_meeting_confinement_boundary_validation.scenarios[15].boundary_json_bytes` | `1730690` |
-| `runtime_implementation_confinement_boundary_validation.scenarios[15].boundary_json_bytes` | `1725265` |
+| `tamper_validation.scenarios[410].artifact_json_bytes` | `2623334` |
+| `runtime_implementation_kernel_meeting_boundary_validation.scenarios[15].boundary_json_bytes` | `1773964` |
+| `runtime_implementation_kernel_meeting_confinement_boundary_validation.scenarios[15].boundary_json_bytes` | `1773964` |
+| `runtime_implementation_confinement_boundary_validation.scenarios[15].boundary_json_bytes` | `1768539` |
 
 ## Largest Estimated Artifacts
 
@@ -170,9 +170,9 @@
 
 | Surface | Total Non-Empty LOC |
 | --- | ---: |
-| Trusted Rust runtime surface | `14387` |
-| Outer runtime risk surface | `3971` |
-| Lean theorem/checker repo surface | `126765` |
+| Trusted Rust runtime surface | `14403` |
+| Outer runtime risk surface | `4577` |
+| Lean theorem/checker repo surface | `126861` |
 
 ## Current TCB Table
 

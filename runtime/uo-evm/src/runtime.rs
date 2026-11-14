@@ -26,12 +26,15 @@ use uo_core::{
     CompiledArtifact, CompiledContract, CompiledFunction, EncryptedReturnPayload, ExecutionTrace,
 };
 use uo_core::{RuntimeCallOutcome, Value};
+use uo_store::SharedStorage;
 
 pub(crate) fn deploy_contract_runtime(
     contract_state: &[StateObject],
     master: &RuntimeMasterSecret,
+    storage: &SharedStorage,
+    restore: bool,
 ) -> Result<ContractRuntime> {
-    state::ContractRuntime::deploy(contract_state, master)
+    state::ContractRuntime::deploy(contract_state, master, storage, restore)
 }
 
 #[cfg(test)]

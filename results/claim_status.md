@@ -16,6 +16,7 @@ Generated from `docs/claim-boundary.md` by `mplus-probe --only claim-status`. Do
 | `admitted-package-identity-hash` | generated-and-checked | The artifact-level admitted-package hash is a canonical SHA-256 binding over source-language tag, semantics-profile tag, source bytes, sidecar metadata, compilation mode, compiler version, toolchain digest, and package schema tag. |
 | `executable-semantics-profile` | generated-and-checked | Every artifact declares the executable-semantics profile tag uo-evm-modular256-v1, bound into the admitted-package hash, pinning the executable divergences from Solidity 0.8; the proof-grade checker rejects an unknown or divergent profile. |
 | `source-backed-runtime-boundaries` | source-frozen | The source-backed runtime implementation boundaries are source-frozen/static-drift evidence, not a full semantics-of-Rust refinement; proof-critical obligations may not rest solely on a source regression. |
+| `storage-boundary-log` | empirically-tested | Every sealed record the runtime opens or seals crosses to a storage adapter, which logs the read with the record it keeps and the write with the class it computes from its own records. On every benchmark and sealed backend the adapter's writes are the trace's writes of sealed objects, each an Update, and its reads are the trace's reads, except that a Path ORAM map's counter and metadata pages cross once per call where the trace names them at every access or operation. A runtime restarted from the adapter's files answers as before and repeats no nonce. Empirically tested over the benchmarks; the places where a record crosses are source-frozen. |
 | `dsl-admission-subset` | empirically-tested | uo-solc admits the uo-solidity-like-dsl-v1 subset and rejects every unsupported feature with a diagnostic that names it; admission is empirically exercised, not a semantic proof. |
 | `insecure-evaluation-baselines` | experimental | Executable insecure raw baselines (insecure-eval-raw) run confidential work on raw backends to measure overhead and leakage; they are evaluation-only and never admitted by the proof-grade or deployment paths. |
 
@@ -36,6 +37,7 @@ Generated from `docs/claim-boundary.md` by `mplus-probe --only claim-status`. Do
 
 | id | status | claim |
 | --- | --- | --- |
+| `nonclaim-production-restart-and-store-rollback` | non-claim | Not claimed: a restart of a deployment from OS randomness, whose master secret is in memory alone, or the detection of a store that was rolled back or holds an older record of a location. A restart relies on the rollback resistance of the TEE deployment assumptions. |
 | `nonclaim-machine-code-equivalence` | non-claim | Not claimed: downstream machine-code equivalence below the checked runtime boundary. Would require additional models and proofs. |
 | `nonclaim-rust-semantics-refinement` | non-claim | Not claimed: a complete semantics-of-Rust refinement for every residual implementation detail. |
 | `nonclaim-sgx-page-identities` | non-claim | Not claimed: raw equality of SGX page identities or full micro-event sequences. |

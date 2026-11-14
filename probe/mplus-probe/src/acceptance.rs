@@ -53,6 +53,7 @@ fn report_mode(report: &str) -> &'static str {
         // Written by scripts/run_stash_occupancy_full.sh, not the validation
         // script.
         | "stash_occupancy_full"
+        | "storage_boundary"
         // Written by scripts/measure_tree_eviction_instructions.sh, not the probe.
         | "tree_eviction_instructions"
         // Written by scripts/measure_kernel_operator_instructions.sh, not the
@@ -572,6 +573,47 @@ mod tests {
         let report = run_acceptance_check_report(dir.to_str().unwrap()).unwrap();
         assert_eq!(report["accepted"], json!(false));
         assert!(run_acceptance_check_fail_closed(dir.to_str().unwrap()).is_err());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// A call of the storage-boundary report that did not abort is not a
+    /// failure. A call whose store log differs from its trace is one, and so
+    /// is a restart that sealed a record under a nonce the files held.
+    #[test]
+    fn a_storage_boundary_difference_fails_closed() {
+        let dir = temp_results_dir("storage-boundary");
+        let report = |agrees: bool, no_nonce_repeats: bool| {
+            json!({
+                "accepted": agrees && no_nonce_repeats,
+                "checks": {
+                    "store_log_agrees_with_trace_in_every_call": agrees,
+                    "every_restart_continues_its_deployment": no_nonce_repeats,
+                },
+                "benchmarks": [{
+                    "store_log_agrees_with_trace": agrees,
+                    "calls": [{
+                        "aborted": false,
+                        "store_writes_equal_traced_writes": true,
+                        "store_reads_equal_traced_reads_but_for_held_units": agrees,
+                    }],
+                }],
+                "restarts": [{"no_nonce_repeats_after_restart": no_nonce_repeats}],
+            })
+        };
+        write(&dir, "storage_boundary.json", report(true, true));
+        let accepted = run_acceptance_check_report(dir.to_str().unwrap()).unwrap();
+        assert_eq!(accepted["accepted"], json!(true));
+        assert!(run_acceptance_check_fail_closed(dir.to_str().unwrap()).is_ok());
+        for (agrees, no_nonce_repeats) in [(false, true), (true, false)] {
+            write(
+                &dir,
+                "storage_boundary.json",
+                report(agrees, no_nonce_repeats),
+            );
+            let rejected = run_acceptance_check_report(dir.to_str().unwrap()).unwrap();
+            assert_eq!(rejected["accepted"], json!(false));
+            assert!(run_acceptance_check_fail_closed(dir.to_str().unwrap()).is_err());
+        }
         let _ = fs::remove_dir_all(&dir);
     }
 

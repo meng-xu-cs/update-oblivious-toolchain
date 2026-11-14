@@ -20,7 +20,9 @@ and the ownership boundaries that keep them auditable.
 | `RuntimeShadowState` / `ConfidentialRuntimeShadowState` / `PublicRuntimeShadowState` | `runtime/uo-evm/src/state.rs` | runtime-only reopened state; public shell receives only public wrapper |
 | `RuntimeObject` graph | `runtime/uo-evm/src/objects.rs` | runtime-owned object state and commit/restore paths. A committed object is cold and is never changed: the committed state and the states staged from it hold the same object (invariant 16) |
 | `OramState` and ORAM transcript/write evidence | `runtime/uo-evm/src/oram.rs` | runtime-owned ORAM state; generated helpers own codec/rebuild/write-log internals. The sealed records of a map's storage (`SealedPage`) are held by reference by the committed map and by the copy a call loads |
-| Store cipher key and plaintext staging buffers | `runtime/uo-store/src/*` | store/codec layer; generated helpers own exact-size seal/open/filler surface. The cipher also holds the count of the seals under its key, which is public |
+| Store cipher key and plaintext staging buffers | `runtime/uo-store/src/*` | store/codec layer; generated helpers own exact-size seal/open/filler surface. The cipher also holds the count of the seals under its key, which is public, and its object's part of the contract's store |
+| Commit-metadata key (`StoreMetaKey`) | `runtime/uo-evm/src/secret.rs` | an HKDF-SHA256 expansion of the master secret, kept by the contract instance. It tags the public metadata of every commit, so a restart takes only metadata that a runtime with the same secret wrote. It is wiped on drop and has no `Clone`, no serialization and an opaque `Debug` form |
+| Storage adapter (`StorageAdapter`: `MemoryStorage`, `FileStorage`) | `runtime/uo-store/src/storage.rs` | holds no secret: the sealed records as a host keeps them, the values of the public objects, the seal-count reservations and the tagged commit metadata |
 
 ## Invariants
 
@@ -156,6 +158,50 @@ and the ownership boundaries that keep them auditable.
     and is recorded by itself. A run that names a Path ORAM object is
     rejected, so no run holds an event of a Path ORAM access.
 
+18. Every sealed record crosses to the contract's store where it is opened
+    and where it is sealed. A deployed contract has a store
+    (`StorageAdapter` in `runtime/uo-store/src/storage.rs`), in memory
+    unless it is deployed with one in files. The store keeps a copy of
+    every sealed record under the name a trace gives the record's location.
+    The one function that opens a record first names it to the store
+    (`check_stored_record`): the store compares the runtime's copy with the
+    record it keeps, fails the call if they differ, and logs the read. The
+    one function that seals a record in place hands the store the new
+    record (`store_sealed_record`), after the check of invariant 14 and
+    before the write's event is recorded: the store classifies the write
+    from the record it kept and logs it, and the call fails unless that
+    class is `Update` too. So the store writes its log of a call from its
+    own records, and the runtime's copies of the records are a cache that
+    every open compares with the store.
+
+    A call's records are pending in the store until the call is committed.
+    The engine commits them there, with the commit metadata, before it
+    takes the call's state. A call that fails, or is dropped after it was
+    staged, abandons them: the store puts back what they replaced.
+
+    The store takes a sealed record only if the seal count in the record's
+    nonce is below the count it has reserved for the record's object, and
+    the cipher reserves the counts of the seals made so far before it hands
+    a record over. A reservation is never undone, and a store in files has
+    it in its journal before it takes effect. A runtime that restarts from
+    the files resumes each key's count at its reservation
+    (`resume_seal_count`, which can only raise a count). So it seals no
+    record under a nonce that a record handed to the store carries, whether
+    the call that sealed that record was committed, abandoned or cut off.
+
+    A restart (`ContractInstance::restart_with_seed`, in test and
+    diagnostics builds) takes the commit metadata only with the tag of the
+    deployment's secret, compares its rollback counter with an attested
+    one, takes each object's records from the store, and compares the
+    digest of the public state it restored with the one the metadata
+    names. It does not detect a store that was rolled back together with
+    the attested counter, nor a record replaced by an older record of its
+    location: a record carries its location and not its version. The first
+    is the rollback resistance of the deployment assumptions; a digest tree
+    over the records is Issue 44 of the external review. A deployment from
+    OS randomness cannot restart, since its master secret is in memory
+    alone.
+
 ### What a nonce shows
 
 A record's nonce shows how many records were sealed under its object's key
@@ -166,7 +212,10 @@ follows from the storage trace and shows nothing more. A call that stops on
 an evaluation error is dropped with its trace, but its seals stay counted:
 the next record's nonce then shows how many records the dropped call had
 sealed under that key. Evaluation errors are outside the trace claims (see
-[`proof-architecture.md`](../proof-architecture.md)).
+[`proof-architecture.md`](../proof-architecture.md)). After a restart a
+key's count resumes at the count its store had reserved, so the next
+record's nonce also shows that the runtime restarted and how many counts
+it skipped.
 
 ### What a marker shows
 
@@ -194,7 +243,7 @@ write/read evidence, direct store cipher calls outside the codec layer, and
 reintroduction of host-visible hidden-state errors that should be modeled
 confidential aborts.
 
-Invariants 9 to 17 have twelve bits in `runtime_boundary_validation.json`:
+Invariants 9 to 18 have thirteen bits in `runtime_boundary_validation.json`:
 `deployment_seed_stays_out_of_call_traces`,
 `production_errors_carry_no_runtime_freshness_value`,
 `contract_instance_debug_is_opaque`,
@@ -205,9 +254,10 @@ Invariants 9 to 17 have twelve bits in `runtime_boundary_validation.json`:
 `sealed_writes_are_classified_from_their_bytes`,
 `production_calls_record_no_position_map_witness`,
 `evidence_builds_audit_the_kept_position_map_witness`,
-`a_call_copies_no_committed_object` and
-`trace_runs_stand_for_recorded_events`. Each is a check of source text, and a
-probe unit test shows that it rejects the drifts it guards against.
+`a_call_copies_no_committed_object`,
+`trace_runs_stand_for_recorded_events` and
+`sealed_records_cross_the_storage_boundary`. Each is a check of source text,
+and a probe unit test shows that it rejects the drifts it guards against.
 `cargo test -p uo-evm` runs the tests behind all but the two about secrets
 and nonces in the build a production runtime uses
 (`runtime/uo-evm/tests/production_boundary.rs`, and the production tests
@@ -318,6 +368,30 @@ events, that a rewrite takes the `Update` of its next slot and no other
 write, and that a log of resource events folded into blocks replays as its
 events do; and in `runtime/uo-evm/src/engine.rs`, where the trace of a
 call on a full-scan map has as many items at 64 entries as at 1,024.
+
+Invariant 18 is pinned in the Lean implementation interface
+(`runtimeObjectOpenUsesSharedDecodeShell`,
+`runtimeObjectCommitUsesPublicSealAndWriteShell` and
+`storeCipherUsesExactSizeNonzeroBuffers`), with three scenarios that the
+Lean checker must reject: a record opened without naming it to the store
+(`runtime_implementation_interface/sealed_open_store_check_skip_drift`), a
+sealed write recorded without handing the record to the store
+(`runtime_implementation_interface/sealed_write_store_skip_drift`), and a
+record handed over before its seal count is reserved
+(`runtime_implementation_interface/store_write_unreserved_nonce_drift`).
+The store's own side is handwritten Rust, which the boundary bit pins and
+`runtime/uo-store/src/storage.rs` tests: the log and the classes it
+computes, a read of a record the runtime does not hold, a record refused
+before its nonce is reserved, what an abandoned call leaves, a store in
+files that reopens as its last commit left it, and a commit cut short at
+several lengths, which is dropped whole. `runtime/uo-evm/src/engine.rs`
+compares the store's log with the trace of calls on exact objects and on
+both Path ORAM schemes, drops a call after it handed records over, and
+restarts from files beside a twin that never restarted: the two return the
+same values and receipts, and no record sealed after the restart carries a
+nonce from before it. `results/storage_boundary.json` makes the comparison
+and the restart on every benchmark and sealed backend (see The Storage
+Boundary in [`claim-boundary.md`](../claim-boundary.md)).
 
 Invariant 11 also has a Lean statement and tests. `sealNonceRun_nodup` and
 `sealNonceRun_disjoint_of_le` in `UOToolchain/RuntimeStoreCodecSemantics.lean`

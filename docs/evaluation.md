@@ -13,8 +13,9 @@ establish and what they do not).
   `results/reproducibility_manifest.json` records the Rust and Lean toolchains
   and the SHA-256 of every file in the bundle. CI regenerates the reports it
   can afford (static checks, the Lean assumption budget, correctness, abort
-  rollback, AVL map replay, acceptance, claim consistency and claim status) and
-  fails if any differs from the committed one.
+  rollback, AVL map replay, the storage boundary, acceptance, claim
+  consistency and claim status) and fails if any differs from the committed
+  one.
 - `scripts/measure_tree_eviction_instructions.sh` writes
   `results/tree_eviction_instructions.json`. `run_validation.sh` does not
   regenerate it: the script exports two revisions, builds each in release and
@@ -48,19 +49,26 @@ establish and what they do not).
   `scripts/run_capacity_sweep_full.sh` runs the full one into
   `results/capacity_sweep_full.json`: five warmup rounds and 30 measured
   rounds of each kind of call, workloads of 20 calls at each read fraction,
-  and every map from 1 to 16,384 entries filled to every level. It takes
+  and every map from 1 to 16,384 entries filled to every level. The quick
+  profile keeps its maps' sealed records in memory. The full profile keeps
+  them in files and syncs every commit, so a call's latency includes its
+  persistence, which the report gives as a part of its own
+  (`p50_persistence_ns`, `p50_persisted_bytes`; `UO_SWEEP_STORAGE` is
+  `memory`, `files` or `files_synced`, and `provenance.storage` says which
+  ran). Where the records are kept changes no count. It takes
   about an hour on four cores and wants the machine to itself, so
   `run_validation.sh` does not run it; run it when a change claims a saving.
   `scripts/compare_capacity_sweep.py` compares two reports, and
   `review/2026-11-external-review/capacity_sweep_baseline.json` is the full
   profile from before the optimizations that review asked for; its gas is
   that of cost model v1, which charged no reads. The committed full report
-  was measured when Issues 30 to 40 of that review were in, and its
-  `provenance` names the build that measured it. The latencies of two
-  reports compare only if one machine in one state measured both, so the
-  review directory also holds two controls, one for Issues 36 to 38 and one
-  for the stash cap of Issue 40: the largest maps measured on the code
-  before the change and on the code after it, one run after the other (see
+  was measured when Issues 30 to 41 of that review were in, and its
+  `provenance` names the build that measured it and where the records were
+  kept. The latencies of two reports compare only if one machine in one
+  state measured both, so the review directory also holds three controls,
+  for Issues 36 to 38, for the stash cap of Issue 40 and for the storage
+  adapter of Issue 41: the largest maps measured on the code before the
+  change and on the code after it, one run after the other (see
   [`path-oram.md`](./path-oram.md)).
 
 ## Index
@@ -71,6 +79,7 @@ establish and what they do not).
 | Correctness | `correctness.json` (differential runs against the raw baseline), `abort_rollback.json` (aborting and committing calls on the exact backend and on both Path ORAM schemes), `path_oram_avl_map_replay.json` (runtime AVL map operations replayed against the Lean model), and the model columns of `trace_equivalence.json` (each run's public outcome and final public state against their Lean models, and the exact store's encoding on the exact backends) |
 | Runtime and storage cost | `overheads.json` (modeled gas, physical reads and writes, bytes moved, trace and artifact sizes per benchmark and backend) |
 | Scalability | `capacity_sweep.json` and `capacity_sweep_full.json` (one map of 1 to 16,384 entries on every backend, at five occupancy levels: the traced counts of seven kinds of call, the untraced reads at a call's start and in the decode of the position-map witness, which the runtime keeps from call to call, with an audit of the kept witness after every level, read/write mixes computed and executed, break-even capacities, and release-build latencies with medians, 95th percentiles and bootstrap intervals, split into staging, loading, the runtime's own work, witnesses, proof objects, JSON serialization and Lean's check of a sampled call, with peak resident memory and evidence sizes) |
+| What crosses the storage boundary, and does a runtime start again from its files? | `storage_boundary.json` (every benchmark on every sealed backend: the log a storage adapter keeps of the sealed records the runtime opens and seals against the reads and writes of each call's trace, with the reads of a Path ORAM map's counter and metadata pages that the trace names again counted; a call dropped after it handed records over; a record refused before its nonce is reserved; and each benchmark restarted from a store in files, which must answer as before and repeat no nonce) |
 | How full does the private scheme's stash get, and what does an overflow do? | `stash_occupancy.json` and `stash_occupancy_full.json` (the stash counted after every node access of a simulation that runs the runtime's tree operations without the cryptography, against the assumed tail; and a stash overflow forced on the runtime: the call fails, the committed ciphertext is unchanged, and every stored key reads back) |
 | Cost of a tree node access | `tree_eviction_instructions.json` (callgrind instruction counts per node access of the private scheme, before and after the eviction rewrite) |
 | Do the kernel's operators branch on their operands? | `kernel_operator_instructions.json` (callgrind instruction counts of one evaluation of each binary operator of the confidential kernel, and of an array index's conversion, for every class of operands, before and after the operators were made branch-free), with `kernel_operators_do_not_branch_on_operands` in `runtime_boundary_validation.json` for the source |

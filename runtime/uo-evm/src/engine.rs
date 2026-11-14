@@ -14,12 +14,16 @@ use crate::runtime::{
     deploy_contract_runtime, run_contract_call, stage_contract_runtime, ContractRuntime,
     PathOramFreshCoinPlan,
 };
-use crate::secret::RuntimeMasterSecret;
+use crate::secret::{RuntimeMasterSecret, StoreMetaKey};
+use crate::store_meta::{make_deployment_durable, StagedStore, StoreMeta};
 use anyhow::{anyhow, bail, Result};
 use uo_core::{
     CompiledArtifact, EncryptedReturnPayload, ExecutionTrace, PublicEnvironment, PublicReceipt,
     ReturnPolicy, Value,
 };
+use uo_store::SharedStorage;
+#[cfg(any(test, feature = "diagnostics"))]
+use uo_store::{StorageIo, StorageStats};
 
 pub struct ContractInstance {
     artifact: CompiledArtifact,
@@ -31,6 +35,12 @@ pub struct ContractInstance {
     freshness: RuntimeFreshnessState,
     environment: PublicEnvironment,
     initialized: bool,
+    /// The store that keeps the contract's sealed records. Every record a
+    /// call opens or seals crosses to it, and a call is committed there,
+    /// with the commit metadata, before the runtime takes the call's state.
+    storage: SharedStorage,
+    /// The key of the tag the commit metadata carries.
+    store_meta_key: StoreMetaKey,
 }
 
 /// The instance holds the runtime's secrets (its objects' storage keys and
@@ -110,6 +120,7 @@ struct StagedCall {
     state: ContractRuntime,
     freshness: RuntimeFreshnessState,
     initialized: bool,
+    store: StagedStore,
 }
 
 /// Preflight the return-channel/session policy for an entrypoint before any
@@ -268,7 +279,7 @@ impl ProductionContractInstance {
             staged.state.ciphertext_store_digest()?,
         )?;
         let receipt_sha256 = receipt.sha256()?;
-        let call = self.inner.commit_staged(staged).0;
+        let call = self.inner.commit_staged(staged)?.0;
         self.last_receipt = receipt.clone();
         self.last_receipt_sha256 = receipt_sha256;
         Ok(ProductionCallResult { call, receipt })
@@ -280,9 +291,15 @@ impl ContractInstance {
     /// are drawn independently: the epoch is public, since production call
     /// evidence carries it, and nothing public derives from the secret.
     pub fn deploy(artifact: CompiledArtifact) -> Result<Self> {
+        Self::deploy_with_storage(artifact, SharedStorage::memory())
+    }
+
+    /// `deploy`, with the contract's records kept in `storage`, which must
+    /// hold nothing yet.
+    pub fn deploy_with_storage(artifact: CompiledArtifact, storage: SharedStorage) -> Result<Self> {
         let master = RuntimeMasterSecret::from_os_rng();
         let freshness = RuntimeFreshnessState::from_os_rng();
-        Self::deploy_internal(artifact, &master, freshness, None)
+        Self::deploy_internal(artifact, &master, freshness, None, storage)
     }
 
     /// Deploy from a seed, so that a test or a diagnostics run can replay
@@ -290,9 +307,57 @@ impl ContractInstance {
     /// the tag of the instance's traces; it protects nothing.
     #[cfg(any(test, feature = "diagnostics"))]
     pub fn deploy_with_seed(artifact: CompiledArtifact, deploy_seed: u64) -> Result<Self> {
+        Self::deploy_with_seed_and_storage(artifact, deploy_seed, SharedStorage::memory())
+    }
+
+    /// `deploy_with_seed`, with the contract's records kept in `storage`,
+    /// which must hold nothing yet.
+    #[cfg(any(test, feature = "diagnostics"))]
+    pub fn deploy_with_seed_and_storage(
+        artifact: CompiledArtifact,
+        deploy_seed: u64,
+        storage: SharedStorage,
+    ) -> Result<Self> {
         let master = RuntimeMasterSecret::from_diagnostic_seed(deploy_seed);
         let freshness = RuntimeFreshnessState::from_epoch(deploy_seed);
-        Self::deploy_internal(artifact, &master, freshness, Some(deploy_seed))
+        Self::deploy_internal(artifact, &master, freshness, Some(deploy_seed), storage)
+    }
+
+    /// Start again from the store a seeded deployment of `artifact` left:
+    /// the instance of its last commit. The commit metadata must carry the
+    /// tag of the deployment's secret, its rollback counter must be the
+    /// attested one, and the public state the store keeps must have the
+    /// digest the metadata names. Each storage key resumes at the seal count
+    /// the store has reserved for it. Only a seeded deployment can restart:
+    /// a deployment from OS randomness keeps its master secret in memory
+    /// alone, and sealing it to a platform is not this runtime's part.
+    #[cfg(any(test, feature = "diagnostics"))]
+    pub fn restart_with_seed(
+        artifact: CompiledArtifact,
+        deploy_seed: u64,
+        storage: SharedStorage,
+        attested_rollback_counter: u64,
+    ) -> Result<Self> {
+        let master = RuntimeMasterSecret::from_diagnostic_seed(deploy_seed);
+        let store_meta_key = master.store_meta_key()?;
+        let meta = storage
+            .with(|adapter| StoreMeta::from_tagged_bytes(&store_meta_key, adapter.meta()))?;
+        let freshness =
+            RuntimeFreshnessState::recover(meta.freshness(), attested_rollback_counter)?;
+        let state = deploy_contract_runtime(&artifact.contract.state, &master, &storage, true)?;
+        if state.public_state_digest()? != meta.public_state_sha256 {
+            bail!("the public state the store keeps is not the public state of its last commit");
+        }
+        Ok(Self {
+            artifact,
+            state,
+            replay_seed: Some(deploy_seed),
+            freshness,
+            environment: PublicEnvironment::default(),
+            initialized: meta.initialized,
+            storage,
+            store_meta_key,
+        })
     }
 
     fn deploy_internal(
@@ -300,6 +365,7 @@ impl ContractInstance {
         master: &RuntimeMasterSecret,
         freshness: RuntimeFreshnessState,
         replay_seed: Option<u64>,
+        storage: SharedStorage,
     ) -> Result<Self> {
         let initialized = !artifact
             .contract
@@ -307,14 +373,37 @@ impl ContractInstance {
             .entrypoints
             .values()
             .any(|entry| entry.initializer);
-        Ok(Self {
-            state: deploy_contract_runtime(&artifact.contract.state, master)?,
+        let state = deploy_contract_runtime(&artifact.contract.state, master, &storage, false)?;
+        let instance = Self {
+            state,
             artifact,
             replay_seed,
             freshness,
             environment: PublicEnvironment::default(),
             initialized,
-        })
+            storage,
+            store_meta_key: master.store_meta_key()?,
+        };
+        // The deployment's records are in the store once this commit returns.
+        let meta = instance.store_meta(
+            &instance.freshness,
+            instance.initialized,
+            instance.state.public_state_digest()?,
+        )?;
+        make_deployment_durable(&instance.storage, &meta)?;
+        Ok(instance)
+    }
+
+    /// The commit metadata of a state: its freshness counters, whether it is
+    /// initialized and the digest of its public state, with the tag.
+    fn store_meta(
+        &self,
+        freshness: &RuntimeFreshnessState,
+        initialized: bool,
+        public_state_sha256: String,
+    ) -> Result<Vec<u8>> {
+        StoreMeta::new(freshness.snapshot(), initialized, public_state_sha256)
+            .tagged_bytes(&self.store_meta_key)
     }
 
     pub fn call(&mut self, entrypoint: &str, args: Vec<Value>) -> Result<CallResult> {
@@ -412,7 +501,34 @@ impl ContractInstance {
         map: &str,
         entries: Vec<(Value, Value)>,
     ) -> Result<()> {
-        bulk_load_contract_map_for_diagnostics(&mut self.state, map, entries)
+        // The load's records reach the store as a call's do, and are
+        // committed there with the metadata the instance had. The store
+        // logs none of them: nothing compares a load with a trace.
+        let store = StagedStore::begin(&self.storage)?;
+        self.storage.with(|adapter| adapter.set_logging(false));
+        let loaded = bulk_load_contract_map_for_diagnostics(&mut self.state, map, entries);
+        self.storage.with(|adapter| adapter.set_logging(true));
+        loaded?;
+        let meta = self.store_meta(
+            &self.freshness,
+            self.initialized,
+            self.state.public_state_digest()?,
+        )?;
+        store.make_durable(&meta)
+    }
+
+    /// The reads and writes of sealed records that the store saw since the
+    /// last call began, in order: the call's own log of them, which does
+    /// not come from the call's recorder.
+    #[cfg(any(test, feature = "diagnostics"))]
+    pub fn storage_io_log(&self) -> Vec<StorageIo> {
+        self.storage.with(|adapter| adapter.log())
+    }
+
+    /// The store's counts of its work since the deployment.
+    #[cfg(any(test, feature = "diagnostics"))]
+    pub fn storage_stats(&self) -> StorageStats {
+        self.storage.with(|adapter| adapter.stats())
     }
 
     /// Decode the position-map witness of the Path ORAM maps from the whole
@@ -445,17 +561,26 @@ impl ContractInstance {
         environment: Option<PublicEnvironment>,
     ) -> Result<(CallResult, usize)> {
         let staged = self.stage_call(entrypoint, args, fresh_coins, return_channel, environment)?;
-        Ok(self.commit_staged(staged))
+        self.commit_staged(staged)
     }
 
     /// Apply a staged call to `self`. Only called once every host-visible
     /// validation has succeeded, so a failure before this point leaves
     /// committed state, freshness counters, and the initialized flag unchanged.
-    fn commit_staged(&mut self, staged: StagedCall) -> (CallResult, usize) {
+    /// The store commits the call's records first, with the metadata of the
+    /// state the call leaves; if it cannot, the call is dropped like one that
+    /// failed, and `self` is as it was.
+    fn commit_staged(&mut self, staged: StagedCall) -> Result<(CallResult, usize)> {
+        let public_state_sha256 = match staged.trace.receipt.public_state_transition.as_ref() {
+            Some(transition) => transition.committed_public_state_hash.clone(),
+            None => staged.state.public_state_digest()?,
+        };
+        let meta = self.store_meta(&staged.freshness, staged.initialized, public_state_sha256)?;
+        crate::instrumentation::time_store_persistence(|| staged.store.make_durable(&meta))?;
         self.state = staged.state;
         self.freshness = staged.freshness;
         self.initialized = staged.initialized;
-        (
+        Ok((
             CallResult::from_staged(
                 staged.return_value,
                 staged.encrypted_return,
@@ -463,7 +588,7 @@ impl ContractInstance {
                 staged.trace,
             ),
             staged.zero_writes,
-        )
+        ))
     }
 
     /// Execute a call on a staged copy of committed state and freshness without
@@ -532,6 +657,10 @@ impl ContractInstance {
         let args = runtime_args.into_boxed_slice();
         let mut staged_freshness = self.freshness.clone();
         let call_freshness = staged_freshness.begin_call()?;
+        // From here the call's records are pending in the store. If the call
+        // fails, or is dropped after it was staged, `store` is dropped and
+        // the store puts back what the call replaced.
+        let store = StagedStore::begin(&self.storage)?;
         let mut staged_state = stage_contract_runtime(&self.state)?;
         let (return_value, encrypted_return, aborted, trace, zero_writes) = run_contract_call(
             &mut staged_state,
@@ -554,6 +683,7 @@ impl ContractInstance {
             state: staged_state,
             freshness: staged_freshness,
             initialized,
+            store,
         })
     }
 }
@@ -3270,6 +3400,504 @@ bounds:
             .expect("expected one UO ORAM map object");
         assert_objects_are_cold(&instance);
         assert_eq!(committed_map.path_oram_access_counter_for_test(), Some(0));
+    }
+
+    /// The names of an instance's sealed objects: those whose records its
+    /// store keeps.
+    fn sealed_object_names(instance: &ContractInstance) -> BTreeSet<String> {
+        instance
+            .artifact
+            .contract
+            .state
+            .iter()
+            .filter(|object| object.backend != uo_core::ir::BackendKind::Raw)
+            .map(|object| object.name.clone())
+            .collect()
+    }
+
+    /// Compare the store's own log of the last call with the call's trace.
+    ///
+    /// The store's writes are the trace's writes of sealed objects, one for
+    /// one and in order, and the store classified each as an `Update` from
+    /// its own records.
+    ///
+    /// The store's reads of each sealed object are the trace's reads of it,
+    /// in order, with one difference: the counter and the metadata pages of
+    /// a Path ORAM map are in the store's log once, where the call loaded
+    /// the map. The runtime holds them open through the call, and the trace
+    /// names them again at every access (the counter) and at every
+    /// operation (the metadata). Returns how many reads the trace names
+    /// again.
+    fn compare_store_log_with_trace(instance: &ContractInstance, result: &CallResult) -> usize {
+        use uo_core::WriteClass;
+        use uo_store::StorageIo;
+        let sealed = sealed_object_names(instance);
+        let log = instance.storage_io_log();
+        let traced_writes: Vec<(String, String, usize, WriteClass)> = result
+            .trace
+            .receipt
+            .physical_writes
+            .events()
+            .filter(|event| sealed.contains(&event.object))
+            .map(|event| (event.object, event.location, event.len, event.class))
+            .collect();
+        let store_writes: Vec<(String, String, usize, WriteClass)> = log
+            .iter()
+            .filter_map(|io| match io {
+                StorageIo::Write {
+                    object,
+                    location,
+                    len,
+                    class,
+                } => Some((object.clone(), location.clone(), *len, *class)),
+                StorageIo::Read { .. } => None,
+            })
+            .collect();
+        assert_eq!(store_writes, traced_writes);
+        assert!(store_writes
+            .iter()
+            .all(|write| write.3 == WriteClass::Update));
+
+        let held = |location: &str| location.ends_with("@counter") || location.contains("@meta");
+        let mut named_again = 0usize;
+        let mut seen: BTreeSet<String> = BTreeSet::new();
+        let mut traced_reads: BTreeMap<String, Vec<(String, usize)>> = BTreeMap::new();
+        for event in result.trace.receipt.physical_reads.events() {
+            if !sealed.contains(&event.object) {
+                continue;
+            }
+            if held(&event.location) && !seen.insert(event.location.clone()) {
+                named_again += 1;
+                continue;
+            }
+            traced_reads
+                .entry(event.object)
+                .or_default()
+                .push((event.location, event.len));
+        }
+        let mut store_reads: BTreeMap<String, Vec<(String, usize)>> = BTreeMap::new();
+        for io in log {
+            if let StorageIo::Read {
+                object,
+                location,
+                len,
+            } = io
+            {
+                store_reads.entry(object).or_default().push((location, len));
+            }
+        }
+        assert_eq!(store_reads, traced_reads);
+        named_again
+    }
+
+    fn erc20_calls() -> Vec<(&'static str, Vec<Value>, bool)> {
+        let owner = Value::Address([0xA1; 20]);
+        let spender = Value::Address([0xB2; 20]);
+        let to = Value::Address([0xC3; 20]);
+        vec![
+            (
+                "mint(address,uint256)",
+                vec![owner.clone(), Value::uint(10)],
+                false,
+            ),
+            (
+                "approve(address,address,uint256)",
+                vec![owner.clone(), spender.clone(), Value::uint(5)],
+                false,
+            ),
+            (
+                "transfer(address,address,uint256)",
+                vec![owner.clone(), to.clone(), Value::uint(3)],
+                false,
+            ),
+            // A call that aborts writes what a committed one does.
+            (
+                "transfer(address,address,uint256)",
+                vec![owner.clone(), to.clone(), Value::uint(100)],
+                true,
+            ),
+            (
+                "transferFrom(address,address,address,uint256)",
+                vec![owner.clone(), spender.clone(), to.clone(), Value::uint(2)],
+                false,
+            ),
+            ("balanceOf(address)", vec![owner.clone()], false),
+            (
+                "allowanceOf(address,address)",
+                vec![owner.clone(), spender.clone()],
+                false,
+            ),
+            (
+                "balanceOf(address)",
+                vec![Value::Address([0xEE; 20])],
+                false,
+            ),
+        ]
+    }
+
+    #[test]
+    fn the_store_sees_the_sealed_reads_and_writes_a_call_traces() {
+        // Exact objects: the store sees the traced schedule and nothing
+        // else. A full-scan map is read when the call loads it and rewritten
+        // when the call may write it.
+        let mut exact = ContractInstance::deploy_with_seed(
+            compile_bench(
+                bench_raw!("ERC20Lite.sol"),
+                include_str!(bench_raw!("ERC20Lite.uo.yaml")),
+                ProgramMode::Uo,
+            ),
+            0x41,
+        )
+        .unwrap();
+        for (index, (entrypoint, args, aborts)) in erc20_calls().into_iter().enumerate() {
+            let result = exact.call(entrypoint, args).unwrap();
+            assert_eq!(result.aborted, aborts, "call {index}, {entrypoint}");
+            assert!(result.trace.receipt.physical_reads.event_count() > 0);
+            assert_eq!(
+                compare_store_log_with_trace(&exact, &result),
+                0,
+                "call {index}, {entrypoint}"
+            );
+        }
+
+        // Path ORAM maps of both schemes. A call that makes one access to a
+        // map of the local scheme reads what its trace names. A call that
+        // makes more accesses, and every call on the tree, holds the map's
+        // counter and metadata pages open after it loaded the map, so the
+        // store sees them once where the trace names them again. The calls
+        // record no witness: a test build's audit of the witness decodes
+        // the whole store, and the store would log that too.
+        let mut oram = ContractInstance::deploy_with_seed(
+            compile_bench(
+                bench_raw!("ERC20Lite.sol"),
+                include_str!(bench_raw!("ERC20Lite.private-posmap.yaml")),
+                ProgramMode::Uo,
+            ),
+            0x41,
+        )
+        .unwrap();
+        oram.state.run_unwitnessed_for_test();
+        let mut named_again = Vec::new();
+        for (index, (entrypoint, args, aborts)) in erc20_calls().into_iter().enumerate() {
+            let result = oram.call(entrypoint, args).unwrap();
+            assert_eq!(result.aborted, aborts, "call {index}, {entrypoint}");
+            named_again.push((entrypoint, compare_store_log_with_trace(&oram, &result)));
+        }
+        // One access to `allowances`, on the local scheme: nothing is named
+        // again. A get on the tree of 256 entries makes 11 node accesses and
+        // names the counter again at 10 of them.
+        assert_eq!(named_again[1], ("approve(address,address,uint256)", 0));
+        assert_eq!(named_again[6], ("allowanceOf(address,address)", 0));
+        assert_eq!(named_again[5], ("balanceOf(address)", 10));
+        assert!(named_again[0].1 > 10 && named_again[2].1 > named_again[0].1);
+    }
+
+    #[test]
+    fn a_dropped_call_leaves_the_store_as_it_was() {
+        let mut artifact = compile_bench(
+            bench_raw!("SingleAccessMap.sol"),
+            include_str!(bench_raw!("SingleAccessMap.pathoram.yaml")),
+            ProgramMode::Uo,
+        );
+        // The put fails after it ran: its records are with the store by then.
+        artifact
+            .contract
+            .manifest
+            .entrypoints
+            .get_mut("put(bytes32,uint256)")
+            .expect("entrypoint")
+            .max_commit_ops = 0;
+        let mut instance = ContractInstance::deploy_with_seed(artifact, 9).unwrap();
+        let stored = |instance: &ContractInstance| {
+            instance
+                .storage
+                .with(|adapter| (adapter.sealed_records_sha256(), adapter.meta().to_vec()))
+        };
+        let before = stored(&instance);
+        let writes_before = instance.storage_stats().writes;
+
+        instance
+            .call("put(bytes32,uint256)", vec![b32(7), Value::uint(9)])
+            .unwrap_err();
+        assert!(instance.storage_stats().writes > writes_before);
+        assert_eq!(stored(&instance), before);
+        assert_eq!(
+            instance
+                .state
+                .ciphertext_store_digest_from_records()
+                .unwrap(),
+            instance.state.ciphertext_store_digest().unwrap()
+        );
+        // The store takes the next call, whose reads find the records the
+        // runtime holds, and commits it.
+        let commits = instance.storage_stats().commits;
+        instance.call("read(bytes32)", vec![b32(7)]).unwrap();
+        assert_eq!(instance.storage_stats().commits, commits + 1);
+        assert_ne!(stored(&instance), before);
+    }
+
+    fn scratch_store_directory(name: &str) -> PathBuf {
+        static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        let directory = std::env::temp_dir().join(format!(
+            "uo-evm-engine-store-{}-{}-{}",
+            name,
+            std::process::id(),
+            NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        ));
+        let _ = fs::remove_dir_all(&directory);
+        directory
+    }
+
+    #[test]
+    fn a_restart_from_files_continues_the_deployment() {
+        use uo_store::{FileStorage, SharedStorage, SyncPolicy};
+        let artifact = || {
+            compile_bench(
+                bench_raw!("ERC20Lite.sol"),
+                include_str!(bench_raw!("ERC20Lite.private-posmap.yaml")),
+                ProgramMode::Uo,
+            )
+        };
+        let directory = scratch_store_directory("restart");
+        let seed = 0x52;
+        let reopened =
+            || SharedStorage::new(FileStorage::open(&directory, SyncPolicy::Never).unwrap());
+        // A twin that never restarts, with its records in memory.
+        let mut twin = ContractInstance::deploy_with_seed(artifact(), seed).unwrap();
+        let mut instance = ContractInstance::deploy_with_seed_and_storage(
+            artifact(),
+            seed,
+            SharedStorage::new(FileStorage::create(&directory, SyncPolicy::Never).unwrap()),
+        )
+        .unwrap();
+        let calls = erc20_calls();
+        let (first, rest) = calls.split_at(3);
+        for (entrypoint, args, _) in first {
+            let ours = instance.call(entrypoint, args.clone()).unwrap();
+            let theirs = twin.call(entrypoint, args.clone()).unwrap();
+            assert_eq!(ours.trace.receipt, theirs.trace.receipt, "{entrypoint}");
+        }
+        let rollback_counter = instance.freshness.snapshot().rollback_counter;
+        let counters_before = sealed_counters(&instance.state);
+        let ciphertext = instance.state.ciphertext_store_digest().unwrap();
+        drop(instance);
+
+        // The attested rollback counter must be the store's, and the
+        // metadata must carry the tag of this deployment's secret.
+        let refused =
+            ContractInstance::restart_with_seed(artifact(), seed, reopened(), rollback_counter + 1)
+                .unwrap_err();
+        assert!(refused.to_string().contains("rollback counter mismatch"));
+        let refused =
+            ContractInstance::restart_with_seed(artifact(), seed + 1, reopened(), rollback_counter)
+                .unwrap_err();
+        assert!(refused.to_string().contains("tag"), "{refused}");
+
+        let mut restarted =
+            ContractInstance::restart_with_seed(artifact(), seed, reopened(), rollback_counter)
+                .unwrap();
+        // The restarted instance holds the records of the last commit, and
+        // the freshness and public state of the twin.
+        assert_eq!(
+            restarted.state.ciphertext_store_digest().unwrap(),
+            ciphertext
+        );
+        assert_eq!(restarted.freshness, twin.freshness);
+        assert_eq!(restarted.initialized, twin.initialized);
+        assert_eq!(
+            restarted.state.public_state_digest().unwrap(),
+            twin.state.public_state_digest().unwrap()
+        );
+        assert_eq!(sealed_counters(&restarted.state), counters_before);
+        let reserved: BTreeMap<u32, u64> = restarted
+            .artifact
+            .contract
+            .state
+            .iter()
+            .map(|object| {
+                (
+                    object.id,
+                    restarted
+                        .storage
+                        .with(|adapter| adapter.reserved_seals(&object.name)),
+                )
+            })
+            .collect();
+        for (object, counters) in &counters_before {
+            assert!(counters.iter().all(|counter| *counter < reserved[object]));
+        }
+
+        // It goes on as the twin does: the same results and the same public
+        // receipts, call for call.
+        for (entrypoint, args, aborts) in rest {
+            let ours = restarted.call(entrypoint, args.clone()).unwrap();
+            let theirs = twin.call(entrypoint, args.clone()).unwrap();
+            assert_eq!(ours.aborted, *aborts, "{entrypoint}");
+            assert_eq!(ours.return_value, theirs.return_value, "{entrypoint}");
+            assert_eq!(ours.trace.receipt, theirs.trace.receipt, "{entrypoint}");
+        }
+        assert_eq!(restarted.freshness, twin.freshness);
+        // No record sealed after the restart carries a nonce from before
+        // it: each is one the restart found, or is at or above the count
+        // the store had reserved.
+        for (object, counters) in sealed_counters(&restarted.state) {
+            let before = &counters_before[&object];
+            assert!(counters.iter().any(|counter| !before.contains(counter)));
+            for counter in counters {
+                assert!(
+                    before.contains(&counter) || counter >= reserved[&object],
+                    "object {object}: nonce {counter} below the reservation {}",
+                    reserved[&object]
+                );
+            }
+        }
+        drop(restarted);
+        fs::remove_dir_all(&directory).unwrap();
+    }
+
+    #[test]
+    fn a_restart_restores_public_state_and_checks_its_digest() {
+        use uo_store::{FileStorage, SharedStorage, StorageAdapter, SyncPolicy};
+        let source = write_temp(
+            "restart-public-state",
+            r#"
+            contract C {
+                uint256 private total;
+                mapping(address => uint256) private seen;
+                uint256 private hidden;
+                function note(address who, uint256 v) public {
+                    total = total + v;
+                    seen[who] = v;
+                }
+                function hide(uint256 amount) public {
+                    hidden = amount;
+                }
+                function totalOf() public returns (uint256) {
+                    return total;
+                }
+                function seenOf(address who) public returns (uint256) {
+                    return seen[who];
+                }
+            }
+            "#,
+        );
+        let metadata = r#"
+contract: C
+entrypoints:
+  note(address,uint256):
+    confidential: false
+    returns: forbidden
+    status: public
+  hide(uint256):
+    confidential: true
+    secret_args: [amount]
+    returns: forbidden
+    status: public
+  totalOf():
+    confidential: false
+    returns: public
+    status: public
+  seenOf(address):
+    confidential: false
+    returns: public
+    status: public
+state:
+  total:
+    kind: cell
+    value: uint256
+    backend: raw
+    confidential: false
+  seen:
+    kind: map
+    key: address
+    value: uint256
+    capacity: 8
+    backend: raw
+    confidential: false
+  hidden:
+    kind: cell
+    value: uint256
+    backend: full_scan
+    confidential: true
+bounds:
+  loops: {}
+"#;
+        let artifact = || compile_bench(source.to_str().unwrap(), metadata, ProgramMode::Uo);
+        let directory = scratch_store_directory("restart-public");
+        let seed = 0x53;
+        let alice = Value::Address([0xA1; 20]);
+        let bob = Value::Address([0xB2; 20]);
+        let mut instance = ContractInstance::deploy_with_seed_and_storage(
+            artifact(),
+            seed,
+            SharedStorage::new(FileStorage::create(&directory, SyncPolicy::Never).unwrap()),
+        )
+        .unwrap();
+        for (who, amount) in [(&alice, 5u64), (&bob, 7), (&alice, 0)] {
+            instance
+                .call(
+                    "note(address,uint256)",
+                    vec![who.clone(), Value::uint(amount)],
+                )
+                .unwrap();
+        }
+        instance
+            .call("hide(uint256)", vec![Value::uint(9)])
+            .unwrap();
+        let rollback_counter = instance.freshness.snapshot().rollback_counter;
+        let public_state = instance.state.public_state_digest().unwrap();
+        drop(instance);
+
+        let mut restarted = ContractInstance::restart_with_seed(
+            artifact(),
+            seed,
+            SharedStorage::new(FileStorage::open(&directory, SyncPolicy::Never).unwrap()),
+            rollback_counter,
+        )
+        .unwrap();
+        assert_eq!(restarted.state.public_state_digest().unwrap(), public_state);
+        let read = |instance: &mut ContractInstance, entrypoint: &str, args: Vec<Value>| {
+            instance.call(entrypoint, args).unwrap().return_value
+        };
+        assert_eq!(
+            read(&mut restarted, "totalOf()", vec![]),
+            Some(Value::uint(12))
+        );
+        assert_eq!(
+            read(&mut restarted, "seenOf(address)", vec![bob.clone()]),
+            Some(Value::uint(7))
+        );
+        // A key written back to zero reads as one never written.
+        assert_eq!(
+            read(&mut restarted, "seenOf(address)", vec![alice.clone()]),
+            Some(Value::uint(0))
+        );
+        // The reads were calls, and moved the counters.
+        let rollback_counter = restarted.freshness.snapshot().rollback_counter;
+        drop(restarted);
+
+        // A public value changed in the files is not the public state of the
+        // last commit, whose digest the tagged metadata names.
+        let mut store = FileStorage::open(&directory, SyncPolicy::Never).unwrap();
+        let meta = store.meta().to_vec();
+        store
+            .put_public(
+                "total",
+                "total",
+                &serde_json::to_vec(&Value::uint(13)).unwrap(),
+            )
+            .unwrap();
+        store.commit(&meta).unwrap();
+        drop(store);
+        let refused = ContractInstance::restart_with_seed(
+            artifact(),
+            seed,
+            SharedStorage::new(FileStorage::open(&directory, SyncPolicy::Never).unwrap()),
+            rollback_counter,
+        )
+        .unwrap_err();
+        assert!(refused.to_string().contains("public state"), "{refused}");
+        fs::remove_dir_all(&directory).unwrap();
     }
 
     #[test]

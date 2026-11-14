@@ -15,6 +15,7 @@ mod oram;
 mod return_channel;
 mod runtime;
 mod secret;
+mod store_meta;
 
 pub use deployment::{
     production_build_profile_sha256, production_call_evidence_sha256,
@@ -45,6 +46,9 @@ pub use oram::stash_occupancy::{simulate_stash_occupancy, StashOccupancyRun, Sta
 pub use return_channel::{open_encrypted_return, ReturnChannelSession, RETURN_CHANNEL_SCHEME};
 #[cfg(feature = "diagnostics")]
 pub use runtime::PathOramFreshCoinPlan;
+pub use uo_store::{
+    FileStorage, MemoryStorage, SharedStorage, StorageAdapter, StorageIo, StorageStats, SyncPolicy,
+};
 
 #[cfg(test)]
 mod tests {

@@ -52,6 +52,7 @@ pub use acceptance::{
 
 mod capacity_sweep;
 mod stash_occupancy;
+mod storage_boundary;
 
 mod claim_consistency;
 pub use claim_consistency::{run_claim_consistency_report, CLAIM_CONSISTENCY_SCHEMA};
@@ -1363,6 +1364,13 @@ pub fn run_correctness_report() -> Result<JsonValue> {
 pub fn run_trace_equivalence_report() -> Result<JsonValue> {
     let suite = compile_suite()?;
     run_trace_equivalence(&suite)
+}
+
+/// What a store that keeps the contracts' sealed records sees of the
+/// benchmarks' calls, against their traces, and a restart from files.
+pub fn run_storage_boundary_report() -> Result<JsonValue> {
+    let suite = compile_suite()?;
+    storage_boundary::run_storage_boundary(&suite)
 }
 
 pub fn run_leakage_auc_report() -> Result<JsonValue> {
@@ -9947,8 +9955,8 @@ fn run_tamper_validation() -> Result<JsonValue> {
         tampered_runtime_implementation_sealed_write_update_check
             .generated_object_helpers_source
             .replace(
-                "    if !is_update_write(&replaced, physical) {\n        bail!(\n            \"internal error: the sealed write of {} is not an Update of the record it replaces\",\n            location\n        );\n    }\n    record_write(physical.len())",
-                "    record_write(physical.len())",
+                "    if !is_update_write(&replaced, physical) {\n        bail!(\n            \"internal error: the sealed write of {} is not an Update of the record it replaces\",\n            location\n        );\n    }\n    // The record crosses",
+                "    // The record crosses",
             );
     if tampered_runtime_implementation_sealed_write_update_check.generated_object_helpers_source
         == runtime_implementation_interface.generated_object_helpers_source
@@ -10269,6 +10277,80 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "benchmark": "SingleAccessMap/pathoram/put",
             "entrypoint": target.entrypoint,
             "mutation": "let a node access of the private scheme's tree go on when a block finds no room in the stash, so that the block is dropped and the access can commit; the implementation interface must reject a stash overflow that is not an error of the access",
+        }),
+    )?);
+    // Issue 41: every sealed record crosses to the contract's store where it
+    // is opened and where it is sealed.
+    let mut tampered_runtime_implementation_sealed_open_store_check =
+        runtime_implementation_interface.clone();
+    tampered_runtime_implementation_sealed_open_store_check.generated_object_helpers_source = replace_exactly_once(
+        &tampered_runtime_implementation_sealed_open_store_check.generated_object_helpers_source,
+        "    cipher.check_stored_record(&location, physical)?;\n    cipher\n        .with_opened_payload(",
+        "    cipher\n        .with_opened_payload(",
+        "runtime implementation sealed-open store-check tamper",
+    )?;
+    scenarios.push(validate_tampered_json_case(
+        "runtime_implementation_interface/sealed_open_store_check_skip_drift",
+        &tampered_runtime_implementation_sealed_open_store_check,
+        |interface_path| {
+            Ok(Command::new(&runtime_implementation_interface_checker)
+                .arg(interface_path)
+                .output()?)
+        },
+        json!({
+            "scenario": "runtime_implementation_interface/sealed_open_store_check_skip_drift",
+            "artifact_kind": "proofgrade_runtime_implementation_interface",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "open a sealed record without naming it to the contract's store, so that the store neither compares the record the runtime holds with the one it keeps nor logs the read; the implementation interface must reject an open that does not cross the storage boundary",
+        }),
+    )?);
+    let mut tampered_runtime_implementation_sealed_write_store =
+        runtime_implementation_interface.clone();
+    tampered_runtime_implementation_sealed_write_store.generated_object_helpers_source = replace_exactly_once(
+        &tampered_runtime_implementation_sealed_write_store.generated_object_helpers_source,
+        "    cipher.store_sealed_record(location, physical)?;\n    record_write(physical.len())",
+        "    record_write(physical.len())",
+        "runtime implementation sealed-write store tamper",
+    )?;
+    scenarios.push(validate_tampered_json_case(
+        "runtime_implementation_interface/sealed_write_store_skip_drift",
+        &tampered_runtime_implementation_sealed_write_store,
+        |interface_path| {
+            Ok(Command::new(&runtime_implementation_interface_checker)
+                .arg(interface_path)
+                .output()?)
+        },
+        json!({
+            "scenario": "runtime_implementation_interface/sealed_write_store_skip_drift",
+            "artifact_kind": "proofgrade_runtime_implementation_interface",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "record the write of a sealed record without handing the record to the contract's store, so that the trace names a write the store never classified; the implementation interface must reject a sealed write that does not cross the storage boundary",
+        }),
+    )?);
+    let mut tampered_runtime_implementation_store_write_unreserved =
+        runtime_implementation_interface.clone();
+    tampered_runtime_implementation_store_write_unreserved.generated_store_surface_source = replace_exactly_once(
+        &tampered_runtime_implementation_store_write_unreserved.generated_store_surface_source,
+        "        storage.reserve_seals(self.seal_count())?;\n        let class = storage.write(location, record)?;",
+        "        let class = storage.write(location, record)?;",
+        "runtime implementation unreserved-nonce tamper",
+    )?;
+    scenarios.push(validate_tampered_json_case(
+        "runtime_implementation_interface/store_write_unreserved_nonce_drift",
+        &tampered_runtime_implementation_store_write_unreserved,
+        |interface_path| {
+            Ok(Command::new(&runtime_implementation_interface_checker)
+                .arg(interface_path)
+                .output()?)
+        },
+        json!({
+            "scenario": "runtime_implementation_interface/store_write_unreserved_nonce_drift",
+            "artifact_kind": "proofgrade_runtime_implementation_interface",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "hand a sealed record to the contract's store without first reserving the seal counts made under its key, so that ciphertext could reach the store before the state that fixes its nonce is durable; the implementation interface must reject a write that is not preceded by the reservation",
         }),
     )?);
     let tampered_runtime_small_confidential_kernel_generated_object_helpers_commit =
@@ -27694,9 +27776,11 @@ fn check_deployment_seed_stays_out_of_call_traces(
     runtime_module_source: &str,
     theorem_source: &str,
 ) -> bool {
-    engine_impl_source.contains("Self::deploy_internal(artifact, &master, freshness, None)")
-        && engine_impl_source
-            .contains("Self::deploy_internal(artifact, &master, freshness, Some(deploy_seed))")
+    engine_impl_source
+        .contains("Self::deploy_internal(artifact, &master, freshness, None, storage)")
+        && engine_impl_source.contains(
+            "Self::deploy_internal(artifact, &master, freshness, Some(deploy_seed), storage)",
+        )
         && engine_impl_source.contains("replay_seed: Option<u64>,")
         && engine_impl_source.contains("self.replay_seed,")
         && !engine_impl_source.contains("self.deploy_seed")
@@ -27717,17 +27801,19 @@ fn check_runtime_secrets_derive_from_the_master_secret(
     secret_production_source: &str,
 ) -> bool {
     engine_impl_source.contains(
-        "    pub fn deploy(artifact: CompiledArtifact) -> Result<Self> {\n        let master = RuntimeMasterSecret::from_os_rng();\n        let freshness = RuntimeFreshnessState::from_os_rng();\n        Self::deploy_internal(artifact, &master, freshness, None)\n    }",
+        "    pub fn deploy_with_storage(artifact: CompiledArtifact, storage: SharedStorage) -> Result<Self> {\n        let master = RuntimeMasterSecret::from_os_rng();\n        let freshness = RuntimeFreshnessState::from_os_rng();\n        Self::deploy_internal(artifact, &master, freshness, None, storage)\n    }",
     ) && engine_impl_source.contains(
-        "    #[cfg(any(test, feature = \"diagnostics\"))]\n    pub fn deploy_with_seed(artifact: CompiledArtifact, deploy_seed: u64) -> Result<Self> {\n        let master = RuntimeMasterSecret::from_diagnostic_seed(deploy_seed);",
+        "    #[cfg(any(test, feature = \"diagnostics\"))]\n    pub fn deploy_with_seed_and_storage(\n        artifact: CompiledArtifact,\n        deploy_seed: u64,\n        storage: SharedStorage,\n    ) -> Result<Self> {\n        let master = RuntimeMasterSecret::from_diagnostic_seed(deploy_seed);",
+    ) && engine_impl_source.contains(
+        "    #[cfg(any(test, feature = \"diagnostics\"))]\n    pub fn restart_with_seed(\n        artifact: CompiledArtifact,\n        deploy_seed: u64,\n        storage: SharedStorage,\n        attested_rollback_counter: u64,\n    ) -> Result<Self> {\n        let master = RuntimeMasterSecret::from_diagnostic_seed(deploy_seed);",
     ) && engine_impl_source
         .matches("RuntimeMasterSecret::from_diagnostic_seed(")
         .count()
-        == 1
-        && engine_impl_source.matches("RuntimeMasterSecret::").count() == 2
+        == 2
+        && engine_impl_source.matches("RuntimeMasterSecret::").count() == 3
         && !engine_impl_source.contains("seed_from_u64")
         && state_source.contains("let secret = master.object_secret(spec.id, &spec.name)?;")
-        && state_source.contains("RuntimeObject::instantiate(spec, &secret)?,")
+        && state_source.contains("let mut object = RuntimeObject::instantiate(spec, &secret)?;")
         && objects_production_source.contains("let mut rng = secret.rng()?;")
         && objects_production_source
             .contains("let leaf_coin_seed = secret.path_oram_leaf_seed()?;")
@@ -27758,15 +27844,16 @@ fn check_seal_nonces_come_from_the_seal_count(
     generated_store_codec_source: &str,
 ) -> bool {
     generated_store_surface_production_source
-        .contains("pub struct StoreCipher {\n    key: [u8; 32],\n    seals: Arc<AtomicU64>,\n}")
+        .contains("pub struct StoreCipher {\n    key: [u8; 32],\n    seals: Arc<AtomicU64>,\n    storage: Option<StorageHandle>,\n}")
         && generated_store_surface_production_source.contains(
-            "        Self {\n            key,\n            seals: Arc::new(AtomicU64::new(0)),\n        }",
+            "        Self {\n            key,\n            seals: Arc::new(AtomicU64::new(0)),\n            storage: None,\n        }",
         )
         && generated_store_surface_production_source.contains(
-            "        Self {\n            key: self.key,\n            seals: Arc::clone(&self.seals),\n        }",
+            "        Self {\n            key: self.key,\n            seals: Arc::clone(&self.seals),\n            storage: self.storage.clone(),\n        }",
         )
-        // The count is written where a cipher is made and where a seal reads
-        // it, and nowhere else.
+        // The count is written where a cipher is made, where a seal reads
+        // it and where a restart raises it, and nowhere else. A restart
+        // cannot lower it.
         && generated_store_surface_production_source
             .matches("AtomicU64::new(")
             .count()
@@ -27774,8 +27861,14 @@ fn check_seal_nonces_come_from_the_seal_count(
         && generated_store_surface_production_source
             .matches("self.seals")
             .count()
-            == 1
-        && generated_store_surface_production_source.matches(".seals").count() == 2
+            == 3
+        && generated_store_surface_production_source.matches(".seals").count() == 4
+        && generated_store_surface_production_source.contains(
+            "    pub fn seal_count(&self) -> u64 {\n        self.seals.load(Ordering::SeqCst)\n    }",
+        )
+        && generated_store_surface_production_source.contains(
+            "    pub fn resume_seal_count(&self, count: u64) {\n        self.seals.fetch_max(count, Ordering::SeqCst);\n    }",
+        )
         && generated_store_surface_production_source.contains(
             "            .seals\n            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |seals| {\n                seals.checked_add(1)\n            })\n            .ok()?;\n        Some(seal_nonce(counter))",
         )
@@ -27938,13 +28031,26 @@ fn check_kernel_operators_do_not_branch_on_operands(
         )
 }
 
-/// The files whose production code may name the class `Update` or build a
-/// write event from a class it names: the generated helpers that seal a
-/// record in place, each behind the check of the write's bytes.
+/// The files whose production code may build a write event from a class it
+/// names: the generated helpers that seal a record in place, each behind the
+/// check of the write's bytes.
 const SEALED_WRITE_LABEL_FILES: [&str; 3] = [
     "runtime/uo-evm/src/generated_object_helpers.rs",
     "runtime/uo-evm/src/generated_oram_codecs.rs",
     "runtime/uo-store/src/generated_store_helpers.rs",
+];
+
+/// The files whose production code names the class `Update`: those that
+/// label an event, and the two of the storage boundary that do not. The
+/// store computes the class of a write from its own records, and the cipher
+/// compares what the store returns with it
+/// (`check_sealed_records_cross_the_storage_boundary`).
+const SEALED_WRITE_CLASS_FILES: [&str; 5] = [
+    "runtime/uo-evm/src/generated_object_helpers.rs",
+    "runtime/uo-evm/src/generated_oram_codecs.rs",
+    "runtime/uo-store/src/generated_store_helpers.rs",
+    "runtime/uo-store/src/generated_surface.rs",
+    "runtime/uo-store/src/storage.rs",
 ];
 
 /// Whether the event of a sealed write is recorded only after the write has
@@ -27982,7 +28088,7 @@ fn check_sealed_writes_are_classified_from_their_bytes(
             "    let replaced: Box<[u8]> = (&*physical).into();\n    if !cipher.seal_and_wipe_into_slice(aad.as_bytes(), payload, rng, physical) {",
         )
         && helpers.contains(
-            "    if !is_update_write(&replaced, physical) {\n        bail!(\n            \"internal error: the sealed write of {} is not an Update of the record it replaces\",\n            location\n        );\n    }\n    record_write(physical.len())\n}",
+            "    if !is_update_write(&replaced, physical) {\n        bail!(\n            \"internal error: the sealed write of {} is not an Update of the record it replaces\",\n            location\n        );\n    }\n    // The record crosses the storage boundary here: the store takes it in\n    // place of the record it keeps at this location, and classifies the\n    // write from its own bytes.\n    cipher.store_sealed_record(location, physical)?;\n    record_write(physical.len())\n}",
         )
         && helpers.matches("seal_and_wipe_into_slice(").count() == 1
         && helpers.matches("    record_write(").count() == 1
@@ -28026,12 +28132,87 @@ fn check_sealed_writes_are_classified_from_their_bytes(
         // Nothing else in the runtime names the class or builds an event
         // from a class, and none builds an event field by field: the type
         // name opens a brace once, where a function returns the event.
-        && update_label_files == SEALED_WRITE_LABEL_FILES
+        && update_label_files == SEALED_WRITE_CLASS_FILES
         && shape_constructor_files == SEALED_WRITE_LABEL_FILES
         && write_event_brace_files == ["runtime/uo-evm/src/generated_oram_codecs.rs"]
         && codecs.matches("PhysicalWriteEvent {").count() == 1
         && codecs.contains(
             "    pub(crate) fn with_object(&self, object: &str) -> uo_core::trace::PhysicalWriteEvent {",
+        )
+}
+
+/// Every sealed record crosses to the contract's store where it is opened
+/// and where it is sealed, and nowhere else (invariant 18).
+///
+/// The generated helpers open a record in one function, which first names
+/// the record to the store, and seal one in place in one function, which
+/// hands the store the new record before the write is recorded. The cipher
+/// reaches the store: a read is the store's comparison with the record it
+/// keeps, and a write is preceded by the reservation of the seal counts made
+/// so far and must come back classified as an `Update`. The store refuses a
+/// sealed record whose seal count is not below its reservation, classifies
+/// a write from the record it kept, and a store in files journals a
+/// reservation before it takes effect. The engine commits a call in the
+/// store before it takes the call's state, and a staged call that is
+/// dropped abandons what it handed over.
+fn check_sealed_records_cross_the_storage_boundary(
+    generated_object_helpers_production_source: &str,
+    generated_store_surface_production_source: &str,
+    storage_production_source: &str,
+    engine_impl_source: &str,
+    store_meta_production_source: &str,
+) -> bool {
+    let helpers = generated_object_helpers_production_source;
+    let surface = generated_store_surface_production_source;
+    let storage = storage_production_source;
+    // One open, behind the store's comparison.
+    helpers.contains(
+        "    cipher.check_stored_record(&location, physical)?;\n    cipher\n        .with_opened_payload(aad.as_bytes(), payload_len, physical, open)",
+    ) && helpers.matches(".with_opened_payload(").count() == 1
+        && helpers.matches("check_stored_record(").count() == 1
+        // One seal in place; the store takes the record before the event.
+        && helpers.contains(
+            "    cipher.store_sealed_record(location, physical)?;\n    record_write(physical.len())",
+        )
+        && helpers.matches("store_sealed_record(").count() == 1
+        && helpers.matches("    record_write(").count() == 1
+        // The cipher's side.
+        && surface.contains(
+            "        match &self.storage {\n            Some(storage) => storage.read(location, record),\n            None => Ok(()),\n        }",
+        )
+        && surface.contains(
+            "        storage.reserve_seals(self.seal_count())?;\n        let class = storage.write(location, record)?;\n        if class != WriteClass::Update {\n            bail!(",
+        )
+        && surface.contains(
+            "        storage.reserve_seals(self.seal_count())?;\n        storage.create(location, record)",
+        )
+        && surface.matches("storage.write(").count() == 1
+        && surface.matches("storage.create(").count() == 1
+        // The cipher names the class once, to compare; the store names it
+        // where it computes the class of a write from two records.
+        && surface.matches("WriteClass::Update").count() == 1
+        && storage.contains(
+            "        .find(|class| *class != WriteClass::Update)\n        .unwrap_or(WriteClass::Update)",
+        )
+        && storage.matches("WriteClass::Update").count() == 2
+        // The store's side.
+        && storage.contains("        if &*record.bytes != held {\n            bail!(")
+        && storage.contains("        if count >= reserved {\n            bail!(")
+        && storage.matches("self.ensure_nonce_reserved(object, location, record)?;").count() == 2
+        && storage.contains("        let class = sealed_write_class(&stored.bytes, record);")
+        && storage.contains(
+            "        self.append(&payload)?;\n        self.image.reserve_seals(object, below)",
+        )
+        // The engine commits in the store first, and a dropped call abandons.
+        && engine_impl_source.contains(
+            "        crate::instrumentation::time_store_persistence(|| staged.store.make_durable(&meta))?;\n        self.state = staged.state;",
+        )
+        && engine_impl_source.matches("self.state = staged.state;").count() == 1
+        && engine_impl_source.contains(
+            "        let store = StagedStore::begin(&self.storage)?;\n        let mut staged_state = stage_contract_runtime(&self.state)?;",
+        )
+        && store_meta_production_source.contains(
+            "impl Drop for StagedStore {\n    fn drop(&mut self) {\n        if self.pending {\n            self.storage.with(|adapter| adapter.abandon());\n        }\n    }\n}",
         )
 }
 
@@ -28196,7 +28377,7 @@ fn check_production_calls_issue_chained_receipts(
             "            self.inner.freshness.snapshot(),\n            &self.last_receipt_sha256,\n        )?;",
         )
         && engine_impl_source.contains(
-            "        let receipt = ProductionReceipt::for_call(\n            evidence,\n            &self.last_receipt,\n            &staged.trace.receipt,\n            staged.freshness.snapshot(),\n            staged.state.public_state_digest()?,\n            staged.state.ciphertext_store_digest()?,\n        )?;\n        let receipt_sha256 = receipt.sha256()?;\n        let call = self.inner.commit_staged(staged).0;\n        self.last_receipt = receipt.clone();\n        self.last_receipt_sha256 = receipt_sha256;\n        Ok(ProductionCallResult { call, receipt })",
+            "        let receipt = ProductionReceipt::for_call(\n            evidence,\n            &self.last_receipt,\n            &staged.trace.receipt,\n            staged.freshness.snapshot(),\n            staged.state.public_state_digest()?,\n            staged.state.ciphertext_store_digest()?,\n        )?;\n        let receipt_sha256 = receipt.sha256()?;\n        let call = self.inner.commit_staged(staged)?.0;\n        self.last_receipt = receipt.clone();\n        self.last_receipt_sha256 = receipt_sha256;\n        Ok(ProductionCallResult { call, receipt })",
         )
         && engine_impl_source.matches("self.last_receipt = ").count() == 1
         && engine_impl_source.matches("self.last_receipt_sha256 = ").count() == 1
@@ -30139,7 +30320,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && generated_object_helpers_source.contains("pub(super) fn decode_small_map_entries_from_storage(")
         && generated_object_helpers_source
             .contains("let aad = format!(\"small_map:{}:{index}\", spec.name);")
-        && generated_object_helpers_source.contains("format!(\"{}@smallmap{}\", spec.name, index),")
+        && generated_object_helpers_source.contains("format!(\"{}#{index}\", spec.name),")
         && generated_object_helpers_source
             .contains("pub(super) fn wipe_value_and_physical_slot(value: &mut Value, physical: &mut [u8]) {")
         && generated_object_helpers_source.contains("physical.fill(0);")
@@ -30215,7 +30396,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && !objects_source.contains("decode_sealed_map_record(")
         && !objects_source
             .contains("for (index, physical) in self.physical_slots.iter().enumerate() {")
-        && !objects_source.contains("format!(\"{}@smallmap{}\", self.spec.name, index),")
+        && !objects_source.contains("format!(\"{}#{index}\", self.spec.name),")
         && !objects_source
             .contains(".with_opened_payload(aad.as_bytes(), payload_len, physical, open)")
         && !objects_source.contains("failed to decode sealed object payload")
@@ -30251,8 +30432,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             .contains("pub(super) fn decode_small_map_entries_from_storage(")
         && generated_object_helpers_source
             .contains("let aad = format!(\"small_map:{}:{index}\", spec.name);")
-        && generated_object_helpers_source
-            .contains("format!(\"{}@smallmap{}\", spec.name, index),");
+        && generated_object_helpers_source.contains("format!(\"{}#{index}\", spec.name),");
     let objects_runtime_uses_shared_boxed_seal_helper = objects_source
         .contains("physical: seal_value(&aad, &logical, &cipher, &mut rng)?,")
         && objects_source
@@ -46181,6 +46361,17 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             &collect_production_pattern_hits(&runtime_src, "from_shape(")?,
             &collect_production_pattern_hits(&runtime_src, "PhysicalWriteEvent {")?,
         );
+    let sealed_records_cross_the_storage_boundary = check_sealed_records_cross_the_storage_boundary(
+        &production_source_slice(&generated_object_helpers_source),
+        &production_source_slice(&generated_store_surface_source),
+        &production_source_slice(&fs::read_to_string(
+            root.join("runtime/uo-store/src/storage.rs"),
+        )?),
+        &engine_impl_source,
+        &production_source_slice(&fs::read_to_string(
+            root.join("runtime/uo-evm/src/store_meta.rs"),
+        )?),
+    );
     let private_evidence_stays_inside_the_runtime = check_private_evidence_stays_inside_the_runtime(
         &core_trace_source,
         &engine_impl_source,
@@ -47626,6 +47817,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "seal_nonces_come_from_the_seal_count": seal_nonces_come_from_the_seal_count,
         "sealed_writes_are_classified_from_their_bytes":
             sealed_writes_are_classified_from_their_bytes,
+        "sealed_records_cross_the_storage_boundary":
+            sealed_records_cross_the_storage_boundary,
         "kernel_operators_do_not_branch_on_operands": kernel_operators_do_not_branch_on_operands,
         "private_evidence_stays_inside_the_runtime": private_evidence_stays_inside_the_runtime,
         "production_calls_record_no_position_map_witness": production_calls_record_no_position_map_witness,
@@ -48575,6 +48768,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && runtime_secrets_derive_from_the_master_secret
             && seal_nonces_come_from_the_seal_count
             && sealed_writes_are_classified_from_their_bytes
+            && sealed_records_cross_the_storage_boundary
             && kernel_operators_do_not_branch_on_operands
             && private_evidence_stays_inside_the_runtime
             && production_calls_record_no_position_map_witness
@@ -52960,153 +53154,123 @@ fn sha256_file_if_exists(path: &Path) -> JsonValue {
     }
 }
 
+/// One workload of a benchmark: the calls that set its state up, the call
+/// the reports measure, and the reads that show what it left.
+struct BenchmarkWorkload {
+    /// The benchmark and the measured entrypoint, as the reports label it.
+    label: &'static str,
+    /// The benchmark's key in the compiled suite.
+    suite: &'static str,
+    setup: Vec<CallSpec>,
+    target: CallSpec,
+    getters: Vec<CallSpec>,
+}
+
+/// The workloads the overhead report and the storage-boundary report run on
+/// every backend of a benchmark.
+fn benchmark_workloads() -> Vec<BenchmarkWorkload> {
+    let call = |entrypoint: &'static str, args: Vec<Value>| CallSpec { entrypoint, args };
+    let mixer_key = b32(7);
+    let alice = addr(0x11);
+    let bob = addr(0x22);
+    let carol = addr(0x33);
+    let registry_key = b32(4);
+    vec![
+        BenchmarkWorkload {
+            label: "FixedSlotClassifier/classify",
+            suite: "FixedSlotClassifier",
+            setup: vec![],
+            target: call("classify(uint256)", vec![Value::uint(1)]),
+            getters: vec![call("peek()", vec![])],
+        },
+        BenchmarkWorkload {
+            label: "AuthScan/auth",
+            suite: "AuthScan",
+            setup: vec![
+                call("seed(uint256,bytes32)", vec![Value::uint(0), b32(1)]),
+                call("seed(uint256,bytes32)", vec![Value::uint(1), b32(2)]),
+            ],
+            target: call("auth(bytes32)", vec![b32(2)]),
+            getters: vec![call("readLast()", vec![])],
+        },
+        BenchmarkWorkload {
+            label: "ConfidentialMixer/deposit",
+            suite: "ConfidentialMixer",
+            setup: vec![],
+            target: call(
+                "deposit(bytes32,uint256)",
+                vec![mixer_key.clone(), Value::uint(3)],
+            ),
+            getters: vec![],
+        },
+        BenchmarkWorkload {
+            label: "ConfidentialMixer/withdraw",
+            suite: "ConfidentialMixer",
+            setup: vec![call(
+                "deposit(bytes32,uint256)",
+                vec![mixer_key.clone(), Value::uint(5)],
+            )],
+            target: call("withdraw(bytes32,uint256)", vec![mixer_key, Value::uint(2)]),
+            getters: vec![
+                call("balanceOf(bytes32)", vec![b32(7)]),
+                call("totalValue()", vec![]),
+            ],
+        },
+        BenchmarkWorkload {
+            label: "ERC20Lite/transferFrom",
+            suite: "ERC20Lite",
+            setup: vec![
+                call(
+                    "mint(address,uint256)",
+                    vec![alice.clone(), Value::uint(10)],
+                ),
+                call(
+                    "approve(address,address,uint256)",
+                    vec![alice.clone(), bob.clone(), Value::uint(4)],
+                ),
+            ],
+            target: call(
+                "transferFrom(address,address,address,uint256)",
+                vec![alice.clone(), bob.clone(), carol.clone(), Value::uint(3)],
+            ),
+            getters: vec![
+                call("balanceOf(address)", vec![alice]),
+                call("balanceOf(address)", vec![carol]),
+                call("allowanceOf(address,address)", vec![addr(0x11), bob]),
+            ],
+        },
+        BenchmarkWorkload {
+            label: "RegistryCRUD/clearIfMatch",
+            suite: "RegistryCRUD",
+            setup: vec![call(
+                "upsert(bytes32,uint256)",
+                vec![registry_key.clone(), Value::uint(9)],
+            )],
+            target: call(
+                "clearIfMatch(bytes32,uint256)",
+                vec![registry_key.clone(), Value::uint(9)],
+            ),
+            getters: vec![call("read(bytes32)", vec![registry_key])],
+        },
+    ]
+}
+
 fn run_overheads(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<JsonValue> {
     let mut cases = Vec::new();
     let mut matrix = Vec::new();
 
-    append_overhead_workload(
-        &mut cases,
-        &mut matrix,
-        "FixedSlotClassifier/classify",
-        &suite["FixedSlotClassifier"],
-        &[],
-        &CallSpec {
-            entrypoint: "classify(uint256)",
-            args: vec![Value::uint(1)],
-        },
-        &[CallSpec {
-            entrypoint: "peek()",
-            args: vec![],
-        }],
-    )
-    .context("overheads/FixedSlotClassifier/classify")?;
-
-    append_overhead_workload(
-        &mut cases,
-        &mut matrix,
-        "AuthScan/auth",
-        &suite["AuthScan"],
-        &[
-            CallSpec {
-                entrypoint: "seed(uint256,bytes32)",
-                args: vec![Value::uint(0), b32(1)],
-            },
-            CallSpec {
-                entrypoint: "seed(uint256,bytes32)",
-                args: vec![Value::uint(1), b32(2)],
-            },
-        ],
-        &CallSpec {
-            entrypoint: "auth(bytes32)",
-            args: vec![b32(2)],
-        },
-        &[CallSpec {
-            entrypoint: "readLast()",
-            args: vec![],
-        }],
-    )
-    .context("overheads/AuthScan/auth")?;
-
-    let mixer_key = b32(7);
-    append_overhead_workload(
-        &mut cases,
-        &mut matrix,
-        "ConfidentialMixer/deposit",
-        &suite["ConfidentialMixer"],
-        &[],
-        &CallSpec {
-            entrypoint: "deposit(bytes32,uint256)",
-            args: vec![mixer_key.clone(), Value::uint(3)],
-        },
-        &[],
-    )
-    .context("overheads/ConfidentialMixer/deposit")?;
-
-    append_overhead_workload(
-        &mut cases,
-        &mut matrix,
-        "ConfidentialMixer/withdraw",
-        &suite["ConfidentialMixer"],
-        &[CallSpec {
-            entrypoint: "deposit(bytes32,uint256)",
-            args: vec![mixer_key.clone(), Value::uint(5)],
-        }],
-        &CallSpec {
-            entrypoint: "withdraw(bytes32,uint256)",
-            args: vec![mixer_key, Value::uint(2)],
-        },
-        &[
-            CallSpec {
-                entrypoint: "balanceOf(bytes32)",
-                args: vec![b32(7)],
-            },
-            CallSpec {
-                entrypoint: "totalValue()",
-                args: vec![],
-            },
-        ],
-    )
-    .context("overheads/ConfidentialMixer/withdraw")?;
-
-    let alice = addr(0x11);
-    let bob = addr(0x22);
-    let carol = addr(0x33);
-    append_overhead_workload(
-        &mut cases,
-        &mut matrix,
-        "ERC20Lite/transferFrom",
-        &suite["ERC20Lite"],
-        &[
-            CallSpec {
-                entrypoint: "mint(address,uint256)",
-                args: vec![alice.clone(), Value::uint(10)],
-            },
-            CallSpec {
-                entrypoint: "approve(address,address,uint256)",
-                args: vec![alice.clone(), bob.clone(), Value::uint(4)],
-            },
-        ],
-        &CallSpec {
-            entrypoint: "transferFrom(address,address,address,uint256)",
-            args: vec![alice.clone(), bob.clone(), carol.clone(), Value::uint(3)],
-        },
-        &[
-            CallSpec {
-                entrypoint: "balanceOf(address)",
-                args: vec![alice],
-            },
-            CallSpec {
-                entrypoint: "balanceOf(address)",
-                args: vec![carol],
-            },
-            CallSpec {
-                entrypoint: "allowanceOf(address,address)",
-                args: vec![addr(0x11), bob],
-            },
-        ],
-    )
-    .context("overheads/ERC20Lite/transferFrom")?;
-
-    let registry_key = b32(4);
-    append_overhead_workload(
-        &mut cases,
-        &mut matrix,
-        "RegistryCRUD/clearIfMatch",
-        &suite["RegistryCRUD"],
-        &[CallSpec {
-            entrypoint: "upsert(bytes32,uint256)",
-            args: vec![registry_key.clone(), Value::uint(9)],
-        }],
-        &CallSpec {
-            entrypoint: "clearIfMatch(bytes32,uint256)",
-            args: vec![registry_key.clone(), Value::uint(9)],
-        },
-        &[CallSpec {
-            entrypoint: "read(bytes32)",
-            args: vec![registry_key],
-        }],
-    )
-    .context("overheads/RegistryCRUD/clearIfMatch")?;
+    for workload in benchmark_workloads() {
+        append_overhead_workload(
+            &mut cases,
+            &mut matrix,
+            workload.label,
+            &suite[workload.suite],
+            &workload.setup,
+            &workload.target,
+            &workload.getters,
+        )
+        .with_context(|| format!("overheads/{}", workload.label))?;
+    }
 
     let cost_formula_exact = cases.iter().all(|case| {
         case.get("cost_formula")
@@ -56933,8 +57097,8 @@ mod tests {
 
         // An unseeded deployment that tags its traces with a seed.
         let tagged = engine.replace(
-            "Self::deploy_internal(artifact, &master, freshness, None)",
-            "Self::deploy_internal(artifact, &master, freshness, Some(0))",
+            "Self::deploy_internal(artifact, &master, freshness, None, storage)",
+            "Self::deploy_internal(artifact, &master, freshness, Some(0), storage)",
         );
         assert_ne!(tagged, engine);
         assert!(!check_deployment_seed_stays_out_of_call_traces(
@@ -57081,6 +57245,15 @@ mod tests {
             &resettable,
             &codec
         ));
+        // A restart that sets the count where it is told, lower or not.
+        let lowered = surface.replace(
+            "        self.seals.fetch_max(count, Ordering::SeqCst);",
+            "        self.seals.store(count, Ordering::SeqCst);",
+        );
+        assert_ne!(lowered, surface);
+        assert!(!check_seal_nonces_come_from_the_seal_count(
+            &lowered, &codec
+        ));
         // A nonce that drops the top half of the count.
         let truncated = codec.replace(
             "nonce.iter_mut().skip(4).zip(counter.to_be_bytes().iter())",
@@ -57093,10 +57266,135 @@ mod tests {
     }
 
     #[test]
+    fn storage_boundary_check_rejects_the_drifts_it_guards() {
+        use super::{check_sealed_records_cross_the_storage_boundary, repo_root};
+        let root = repo_root();
+        let read =
+            |rel: &str| production_source_slice(&std::fs::read_to_string(root.join(rel)).unwrap());
+        let helpers = read("runtime/uo-evm/src/generated_object_helpers.rs");
+        let surface = read("runtime/uo-store/src/generated_surface.rs");
+        let storage = read("runtime/uo-store/src/storage.rs");
+        let engine = read("runtime/uo-evm/src/engine.rs");
+        let store_meta = read("runtime/uo-evm/src/store_meta.rs");
+        let ok = |helpers: &str, surface: &str, storage: &str, engine: &str, store_meta: &str| {
+            check_sealed_records_cross_the_storage_boundary(
+                helpers, surface, storage, engine, store_meta,
+            )
+        };
+        // The sources pass as they are.
+        assert!(ok(&helpers, &surface, &storage, &engine, &store_meta));
+
+        // Each drift changes one source, and the check must fail on it.
+        let drift = |source: &str, from: &str, to: &str| {
+            let changed = source.replace(from, to);
+            assert_ne!(changed, source, "no {from:?} to change");
+            changed
+        };
+        // A record opened without the store's comparison.
+        let unchecked_open = drift(
+            &helpers,
+            "    cipher.check_stored_record(&location, physical)?;\n",
+            "",
+        );
+        assert!(!ok(
+            &unchecked_open,
+            &surface,
+            &storage,
+            &engine,
+            &store_meta
+        ));
+        // A second open beside the checked one.
+        let second_open = drift(
+            &helpers,
+            "pub(super) fn with_opened_object_payload<T, F>(",
+            "fn open_unchecked<T>(cipher: &StoreCipher, aad: &str, len: usize, physical: &[u8], open: impl FnOnce(&[u8]) -> T) -> Option<T> {\n    cipher.with_opened_payload(aad.as_bytes(), len, physical, open)\n}\n\npub(super) fn with_opened_object_payload<T, F>(",
+        );
+        assert!(!ok(&second_open, &surface, &storage, &engine, &store_meta));
+        // A sealed record that is recorded and never handed to the store.
+        let unstored_write = drift(
+            &helpers,
+            "    cipher.store_sealed_record(location, physical)?;\n",
+            "",
+        );
+        assert!(!ok(
+            &unstored_write,
+            &surface,
+            &storage,
+            &engine,
+            &store_meta
+        ));
+        // A cipher that hands a record over before its nonce is reserved.
+        let unreserved = drift(
+            &surface,
+            "        storage.reserve_seals(self.seal_count())?;\n        let class = storage.write(location, record)?;",
+            "        let class = storage.write(location, record)?;",
+        );
+        assert!(!ok(&helpers, &unreserved, &storage, &engine, &store_meta));
+        // A cipher that takes any class the store returns.
+        let any_class = drift(
+            &surface,
+            "        if class != WriteClass::Update {\n            bail!(",
+            "        if false {\n            bail!(",
+        );
+        assert!(!ok(&helpers, &any_class, &storage, &engine, &store_meta));
+        // A cipher whose read does not reach the store.
+        let unread = drift(
+            &surface,
+            "            Some(storage) => storage.read(location, record),",
+            "            Some(_) => Ok(()),",
+        );
+        assert!(!ok(&helpers, &unread, &storage, &engine, &store_meta));
+        // A store that takes a record whatever its seal count.
+        let unbounded = drift(
+            &storage,
+            "        if count >= reserved {\n            bail!(",
+            "        if false {\n            bail!(",
+        );
+        assert!(!ok(&helpers, &surface, &unbounded, &engine, &store_meta));
+        // A store that logs a read of a record it does not compare.
+        let uncompared = drift(
+            &storage,
+            "        if &*record.bytes != held {\n            bail!(",
+            "        if false {\n            bail!(",
+        );
+        assert!(!ok(&helpers, &surface, &uncompared, &engine, &store_meta));
+        // A store that takes its caller's word for the class.
+        let unclassified = drift(
+            &storage,
+            "        let class = sealed_write_class(&stored.bytes, record);",
+            "        let class = WriteClass::Update;",
+        );
+        assert!(!ok(&helpers, &surface, &unclassified, &engine, &store_meta));
+        // A store in files whose reservation takes effect before it is in
+        // the journal.
+        let unjournaled = drift(
+            &storage,
+            "        self.append(&payload)?;\n        self.image.reserve_seals(object, below)",
+            "        self.image.reserve_seals(object, below)?;\n        self.append(&payload)",
+        );
+        assert!(!ok(&helpers, &surface, &unjournaled, &engine, &store_meta));
+        // An engine that takes the call's state before the store has
+        // committed it.
+        let early_state = drift(
+            &engine,
+            "        crate::instrumentation::time_store_persistence(|| staged.store.make_durable(&meta))?;\n        self.state = staged.state;",
+            "        self.state = staged.state;\n        crate::instrumentation::time_store_persistence(|| staged.store.make_durable(&meta))?;",
+        );
+        assert!(!ok(&helpers, &surface, &storage, &early_state, &store_meta));
+        // A staged call that leaves its records pending when it is dropped.
+        let unabandoned = drift(
+            &store_meta,
+            "            self.storage.with(|adapter| adapter.abandon());",
+            "",
+        );
+        assert!(!ok(&helpers, &surface, &storage, &engine, &unabandoned));
+    }
+
+    #[test]
     fn sealed_write_check_rejects_the_drifts_it_guards() {
         use super::{
             check_sealed_writes_are_classified_from_their_bytes, collect_production_pattern_hits,
-            repo_root, SEALED_WRITE_LABEL_FILES,
+            repo_root, SEALED_WRITE_CLASS_FILES, SEALED_WRITE_LABEL_FILES,
         };
         let root = repo_root();
         let read = |rel: &str| std::fs::read_to_string(root.join(rel)).unwrap();
@@ -57119,7 +57417,7 @@ mod tests {
         };
 
         // The sources pass as they are.
-        assert_eq!(labels, SEALED_WRITE_LABEL_FILES);
+        assert_eq!(labels, SEALED_WRITE_CLASS_FILES);
         assert_eq!(shapes, SEALED_WRITE_LABEL_FILES);
         assert_eq!(literals, ["runtime/uo-evm/src/generated_oram_codecs.rs"]);
         assert!(ok(&trace, &helpers, &codecs, &oram, &store));
@@ -58126,8 +58424,8 @@ mod tests {
 
         // A call that commits before its receipt exists.
         let early = engine.replacen(
-            "        let receipt_sha256 = receipt.sha256()?;\n        let call = self.inner.commit_staged(staged).0;\n",
-            "        let call = self.inner.commit_staged(staged).0;\n        let receipt_sha256 = receipt.sha256()?;\n",
+            "        let receipt_sha256 = receipt.sha256()?;\n        let call = self.inner.commit_staged(staged)?.0;\n",
+            "        let call = self.inner.commit_staged(staged)?.0;\n        let receipt_sha256 = receipt.sha256()?;\n",
             1,
         );
         rejects("early commit", &early, &engine, ok(&deployment, &early));

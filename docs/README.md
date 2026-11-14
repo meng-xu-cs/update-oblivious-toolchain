@@ -59,7 +59,7 @@ belongs.
 | [`docs/coding-agent-conventions.md`](./coding-agent-conventions.md) | maintained | process rules for future changes |
 | [`proof/README.md`](../proof/README.md) | maintained | Lean workspace map |
 | [`benches/harnesses/README.md`](../benches/harnesses/README.md) | maintained | benchmark harness note |
-| [`review/2026-11-external-review/`](../review/2026-11-external-review/README.md) | tracker | validation of the November 2026 external review, Issues 22 to 56 and their status; delete once its scheduled issues are done and their facts are in the topic documents |
+| [`review/2026-11-external-review/`](../review/2026-11-external-review/README.md) | tracker | validation of the November 2026 external review, Issues 22 to 59 and their status; delete once its scheduled issues are done and their facts are in the topic documents |
 | [`results/artifact_readme.md`](../results/artifact_readme.md) | generated | probe output; source is `probe/mplus-probe` |
 | [`results/reviewer_summary.md`](../results/reviewer_summary.md) | generated | probe output; source is `probe/mplus-probe` |
 | archived root paper drafts | removed | durable claims moved into maintained docs |

@@ -3046,6 +3046,11 @@ def RuntimeImplementationInterface.storeCipherUsesExactSizeNonzeroBuffers
     , "Self::from_rng(&mut rng)"
     , "pub fn clone_for_runtime_state(&self) -> Self {"
     , "seals: Arc::clone(&self.seals),"
+    , "storage: self.storage.clone(),"
+    , "self.seals.fetch_max(count, Ordering::SeqCst);"
+    , "Some(storage) => storage.read(location, record),"
+    , "storage.reserve_seals(self.seal_count())?;\n        let class = storage.write(location, record)?;\n        if class != WriteClass::Update {"
+    , "storage.reserve_seals(self.seal_count())?;\n        storage.create(location, record)"
     , "fn next_seal_nonce(&self) -> Option<[u8; SEALED_NONCE_BYTES]> {"
     , ".fetch_update(Ordering::SeqCst, Ordering::SeqCst, |seals| {"
     , "seals.checked_add(1)"
@@ -3446,7 +3451,7 @@ def RuntimeImplementationInterface.storeLibrarySurfaceKeepsGeneratedHelpersPriva
   sourceContainsAll iface.storeLibProductionSource
     [ "pub mod codec;"
     , "mod store;"
-    , "pub use codec::StoreCipher;"
+    , "pub use codec::{sealed_record_seal_count, StoreCipher};"
     , "pub use store::StoreExecutionMetrics;"
     ] ∧
   sourceLacksAll iface.storeLibProductionSource
@@ -3571,6 +3576,11 @@ def RuntimeImplementationInterface.checkStoreCipherUsesExactSizeNonzeroBuffers
     , "Self::from_rng(&mut rng)"
     , "pub fn clone_for_runtime_state(&self) -> Self {"
     , "seals: Arc::clone(&self.seals),"
+    , "storage: self.storage.clone(),"
+    , "self.seals.fetch_max(count, Ordering::SeqCst);"
+    , "Some(storage) => storage.read(location, record),"
+    , "storage.reserve_seals(self.seal_count())?;\n        let class = storage.write(location, record)?;\n        if class != WriteClass::Update {"
+    , "storage.reserve_seals(self.seal_count())?;\n        storage.create(location, record)"
     , "fn next_seal_nonce(&self) -> Option<[u8; SEALED_NONCE_BYTES]> {"
     , ".fetch_update(Ordering::SeqCst, Ordering::SeqCst, |seals| {"
     , "seals.checked_add(1)"
@@ -3965,7 +3975,7 @@ def RuntimeImplementationInterface.checkStoreLibrarySurfaceKeepsGeneratedHelpers
   checkSourceContainsAll iface.storeLibProductionSource
     [ "pub mod codec;"
     , "mod store;"
-    , "pub use codec::StoreCipher;"
+    , "pub use codec::{sealed_record_seal_count, StoreCipher};"
     , "pub use store::StoreExecutionMetrics;"
     ] &&
   checkSourceLacksAll iface.storeLibProductionSource
@@ -4672,7 +4682,7 @@ def RuntimeImplementationInterface.runtimeObjectCommitUsesPublicSealAndWriteShel
     , "fn reseal_payload_and_record_write<F>("
     , "allocator.reserve_guard(ScratchRegion::IoScratch, payload.len())?;"
     , "let replaced: Box<[u8]> = (&*physical).into();\n    if !cipher.seal_and_wipe_into_slice(aad.as_bytes(), payload, rng, physical) {"
-    , "if !is_update_write(&replaced, physical) {\n        bail!(\n            \"internal error: the sealed write of {} is not an Update of the record it replaces\",\n            location\n        );\n    }\n    record_write(physical.len())"
+    , "if !is_update_write(&replaced, physical) {\n        bail!(\n            \"internal error: the sealed write of {} is not an Update of the record it replaces\",\n            location\n        );\n    }\n    // The record crosses the storage boundary here: the store takes it in\n    // place of the record it keeps at this location, and classifies the\n    // write from its own bytes.\n    cipher.store_sealed_record(location, physical)?;\n    record_write(physical.len())"
     , "|physical_len| writes.push_update(location, physical_len),"
     , "use uo_core::trace::{is_update_write, PhysicalWriteEvent, WriteClass};"
     , "pub(super) fn reseal_payload_and_trace_write("
@@ -4708,6 +4718,7 @@ def RuntimeImplementationInterface.runtimeObjectOpenUsesSharedDecodeShell
     , "fn with_opened_payload<T, F>("
     , "allocator.reserve_guard(ScratchRegion::IoScratch, payload_len)?;"
     , ".with_opened_payload(aad.as_bytes(), payload_len, physical, open)"
+    , "cipher.check_stored_record(&location, physical)?;\n    cipher\n        .with_opened_payload(aad.as_bytes(), payload_len, physical, open)"
     , "pub(super) fn with_opened_object_payload<T, F>("
     , "with_opened_payload(\n        location,\n        aad,\n        payload_len,\n        physical,\n        cipher,\n        allocator,\n        open,\n    )"
     , "pub(super) fn decode_sealed_value("
@@ -4724,7 +4735,7 @@ def RuntimeImplementationInterface.runtimeObjectOpenUsesSharedDecodeShell
     , "values.push(decode_sealed_value("
     , "pub(super) fn decode_small_map_entries_from_storage("
     , "let aad = format!(\"small_map:{}:{index}\", spec.name);"
-    , "format!(\"{}@smallmap{}\", spec.name, index),"
+    , "format!(\"{}#{index}\", spec.name),"
     ] ∧
   sourceLacksAll iface.objectsProductionSource
     [ "fn with_opened_object_payload<"
@@ -4733,7 +4744,7 @@ def RuntimeImplementationInterface.runtimeObjectOpenUsesSharedDecodeShell
     , "decode_sealed_value("
     , "decode_sealed_map_record("
     , "for (index, physical) in self.physical_slots.iter().enumerate() {"
-    , "format!(\"{}@smallmap{}\", self.spec.name, index),"
+    , "format!(\"{}#{index}\", self.spec.name),"
     , ".with_opened_payload(aad.as_bytes(), payload_len, physical, open)"
     , "failed to decode sealed object payload"
     ]
@@ -4873,7 +4884,7 @@ def RuntimeImplementationInterface.checkRuntimeObjectCommitUsesPublicSealAndWrit
     , "fn reseal_payload_and_record_write<F>("
     , "allocator.reserve_guard(ScratchRegion::IoScratch, payload.len())?;"
     , "let replaced: Box<[u8]> = (&*physical).into();\n    if !cipher.seal_and_wipe_into_slice(aad.as_bytes(), payload, rng, physical) {"
-    , "if !is_update_write(&replaced, physical) {\n        bail!(\n            \"internal error: the sealed write of {} is not an Update of the record it replaces\",\n            location\n        );\n    }\n    record_write(physical.len())"
+    , "if !is_update_write(&replaced, physical) {\n        bail!(\n            \"internal error: the sealed write of {} is not an Update of the record it replaces\",\n            location\n        );\n    }\n    // The record crosses the storage boundary here: the store takes it in\n    // place of the record it keeps at this location, and classifies the\n    // write from its own bytes.\n    cipher.store_sealed_record(location, physical)?;\n    record_write(physical.len())"
     , "|physical_len| writes.push_update(location, physical_len),"
     , "use uo_core::trace::{is_update_write, PhysicalWriteEvent, WriteClass};"
     , "pub(super) fn reseal_payload_and_trace_write("
@@ -4977,6 +4988,7 @@ def RuntimeImplementationInterface.checkRuntimeObjectOpenUsesSharedDecodeShell
     , "fn with_opened_payload<T, F>("
     , "allocator.reserve_guard(ScratchRegion::IoScratch, payload_len)?;"
     , ".with_opened_payload(aad.as_bytes(), payload_len, physical, open)"
+    , "cipher.check_stored_record(&location, physical)?;\n    cipher\n        .with_opened_payload(aad.as_bytes(), payload_len, physical, open)"
     , "pub(super) fn with_opened_object_payload<T, F>("
     , "with_opened_payload(\n        location,\n        aad,\n        payload_len,\n        physical,\n        cipher,\n        allocator,\n        open,\n    )"
     , "pub(super) fn decode_sealed_value("
@@ -4993,7 +5005,7 @@ def RuntimeImplementationInterface.checkRuntimeObjectOpenUsesSharedDecodeShell
     , "values.push(decode_sealed_value("
     , "pub(super) fn decode_small_map_entries_from_storage("
     , "let aad = format!(\"small_map:{}:{index}\", spec.name);"
-    , "format!(\"{}@smallmap{}\", spec.name, index),"
+    , "format!(\"{}#{index}\", spec.name),"
     ] &&
   checkSourceLacksAll iface.objectsProductionSource
     [ "fn with_opened_object_payload<"
@@ -5002,7 +5014,7 @@ def RuntimeImplementationInterface.checkRuntimeObjectOpenUsesSharedDecodeShell
     , "decode_sealed_value("
     , "decode_sealed_map_record("
     , "for (index, physical) in self.physical_slots.iter().enumerate() {"
-    , "format!(\"{}@smallmap{}\", self.spec.name, index),"
+    , "format!(\"{}#{index}\", self.spec.name),"
     , ".with_opened_payload(aad.as_bytes(), payload_len, physical, open)"
     , "failed to decode sealed object payload"
     ]
