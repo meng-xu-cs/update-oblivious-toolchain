@@ -28,10 +28,6 @@ const STORE_META_KEY_LABEL: &[u8] = b"uo-runtime/store-meta-key/v1";
 const STORE_META_TAG_LABEL: &[u8] = b"uo-runtime/store-meta-tag/v1";
 #[cfg(any(test, feature = "diagnostics"))]
 const DIAGNOSTIC_MASTER_SECRET_LABEL: &[u8] = b"uo-runtime/diagnostic-master-secret/v1";
-#[cfg(test)]
-const DIAGNOSTIC_OBJECT_SECRET_LABEL: &[u8] = b"uo-runtime/diagnostic-object-secret/v1";
-#[cfg(test)]
-const DIAGNOSTIC_LEAF_SEED_LABEL: &[u8] = b"uo-runtime/diagnostic-path-oram-leaf-seed/v1";
 
 /// HKDF-SHA256 expansion of a 32-byte key. The context is the label and then
 /// each part, every one prefixed with its length, so that two different
@@ -150,6 +146,7 @@ impl Drop for ObjectSecret {
 impl ObjectSecret {
     #[cfg(test)]
     pub(crate) fn from_diagnostic_seed(seed: u64) -> Self {
+        const DIAGNOSTIC_OBJECT_SECRET_LABEL: &[u8] = b"uo-runtime/diagnostic-object-secret/v1";
         Self(diagnostic_secret(DIAGNOSTIC_OBJECT_SECRET_LABEL, seed))
     }
 
@@ -194,6 +191,7 @@ impl fmt::Debug for PathOramLeafSeed {
 impl PathOramLeafSeed {
     #[cfg(test)]
     pub(crate) fn from_diagnostic_seed(seed: u64) -> Self {
+        const DIAGNOSTIC_LEAF_SEED_LABEL: &[u8] = b"uo-runtime/diagnostic-path-oram-leaf-seed/v1";
         Self(diagnostic_secret(DIAGNOSTIC_LEAF_SEED_LABEL, seed))
     }
 

@@ -92,12 +92,20 @@ Issue 22 has the options and the reasoning.
    the tape substitution is tested over 1,344 tapes and the AVL map on
    trees of up to 2,048 nodes, with no divergence.
 
-Every scheduled issue is done. What remains is the research issues, the
-backlog, and the folding of this directory into the topic documents (see
-Using the Tracker), which waits for the maintainer.
+8. **Wave 7, the backlog of Issues 51 to 59**, which the maintainer
+   scheduled on 2026-11-14, in this order: 56, 51, 52, 54, 55, 53, 59, 58,
+   57. Issue 56 comes first because the others change pinned sources, and
+   the lexer lets a check write its needles whole. Issues 51 and 52 change
+   how a seal is made and counted, before Issue 59 moves the records into
+   the store. Issue 53 comes before Issue 58, which needs it, and Issue 59
+   before Issue 58, so that a restart seals nothing. Issue 57 comes last:
+   it changes every Path ORAM count, so the full profile of the capacity
+   sweep runs once after it, and measures Issue 59's memory too.
 
 The research issues (43 to 46) start once the issues they depend on are
-done. The backlog (47 to 59) is not scheduled.
+done. The rest of the backlog (47 to 50) is not scheduled, and the folding
+of this directory into the topic documents (see Using the Tracker) waits
+for the maintainer.
 
 This differs from the review's sequence in two ways. The measurement work
 comes before the optimizations, not after. And incremental state is split:
@@ -136,15 +144,15 @@ its engineering part is Wave 4, its certified part is research.
 | 48 | Fuse scans and generalize the reuse analysis | backlog | M | 31, 32 | todo | |
 | 49 | Write the related-work boundary and add matched baselines | backlog | M | 27 | todo | |
 | 50 | Bridge a scoped subset to Solidity 0.8 semantics | backlog | L | | deferred | |
-| 51 | Remove the generator that a seal no longer reads | backlog | S to M | 24 | todo | |
-| 52 | Make the seal count of a dropped call a function of its entrypoint | backlog | M | 24 | todo | |
-| 53 | Authenticate production receipts under an attested key | backlog | M | 26 | todo | |
-| 54 | Compare a runtime trace with the exact encoding in Lean | backlog | M | 38 | todo | |
-| 55 | Take the public-state snapshot once for each object a call changes | backlog | M | 37 | todo | |
-| 56 | Slice production sources with a lexer | backlog | S to M | | todo | |
-| 57 | Trace the reads of a Path ORAM map that cross the storage boundary | backlog | L | 41 | todo | |
-| 58 | Seal the master secret so that a production deployment can restart | backlog | M | 41, 53 | todo | |
-| 59 | Keep sealed records in the store alone | backlog | L | 41 | todo | |
+| 51 | Remove the generator that a seal no longer reads | 7 | S to M | 24 | todo | |
+| 52 | Make the seal count of a dropped call a function of its entrypoint | 7 | M | 24 | todo | |
+| 53 | Authenticate production receipts under an attested key | 7 | M | 26 | todo | |
+| 54 | Compare a runtime trace with the exact encoding in Lean | 7 | M | 38 | todo | |
+| 55 | Take the public-state snapshot once for each object a call changes | 7 | M | 37 | todo | |
+| 56 | Slice production sources with a lexer | 7 | S to M | | done | |
+| 57 | Trace the reads of a Path ORAM map that cross the storage boundary | 7 | L | 41 | todo | |
+| 58 | Seal the master secret so that a production deployment can restart | 7 | M | 41, 53 | todo | |
+| 59 | Keep sealed records in the store alone | 7 | L | 41 | todo | |
 
 Sizes are relative, not a schedule: S a day or less, M several days, L one
 to two weeks, R research with no fixed end.

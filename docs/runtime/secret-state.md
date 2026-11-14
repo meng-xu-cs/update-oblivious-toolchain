@@ -117,8 +117,11 @@ and the ownership boundaries that keep them auditable.
     the transitions carry one to the other no longer says anything about
     the store. The audit does: every call compares the kept witness with
     the decode of the whole store, before it runs and after, and fails if
-    they differ. A measurement turns the audit off for the calls it times
-    (`set_position_map_witness_audit`) and audits where it does not time.
+    they differ. The probe turns the audit off
+    (`set_position_map_witness_audit`) for the calls it times, in the
+    latency report and the capacity sweep, and in the storage-boundary
+    report, whose comparison of a store's log with the trace the audit's
+    decode of the whole store would join. It audits everywhere else.
 
 16. A call copies no committed object, and a committed object never
     changes. The state a call is staged on is a table of the committed
@@ -258,10 +261,26 @@ Invariants 9 to 18 have thirteen bits in `runtime_boundary_validation.json`:
 `trace_runs_stand_for_recorded_events` and
 `sealed_records_cross_the_storage_boundary`. Each is a check of source text,
 and a probe unit test shows that it rejects the drifts it guards against.
-`cargo test -p uo-evm` runs the tests behind all but the two about secrets
-and nonces in the build a production runtime uses
-(`runtime/uo-evm/tests/production_boundary.rs`, and the production tests
-of `engine.rs`); a workspace build turns on the `diagnostics` feature and
+
+A source check reads the production part of a file: the file without the
+modules and functions marked `#[cfg(test)]`. The probe
+(`production_source_slice` in `probe/mplus-probe/src/rust_source.rs`) and Lean
+(`productionSource` in `UOToolchain/RustSourceSlice.lean`) cut it with the
+same lexer, which finds where an item ends by its braces and knows string,
+raw-string and character literals and comments, so a brace or an attribute
+inside one does not count. `runtime_implementation_interface_validation.json`
+checks that the two cut every file the implementation interface pins alike
+(`production_source_slices.lean_and_probe_slices_agree`), and that no
+`#[cfg(test)]` in the workspace's Rust sources marks anything but a module or
+a function (`cfg_test_marks_only_modules_and_functions`): the slicer leaves
+any other item in place, where a check that a text is absent still sees it. A
+check that counts code counts it with literals and comments blanked
+(`rust_code_text`), so a needle that a check holds in a string is not code,
+and no check splits a needle to keep its own text out of a count. `cargo test
+-p uo-evm` runs the tests behind all but the two about secrets and nonces in
+the build a production runtime uses
+(`runtime/uo-evm/tests/production_boundary.rs`, and the production tests of
+`engine.rs`); a workspace build turns on the `diagnostics` feature and
 compiles those tests out.
 
 Invariant 12 is also pinned in the Lean implementation interface

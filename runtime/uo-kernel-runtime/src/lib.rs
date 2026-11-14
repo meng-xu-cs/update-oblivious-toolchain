@@ -1,7 +1,5 @@
 use anyhow::Result;
 use uo_allocator::{AllocatorPlan, AllocatorSession, ScratchRegion};
-#[cfg(test)]
-use uo_core::RuntimeKernelStepWitness;
 use uo_core::{
     execute_confidential_kernel_slot_program, fixed_buffer, ConfidentialKernelEffectRuntime,
     ConfidentialKernelSlotProgram, ConfidentialKernelSlotRuntime, RuntimeKernelBoundaryTracker,
@@ -316,7 +314,7 @@ impl RuntimeKernelMachine {
     #[cfg(test)]
     pub fn begin_with_expected_kernel_steps(
         plan: AllocatorPlan,
-        expected_kernel_steps: Vec<RuntimeKernelStepWitness>,
+        expected_kernel_steps: Vec<uo_core::RuntimeKernelStepWitness>,
         public_object_ids: &[u32],
     ) -> Result<Self> {
         let mut machine = Self::begin(plan, public_object_ids)?;

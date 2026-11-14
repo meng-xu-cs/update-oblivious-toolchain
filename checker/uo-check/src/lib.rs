@@ -10,9 +10,6 @@ use uo_core::{
     Type, Uint256,
 };
 
-#[cfg(test)]
-use uo_core::lower_confidential_kernel_expr;
-
 pub fn check_source(source_path: &str, metadata: &ContractMetadata) -> Result<Vec<String>> {
     let report = uo_solc::validate_source(source_path, metadata)?;
     let mut lines = Vec::new();
@@ -1559,7 +1556,7 @@ fn forbid_control_flow(statements: &[Statement], signature: &str) -> Result<()> 
 
 #[cfg(test)]
 fn forbid_raw_expr(expr: &Expr, signature: &str) -> Result<()> {
-    lower_confidential_kernel_expr(expr, signature)?;
+    uo_core::lower_confidential_kernel_expr(expr, signature)?;
     Ok(())
 }
 

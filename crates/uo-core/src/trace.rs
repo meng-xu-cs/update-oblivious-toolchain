@@ -29,11 +29,6 @@ where
     Option::<T>::deserialize(deserializer)
 }
 
-#[cfg(test)]
-use crate::confidential_kernel::lower_confidential_kernel_expr;
-#[cfg(test)]
-use crate::ir::Expr;
-
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum WriteClass {
     Set,
@@ -9125,12 +9120,12 @@ fn runtime_oram_objects(artifact: &CompiledArtifact) -> Box<[RuntimeOramObjectWi
 
 #[cfg(test)]
 fn collect_kernel_steps_from_expr(
-    expr: &Expr,
+    expr: &crate::ir::Expr,
     entrypoint: &str,
     steps: &mut Vec<RuntimeKernelStepWitness>,
 ) -> Result<(), KernelWitnessError> {
     steps.extend(
-        lower_confidential_kernel_expr(expr, entrypoint)
+        crate::confidential_kernel::lower_confidential_kernel_expr(expr, entrypoint)
             .map_err(KernelWitnessError::from)?
             .kernel_steps()
             .iter()

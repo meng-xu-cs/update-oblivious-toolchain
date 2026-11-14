@@ -20,7 +20,7 @@
 //! Each workload runs once as the representative and then on every sample
 //! seed. A sample that differs from the substituted run fails the report.
 
-use crate::capacity_sweep::{sweep_map_artifact, WitnessAuditOff};
+use crate::capacity_sweep::sweep_map_artifact;
 use crate::{ensure_lean_checker, lean_checker_counts, write_temp_json};
 use anyhow::{anyhow, bail, Context, Result};
 use serde::Serialize;
@@ -497,9 +497,6 @@ fn check_map(
 pub(crate) fn run_tape_substitution(profile: TapeProfile) -> Result<JsonValue> {
     let parameters = TapeParameters::of(profile);
     let checker = ensure_lean_checker("checkPathOramTapeSamples", "tape samples")?;
-    // The checker compares whole witnesses, so the calls record theirs; the
-    // audit of the kept witness is another matter and is off.
-    let _audit_off = WitnessAuditOff::new();
     let maps: Vec<(&'static str, usize)> = parameters
         .local_capacities
         .iter()
@@ -650,7 +647,6 @@ mod tests {
             setup_calls: 1,
             samples: 1,
         };
-        let _audit_off = WitnessAuditOff::new();
         let outcome = check_map(&parameters, &checker, PATH_ORAM_SCHEME, 8, true).unwrap();
         let _ = std::fs::remove_dir_all(&dir);
         assert!(!outcome.accepted);

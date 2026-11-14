@@ -631,6 +631,12 @@
       "restricted": true,
       "uses_legacy_umbrella": false,
       "uses_proofgrade_umbrella": true
+    },
+    {
+      "file": "proof/lean/CheckRustSourceSlices.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
     }
   ],
   "proofgrade_checker_import_surface_restricted": true,

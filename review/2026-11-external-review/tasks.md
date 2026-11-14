@@ -1540,6 +1540,9 @@ when the tape-family theorem needs no sampled runs.
 
 ## Backlog
 
+The maintainer scheduled Issues 51 to 59 as Wave 7 on 2026-11-14; the
+order is in [`README.md`](./README.md). Issues 47 to 50 are not scheduled.
+
 ### Issue 47 — Try an oblivious routing network for tree eviction
 
 Source: F7 (§8). Size: M. Depends on: Issue 27.
@@ -1707,6 +1710,54 @@ item, and reject a `#[cfg(test)]` that is not on a module or a function.
 Acceptance: the slice of every pinned file is the file without its test
 items, tested on files with braces in strings; no check splits its needles
 to avoid its own text.
+
+As built. One lexer, in the probe (`probe/mplus-probe/src/rust_source.rs`)
+and in Lean (`UOToolchain/RustSourceSlice.lean`, which
+`RuntimeImplementationInterface.lean` imports for `productionSource`),
+classifies every character as code, literal (string, byte string, raw string
+with any number of `#`, character, byte character) or comment (line and
+nested block), and tells a character literal from a lifetime or a label. A
+`#[cfg(test)]` counts only in code. It marks a test item when the item after
+it, past further attributes, comments, `pub(…)` and a function's qualifiers,
+is a `mod` or a `fn`; the item ends at its `;` or at the `}` that closes its
+body, counting code braces only, and a `;` inside the brackets of a
+signature (`[u8; 32]`) is not its end. A slice cuts each test item from its
+attribute to its end, whole lines where the item fills them. Any other
+`#[cfg(test)]` is left in place, so that no production text is cut, and
+named. The new Lean executable `checkRustSourceSlices` prints Lean's slices;
+`runtime_implementation_interface_validation.json` compares them with the
+probe's on the 31 pinned files (`lean_and_probe_slices_agree`, byte for
+byte; they also agreed on all 72 tracked Rust files when this was written),
+and rejects a misplaced attribute in any of the workspace's 73 Rust files
+(`cfg_test_marks_only_modules_and_functions`).
+
+The old slicers disagreed with the new one in two ways. The probe's kept
+1,368 non-blank lines of its own test module in the slice of `lib.rs`,
+because a string there holds an unbalanced brace, and it cut text after a
+`#[cfg(test)]` in two string literals and a comment. And nine `#[cfg(test)]`
+attributes marked something else than a module or a function: five `use`
+declarations (`checker/uo-check`, `uo-core`'s `trace.rs`, `oram.rs`,
+`uo-kernel-runtime`), two constants (`secret.rs`), a `thread_local!` and a
+block inside a function (`instrumentation.rs`). Each moved into the test
+module or the function that uses it, or, for the counter of the
+instrumentation, into a test module with a `#[cfg(not(test))]` function that
+does nothing in other builds.
+
+A check that counts code counts in `rust_code_text`, the source with its
+literals and comments blanked. The ten needles that were split with
+`concat!` to keep a check's own text out of its count are whole. Writing
+them whole showed a gap:
+`evidence_builds_audit_the_kept_position_map_witness` counted the places
+that turn the audit of the kept witness off in `lib.rs` and
+`capacity_sweep.rs` only, and Issues 40 to 42 had added five more in other
+files of the probe (one in the stash occupancy, three in the storage
+boundary, one in the tape substitution), against invariant 15, which said
+the audit is off only where calls are timed. The check now counts in every
+file of the probe and lists where the guard may be made: the latency report,
+the capacity sweep, and the storage boundary, whose comparison of the
+store's log with the trace the audit's decode would join. The stash
+occupancy and the tape substitution audit again, and invariant 15 says where
+the audit is off and why.
 
 ### Issue 57 — Trace the reads of a Path ORAM map that cross the storage boundary
 

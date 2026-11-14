@@ -17,7 +17,7 @@
 //! one does: the call that overflows the stash fails, nothing of it is
 //! committed, and every key stored before still reads back.
 
-use crate::capacity_sweep::{sweep_map_artifact, WitnessAuditOff};
+use crate::capacity_sweep::sweep_map_artifact;
 use crate::PROBE_DEPLOY_SEED;
 use anyhow::{anyhow, bail, Context, Result};
 use rayon::prelude::*;
@@ -261,9 +261,6 @@ fn forced_overflow() -> Result<(JsonValue, Option<String>)> {
         path_oram_tree_get_accesses(capacity) + path_oram_tree_put_accesses(capacity);
     let value_of = |index: u64| Value::uint(1000 + index);
 
-    // The calls are not measured; the audit of the kept witness would
-    // decode the whole store around each of them.
-    let _audit_off = WitnessAuditOff::new();
     let mut instance = ContractInstance::deploy_with_seed(artifact, PROBE_DEPLOY_SEED)?;
     let mut stored = Vec::new();
     let mut dropped = None;

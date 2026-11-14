@@ -117,6 +117,14 @@ the committed `results/`.
   be added there and to the corresponding Lean boundary if they are part of the
   proof-facing implementation surface.
 - `uo-check` and `mplus-probe` are not in the proof-grade TCB.
+- Put `#[cfg(test)]` on a module or a function only. The source checks
+  read a file without its test items, and a `#[cfg(test)]` on a `use`, a
+  constant, a field or a block makes
+  `runtime_implementation_interface_validation.json` fail
+  (`cfg_test_marks_only_modules_and_functions`). Move a test-only import or
+  constant into the test module or the function that uses it.
+- A source check that counts code counts in `rust_code_text`, the source
+  with its literals and comments blanked, so write its needles whole.
 - Never hard-code absolute machine paths. Resolve repository files from
   `env!("CARGO_MANIFEST_DIR")` in Rust (including inside `include_str!`) and
   from the script's own location in shell. `uo-solc` records workspace-relative

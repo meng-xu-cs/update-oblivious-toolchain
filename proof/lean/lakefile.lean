@@ -19,6 +19,10 @@ lean_exe checkPathOramTapeSamples where
   root := `CheckPathOramTapeSamples
 
 @[default_target]
+lean_exe checkRustSourceSlices where
+  root := `CheckRustSourceSlices
+
+@[default_target]
 lean_exe checkProofGradeAxiomReport where
   root := `CheckProofGradeAxiomReport
 

@@ -51,9 +51,12 @@ pub use acceptance::{
 };
 
 mod capacity_sweep;
+mod rust_source;
 mod stash_occupancy;
 mod storage_boundary;
 mod tape_substitution;
+
+use rust_source::{misplaced_cfg_test_lines, production_source_slice, rust_code_text};
 
 mod claim_consistency;
 pub use claim_consistency::{run_claim_consistency_report, CLAIM_CONSISTENCY_SCHEMA};
@@ -19473,10 +19476,81 @@ fn runtime_implementation_confidential_statement_trace_bridge_boundary_artifact(
     )
 }
 
+/// The roots of the workspace's Rust sources.
+const WORKSPACE_RUST_ROOTS: [&str; 5] = ["checker", "compiler", "crates", "probe", "runtime"];
+
+/// How the pinned files are sliced: the probe's slicer and Lean's
+/// (`checkRustSourceSlices`) on every file the implementation interface
+/// pins, which must agree, and every `#[cfg(test)]` of the workspace's Rust
+/// sources that marks something other than a module or a function, of
+/// which there must be none.
+fn check_production_source_slices(source_paths: &[PathBuf]) -> Result<JsonValue> {
+    let checker = ensure_lean_checker("checkRustSourceSlices", "Rust source slices")?;
+    let output = Command::new(&checker).args(source_paths).output()?;
+    if !output.status.success() {
+        return Err(anyhow!(
+            "Lean Rust source slicer failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    let lean: JsonValue = serde_json::from_slice(&output.stdout)?;
+    let lean_files = lean["files"]
+        .as_array()
+        .ok_or_else(|| anyhow!("the Lean Rust source slicer printed no files"))?;
+    if lean_files.len() != source_paths.len() {
+        return Err(anyhow!(
+            "the Lean Rust source slicer sliced {} of {} files",
+            lean_files.len(),
+            source_paths.len()
+        ));
+    }
+    let mut disagree = Vec::new();
+    let mut cut_bytes = 0usize;
+    for (path, lean_file) in source_paths.iter().zip(lean_files) {
+        let source =
+            fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
+        let slice = production_source_slice(&source);
+        if lean_file["slice"].as_str() != Some(slice.as_str())
+            || lean_file["misplaced_cfg_test_lines"] != json!(misplaced_cfg_test_lines(&source))
+        {
+            disagree.push(display_report_path(path));
+        }
+        cut_bytes += source.len() - slice.len();
+    }
+    let root = repo_root();
+    let mut files = Vec::new();
+    for workspace_root in WORKSPACE_RUST_ROOTS {
+        collect_rust_source_files(&root.join(workspace_root), &mut files)?;
+    }
+    files.sort();
+    let mut misplaced = Vec::new();
+    for path in &files {
+        let source =
+            fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
+        for line in misplaced_cfg_test_lines(&source) {
+            misplaced.push(format!("{}:{line}", display_report_path(path)));
+        }
+    }
+    Ok(json!({
+        "slicer": "a lexer that knows strings, raw strings, characters and comments: probe/mplus-probe/src/rust_source.rs and proof/lean/UOToolchain/RustSourceSlice.lean",
+        "lean_checker": display_report_path(&checker),
+        "pinned_files": source_paths.len(),
+        "pinned_bytes_cut_as_test_items": cut_bytes,
+        "lean_and_probe_slices_agree": disagree.is_empty(),
+        "files_whose_slices_disagree": disagree,
+        "workspace_rust_files_scanned": files.len(),
+        "cfg_test_marks_only_modules_and_functions": misplaced.is_empty(),
+        "misplaced_cfg_test_attributes": misplaced,
+    }))
+}
+
 fn run_runtime_implementation_interface_validation() -> Result<JsonValue> {
     let checker = lean_proofgrade_runtime_implementation_interface_checker_path()?;
     let interface = runtime_implementation_interface_artifact()?;
     let source_paths = runtime_implementation_interface_source_paths();
+    let slices = check_production_source_slices(&source_paths)?;
+    let slices_accepted = slices["lean_and_probe_slices_agree"] == json!(true)
+        && slices["cfg_test_marks_only_modules_and_functions"] == json!(true);
     let (interface_path, interface_json_bytes) =
         write_temp_json("runtime-implementation-interface", &interface)?;
     let output = Command::new(&checker).arg(&interface_path).output()?;
@@ -19504,8 +19578,9 @@ fn run_runtime_implementation_interface_validation() -> Result<JsonValue> {
         "rust_semantic_refinement_claimed": false,
         "source_text_predicate_boundary": true,
         "deeper_semantics_of_rust_refinement_required": true,
+        "production_source_slices": slices,
         "lean_stdout": String::from_utf8_lossy(&output.stdout).trim(),
-        "accepted": true,
+        "accepted": slices_accepted,
     }))
 }
 
@@ -28552,15 +28627,41 @@ fn check_production_calls_record_no_position_map_witness(
 /// the witness was kept, and fails the call unless the kept one equals it.
 /// The audit is on for every thread until it is turned off, and the probe
 /// turns it off in one place, for the calls it times.
+/// The probe's source files that turn the audit off, and how many guards
+/// each makes: the latency report and the capacity sweep, which time their
+/// calls, and the storage-boundary report, whose comparison of a store's log
+/// with the trace the audit's decode of the store would join.
+const WITNESS_AUDIT_OFF_GUARDS: [(&str, usize); 3] = [
+    ("capacity_sweep.rs", 1),
+    ("lib.rs", 1),
+    ("storage_boundary.rs", 3),
+];
+
 fn check_evidence_builds_audit_the_kept_position_map_witness(
     state_source: &str,
     instrumentation_source: &str,
-    probe_source: &str,
-    capacity_sweep_source: &str,
+    probe_sources: &BTreeMap<String, String>,
 ) -> bool {
-    // Written in two parts, so that this function's own text does not count.
-    let switch_call = concat!("set_position_map_witness", "_audit(");
-    let guard = concat!("WitnessAudit", "Off::new()");
+    let switch_call = "set_position_map_witness_audit(";
+    let guard = "WitnessAuditOff::new()";
+    let source = |name: &str| {
+        probe_sources
+            .get(name)
+            .map(String::as_str)
+            .unwrap_or_default()
+    };
+    let sweep = source("capacity_sweep.rs");
+    // Code is counted where it is code: a needle in a string, as this
+    // function holds them, does not count.
+    let guards_are_where_listed = probe_sources.iter().all(|(name, slice)| {
+        let code = rust_code_text(slice);
+        let guards = WITNESS_AUDIT_OFF_GUARDS
+            .iter()
+            .find(|(file, _)| file == name)
+            .map_or(0, |(_, count)| *count);
+        let switches = if name == "capacity_sweep.rs" { 2 } else { 0 };
+        code.matches(guard).count() == guards && code.matches(switch_call).count() == switches
+    });
     state_source.contains(
         "            let kept = match &self.kept_witness {\n                Some(kept) => {\n                    if crate::instrumentation::witness_audit_enabled() {\n                        self.audit_kept_witness(\"before a call\")?;\n                    }\n                    Arc::clone(kept)\n                }\n                None => {\n                    let decoded = Arc::new(self.committed.witness_snapshot()?);\n                    self.kept_witness = Some(Arc::clone(&decoded));\n                    decoded\n                }\n            };\n            Ok(kept.duplicate())",
     ) && state_source.contains(
@@ -28572,36 +28673,49 @@ fn check_evidence_builds_audit_the_kept_position_map_witness(
         && instrumentation_source.contains(
             "    static WITNESS_AUDIT_OFF: Cell<bool> = const { Cell::new(false) };",
         )
-        && instrumentation_source.contains(concat!(
-            "pub fn set_position_map_witness",
-            "_audit(on: bool) -> bool {\n    WITNESS_AUDIT_OFF.with(|off| !off.replace(!on))\n}",
-        ))
+        && instrumentation_source.contains(
+            "pub fn set_position_map_witness_audit(on: bool) -> bool {\n    WITNESS_AUDIT_OFF.with(|off| !off.replace(!on))\n}",
+        )
         && instrumentation_source.contains(
             "pub(crate) fn witness_audit_enabled() -> bool {\n    #[cfg(feature = \"diagnostics\")]\n    {\n        cfg!(test) || !WITNESS_AUDIT_OFF.with(Cell::get)\n    }\n    #[cfg(not(feature = \"diagnostics\"))]\n    {\n        true\n    }\n}",
         )
         && instrumentation_source.matches("WITNESS_AUDIT_OFF").count() == 3
         // The probe turns the audit off through one guard, which turns it
-        // back on, and only where it times calls: in the capacity sweep,
-        // which audits after each level, and in the latency report.
-        && capacity_sweep_source.contains(concat!(
-            "impl WitnessAuditOff {\n    pub(crate) fn new() -> Self {\n        Self(uo_evm::set_position_map_witness",
-            "_audit(false))\n    }\n}\n\nimpl Drop for WitnessAuditOff {\n    fn drop(&mut self) {\n        uo_evm::set_position_map_witness",
-            "_audit(self.0);\n    }\n}",
-        ))
-        && capacity_sweep_source.matches(switch_call).count() == 2
-        && capacity_sweep_source.matches(guard).count() == 1
-        && capacity_sweep_source.contains(
+        // back on, and only in the files listed, as often as listed: the
+        // sweep, which audits after each level, the latency report and the
+        // storage boundary.
+        && sweep.contains(
+            "impl WitnessAuditOff {\n    pub(crate) fn new() -> Self {\n        Self(uo_evm::set_position_map_witness_audit(false))\n    }\n}\n\nimpl Drop for WitnessAuditOff {\n    fn drop(&mut self) {\n        uo_evm::set_position_map_witness_audit(self.0);\n    }\n}",
+        )
+        && guards_are_where_listed
+        && sweep.contains(
             "            let audited = instance\n                .audit_kept_position_map_witness()\n                .context(\"auditing the kept position-map witness\")?;",
         )
-        && capacity_sweep_source.contains(
+        && sweep.contains(
             "            \"kept_witness_matches_store_after_every_level\": measured_levels > 0\n                && audited_levels == measured_levels,",
         )
-        && probe_source.matches(switch_call).count() == 0
-        && probe_source.matches(guard).count() == 1
-        && probe_source.contains(concat!(
-            "fn run_latency_memory(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<JsonValue> {\n    // Calls are timed with the audit of the kept witness off.\n    let _witness_audit_off = capacity_sweep::WitnessAudit",
-            "Off::new();",
-        ))
+        && source("lib.rs").contains(
+            "fn run_latency_memory(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<JsonValue> {\n    // Calls are timed with the audit of the kept witness off.\n    let _witness_audit_off = capacity_sweep::WitnessAuditOff::new();",
+        )
+}
+
+/// The production part of every source file of the probe, by its name
+/// under `probe/mplus-probe/src`.
+fn probe_production_sources() -> Result<BTreeMap<String, String>> {
+    let src = repo_root().join("probe/mplus-probe/src");
+    let mut files = Vec::new();
+    collect_rust_source_files(&src, &mut files)?;
+    let mut sources = BTreeMap::new();
+    for path in files {
+        let name = path
+            .strip_prefix(&src)
+            .map(|relative| relative.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        let source =
+            fs::read_to_string(&path).with_context(|| format!("reading {}", path.display()))?;
+        sources.insert(name, production_source_slice(&source));
+    }
+    Ok(sources)
 }
 
 /// Whether a call is staged, loaded and committed without copying the
@@ -28819,70 +28933,6 @@ fn check_trace_runs_stand_for_recorded_events(
         && run_type_files.is_empty()
         && rewrite_files == TRACE_RUN_RECORDER_FILES
         && scan_files == TRACE_RUN_RECORDER_FILES
-}
-
-fn production_source_slice(source: &str) -> String {
-    const CFG_TEST_ATTR: &str = "#[cfg(test)]";
-
-    let bytes = source.as_bytes();
-    let mut out = String::with_capacity(source.len());
-    let mut cursor = 0;
-
-    while let Some(relative) = source[cursor..].find(CFG_TEST_ATTR) {
-        let start = cursor + relative;
-        out.push_str(&source[cursor..start]);
-
-        let mut i = start + CFG_TEST_ATTR.len();
-        while i < bytes.len() && bytes[i].is_ascii_whitespace() {
-            i += 1;
-        }
-
-        while i + 1 < bytes.len() && bytes[i] == b'#' && bytes[i + 1] == b'[' {
-            i += 2;
-            while i < bytes.len() && bytes[i] != b']' {
-                i += 1;
-            }
-            if i < bytes.len() {
-                i += 1;
-            }
-            while i < bytes.len() && bytes[i].is_ascii_whitespace() {
-                i += 1;
-            }
-        }
-
-        let mut item_start = i;
-        while item_start < bytes.len() && bytes[item_start].is_ascii_whitespace() {
-            item_start += 1;
-        }
-
-        let mut item_end = item_start;
-        while item_end < bytes.len() && bytes[item_end] != b'{' && bytes[item_end] != b';' {
-            item_end += 1;
-        }
-        if item_end == bytes.len() {
-            cursor = item_end;
-            break;
-        }
-        if bytes[item_end] == b';' {
-            cursor = item_end + 1;
-            continue;
-        }
-
-        let mut depth = 1usize;
-        item_end += 1;
-        while item_end < bytes.len() && depth > 0 {
-            match bytes[item_end] {
-                b'{' => depth += 1,
-                b'}' => depth -= 1,
-                _ => {}
-            }
-            item_end += 1;
-        }
-        cursor = item_end;
-    }
-
-    out.push_str(&source[cursor..]);
-    out
 }
 
 fn collect_production_pattern_hits(root: &Path, pattern: &str) -> Result<Vec<String>> {
@@ -46430,10 +46480,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         check_evidence_builds_audit_the_kept_position_map_witness(
             &production_source_slice(&state_source),
             &fs::read_to_string(root.join("runtime/uo-evm/src/instrumentation.rs"))?,
-            &production_source_slice(&probe_source),
-            &production_source_slice(&fs::read_to_string(
-                root.join("probe/mplus-probe/src/capacity_sweep.rs"),
-            )?),
+            &probe_production_sources()?,
         );
     let probe_reads_runtime_telemetry_from_diagnostic_channel = extract_metrics_source
         .contains("fn extract_metrics(result: &DiagnosticCallResult)")
@@ -57890,7 +57937,8 @@ mod tests {
     fn position_map_witness_checks_reject_the_drifts_they_guard() {
         use super::{
             check_evidence_builds_audit_the_kept_position_map_witness,
-            check_production_calls_record_no_position_map_witness, repo_root,
+            check_production_calls_record_no_position_map_witness, probe_production_sources,
+            repo_root,
         };
         let root = repo_root();
         let whole = |rel: &str| std::fs::read_to_string(root.join(rel)).unwrap();
@@ -57901,8 +57949,7 @@ mod tests {
         let objects = read("runtime/uo-evm/src/objects.rs");
         let trace = read("crates/uo-core/src/trace.rs");
         let instrumentation = whole("runtime/uo-evm/src/instrumentation.rs");
-        let probe = read("probe/mplus-probe/src/lib.rs");
-        let sweep = read("probe/mplus-probe/src/capacity_sweep.rs");
+        let probe = probe_production_sources().unwrap();
         // One place of `source` changed.
         let drift = |source: &str, from: &str, to: &str| {
             assert_eq!(source.matches(from).count(), 1, "{from}");
@@ -57918,7 +57965,6 @@ mod tests {
             &state,
             &instrumentation,
             &probe,
-            &sweep
         ));
 
         // A production call records no witness.
@@ -58031,13 +58077,17 @@ mod tests {
         assert!(!records_none(&state, &theorem, &oram, &objects, &unchecked));
 
         // Every call of a build that exports evidence audits its witness.
-        let audits = |state: &str, instrumentation: &str, probe: &str, sweep: &str| {
-            check_evidence_builds_audit_the_kept_position_map_witness(
-                state,
-                instrumentation,
-                probe,
-                sweep,
-            )
+        let audits = |state: &str,
+                      instrumentation: &str,
+                      probe: &std::collections::BTreeMap<String, String>| {
+            check_evidence_builds_audit_the_kept_position_map_witness(state, instrumentation, probe)
+        };
+        // One probe file changed.
+        let probe_drift = |name: &str, from: &str, to: &str| {
+            let mut probe = probe.clone();
+            let changed = drift(&probe[name], from, to);
+            probe.insert(name.to_string(), changed);
+            probe
         };
         // No audit before a call, or after it.
         let unaudited = drift(
@@ -58045,71 +58095,75 @@ mod tests {
             "                    if crate::instrumentation::witness_audit_enabled() {\n                        self.audit_kept_witness(\"before a call\")?;\n                    }\n",
             "",
         );
-        assert!(!audits(&unaudited, &instrumentation, &probe, &sweep));
+        assert!(!audits(&unaudited, &instrumentation, &probe));
         let unaudited = drift(
             &state,
             "            if crate::instrumentation::witness_audit_enabled() {\n                self.audit_kept_witness(\"after a call\")?;\n            }\n",
             "",
         );
-        assert!(!audits(&unaudited, &instrumentation, &probe, &sweep));
+        assert!(!audits(&unaudited, &instrumentation, &probe));
         // An audit that fails no call.
         let lenient = drift(
             &state,
             "        if decoded != **kept {\n            bail!(\"the kept position-map witness differs from the decoded store {context}\");\n        }\n        Ok(true)",
             "        Ok(decoded == **kept)",
         );
-        assert!(!audits(&lenient, &instrumentation, &probe, &sweep));
+        assert!(!audits(&lenient, &instrumentation, &probe));
         // An audit that is off until it is turned on.
         let off = drift(
             &instrumentation,
             "    static WITNESS_AUDIT_OFF: Cell<bool> = const { Cell::new(false) };",
             "    static WITNESS_AUDIT_OFF: Cell<bool> = const { Cell::new(true) };",
         );
-        assert!(!audits(&state, &off, &probe, &sweep));
+        assert!(!audits(&state, &off, &probe));
         let off = drift(
             &instrumentation,
             "        cfg!(test) || !WITNESS_AUDIT_OFF.with(Cell::get)",
             "        false",
         );
-        assert!(!audits(&state, &off, &probe, &sweep));
-        // A report that builds proof objects with the audit off. The check
-        // counts the places that turn the audit off, in this file too, so
-        // these lines are written in two parts.
-        let hidden = drift(
-            &probe,
+        assert!(!audits(&state, &off, &probe));
+        // A report that builds proof objects with the audit off, through
+        // the guard or the switch.
+        let hidden = probe_drift(
+            "lib.rs",
             "fn run_pathoram_hidden_validation() -> Result<JsonValue> {\n",
-            concat!(
-                "fn run_pathoram_hidden_validation() -> Result<JsonValue> {\n    let _witness_audit_off = capacity_sweep::WitnessAudit",
-                "Off::new();\n",
-            ),
+            "fn run_pathoram_hidden_validation() -> Result<JsonValue> {\n    let _witness_audit_off = capacity_sweep::WitnessAuditOff::new();\n",
         );
-        assert!(!audits(&state, &instrumentation, &hidden, &sweep));
-        let hidden = drift(
-            &probe,
+        assert!(!audits(&state, &instrumentation, &hidden));
+        let hidden = probe_drift(
+            "lib.rs",
             "fn run_pathoram_hidden_validation() -> Result<JsonValue> {\n",
-            concat!(
-                "fn run_pathoram_hidden_validation() -> Result<JsonValue> {\n    uo_evm::set_position_map_witness",
-                "_audit(false);\n",
-            ),
+            "fn run_pathoram_hidden_validation() -> Result<JsonValue> {\n    uo_evm::set_position_map_witness_audit(false);\n",
         );
-        assert!(!audits(&state, &instrumentation, &hidden, &sweep));
+        assert!(!audits(&state, &instrumentation, &hidden));
+        // Another module of the probe that turns the audit off.
+        let elsewhere = probe_drift(
+            "tape_substitution.rs",
+            "    let parameters = TapeParameters::of(profile);\n",
+            "    let parameters = TapeParameters::of(profile);\n    let _audit_off = crate::capacity_sweep::WitnessAuditOff::new();\n",
+        );
+        assert!(!audits(&state, &instrumentation, &elsewhere));
+        // A needle in a string or a comment is not code, and is not counted.
+        let quoted = probe_drift(
+            "tape_substitution.rs",
+            "    let parameters = TapeParameters::of(profile);\n",
+            "    let parameters = TapeParameters::of(profile);\n    // WitnessAuditOff::new()\n    let _ = \"uo_evm::set_position_map_witness_audit(false)\";\n",
+        );
+        assert!(audits(&state, &instrumentation, &quoted));
         // A guard that leaves the audit off.
-        let left_off = drift(
-            &sweep,
-            concat!(
-                "        uo_evm::set_position_map_witness",
-                "_audit(self.0);\n"
-            ),
+        let left_off = probe_drift(
+            "capacity_sweep.rs",
+            "        uo_evm::set_position_map_witness_audit(self.0);\n",
             "",
         );
-        assert!(!audits(&state, &instrumentation, &probe, &left_off));
+        assert!(!audits(&state, &instrumentation, &left_off));
         // A sweep that audits no level.
-        let no_level = drift(
-            &sweep,
+        let no_level = probe_drift(
+            "capacity_sweep.rs",
             "            let audited = instance\n                .audit_kept_position_map_witness()\n                .context(\"auditing the kept position-map witness\")?;",
             "            let audited = true;",
         );
-        assert!(!audits(&state, &instrumentation, &probe, &no_level));
+        assert!(!audits(&state, &instrumentation, &no_level));
     }
 
     #[test]
@@ -58129,8 +58183,8 @@ mod tests {
             .iter()
             .flat_map(|pattern| hits(pattern))
             .collect();
-        let rewrites = hits(concat!("PhysicalWriteItem::", "rewrite"));
-        let scans = hits(concat!("Item::", "scan("));
+        let rewrites = hits("PhysicalWriteItem::rewrite");
+        let scans = hits("Item::scan(");
         let ok = |trace: &str, recorder: &str, objects: &str| {
             check_trace_runs_stand_for_recorded_events(
                 trace, recorder, objects, &run_types, &rewrites, &scans,

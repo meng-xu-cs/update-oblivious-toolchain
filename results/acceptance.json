@@ -1,7 +1,7 @@
 {
   "accepted": true,
   "class_counts": {
-    "advisory_nonclaim": 677,
+    "advisory_nonclaim": 679,
     "deprecated_report": 0,
     "expected_computational_difference": 107,
     "expected_negative": 1062,
@@ -259,10 +259,11 @@
         "static_checks.proofgrade_checker_import_surface_checks.71.uses_legacy_umbrella",
         "static_checks.proofgrade_checker_import_surface_checks.72.uses_legacy_umbrella",
         "static_checks.proofgrade_checker_import_surface_checks.73.uses_legacy_umbrella",
-        "static_checks.proofgrade_checker_import_surface_checks.74.uses_legacy_umbrella"
+        "static_checks.proofgrade_checker_import_surface_checks.74.uses_legacy_umbrella",
+        "static_checks.proofgrade_checker_import_surface_checks.75.uses_legacy_umbrella"
       ],
       "class_counts": {
-        "advisory_nonclaim": 165,
+        "advisory_nonclaim": 166,
         "deprecated_report": 0,
         "expected_computational_difference": 48,
         "expected_negative": 531,
@@ -851,8 +852,8 @@
         "tamper_validation.scenarios.420.accepted",
         "tamper_validation.scenarios.421.accepted"
       ],
-      "false_count": 744,
-      "false_paths": 744,
+      "false_count": 745,
+      "false_paths": 745,
       "mode": "proof_grade",
       "report": "bridge_validation",
       "required": true,
@@ -3119,10 +3120,11 @@
         "proofgrade_checker_import_surface_checks.71.uses_legacy_umbrella",
         "proofgrade_checker_import_surface_checks.72.uses_legacy_umbrella",
         "proofgrade_checker_import_surface_checks.73.uses_legacy_umbrella",
-        "proofgrade_checker_import_surface_checks.74.uses_legacy_umbrella"
+        "proofgrade_checker_import_surface_checks.74.uses_legacy_umbrella",
+        "proofgrade_checker_import_surface_checks.75.uses_legacy_umbrella"
       ],
       "class_counts": {
-        "advisory_nonclaim": 75,
+        "advisory_nonclaim": 76,
         "deprecated_report": 0,
         "expected_computational_difference": 0,
         "expected_negative": 5,
@@ -3137,8 +3139,8 @@
         "reports.3.raw_artifact.accepted",
         "reports.4.raw_artifact.accepted"
       ],
-      "false_count": 80,
-      "false_paths": 80,
+      "false_count": 81,
+      "false_paths": 81,
       "mode": "proof_grade",
       "report": "static_checks",
       "required": true,

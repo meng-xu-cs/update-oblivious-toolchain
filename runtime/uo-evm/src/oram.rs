@@ -58,11 +58,6 @@ use generated_oram_codecs::{
     reused_tree_presence, run_tree_get, run_tree_put, tree_entries_from_storage,
     tree_position_map_witness_leaves, tree_put_accesses, TreeState,
 };
-#[cfg(test)]
-use generated_oram_codecs::{
-    bucket_on_leaf_path, decode_bucket_payload, deserialize_oram_bucket, oram_bucket_aad,
-    oram_bucket_bytes, oram_bucket_from_entries, oram_bucket_with_live_blocks,
-};
 #[allow(unused_imports)]
 pub(crate) use generated_oram_codecs::{OramBlock, OramBucket};
 
@@ -1079,13 +1074,15 @@ impl OramState {
 
 #[cfg(test)]
 mod tests {
+    use super::generated_oram_codecs::{
+        bucket_on_leaf_path, decode_bucket_payload, decode_path_metadata_pages,
+        deserialize_oram_bucket, oram_bucket_aad, oram_bucket_bytes, oram_bucket_from_entries,
+        oram_bucket_with_live_blocks,
+    };
     use super::{
-        bucket_on_leaf_path, decode_bucket_payload, deserialize_oram_bucket, empty_map_entry,
-        encode_path_metadata_pages, generated_oram_codecs::decode_path_metadata_pages,
-        oram_bucket_bytes, oram_bucket_from_entries, oram_bucket_with_live_blocks,
-        repeat_boxed_map_entries, repeat_boxed_masked_usize_options, MapEntry, MaskedUsizeOption,
-        OramBlock, OramParameters, OramState, PathOramLeafCoinSource, SealedPage,
-        SURROGATE_ORAM_SCHEME,
+        empty_map_entry, encode_path_metadata_pages, repeat_boxed_map_entries,
+        repeat_boxed_masked_usize_options, MapEntry, MaskedUsizeOption, OramBlock, OramParameters,
+        OramState, PathOramLeafCoinSource, SealedPage, SURROGATE_ORAM_SCHEME,
     };
     use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
@@ -2096,7 +2093,7 @@ mod tests {
         );
         let leaf_bucket = state.parameters.leaf_count() - 1 + leaf;
         let bucket = oram_bucket_with_live_blocks(&spec, 0, leaf_bucket, 1, &[block]).unwrap();
-        let aad = super::oram_bucket_aad(&spec, leaf_bucket);
+        let aad = oram_bucket_aad(&spec, leaf_bucket);
         let mut payload = oram_bucket_bytes(&bucket, &spec).unwrap();
         state.storage.buckets[leaf_bucket] = state
             .cipher
@@ -2148,7 +2145,7 @@ mod tests {
             0xBAD5EED,
         );
         let bucket = oram_bucket_with_live_blocks(&spec, 0, 0, 1, &[duplicate]).unwrap();
-        let aad = super::oram_bucket_aad(&spec, 0);
+        let aad = oram_bucket_aad(&spec, 0);
         let mut payload = oram_bucket_bytes(&bucket, &spec).unwrap();
         state.storage.buckets[0] = state
             .cipher
@@ -2239,13 +2236,13 @@ mod tests {
             0xFACE123,
         );
         let off_path_bucket = 1usize;
-        assert!(!super::bucket_on_leaf_path(
+        assert!(!bucket_on_leaf_path(
             state.parameters.leaf_count(),
             off_path_bucket,
             leaf
         ));
         let bucket = oram_bucket_with_live_blocks(&spec, 0, off_path_bucket, 1, &[block]).unwrap();
-        let aad = super::oram_bucket_aad(&spec, off_path_bucket);
+        let aad = oram_bucket_aad(&spec, off_path_bucket);
         let mut payload = oram_bucket_bytes(&bucket, &spec).unwrap();
         state.storage.buckets[off_path_bucket] = state
             .cipher

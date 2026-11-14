@@ -195,23 +195,20 @@ pub(crate) fn count_witness_audit() {
 /// Record that one object's sealed records were read for a digest of the
 /// ciphertext. An object keeps its digest, so a test counts here the
 /// objects a digest could not take from before: those written since.
+#[cfg(test)]
 pub(crate) fn count_sealed_records_digest() {
-    #[cfg(test)]
-    {
-        SEALED_RECORDS_DIGESTS.with(|digests| digests.set(digests.get().saturating_add(1)));
-    }
+    sealed_records_digests::count();
 }
+
+/// A build other than a test's counts nothing.
+#[cfg(not(test))]
+pub(crate) fn count_sealed_records_digest() {}
 
 /// How many times this thread has read an object's sealed records for a
 /// digest of the ciphertext.
 #[cfg(test)]
 pub(crate) fn sealed_records_digests_computed() -> u64 {
-    SEALED_RECORDS_DIGESTS.with(std::cell::Cell::get)
-}
-
-#[cfg(test)]
-thread_local! {
-    static SEALED_RECORDS_DIGESTS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+    sealed_records_digests::computed()
 }
 
 /// Record that a position-map witness opened `records` sealed records.
@@ -230,5 +227,20 @@ pub(crate) fn count_witness_records(records: usize) {
     #[cfg(not(feature = "diagnostics"))]
     {
         let _ = records;
+    }
+}
+
+#[cfg(test)]
+mod sealed_records_digests {
+    thread_local! {
+        static DIGESTS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+    }
+
+    pub(super) fn count() {
+        DIGESTS.with(|digests| digests.set(digests.get().saturating_add(1)));
+    }
+
+    pub(super) fn computed() -> u64 {
+        DIGESTS.with(std::cell::Cell::get)
     }
 }

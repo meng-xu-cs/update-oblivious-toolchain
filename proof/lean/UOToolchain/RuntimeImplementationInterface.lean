@@ -22,6 +22,7 @@ import UOToolchain.RuntimeReturnScheduleDiscipline
 import UOToolchain.RuntimeSmallMapLookupDiscipline
 import UOToolchain.RuntimeStatementTraceDiscipline
 import UOToolchain.RuntimeShellBoundary
+import UOToolchain.RustSourceSlice
 
 open Lean
 
@@ -84,55 +85,6 @@ def sourceContainsLineOrdered (source : String) (needles : List String) : Prop :
   checkSourceContainsLineOrdered source needles = true ↔
     sourceContainsLineOrdered source needles := by
   rfl
-
-def countChar (line : String) (target : Char) : Int :=
-  line.toList.foldl (fun acc ch => if ch = target then acc + 1 else acc) 0
-
-def lineContainsChar (line : String) (target : Char) : Bool :=
-  line.toList.any (fun ch => ch = target)
-
-def dropLeadingBlankLines : List String → List String
-  | [] => []
-  | line :: rest =>
-      if line.trimAscii.isEmpty then
-        dropLeadingBlankLines rest
-      else
-        line :: rest
-
-def skipCfgTestItemFuel : Nat → List String → Int → Bool → List String
-  | 0, lines, _, _ => lines
-  | _ + 1, [], _, _ => []
-  | fuel + 1, line :: rest, braceDepth, sawBody =>
-      let braceDepth :=
-        braceDepth + countChar line '{' - countChar line '}'
-      let sawBody := sawBody || lineContainsChar line '{'
-      if !sawBody then
-        if line.trimAsciiEnd.endsWith ";" then
-          rest
-        else
-          skipCfgTestItemFuel fuel rest braceDepth sawBody
-      else if braceDepth <= 0 then
-        rest
-      else
-        skipCfgTestItemFuel fuel rest braceDepth sawBody
-
-def skipCfgTestItem (lines : List String) : List String :=
-  skipCfgTestItemFuel lines.length lines 0 false
-
-def stripCfgTestItemsFuel : Nat → List String → List String
-  | 0, lines => lines
-  | _ + 1, [] => []
-  | fuel + 1, line :: rest =>
-      if line.trimAsciiStart.startsWith "#[cfg(test)]" then
-        stripCfgTestItemsFuel fuel (skipCfgTestItem (dropLeadingBlankLines rest))
-      else
-        line :: stripCfgTestItemsFuel fuel rest
-
-def stripCfgTestItems (lines : List String) : List String :=
-  stripCfgTestItemsFuel lines.length lines
-
-def productionSource (source : String) : String :=
-  String.intercalate "\n" (stripCfgTestItems (source.splitOn "\n"))
 
 /--
 Source-backed implementation interface for the real `uo-evm` runtime. This is
