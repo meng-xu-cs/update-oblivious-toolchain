@@ -127,7 +127,7 @@ its engineering part is Wave 4, its certified part is research.
 | 39 | Admit encrypted returns in the kernel theorems | 5 | M | | done | `ece1167` |
 | 40 | Give the stash bound a lifetime budget and test deferred write-back | 5 | M | | done | `305c1a2` |
 | 41 | Put storage behind an adapter that keeps its own I/O log | 6 | M to L | 24, 31, 32 | done | `6aecff2` |
-| 42 | Widen the runtime-versus-model tests of the tree and the tape substitution | 6 | M | | done | |
+| 42 | Widen the runtime-versus-model tests of the tree and the tape substitution | 6 | M | | done | `36d474d` |
 | 43 | Prove a store operation's post-state and its write class together | research | R | 33, 35 | todo | |
 | 44 | Certify state transitions incrementally | research | R | 36, 37, 41 | todo | |
 | 45 | State security over call histories with a quantified bound | research | R | 24, 39, 40 | todo | |
