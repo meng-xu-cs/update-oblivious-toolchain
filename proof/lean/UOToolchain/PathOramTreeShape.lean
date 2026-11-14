@@ -49,6 +49,7 @@ example : pathOramTreeAvlHeight 16 = 5 := by decide
 example : pathOramTreeAvlHeight 256 = 11 := by decide
 example : pathOramTreeAvlHeight 4096 = 16 := by decide
 example : pathOramTreeAvlHeight 16384 = 19 := by decide
-example : pathOramTreeStashBoundWith 114 256 = 148 := by decide
+example : pathOramTreeStashBoundWith 152 256 = 186 := by decide
+example : pathOramTreeStashBoundWith 152 16384 = 210 := by decide
 
 end UOToolchain

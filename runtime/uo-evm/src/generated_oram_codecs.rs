@@ -3012,16 +3012,17 @@ where
         allocator,
         &mut working_stash,
     )?;
-    let mut update_failed = working_stash.overflowed();
-
-    let effect_failed = update(
+    let update_failed = update(
         &mut working_entries,
         &mut working_position_map,
         &mut working_stash,
         rng,
     )?;
-    update_failed |= effect_failed;
-    update_failed |=
+    // A stash that holds more blocks than its bound is an overflow: the
+    // access stops with an error, so the call that made it is dropped and
+    // the committed map keeps every block.
+    let mut stash_overflowed = working_stash.overflowed();
+    stash_overflowed |=
         working_stash.len() > state.parameters.stash_bound + state.parameters.buckets_per_access;
 
     rebuild_path_buckets_from_stash(
@@ -3036,7 +3037,11 @@ where
         &mut working_stash,
     )?;
 
-    update_failed |= working_stash.len() > state.parameters.stash_bound;
+    stash_overflowed |= working_stash.overflowed();
+    stash_overflowed |= working_stash.len() > state.parameters.stash_bound;
+    if stash_overflowed {
+        return Err(stash_overflow_error(state.parameters.stash_bound));
+    }
 
     rewrite_path_metadata_pages_in_place(
         spec,
@@ -4003,9 +4008,11 @@ impl TreeStash {
         Ok(bucket)
     }
 
-    /// Move the appended blocks still occupied into empty persistent slots;
-    /// report whether one found no room.
-    pub(super) fn compact(&mut self) -> Result<bool> {
+    /// Move the appended blocks still occupied into empty persistent slots.
+    /// A block that finds no room is an overflow of the stash: the access
+    /// stops with an error, so the call that made it is dropped, nothing of
+    /// it is committed and no block is lost.
+    pub(super) fn compact(&mut self) -> Result<()> {
         let persistent = self.persistent;
         let fill = self.fill;
         if fill > self.blocks.len() || persistent > fill {
@@ -4029,8 +4036,23 @@ impl TreeStash {
             assign_tree_node(true, moving, &self.empty)?;
         }
         self.fill = persistent;
-        Ok(overflowed)
+        if overflowed {
+            return Err(stash_overflow_error(persistent));
+        }
+        Ok(())
     }
+}
+
+/// The error of a stash that overflowed its bound. The stash theorem bounds
+/// the event's probability for a map larger than the bound, and a map no
+/// larger than its bound cannot overflow. A call that meets it is dropped
+/// before anything of it is committed, so the committed map keeps every
+/// block.
+pub(super) fn stash_overflow_error(stash_bound: usize) -> anyhow::Error {
+    anyhow!(
+        "internal error: a Path ORAM stash overflowed its bound of {} blocks; the call is dropped and the committed map is unchanged",
+        stash_bound
+    )
 }
 
 /// What one node access did: whether it read a node (`real`), which node
@@ -4215,9 +4237,9 @@ fn tree_levels_below(shape: &TreeShape, depth: usize) -> Result<usize> {
 /// not read the node yet, else the path of a fresh coin; take the node out of
 /// the stash into the cache; evict the path and write it back. Returns the
 /// node's cache slot and whether the access failed: the node was missing,
-/// duplicated or under another leaf, or the stash overflowed. The last
-/// access of an operation ends in `tree_finish`, once the operation has
-/// written the header and the stash.
+/// duplicated or under another leaf. A stash that overflows is an error.
+/// The last access of an operation ends in `tree_finish`, once the
+/// operation has written the header and the stash.
 fn tree_access<S: TreePathStore>(
     shape: &TreeShape,
     store: &mut S,
@@ -4252,7 +4274,7 @@ fn tree_access<S: TreePathStore>(
     let (node, count) = stash.take(link.id, real)?;
     let failed = real & ((count != 1) | (node.leaf != link.leaf));
     evict_tree_path(shape, store, stash, read_leaf)?;
-    let overflowed = stash.compact()?;
+    stash.compact()?;
     let record = TreeAccessRecord {
         real,
         node_id: masked_select_usize(real, link.id, 0),
@@ -4275,7 +4297,7 @@ fn tree_access<S: TreePathStore>(
         .get_mut(slot)
         .ok_or_else(|| anyhow!("tree coin slot {} missing despite public bound", slot))? = coin;
     cache.used += 1;
-    Ok((slot, failed | overflowed))
+    Ok((slot, failed))
 }
 
 /// The node behind `link` for this operation: read it if `want` (a dummy
@@ -4295,14 +4317,15 @@ fn tree_fetch<S: TreePathStore>(
 }
 
 /// Give every node the operation read a fresh leaf (its access's coin), point
-/// every pointer to it at that leaf, and return the nodes to the stash.
-/// Returns whether the stash overflowed.
+/// every pointer to it at that leaf, and return the nodes to the stash. A
+/// node that finds no room there is an overflow of the stash: the operation
+/// stops with an error before it writes the header and the stash.
 fn tree_finish<S: TreePathStore>(
     store: &mut S,
     stash: &mut TreeStash,
     header: &mut TreeHeader,
     cache: &mut TreeOpCache,
-) -> Result<bool> {
+) -> Result<()> {
     let used = cache.used;
     for target in 0..used {
         for source in 0..used {
@@ -4344,13 +4367,16 @@ fn tree_finish<S: TreePathStore>(
         node.leaf = masked_select_usize(node.occupied, coin, node.leaf);
         overflowed |= stash.push_persistent(node)?;
     }
+    if overflowed {
+        return Err(stash_overflow_error(stash.persistent));
+    }
     store.end_operation(header, stash)?;
     let record = cache
         .last_record
         .take()
         .ok_or_else(|| anyhow!("tree operation ended without its last access"))?;
     store.end_access(&record)?;
-    Ok(overflowed)
+    Ok(())
 }
 
 /// Read the value of `key`: walk `avl_height` levels from the root, a dummy
@@ -4387,7 +4413,7 @@ pub(super) fn tree_get<S: TreePathStore>(
         active = real & !found & next.present;
         current = TreeLink::select(active, &next, &TreeLink::none());
     }
-    failed |= tree_finish(store, stash, header, &mut cache)?;
+    tree_finish(store, stash, header, &mut cache)?;
     Ok((value, found_any, failed))
 }
 
@@ -4632,7 +4658,7 @@ pub(super) fn tree_put<S: TreePathStore>(
         sub = TreeLink::select(active_level, &new_root, &sub);
     }
     header.root = TreeLink::select(changed, &sub, &header.root);
-    failed |= tree_finish(store, stash, header, &mut cache)?;
+    tree_finish(store, stash, header, &mut cache)?;
     Ok((overflow, failed))
 }
 

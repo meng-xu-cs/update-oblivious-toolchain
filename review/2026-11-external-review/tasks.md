@@ -1114,6 +1114,93 @@ tree node, and its subtree is no longer reachable.
    its distribution, during an operation and between operations.
 4. Say exactly what remains assumed.
 
+As built. The cap is 152 (`PATH_ORAM_STASH_BOUND_LIMIT`,
+`pathOramStashBoundLimit` and `translationPathOramStashBoundLimit`): at
+most `14 · 0.6002^152 < 2^-108` per access and `2^-60` over `2^48` node
+accesses of a map. A map of at most 152 entries has a stash as large as
+itself, so the local scheme, capped at 128 entries, needs no stash
+assumption. The private scheme's stash is `152 + 3h + 1` blocks: 186 at
+256 entries and 210 at 16,384, where it was 148 and 172.
+
+An overflow is an error. The node access that finds no room for a block
+stops (`TreeStash::compact`, `tree_finish` and, on the local scheme,
+`rewrite_path_for_access` return `stash_overflow_error`), so the staged
+call is dropped and the committed map keeps every block. Before, the block
+was dropped, the access reported a failure in band, the call aborted, and
+an aborted call keeps its ORAM accesses. The Lean generator emits the
+changed codecs byte for byte, the implementation interface pins the new
+text, and a tamper scenario that lets an access go on after an overflow is
+rejected (`runtime_implementation_interface/stash_overflow_goes_on_drift`,
+419 scenarios in all).
+
+The test that forces an overflow runs on the runtime with its real
+parameters, not with a small stash: the stash bound is a function of the
+capacity everywhere, from the manifest to the Lean checkers, and a map can
+overflow only above 186 entries. The probe deploys the sweep contract on
+the private scheme at 256 entries and gives every node access of every put
+the same leaf (`call_with_path_oram_fresh_coins`). The nodes the puts read
+pile up on one path of 45 blocks and in the stash, and the 232nd put fails
+with the stash error. The committed ciphertext is then what it was before
+that call, the 231 keys stored before it read back with honest coins, the
+key of the dropped call is absent, and the map takes a write again
+(`forced_overflow` in `results/stash_occupancy.json`). It makes 232 puts
+and 232 reads of that map, which take minutes in a debug build, so it is a
+probe report that the validation script runs from a release build and not
+a unit test. The unit tests cover the error itself, on both schemes, with
+a stash too small for the tree (`tree_map_fails_on_a_stash_overflow`,
+`path_oram_get_fails_on_a_stash_overflow`).
+
+`--only stash-occupancy` has two profiles, like the capacity sweep. The
+simulator (`runtime/uo-evm/src/stash_occupancy.rs`, a diagnostics module)
+runs `tree_get` and `tree_put` over buckets in memory, with the runtime's
+eviction and compaction and no cryptography, and counts the stash after
+each node access of an operation but its last, when the operation holds
+the nodes it read, and after each operation, when it has returned them.
+The full profile (`scripts/run_stash_occupancy_full.sh`,
+`results/stash_occupancy_full.json`, 40 to 50 minutes on four cores) makes
+10,800,300 node accesses: maps of 256, 1,024, 4,096 and 16,384 entries,
+each under a random workload, one key read and written over and over, and
+inserts and deletes between half full and nine tenths full. The largest
+stash while an operation held its nodes was 9 blocks, with a mean below
+0.07, and the largest after an operation 18, about the nodes one operation
+reads. Against stashes of 186 to 210 blocks the least headroom is 175
+blocks. No run overflowed.
+
+What the report compares the counts with: the stash holds more than
+`3h + 1 + R` blocks after a node access with probability at most
+`14 · 0.6002^R`. It fails if the samples above `3h + 1 + R` blocks
+outnumber that bound for some `R`, or if there is a sample where the bound
+is below one sample. The observed stash is far below it.
+
+What remains assumed, exactly:
+
+- the stash theorem itself, cited and not proved in Lean, for 5 blocks per
+  bucket;
+- that it carries over to operations that hold up to `3h + 1` nodes out of
+  the tree until they end, with the same tail above those nodes. Ten
+  million accesses cannot show a tail of `2^-108`; they would show a stash
+  that grows with deferred write-back, and show none;
+- that the leaf coins are uniform, which is the key-derivation assumption;
+- the budget: the bound is `2^-60` for `2^48` node accesses of a map. The
+  runtime does not count a map's accesses against it, and beyond it the
+  bound grows with the number of accesses.
+
+A dropped call does not remap the keys it read, where an aborted call
+does. That is so for every call that is dropped on an error; for a stash
+overflow it happens with the overflow's probability, which the bound of
+Issue 29 counts.
+
+The cost of the cap, in the counts of the capacity sweep
+(`results/capacity_sweep.json`): the private scheme's stash has five more
+pages, read and written once per operation, so a tree read traces 270
+physical operations at 256 entries where it traced 260, and 664 at 16,384
+where it traced 654. That is 5.7% and 2.3% more bytes. The gas break-even
+of the tree against the full scan for reads alone moved from 1,024 entries
+to 2,048; the break-evens in bytes and physical operations did not move.
+On the local scheme only the map of 128 entries changed: its stash is now
+as large as itself. The latencies are in the full profile, which is run
+again after this issue.
+
 #### Acceptance criteria
 
 - A test forces an overflow with a small stash: the call fails, the

@@ -1,0 +1,1877 @@
+{
+  "accepted": true,
+  "assumed_tail": {
+    "base": 0.6002,
+    "factor": 14.0,
+    "statement": "after a node access the stash holds more than 3h + 1 + R blocks with probability at most 14 * 0.6002^R, where 3h + 1 are the nodes an operation may return to it"
+  },
+  "cells": [
+    {
+      "after_operation": {
+        "histogram": [
+          0,
+          148,
+          315,
+          573,
+          1088,
+          2138,
+          4631,
+          11610,
+          14391,
+          4745,
+          427,
+          10
+        ],
+        "largest": 11,
+        "mean": 7.206507635492565,
+        "p50": 7,
+        "p99": 10,
+        "p999": 10,
+        "samples": 40076,
+        "tail": [
+          {
+            "more_than_blocks": 34,
+            "predicted_at_most": 561064.0,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 38,
+            "predicted_at_most": 72810.89474590289,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 42,
+            "predicted_at_most": 9448.879973940495,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 46,
+            "predicted_at_most": 1226.2084276468477,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 50,
+            "predicted_at_most": 159.12860700728208,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 58,
+            "predicted_at_most": 2.6798851967550132,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 66,
+            "predicted_at_most": 0.04513195209116612,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 82,
+            "predicted_at_most": 0.000012800294917846549,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 98,
+            "predicted_at_most": 3.6304113248387234e-9,
+            "samples": 0
+          }
+        ]
+      },
+      "avl_height": 11,
+      "capacity": 256,
+      "largest_stash": 11,
+      "largest_stash_within_the_bound": true,
+      "node_accesses": 900008,
+      "nodes_an_operation_returns": 34,
+      "occupancy_within_predicted_tail": true,
+      "operations": 40076,
+      "overflowed": false,
+      "seed": 6004496029143945009,
+      "stash_bound": 186,
+      "stash_bound_headroom": 175,
+      "stored_keys_at_end": 184,
+      "within_operation": {
+        "histogram": [
+          856767,
+          2655,
+          478,
+          30,
+          2
+        ],
+        "largest": 4,
+        "mean": 0.00431313173599773,
+        "p50": 0,
+        "p99": 0,
+        "p999": 1,
+        "samples": 859932,
+        "tail": [
+          {
+            "more_than_blocks": 34,
+            "predicted_at_most": 12039048.0,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 38,
+            "predicted_at_most": 1562342.0086993154,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 42,
+            "predicted_at_most": 202749.63204288346,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 46,
+            "predicted_at_most": 26311.404970636017,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 50,
+            "predicted_at_most": 3414.5069687839627,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 58,
+            "predicted_at_most": 57.503718859565126,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 66,
+            "predicted_at_most": 0.9684202471718899,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 82,
+            "predicted_at_most": 0.00027466272106232205,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 98,
+            "predicted_at_most": 7.78996624261706e-8,
+            "samples": 0
+          }
+        ]
+      },
+      "workload": "random"
+    },
+    {
+      "after_operation": {
+        "histogram": [
+          0,
+          1,
+          1,
+          3,
+          6,
+          10,
+          26,
+          39847,
+          32,
+          10
+        ],
+        "largest": 9,
+        "mean": 6.999123597756411,
+        "p50": 7,
+        "p99": 7,
+        "p999": 8,
+        "samples": 39936,
+        "tail": [
+          {
+            "more_than_blocks": 34,
+            "predicted_at_most": 559104.0,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 38,
+            "predicted_at_most": 72556.53988852126,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 42,
+            "predicted_at_most": 9415.871609923335,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 46,
+            "predicted_at_most": 1221.9248369723653,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 50,
+            "predicted_at_most": 158.5727130812161,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 58,
+            "predicted_at_most": 2.6705233860067925,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 66,
+            "predicted_at_most": 0.04497428981716763,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 82,
+            "predicted_at_most": 0.00001275557884617027,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 98,
+            "predicted_at_most": 3.6177289816538394e-9,
+            "samples": 0
+          }
+        ]
+      },
+      "avl_height": 11,
+      "capacity": 256,
+      "largest_stash": 9,
+      "largest_stash_within_the_bound": true,
+      "node_accesses": 900032,
+      "nodes_an_operation_returns": 34,
+      "occupancy_within_predicted_tail": true,
+      "operations": 39936,
+      "overflowed": false,
+      "seed": 6004496029143945008,
+      "stash_bound": 186,
+      "stash_bound_headroom": 177,
+      "stored_keys_at_end": 128,
+      "within_operation": {
+        "histogram": [
+          859474,
+          619,
+          3
+        ],
+        "largest": 2,
+        "mean": 0.0007266630701689114,
+        "p50": 0,
+        "p99": 0,
+        "p999": 0,
+        "samples": 860096,
+        "tail": [
+          {
+            "more_than_blocks": 34,
+            "predicted_at_most": 12041344.0,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 38,
+            "predicted_at_most": 1562639.9672465338,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 42,
+            "predicted_at_most": 202788.29898358925,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 46,
+            "predicted_at_most": 26316.42289114041,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 50,
+            "predicted_at_most": 3415.15815881164,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 58,
+            "predicted_at_most": 57.5146855521559,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 66,
+            "predicted_at_most": 0.9686049372642882,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 82,
+            "predicted_at_most": 0.0002747151027462857,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 98,
+            "predicted_at_most": 7.791451888533004e-8,
+            "samples": 0
+          }
+        ]
+      },
+      "workload": "repeated_key"
+    },
+    {
+      "after_operation": {
+        "histogram": [
+          0,
+          1,
+          1,
+          3,
+          5,
+          746,
+          5678,
+          5970,
+          1889,
+          10579,
+          1599
+        ],
+        "largest": 10,
+        "mean": 7.779570095576291,
+        "p50": 8,
+        "p99": 10,
+        "p999": 10,
+        "samples": 26471,
+        "tail": [
+          {
+            "more_than_blocks": 34,
+            "predicted_at_most": 370594.0,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 38,
+            "predicted_at_most": 48093.05306963757,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 42,
+            "predicted_at_most": 6241.174313558709,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 46,
+            "predicted_at_most": 809.9352053158924,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 50,
+            "predicted_at_most": 105.107629406372,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 58,
+            "predicted_at_most": 1.7701178022582582,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 66,
+            "predicted_at_most": 0.029810557535813412,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 82,
+            "predicted_at_most": 8.454850952448248e-6,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 98,
+            "predicted_at_most": 2.397959331764793e-9,
+            "samples": 0
+          }
+        ]
+      },
+      "avl_height": 11,
+      "capacity": 256,
+      "largest_stash": 10,
+      "largest_stash_within_the_bound": true,
+      "node_accesses": 900014,
+      "nodes_an_operation_returns": 34,
+      "occupancy_within_predicted_tail": true,
+      "operations": 26471,
+      "overflowed": false,
+      "seed": 6004496029143945011,
+      "stash_bound": 186,
+      "stash_bound_headroom": 176,
+      "stored_keys_at_end": 153,
+      "within_operation": {
+        "histogram": [
+          870854,
+          2080,
+          540,
+          67,
+          2
+        ],
+        "largest": 4,
+        "mean": 0.003856707683537044,
+        "p50": 0,
+        "p99": 0,
+        "p999": 1,
+        "samples": 873543,
+        "tail": [
+          {
+            "more_than_blocks": 34,
+            "predicted_at_most": 12229602.0,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 38,
+            "predicted_at_most": 1587070.75129804,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 42,
+            "predicted_at_most": 205958.7523474374,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 46,
+            "predicted_at_most": 26727.86177542445,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 50,
+            "predicted_at_most": 3468.551770410276,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 58,
+            "predicted_at_most": 58.41388747452252,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 66,
+            "predicted_at_most": 0.9837483986818426,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 82,
+            "predicted_at_most": 0.0002790100814307922,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 98,
+            "predicted_at_most": 7.913265794823818e-8,
+            "samples": 0
+          }
+        ]
+      },
+      "workload": "insert_and_delete"
+    },
+    {
+      "after_operation": {
+        "histogram": [
+          0,
+          20,
+          47,
+          112,
+          203,
+          443,
+          914,
+          1723,
+          3704,
+          8869,
+          11306,
+          3627,
+          360,
+          10
+        ],
+        "largest": 13,
+        "mean": 9.18635522369009,
+        "p50": 9,
+        "p99": 12,
+        "p999": 12,
+        "samples": 31338,
+        "tail": [
+          {
+            "more_than_blocks": 43,
+            "predicted_at_most": 438732.0,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 47,
+            "predicted_at_most": 56935.51800446913,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 51,
+            "predicted_at_most": 7388.686511212377,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 55,
+            "predicted_at_most": 958.8511754066502,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 59,
+            "predicted_at_most": 124.43288467896511,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 67,
+            "predicted_at_most": 2.0955744659124815,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 75,
+            "predicted_at_most": 0.03529157387546072,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 91,
+            "predicted_at_most": 0.000010009373244222854,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 107,
+            "predicted_at_most": 2.8388519337707335e-9,
+            "samples": 0
+          }
+        ]
+      },
+      "avl_height": 14,
+      "capacity": 1024,
+      "largest_stash": 13,
+      "largest_stash_within_the_bound": true,
+      "node_accesses": 900006,
+      "nodes_an_operation_returns": 43,
+      "occupancy_within_predicted_tail": true,
+      "operations": 31338,
+      "overflowed": false,
+      "seed": 6004496029143748401,
+      "stash_bound": 195,
+      "stash_bound_headroom": 182,
+      "stored_keys_at_end": 757,
+      "within_operation": {
+        "histogram": [
+          858456,
+          6692,
+          2696,
+          716,
+          102,
+          6
+        ],
+        "largest": 5,
+        "mean": 0.016887924960974732,
+        "p50": 0,
+        "p99": 1,
+        "p999": 2,
+        "samples": 868668,
+        "tail": [
+          {
+            "more_than_blocks": 43,
+            "predicted_at_most": 12161352.0,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 47,
+            "predicted_at_most": 1578213.7517999294,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 51,
+            "predicted_at_most": 204809.35395755418,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 55,
+            "predicted_at_most": 26578.70102872372,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 59,
+            "predicted_at_most": 3449.194749770479,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 67,
+            "predicted_at_most": 58.087895850254114,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 75,
+            "predicted_at_most": 0.9782583730693953,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 91,
+            "predicted_at_most": 0.00027745300393492177,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 107,
+            "predicted_at_most": 7.869104064090739e-8,
+            "samples": 0
+          }
+        ]
+      },
+      "workload": "random"
+    },
+    {
+      "after_operation": {
+        "histogram": [
+          0,
+          1,
+          1,
+          30811,
+          8,
+          13,
+          23,
+          43,
+          89,
+          147,
+          126,
+          52,
+          6
+        ],
+        "largest": 12,
+        "mean": 3.094220945083014,
+        "p50": 3,
+        "p99": 9,
+        "p999": 11,
+        "samples": 31320,
+        "tail": [
+          {
+            "more_than_blocks": 43,
+            "predicted_at_most": 438480.0,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 47,
+            "predicted_at_most": 56902.81523709149,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 51,
+            "predicted_at_most": 7384.442578695885,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 55,
+            "predicted_at_most": 958.3004280342167,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 59,
+            "predicted_at_most": 124.36141260275663,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 67,
+            "predicted_at_most": 2.094370804530567,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 75,
+            "predicted_at_most": 0.03527130301166091,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 91,
+            "predicted_at_most": 0.000010003624035007334,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 107,
+            "predicted_at_most": 2.83722134678982e-9,
+            "samples": 0
+          }
+        ]
+      },
+      "avl_height": 14,
+      "capacity": 1024,
+      "largest_stash": 12,
+      "largest_stash_within_the_bound": true,
+      "node_accesses": 900044,
+      "nodes_an_operation_returns": 43,
+      "occupancy_within_predicted_tail": true,
+      "operations": 31320,
+      "overflowed": false,
+      "seed": 6004496029143748400,
+      "stash_bound": 195,
+      "stash_bound_headroom": 183,
+      "stored_keys_at_end": 512,
+      "within_operation": {
+        "histogram": [
+          868617,
+          78,
+          27,
+          1,
+          1
+        ],
+        "largest": 4,
+        "mean": 0.0001600047886325231,
+        "p50": 0,
+        "p99": 0,
+        "p999": 0,
+        "samples": 868724,
+        "tail": [
+          {
+            "more_than_blocks": 43,
+            "predicted_at_most": 12162136.0,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 47,
+            "predicted_at_most": 1578315.493742882,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 51,
+            "predicted_at_most": 204822.55730316104,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 55,
+            "predicted_at_most": 26580.414464993515,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 59,
+            "predicted_at_most": 3449.417107340905,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 67,
+            "predicted_at_most": 58.0916405745534,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 75,
+            "predicted_at_most": 0.9783214379789947,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 91,
+            "predicted_at_most": 0.0002774708903635923,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 107,
+            "predicted_at_most": 7.869611357818133e-8,
+            "samples": 0
+          }
+        ]
+      },
+      "workload": "repeated_key"
+    },
+    {
+      "after_operation": {
+        "histogram": [
+          0,
+          1,
+          1,
+          3,
+          4,
+          12,
+          179,
+          2232,
+          5056,
+          2652,
+          994,
+          8156,
+          1641
+        ],
+        "largest": 12,
+        "mean": 9.5767044097272,
+        "p50": 10,
+        "p99": 12,
+        "p999": 12,
+        "samples": 20931,
+        "tail": [
+          {
+            "more_than_blocks": 43,
+            "predicted_at_most": 293034.0,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 47,
+            "predicted_at_most": 38027.867998964306,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 51,
+            "predicted_at_most": 4934.986194593984,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 55,
+            "predicted_at_most": 640.4274029113726,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 59,
+            "predicted_at_most": 83.11011261776179,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 67,
+            "predicted_at_most": 1.3996575769358015,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 75,
+            "predicted_at_most": 0.02357163612187339,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 91,
+            "predicted_at_most": 6.685372116115533e-6,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 107,
+            "predicted_at_most": 1.896100894305802e-9,
+            "samples": 0
+          }
+        ]
+      },
+      "avl_height": 14,
+      "capacity": 1024,
+      "largest_stash": 12,
+      "largest_stash_within_the_bound": true,
+      "node_accesses": 900033,
+      "nodes_an_operation_returns": 43,
+      "occupancy_within_predicted_tail": true,
+      "operations": 20931,
+      "overflowed": false,
+      "seed": 6004496029143748403,
+      "stash_bound": 195,
+      "stash_bound_headroom": 183,
+      "stored_keys_at_end": 593,
+      "within_operation": {
+        "histogram": [
+          872115,
+          4255,
+          1924,
+          630,
+          155,
+          22,
+          1
+        ],
+        "largest": 6,
+        "mean": 0.012204499591628731,
+        "p50": 0,
+        "p99": 0,
+        "p999": 2,
+        "samples": 879102,
+        "tail": [
+          {
+            "more_than_blocks": 43,
+            "predicted_at_most": 12307428.0,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 47,
+            "predicted_at_most": 1597170.4559565007,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 51,
+            "predicted_at_most": 207269.4201729473,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 55,
+            "predicted_at_most": 26897.95092227765,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 59,
+            "predicted_at_most": 3490.624729945995,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 67,
+            "predicted_at_most": 58.785618231303665,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 75,
+            "predicted_at_most": 0.9900087171186823,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 91,
+            "predicted_at_most": 0.00028078562887685237,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 107,
+            "predicted_at_most": 7.963623756084369e-8,
+            "samples": 0
+          }
+        ]
+      },
+      "workload": "insert_and_delete"
+    },
+    {
+      "after_operation": {
+        "histogram": [
+          0,
+          5,
+          8,
+          33,
+          51,
+          76,
+          197,
+          359,
+          742,
+          1556,
+          3304,
+          6069,
+          7608,
+          4862,
+          1498,
+          198,
+          3
+        ],
+        "largest": 16,
+        "mean": 11.390342128043962,
+        "p50": 12,
+        "p99": 14,
+        "p999": 15,
+        "samples": 26569,
+        "tail": [
+          {
+            "more_than_blocks": 49,
+            "predicted_at_most": 371966.0,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 53,
+            "predicted_at_most": 48271.10146980472,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 57,
+            "predicted_at_most": 6264.28016837072,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 61,
+            "predicted_at_most": 812.9337187880301,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 65,
+            "predicted_at_most": 105.49675515461817,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 73,
+            "predicted_at_most": 1.776671069782013,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 81,
+            "predicted_at_most": 0.02992092112761235,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 97,
+            "predicted_at_most": 8.486152202621642e-6,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 113,
+            "predicted_at_most": 2.406836971994212e-9,
+            "samples": 0
+          }
+        ]
+      },
+      "avl_height": 16,
+      "capacity": 4096,
+      "largest_stash": 16,
+      "largest_stash_within_the_bound": true,
+      "node_accesses": 900007,
+      "nodes_an_operation_returns": 49,
+      "occupancy_within_predicted_tail": true,
+      "operations": 26569,
+      "overflowed": false,
+      "seed": 6004496029142961969,
+      "stash_bound": 201,
+      "stash_bound_headroom": 185,
+      "stored_keys_at_end": 3027,
+      "within_operation": {
+        "histogram": [
+          852946,
+          9974,
+          6197,
+          2888,
+          1079,
+          283,
+          61,
+          9,
+          1
+        ],
+        "largest": 8,
+        "mean": 0.042590315511805074,
+        "p50": 0,
+        "p99": 2,
+        "p999": 4,
+        "samples": 873438,
+        "tail": [
+          {
+            "more_than_blocks": 49,
+            "predicted_at_most": 12228132.0,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 53,
+            "predicted_at_most": 1586879.9851550038,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 57,
+            "predicted_at_most": 205933.99607442453,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 61,
+            "predicted_at_most": 26724.64908241859,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 65,
+            "predicted_at_most": 3468.1348499657265,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 73,
+            "predicted_at_most": 58.40686611646136,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 81,
+            "predicted_at_most": 0.9836301519763437,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 97,
+            "predicted_at_most": 0.00027897654437703494,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 113,
+            "predicted_at_most": 7.91231461908495e-8,
+            "samples": 0
+          }
+        ]
+      },
+      "workload": "random"
+    },
+    {
+      "after_operation": {
+        "histogram": [
+          0,
+          1,
+          1,
+          4,
+          4,
+          16,
+          24629,
+          37,
+          85,
+          188,
+          356,
+          611,
+          537,
+          179,
+          6
+        ],
+        "largest": 14,
+        "mean": 6.364973362347115,
+        "p50": 6,
+        "p99": 12,
+        "p999": 13,
+        "samples": 26654,
+        "tail": [
+          {
+            "more_than_blocks": 49,
+            "predicted_at_most": 373156.0,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 53,
+            "predicted_at_most": 48425.53120464357,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 57,
+            "predicted_at_most": 6284.3209608097095,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 61,
+            "predicted_at_most": 815.534470268966,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 65,
+            "predicted_at_most": 105.83426218115821,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 73,
+            "predicted_at_most": 1.7823550263077184,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 81,
+            "predicted_at_most": 0.03001664465111143,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 97,
+            "predicted_at_most": 8.513301246139382e-6,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 113,
+            "predicted_at_most": 2.414536966070749e-9,
+            "samples": 0
+          }
+        ]
+      },
+      "avl_height": 16,
+      "capacity": 4096,
+      "largest_stash": 14,
+      "largest_stash_within_the_bound": true,
+      "node_accesses": 900047,
+      "nodes_an_operation_returns": 49,
+      "occupancy_within_predicted_tail": true,
+      "operations": 26654,
+      "overflowed": false,
+      "seed": 6004496029142961968,
+      "stash_bound": 201,
+      "stash_bound_headroom": 187,
+      "stored_keys_at_end": 2048,
+      "within_operation": {
+        "histogram": [
+          872064,
+          707,
+          386,
+          168,
+          60,
+          8
+        ],
+        "largest": 5,
+        "mean": 0.002591044352313334,
+        "p50": 0,
+        "p99": 0,
+        "p999": 1,
+        "samples": 873393,
+        "tail": [
+          {
+            "more_than_blocks": 49,
+            "predicted_at_most": 12227502.0,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 53,
+            "predicted_at_most": 1586798.2282365595,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 57,
+            "predicted_at_most": 205923.3862431333,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 61,
+            "predicted_at_most": 26723.272213987504,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 65,
+            "predicted_at_most": 3467.956169775205,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 73,
+            "predicted_at_most": 58.40385696300657,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 81,
+            "predicted_at_most": 0.9835794748168442,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 97,
+            "predicted_at_most": 0.00027896217135399615,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 113,
+            "predicted_at_most": 7.911906972339723e-8,
+            "samples": 0
+          }
+        ]
+      },
+      "workload": "repeated_key"
+    },
+    {
+      "after_operation": {
+        "histogram": [
+          0,
+          1,
+          1,
+          3,
+          4,
+          12,
+          20,
+          78,
+          745,
+          2727,
+          3283,
+          1883,
+          1701,
+          5184,
+          2722,
+          4
+        ],
+        "largest": 15,
+        "mean": 11.474956445993032,
+        "p50": 12,
+        "p99": 14,
+        "p999": 14,
+        "samples": 18368,
+        "tail": [
+          {
+            "more_than_blocks": 49,
+            "predicted_at_most": 257152.0,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 53,
+            "predicted_at_most": 33371.35728847051,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 57,
+            "predicted_at_most": 4330.697359051278,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 61,
+            "predicted_at_most": 562.0070964920975,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 65,
+            "predicted_at_most": 72.93328309985421,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 73,
+            "predicted_at_most": 1.2282695701665856,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 81,
+            "predicted_at_most": 0.02068529034860114,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 97,
+            "predicted_at_most": 5.8667486039276725e-6,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 113,
+            "predicted_at_most": 1.663923425856814e-9,
+            "samples": 0
+          }
+        ]
+      },
+      "avl_height": 16,
+      "capacity": 4096,
+      "largest_stash": 15,
+      "largest_stash_within_the_bound": true,
+      "node_accesses": 900032,
+      "nodes_an_operation_returns": 49,
+      "occupancy_within_predicted_tail": true,
+      "operations": 18368,
+      "overflowed": false,
+      "seed": 6004496029142961971,
+      "stash_bound": 201,
+      "stash_bound_headroom": 186,
+      "stored_keys_at_end": 2118,
+      "within_operation": {
+        "histogram": [
+          868688,
+          5943,
+          3964,
+          2025,
+          769,
+          219,
+          45,
+          11
+        ],
+        "largest": 7,
+        "mean": 0.02774753193960511,
+        "p50": 0,
+        "p99": 1,
+        "p999": 4,
+        "samples": 881664,
+        "tail": [
+          {
+            "more_than_blocks": 49,
+            "predicted_at_most": 12343296.0,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 53,
+            "predicted_at_most": 1601825.1498465848,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 57,
+            "predicted_at_most": 207873.47323446133,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 61,
+            "predicted_at_most": 26976.34063162068,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 65,
+            "predicted_at_most": 3500.797588793002,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 73,
+            "predicted_at_most": 58.95693936799611,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 81,
+            "predicted_at_most": 0.9928939367328546,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 97,
+            "predicted_at_most": 0.00028160393298852824,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 113,
+            "predicted_at_most": 7.986832444112706e-8,
+            "samples": 0
+          }
+        ]
+      },
+      "workload": "insert_and_delete"
+    },
+    {
+      "after_operation": {
+        "histogram": [
+          0,
+          1,
+          1,
+          9,
+          9,
+          30,
+          40,
+          79,
+          143,
+          316,
+          634,
+          1384,
+          2798,
+          4859,
+          5351,
+          2747,
+          701,
+          70
+        ],
+        "largest": 17,
+        "mean": 13.13524932192781,
+        "p50": 13,
+        "p99": 16,
+        "p999": 17,
+        "samples": 19172,
+        "tail": [
+          {
+            "more_than_blocks": 58,
+            "predicted_at_most": 268408.0,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 62,
+            "predicted_at_most": 34832.08089800505,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 66,
+            "predicted_at_most": 4520.259678121249,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 70,
+            "predicted_at_most": 586.6071457941252,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 74,
+            "predicted_at_most": 76.12570250383303,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 82,
+            "predicted_at_most": 1.282033111892083,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 90,
+            "predicted_at_most": 0.021590722264992434,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 106,
+            "predicted_at_most": 6.123546615554298e-6,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 122,
+            "predicted_at_most": 1.736756311004292e-9,
+            "samples": 0
+          }
+        ]
+      },
+      "avl_height": 19,
+      "capacity": 16384,
+      "largest_stash": 17,
+      "largest_stash_within_the_bound": true,
+      "node_accesses": 900011,
+      "nodes_an_operation_returns": 58,
+      "occupancy_within_predicted_tail": true,
+      "operations": 19172,
+      "overflowed": false,
+      "seed": 6004496029139816241,
+      "stash_bound": 210,
+      "stash_bound_headroom": 193,
+      "stored_keys_at_end": 9332,
+      "within_operation": {
+        "histogram": [
+          858379,
+          7830,
+          6722,
+          4476,
+          2262,
+          879,
+          241,
+          46,
+          4
+        ],
+        "largest": 8,
+        "mean": 0.0567016219763203,
+        "p50": 0,
+        "p99": 2,
+        "p999": 5,
+        "samples": 880839,
+        "tail": [
+          {
+            "more_than_blocks": 58,
+            "predicted_at_most": 12331746.0,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 62,
+            "predicted_at_most": 1600326.273008443,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 66,
+            "predicted_at_most": 207678.95966078877,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 70,
+            "predicted_at_most": 26951.098043717477,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 74,
+            "predicted_at_most": 3497.521785300113,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 82,
+            "predicted_at_most": 58.901771554658374,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 90,
+            "predicted_at_most": 0.9919648554753636,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 106,
+            "predicted_at_most": 0.0002813404275661502,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 122,
+            "predicted_at_most": 7.979358920450186e-8,
+            "samples": 0
+          }
+        ]
+      },
+      "workload": "random"
+    },
+    {
+      "after_operation": {
+        "histogram": [
+          0,
+          1,
+          1,
+          4,
+          5,
+          11,
+          11060,
+          49,
+          86,
+          180,
+          360,
+          682,
+          1434,
+          2373,
+          2195,
+          744,
+          43
+        ],
+        "largest": 16,
+        "mean": 8.884855419180361,
+        "p50": 6,
+        "p99": 15,
+        "p999": 16,
+        "samples": 19228,
+        "tail": [
+          {
+            "more_than_blocks": 58,
+            "predicted_at_most": 269192.0,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 62,
+            "predicted_at_most": 34933.8228409577,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 66,
+            "predicted_at_most": 4533.463023728113,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 70,
+            "predicted_at_most": 588.3205820639182,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 74,
+            "predicted_at_most": 76.34806007425941,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 82,
+            "predicted_at_most": 1.2857778361913712,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 90,
+            "predicted_at_most": 0.021653787174591828,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 106,
+            "predicted_at_most": 6.141433044224809e-6,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 122,
+            "predicted_at_most": 1.7418292482782458e-9,
+            "samples": 0
+          }
+        ]
+      },
+      "avl_height": 19,
+      "capacity": 16384,
+      "largest_stash": 16,
+      "largest_stash_within_the_bound": true,
+      "node_accesses": 900022,
+      "nodes_an_operation_returns": 58,
+      "occupancy_within_predicted_tail": true,
+      "operations": 19228,
+      "overflowed": false,
+      "seed": 6004496029139816240,
+      "stash_bound": 210,
+      "stash_bound_headroom": 194,
+      "stored_keys_at_end": 8192,
+      "within_operation": {
+        "histogram": [
+          871591,
+          3484,
+          2823,
+          1719,
+          801,
+          276,
+          72,
+          27,
+          1
+        ],
+        "largest": 8,
+        "mean": 0.02213911538906941,
+        "p50": 0,
+        "p99": 1,
+        "p999": 4,
+        "samples": 880794,
+        "tail": [
+          {
+            "more_than_blocks": 58,
+            "predicted_at_most": 12331116.0,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 62,
+            "predicted_at_most": 1600244.516089999,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 66,
+            "predicted_at_most": 207668.34982949754,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 70,
+            "predicted_at_most": 26949.721175286395,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 74,
+            "predicted_at_most": 3497.343105109592,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 82,
+            "predicted_at_most": 58.89876240120359,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 90,
+            "predicted_at_most": 0.991914178315864,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 106,
+            "predicted_at_most": 0.0002813260545431114,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 122,
+            "predicted_at_most": 7.978951273704958e-8,
+            "samples": 0
+          }
+        ]
+      },
+      "workload": "repeated_key"
+    },
+    {
+      "after_operation": {
+        "histogram": [
+          0,
+          1,
+          1,
+          2,
+          7,
+          14,
+          19,
+          43,
+          100,
+          173,
+          362,
+          744,
+          1459,
+          2494,
+          2416,
+          1057,
+          996,
+          5629,
+          1
+        ],
+        "largest": 18,
+        "mean": 14.559801520814538,
+        "p50": 14,
+        "p99": 17,
+        "p999": 17,
+        "samples": 15518,
+        "tail": [
+          {
+            "more_than_blocks": 58,
+            "predicted_at_most": 217252.0,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 62,
+            "predicted_at_most": 28193.419120344373,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 66,
+            "predicted_at_most": 3658.7413772733953,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 70,
+            "predicted_at_most": 474.8054291901333,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 74,
+            "predicted_at_most": 61.616871033511416,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 82,
+            "predicted_at_most": 1.0376898513635167,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 90,
+            "predicted_at_most": 0.017475736913631995,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 106,
+            "predicted_at_most": 4.9564571448034415e-6,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 122,
+            "predicted_at_most": 1.405747153878813e-9,
+            "samples": 0
+          }
+        ]
+      },
+      "avl_height": 19,
+      "capacity": 16384,
+      "largest_stash": 18,
+      "largest_stash_within_the_bound": true,
+      "node_accesses": 900044,
+      "nodes_an_operation_returns": 58,
+      "occupancy_within_predicted_tail": true,
+      "operations": 15518,
+      "overflowed": false,
+      "seed": 6004496029139816243,
+      "stash_bound": 210,
+      "stash_bound_headroom": 192,
+      "stored_keys_at_end": 13974,
+      "within_operation": {
+        "histogram": [
+          862836,
+          5675,
+          5570,
+          4564,
+          3217,
+          1663,
+          685,
+          232,
+          71,
+          13
+        ],
+        "largest": 9,
+        "mean": 0.06569507284127318,
+        "p50": 0,
+        "p99": 3,
+        "p999": 6,
+        "samples": 884526,
+        "tail": [
+          {
+            "more_than_blocks": 58,
+            "predicted_at_most": 12383364.0,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 62,
+            "predicted_at_most": 1607024.8898596293,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 66,
+            "predicted_at_most": 208548.25850458353,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 70,
+            "predicted_at_most": 27063.909463837597,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 74,
+            "predicted_at_most": 3512.1616489101507,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 82,
+            "predicted_at_most": 59.148321527720455,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 90,
+            "predicted_at_most": 0.9961170040770236,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 106,
+            "predicted_at_most": 0.00028251805725379615,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 122,
+            "predicted_at_most": 8.012758777109234e-8,
+            "samples": 0
+          }
+        ]
+      },
+      "workload": "insert_and_delete"
+    }
+  ],
+  "checks": {
+    "every_largest_stash_within_the_bound": true,
+    "every_occupancy_within_predicted_tail": true,
+    "no_run_overflowed": true,
+    "node_accesses_meet_the_profile": true,
+    "overflow_loses_nothing": true
+  },
+  "forced_overflow": {
+    "accepted": true,
+    "call_failed_with_stash_overflow": true,
+    "capacity": 256,
+    "coins": "every node access of every put draws leaf 0",
+    "committed_ciphertext_unchanged": true,
+    "contract": "SweepMap",
+    "dropped_key_absent": true,
+    "every_stored_key_reads_back": true,
+    "map_takes_a_write_again": true,
+    "node_accesses_per_put": 45,
+    "overflow_error": "confidential kernel program put(bytes32,uint256): internal error: a Path ORAM stash overflowed its bound of 186 blocks; the call is dropped and the committed map is unchanged",
+    "puts_before_the_overflow": 231,
+    "scheme": "path_oram_private_posmap_v1",
+    "stash_bound": 186,
+    "stored_keys_read_back": 231
+  },
+  "largest_stash": 18,
+  "parameters": {
+    "blocks_per_bucket": 5,
+    "capacities": [
+      256,
+      1024,
+      4096,
+      16384
+    ],
+    "node_accesses_per_cell": 900000,
+    "seed": "0x53544153485f4f31",
+    "workloads": [
+      "random",
+      "repeated_key",
+      "insert_and_delete"
+    ]
+  },
+  "profile": "full",
+  "provenance": {
+    "toolchain_manifest_sha256": "92d1cf7df846881e06ffb758971af81a1b0442255a59593ffe3dc1c3b008e632"
+  },
+  "schema": "uo-stash-occupancy-v1",
+  "scheme": "path_oram_private_posmap_v1",
+  "smallest_stash_bound_headroom": 175,
+  "stash_cap": 152,
+  "total_node_accesses": 10800300
+}

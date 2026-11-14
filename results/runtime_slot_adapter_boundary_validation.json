@@ -1,6 +1,6 @@
 {
   "accepted": true,
-  "artifact_json_bytes": 1712163,
+  "artifact_json_bytes": 1714890,
   "checker": "proof/lean/.lake/build/bin/checkProofGradeRuntimeSlotAdapterBoundary",
   "lean_checker_input": "source-backed runtime slot-adapter boundary",
   "lean_checker_kind": "runtime slot-adapter boundary",

@@ -65,7 +65,7 @@
     },
     {
       "accepted": true,
-      "certificate_json_bytes": 52884,
+      "certificate_json_bytes": 53336,
       "entrypoint": "transferFrom(address,address,address,uint256)",
       "kept_witness_audits": 5,
       "leaf_steps": 6,

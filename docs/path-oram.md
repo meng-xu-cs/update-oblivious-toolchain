@@ -72,9 +72,9 @@ The Lean development states more than it currently proves for Path ORAM:
   its bucket on the path to its leaf), and the accessed slot must have exactly
   one block, on its prior leaf and with its key. The call-start reads are not
   in the trace; they follow a fixed pattern set by the public parameters, so
-  they reveal nothing. ERC20Lite `transferFrom` on the local route makes 176
-  traced reads and 49 call-start reads (a capacity-64 map: the counter and 16
-  pages; a capacity-128 map: the counter and 31 pages), and decrypts 93
+  they reveal nothing. ERC20Lite `transferFrom` on the local route makes 178
+  traced reads and 50 call-start reads (a capacity-64 map: the counter and 16
+  pages; a capacity-128 map: the counter and 32 pages), and decrypts 94
   payloads in all; reading every bucket at call start, as calls did before,
   added the 382 buckets of the two maps.
   `results/overheads.json` reports the call-start reads next to the traced
@@ -82,23 +82,64 @@ The Lean development states more than it currently proves for Path ORAM:
   `physical_reads_with_call_start`, `bytes_read_with_call_start`). On the
   local scheme every access still rewrites every metadata page (the flat
   position map with its keys, linear in the capacity, and the stash, at most
-  15 pages), and its trace reads them all, so an access's cost grows linearly
+  16 pages), and its trace reads them all, so an access's cost grows linearly
   with the capacity; the scheme is capped at 128. The private scheme's
   accesses are those of its AVL map (below).
-- The stash bound is the capacity capped at 114 (`pathOramStashBound`). By
-  the Path ORAM stash theorem the stash then overflows after an access with
-  probability at most `14 · 0.6002^114 < 2^-80`, which `stashOverflowBounded`
-  assumes; an overflow fails the access in band and aborts the call. A map of
-  capacity at most 114 keeps a stash as large as itself and cannot overflow.
+- The stash bound is the capacity capped at 152 (`pathOramStashBound`). By
+  the Path ORAM stash theorem (Stefanov et al., JACM 2018, Theorem 5.1, at 5
+  blocks per bucket) the stash holds more than `R` blocks after an access
+  with probability at most `14 · 0.6002^R`, which is below `2^-108` at
+  `R = 152`. The cap is set for the lifetime of a map and not for one
+  access: over `Q` node accesses the union bound gives `Q · 14 · 0.6002^152`,
+  at most `2^-60` for the `2^48` node accesses the cap budgets and `2^-68`
+  for `2^40`. An ERC20Lite `transfer` at 16,384 entries makes 154 node
+  accesses, so `2^48` of them are about 1.8 trillion transfers. The runtime
+  does not stop a map at `2^48` accesses; past it the bound grows with `Q`.
+  `stashOverflowBounded` assumes the per-access bound. A map of capacity at
+  most 152 keeps a stash as large as itself and cannot overflow, so the
+  local scheme, capped at 128 entries, needs no stash assumption.
   The private scheme's AVL map holds the nodes an operation reads in the
   enclave until the operation ends and then returns them to the stash (the
   deferred write-back of Wang et al., Oblivious Data Structures, CCS 2014),
   so its stash bound adds a put's `3h + 1` node accesses to the limit:
-  `min(max(capacity, 1), 114 + 3h + 1)` (`pathOramTreeStashBound`; 148 at
-  capacity 256, 172 at 16384). That the stash then holds at most 114 blocks
+  `min(max(capacity, 1), 152 + 3h + 1)` (`pathOramTreeStashBound`; 186 at
+  capacity 256, 210 at 16384). That the stash then holds at most 152 blocks
   besides those nodes, with the same tail, is part of what
   `stashOverflowBounded` assumes: the stash theorem is stated for one access
-  at a time, not for operations that hold their nodes until they end.
+  at a time, not for operations that hold their nodes until they end. It is
+  measured, not proved. `results/stash_occupancy_full.json`
+  (`scripts/run_stash_occupancy_full.sh`) runs the runtime's own tree
+  operations, with their eviction and compaction, over buckets in memory and
+  without the cryptography: 10.8 million node accesses on maps of 256,
+  1,024, 4,096 and 16,384 entries, under random, repeated-key and
+  insert-and-delete workloads, with the stash counted after each. While an
+  operation holds its nodes the stash held at most 9 blocks, and fewer than
+  one on average; once an operation had returned them it held at most 18,
+  the nodes that operation read. The stashes are 186 to 210 blocks, so the
+  least headroom seen is 175 blocks. The report checks every count against
+  the assumed tail, more than `3h + 1 + R` blocks with probability at most
+  `14 · 0.6002^R`, and fails on a count the tail does not allow. Ten million
+  accesses say nothing about an event of probability `2^-108`: the
+  simulation would show a stash that grows with deferred write-back, and it
+  shows none.
+- A stash overflow is an error, not an abort. The access that finds no room
+  for a block stops (`stash_overflow_error` in `generated_oram_codecs.rs`),
+  so the call that made it is dropped before anything of it is committed and
+  the committed map keeps every block. The caller sees an internal error
+  and so learns that the stash overflowed, an event the bound counts
+  (`Q · ε_stash`, under Assumption Provenance). The dropped call does not
+  remap the keys it read, as an aborted call does (next item); that too
+  happens only when the stash overflows. A map whose stash is full refuses
+  the calls that would overflow it and takes the others: it can be read,
+  and it is not corrupted. Before, the block that found no room was dropped,
+  the access reported a failure, and the call aborted with its ORAM
+  accesses kept; on the private scheme the lost block was a tree node, and
+  its subtree was no longer reachable. `results/stash_occupancy.json`
+  forces an overflow on the runtime: every node access of every put on a
+  map of 256 entries draws the same leaf, so the nodes the puts read pile
+  up on one path of 45 blocks and in the stash of 186. The 232nd put fails
+  with the error, the committed ciphertext is what it was before that call,
+  the 231 keys stored before it read back, and the map takes a write again.
 - Calls that abort run on both schemes (`results/abort_rollback.json`). A
   map write makes no ORAM access during the call: it is held in the enclave
   with the call's other writes, and it updates a pending view of the map's
@@ -306,12 +347,17 @@ On the full scan a write moves 192 bytes per entry, the scan and the rewrite
 of every slot, and a read moves 96: it scans the map and rewrites nothing,
 since its program has no write statement for the map. On the tree a write, a
 get and then a put of `3h + 1` node accesses, costs about four times a read:
-260 against 980 physical operations at 256 entries, 654 against 2,556 at
+270 against 1,000 physical operations at 256 entries, 664 against 2,576 at
 16,384. The tree moves fewer bytes than the full scan from 4,096 entries for
 reads alone and from 8,192 for an even mix and for writes alone; it makes
 fewer physical operations from 512 entries for reads alone and for an even
 mix and from 1,024 for writes alone; and it costs less modeled gas from
-1,024, 2,048 and 4,096. The gas is that of cost model v2, which charges the
+2,048 for reads alone and for an even mix and from 4,096 for writes alone.
+The stash cap of 152 costs a tree access 10 of these operations, the five
+stash pages it added, read and written once per operation: 2.3% of a read's
+bytes at 16,384 entries and 5.7% at 256, and the gas break-even for reads
+alone, which was at 1,024 entries with a cap of 114. The gas is that of cost
+model v2, which charges the
 sealed records a call reads, those at its start included, as it charges
 those it writes (see The Modeled Cost in
 [`claim-boundary.md`](./claim-boundary.md)). The local scheme makes fewer
@@ -322,15 +368,15 @@ costs less than the tree on every metric.
 
 Beside the traced counts the report gives the work that no trace records. A
 call on a Path ORAM map reads the map's counter and metadata pages when it
-starts: 24 reads of 22,880 bytes on the tree at 16,384 entries. An
+starts: 29 reads of 27,840 bytes on the tree at 16,384 entries. An
 instrumented call exports the position maps before and after it as a
 witness. It once decoded them from storage, every bucket and metadata page
-of the tree twice: 65,580 sealed records at 16,384 entries, where a read
-traces 654 operations. The runtime now keeps the witness from call to call
+of the tree twice: 65,590 sealed records at 16,384 entries, where a read
+traces 664 operations. The runtime now keeps the witness from call to call
 and a call moves it by its own leaf transitions, so a measured call opens no
 record for it (`witness_scan_records` is 0 in every row). The decode
 happens once after each bulk load (`witness_decode_records` of a fill:
-32,790 records at 16,384 entries) and in the audit, which compares the kept
+32,795 records at 16,384 entries) and in the audit, which compares the kept
 witness with that decode. The sweep audits after every occupancy level and
 not in the calls it times; every other instrumented call audits before it
 runs and after. A production call records no witness at all. The report also gives
@@ -340,6 +386,11 @@ that of a tree read 2.7 MB, 2.4 MB of it private evidence. A trace holds
 the scan of an exact object, its rewrite and the logical scan of a map as
 one item each, with the slot count and the length of a sealed slot, so the
 trace of a call on a full-scan map does not grow with the map.
+
+The latencies below were measured with a stash cap of 114. The cap is 152
+since (Issue 40 of the review), which adds 10 storage operations and the
+scan of 38 more stash slots to a tree access, and the profile is run again
+with it.
 
 The latencies are wall-clock times of a release build on one machine. The
 validation script runs a quick profile of the sweep, whose latencies are a
@@ -491,7 +542,8 @@ What remains open on the private scheme: the runtime's pointer-level
 implementation of the AVL map (node ids, leaves, the free list, the stash)
 is replayed against the model and run against a reference map in the
 runtime's tests, not proved; and the stash bound for operations that hold
-their nodes until they end is assumed (`stashOverflowBounded`). A write
+their nodes until they end is assumed (`stashOverflowBounded`) and measured
+over ten million node accesses, not proved. A write
 whose key the program does not show equal to a preceding get's (another key
 expression, a key read from storage, or a key variable bound again in
 between) still makes its own presence get, and the tree costs more than a
@@ -596,7 +648,7 @@ over `Q` primitive accesses; the Explicit Assumptions section of
 
 | Assumption | Provenance |
 | --- | --- |
-| `stashOverflowBounded` | JACM Path ORAM stash theorem specialized to deployed `Z = 5` / `stash_bound = min(max(capacity, 1), 114)` parameters: a stash overflows after an access with probability at most `14 · 0.6002^114 < 2^-80`, and a map of capacity at most 114 cannot overflow |
+| `stashOverflowBounded` | JACM Path ORAM stash theorem specialized to deployed `Z = 5` / `stash_bound = min(max(capacity, 1), 152)` parameters: a stash overflows after an access with probability at most `14 · 0.6002^152 < 2^-108`, so with probability at most `2^-60` over the `2^48` node accesses budgeted for a map's lifetime, and a map of capacity at most 152 cannot overflow. That the private scheme's operations, which hold their nodes until they end, keep this tail above the `3h + 1` nodes they return is assumed and measured (`results/stash_occupancy_full.json`), not proved |
 | `bucketEncryptionINDCPA` | concrete sealed bucket/path records implemented with `ChaCha20Poly1305` and paired with RFC 8439 plus AEAD composition analysis. A record's key derives from the runtime's master secret and its nonce is the count of the seals under the key, so no key seals twice with one nonce (see [`claim-boundary.md`](./claim-boundary.md)) |
 | `metadataEncryptionINDCPA` | same sealed-record crypto route for encrypted position-map metadata pages |
 

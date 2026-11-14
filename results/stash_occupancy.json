@@ -1,0 +1,489 @@
+{
+  "accepted": true,
+  "assumed_tail": {
+    "base": 0.6002,
+    "factor": 14.0,
+    "statement": "after a node access the stash holds more than 3h + 1 + R blocks with probability at most 14 * 0.6002^R, where 3h + 1 are the nodes an operation may return to it"
+  },
+  "cells": [
+    {
+      "after_operation": {
+        "histogram": [
+          0,
+          1,
+          1,
+          5,
+          13,
+          19,
+          44,
+          104,
+          126,
+          55,
+          15
+        ],
+        "largest": 10,
+        "mean": 7.336814621409921,
+        "p50": 8,
+        "p99": 10,
+        "p999": 10,
+        "samples": 383,
+        "tail": [
+          {
+            "more_than_blocks": 34,
+            "predicted_at_most": 5362.0,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 38,
+            "predicted_at_most": 695.8422169797586,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 42,
+            "predicted_at_most": 90.30145298979961,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 46,
+            "predicted_at_most": 11.71868020233413,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 50,
+            "predicted_at_most": 1.520766954880453,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 58,
+            "predicted_at_most": 0.025611239404061535,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 66,
+            "predicted_at_most": 0.00043131893529585344,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 82,
+            "predicted_at_most": 1.2233039608581764e-7,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 98,
+            "predicted_at_most": 3.4695267427219065e-11,
+            "samples": 0
+          }
+        ]
+      },
+      "avl_height": 11,
+      "capacity": 256,
+      "largest_stash": 10,
+      "largest_stash_within_the_bound": true,
+      "node_accesses": 10009,
+      "nodes_an_operation_returns": 34,
+      "occupancy_within_predicted_tail": true,
+      "operations": 383,
+      "overflowed": false,
+      "seed": 6004496029143945009,
+      "stash_bound": 186,
+      "stash_bound_headroom": 176,
+      "stored_keys_at_end": 164,
+      "within_operation": {
+        "histogram": [
+          9606,
+          20
+        ],
+        "largest": 1,
+        "mean": 0.002077706212341575,
+        "p50": 0,
+        "p99": 0,
+        "p999": 1,
+        "samples": 9626,
+        "tail": [
+          {
+            "more_than_blocks": 34,
+            "predicted_at_most": 134764.0,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 38,
+            "predicted_at_most": 17488.713265397277,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 42,
+            "predicted_at_most": 2269.560800208384,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 46,
+            "predicted_at_most": 294.52745594691476,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 50,
+            "predicted_at_most": 38.22167808793536,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 58,
+            "predicted_at_most": 0.6436913590169617,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 66,
+            "predicted_at_most": 0.010840407496495784,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 82,
+            "predicted_at_most": 3.0745493282560853e-6,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 98,
+            "predicted_at_most": 8.720016821263987e-10,
+            "samples": 0
+          }
+        ]
+      },
+      "workload": "random"
+    },
+    {
+      "after_operation": {
+        "histogram": [
+          0,
+          1,
+          1,
+          3,
+          6,
+          10,
+          26,
+          291,
+          32,
+          10
+        ],
+        "largest": 9,
+        "mean": 6.907894736842105,
+        "p50": 7,
+        "p99": 9,
+        "p999": 9,
+        "samples": 380,
+        "tail": [
+          {
+            "more_than_blocks": 34,
+            "predicted_at_most": 5320.0,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 38,
+            "predicted_at_most": 690.3917557501521,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 42,
+            "predicted_at_most": 89.59413090371763,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 46,
+            "predicted_at_most": 11.626888973595221,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 50,
+            "predicted_at_most": 1.5088549421790396,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 58,
+            "predicted_at_most": 0.025410629173742514,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 66,
+            "predicted_at_most": 0.0004279404579958859,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 82,
+            "predicted_at_most": 1.213721945498974e-7,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 98,
+            "predicted_at_most": 3.4423502930400114e-11,
+            "samples": 0
+          }
+        ]
+      },
+      "avl_height": 11,
+      "capacity": 256,
+      "largest_stash": 9,
+      "largest_stash_within_the_bound": true,
+      "node_accesses": 10022,
+      "nodes_an_operation_returns": 34,
+      "occupancy_within_predicted_tail": true,
+      "operations": 380,
+      "overflowed": false,
+      "seed": 6004496029143945008,
+      "stash_bound": 186,
+      "stash_bound_headroom": 177,
+      "stored_keys_at_end": 128,
+      "within_operation": {
+        "histogram": [
+          9631,
+          8,
+          3
+        ],
+        "largest": 2,
+        "mean": 0.001451980916822236,
+        "p50": 0,
+        "p99": 0,
+        "p999": 1,
+        "samples": 9642,
+        "tail": [
+          {
+            "more_than_blocks": 34,
+            "predicted_at_most": 134988.0,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 38,
+            "predicted_at_most": 17517.782391955177,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 42,
+            "predicted_at_most": 2273.333184667488,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 46,
+            "predicted_at_most": 295.0170091668556,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 50,
+            "predicted_at_most": 38.285208822342895,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 58,
+            "predicted_at_most": 0.6447612802453299,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 66,
+            "predicted_at_most": 0.01085842604209561,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 82,
+            "predicted_at_most": 3.07965973644766e-6,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 98,
+            "predicted_at_most": 8.734510927760997e-10,
+            "samples": 0
+          }
+        ]
+      },
+      "workload": "repeated_key"
+    },
+    {
+      "after_operation": {
+        "histogram": [
+          0,
+          1,
+          1,
+          3,
+          5,
+          13,
+          22,
+          58,
+          71,
+          44,
+          77
+        ],
+        "largest": 10,
+        "mean": 8.030508474576271,
+        "p50": 8,
+        "p99": 10,
+        "p999": 10,
+        "samples": 295,
+        "tail": [
+          {
+            "more_than_blocks": 34,
+            "predicted_at_most": 4130.0,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 38,
+            "predicted_at_most": 535.9620209113024,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 42,
+            "predicted_at_most": 69.55333846472816,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 46,
+            "predicted_at_most": 9.026137492659448,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 50,
+            "predicted_at_most": 1.1713479156389912,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 58,
+            "predicted_at_most": 0.01972667264803695,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 66,
+            "predicted_at_most": 0.0003322169344968062,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 82,
+            "predicted_at_most": 9.42231510321572e-8,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 98,
+            "predicted_at_most": 2.6723508853863247e-11,
+            "samples": 0
+          }
+        ]
+      },
+      "avl_height": 11,
+      "capacity": 256,
+      "largest_stash": 10,
+      "largest_stash_within_the_bound": true,
+      "node_accesses": 10030,
+      "nodes_an_operation_returns": 34,
+      "occupancy_within_predicted_tail": true,
+      "operations": 295,
+      "overflowed": false,
+      "seed": 6004496029143945011,
+      "stash_bound": 186,
+      "stash_bound_headroom": 176,
+      "stored_keys_at_end": 167,
+      "within_operation": {
+        "histogram": [
+          9690,
+          34,
+          8,
+          2,
+          1
+        ],
+        "largest": 4,
+        "mean": 0.0061633281972265025,
+        "p50": 0,
+        "p99": 0,
+        "p999": 2,
+        "samples": 9735,
+        "tail": [
+          {
+            "more_than_blocks": 34,
+            "predicted_at_most": 136290.0,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 38,
+            "predicted_at_most": 17686.746690072978,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 42,
+            "predicted_at_most": 2295.2601693360293,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 46,
+            "predicted_at_most": 297.8625372577618,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 50,
+            "predicted_at_most": 38.654481216086715,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 58,
+            "predicted_at_most": 0.6509801973852194,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 66,
+            "predicted_at_most": 0.010963158838394604,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 82,
+            "predicted_at_most": 3.109363984061187e-6,
+            "samples": 0
+          },
+          {
+            "more_than_blocks": 98,
+            "predicted_at_most": 8.818757921774871e-10,
+            "samples": 0
+          }
+        ]
+      },
+      "workload": "insert_and_delete"
+    }
+  ],
+  "checks": {
+    "every_largest_stash_within_the_bound": true,
+    "every_occupancy_within_predicted_tail": true,
+    "no_run_overflowed": true,
+    "node_accesses_meet_the_profile": true,
+    "overflow_loses_nothing": true
+  },
+  "forced_overflow": {
+    "accepted": true,
+    "call_failed_with_stash_overflow": true,
+    "capacity": 256,
+    "coins": "every node access of every put draws leaf 0",
+    "committed_ciphertext_unchanged": true,
+    "contract": "SweepMap",
+    "dropped_key_absent": true,
+    "every_stored_key_reads_back": true,
+    "map_takes_a_write_again": true,
+    "node_accesses_per_put": 45,
+    "overflow_error": "confidential kernel program put(bytes32,uint256): internal error: a Path ORAM stash overflowed its bound of 186 blocks; the call is dropped and the committed map is unchanged",
+    "puts_before_the_overflow": 231,
+    "scheme": "path_oram_private_posmap_v1",
+    "stash_bound": 186,
+    "stored_keys_read_back": 231
+  },
+  "largest_stash": 10,
+  "parameters": {
+    "blocks_per_bucket": 5,
+    "capacities": [
+      256
+    ],
+    "node_accesses_per_cell": 10000,
+    "seed": "0x53544153485f4f31",
+    "workloads": [
+      "random",
+      "repeated_key",
+      "insert_and_delete"
+    ]
+  },
+  "profile": "quick",
+  "provenance": {
+    "toolchain_manifest_sha256": "92d1cf7df846881e06ffb758971af81a1b0442255a59593ffe3dc1c3b008e632"
+  },
+  "schema": "uo-stash-occupancy-v1",
+  "scheme": "path_oram_private_posmap_v1",
+  "smallest_stash_bound_headroom": 176,
+  "stash_cap": 152,
+  "total_node_accesses": 30061
+}

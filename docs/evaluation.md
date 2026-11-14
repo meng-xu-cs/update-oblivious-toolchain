@@ -28,6 +28,16 @@ establish and what they do not).
   tree, and counts under callgrind the instructions of one evaluation of each
   operator on every class of operands. It needs valgrind and takes about two
   minutes on four cores.
+- The stash-occupancy report has two profiles with one schema
+  (`uo-stash-occupancy-v1`). `run_validation.sh` runs the quick one into
+  `results/stash_occupancy.json` from a release build: a few thousand node
+  accesses of a simulated map of 256 entries, and a stash overflow forced on
+  the runtime, which must fail the call and lose nothing.
+  `scripts/run_stash_occupancy_full.sh` runs the full one into
+  `results/stash_occupancy_full.json`: more than ten million node accesses on
+  maps of 256 to 16,384 entries under three workloads, about 45 minutes on
+  four cores. Both are functions of their seed. Run the full one when the
+  stash cap, the eviction or the tree's operations change.
 - The capacity sweep has two profiles with one schema
   (`uo-capacity-sweep-v4`). `run_validation.sh` runs the quick one into
   `results/capacity_sweep.json`: one warmup round and two measured rounds of
@@ -60,6 +70,7 @@ establish and what they do not).
 | Correctness | `correctness.json` (differential runs against the raw baseline), `abort_rollback.json` (aborting and committing calls on the exact backend and on both Path ORAM schemes), `path_oram_avl_map_replay.json` (runtime AVL map operations replayed against the Lean model), and the model columns of `trace_equivalence.json` (each run's public outcome and final public state against their Lean models, and the exact store's encoding on the exact backends) |
 | Runtime and storage cost | `overheads.json` (modeled gas, physical reads and writes, bytes moved, trace and artifact sizes per benchmark and backend) |
 | Scalability | `capacity_sweep.json` and `capacity_sweep_full.json` (one map of 1 to 16,384 entries on every backend, at five occupancy levels: the traced counts of seven kinds of call, the untraced reads at a call's start and in the decode of the position-map witness, which the runtime keeps from call to call, with an audit of the kept witness after every level, read/write mixes computed and executed, break-even capacities, and release-build latencies with medians, 95th percentiles and bootstrap intervals, split into staging, loading, the runtime's own work, witnesses, proof objects, JSON serialization and Lean's check of a sampled call, with peak resident memory and evidence sizes) |
+| How full does the private scheme's stash get, and what does an overflow do? | `stash_occupancy.json` and `stash_occupancy_full.json` (the stash counted after every node access of a simulation that runs the runtime's tree operations without the cryptography, against the assumed tail; and a stash overflow forced on the runtime: the call fails, the committed ciphertext is unchanged, and every stored key reads back) |
 | Cost of a tree node access | `tree_eviction_instructions.json` (callgrind instruction counts per node access of the private scheme, before and after the eviction rewrite) |
 | Do the kernel's operators branch on their operands? | `kernel_operator_instructions.json` (callgrind instruction counts of one evaluation of each binary operator of the confidential kernel, and of an array index's conversion, for every class of operands, before and after the operators were made branch-free), with `kernel_operators_do_not_branch_on_operands` in `runtime_boundary_validation.json` for the source |
 | Verification and TCB cost | `reviewer_summary.json` (proof-checking time per report, proof-artifact size budget, trusted line counts), `tamper_validation.json`, `lean_assumption_budget.json`, `static_checks.json` (including the kernel admission of every confidential entrypoint) |

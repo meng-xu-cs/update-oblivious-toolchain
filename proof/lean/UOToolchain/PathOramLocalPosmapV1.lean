@@ -178,7 +178,7 @@ fallback citation), specialized to the deployed parameter regime:
 - bucket size `Z = 5` (matching `pathOramJACMBlocksPerBucket`,
   `pathOramBlocksPerBucket`, and the deployed `blocks_per_bucket = 5usize`
   in `crates/uo-core/src/manifest.rs`)
-- stash bound formula `min(max(capacity, 1), 114)` (`pathOramStashBound`,
+- stash bound formula `min(max(capacity, 1), 152)` (`pathOramStashBound`,
   matching the deployed `path_oram_stash_bound` in
   `crates/uo-core/src/manifest.rs`)
 - working stash capacity `stash_bound + buckets_per_access *
@@ -188,18 +188,19 @@ fallback citation), specialized to the deployed parameter regime:
   node an operation reads in the enclave until the operation ends and then
   returns it to the stash (the deferred write-back of Wang et al., Oblivious
   Data Structures, CCS 2014), the stash bound formula
-  `min(max(capacity, 1), 114 + 3h + 1)` (`pathOramTreeStashBound`, matching
+  `min(max(capacity, 1), 152 + 3h + 1)` (`pathOramTreeStashBound`, matching
   `path_oram_tree_stash_bound`), where `h` is the largest height of an AVL
   tree of `capacity` nodes and `3h + 1` the node accesses of a put: room for
-  the nodes an operation returns beside the 114 blocks of the Path ORAM bound
+  the nodes an operation returns beside the 152 blocks of the Path ORAM bound
 
 Under these parameters, JACM Theorem 5.1 gives an exponentially small
 upper bound on stash-overflow probability: at bucket size `Z = 5` and
 stash size `R` the failure probability is bounded by `14 * 0.6002^R`
-after any polynomially-bounded access trace. The cap `R = 114` makes this
-at most `2^-80` per access, and a map no larger than the cap cannot overflow
-its stash. For the private scheme the assumption is that the stash holds at
-most 114 blocks besides the nodes the last operation returned to it, with
+after any polynomially-bounded access trace. The cap `R = 152` makes this
+at most `2^-108` per access, so at most `2^-60` over the `2^48` node accesses
+budgeted for the lifetime of a map, and a map no larger than the cap cannot
+overflow its stash. For the private scheme the assumption is that the stash
+holds at most 152 blocks besides the nodes the last operation returned to it, with
 the same tail; the theorem is stated for one access at a time, so this
 transfer to operations that hold their nodes until they end is assumed, not
 proved. The repository keeps
@@ -248,7 +249,7 @@ deriving Repr, DecidableEq
 /-- The actual stash-overflow provenance record for the
 `path_oram_local_posmap_v1` runtime: JACM 2018 Theorem 5.1 (with CCS 2013
 as the fallback), specialized to the deployed bucket size `Z = 5` and
-stash bound `min(max(capacity, 1), 114)`. The probe's
+stash bound `min(max(capacity, 1), 152)`. The probe's
 `path_oram_deployed_stash_parameters_pinned` static-drift check pins the
 Rust manifest still constructs Path-ORAM objects with these parameters;
 the JACM tail bound `14 * 0.6002^R` then becomes the literature reference
@@ -263,11 +264,11 @@ def pathOramLocalPosmapV1_stashOverflowProvenance :
   , fallbackCitation :=
       "Stefanov, van Dijk, Shi, Fletcher, Ren, Yu, Devadas (CCS 2013). Path ORAM: An Extremely Simple Oblivious RAM Protocol. Proceedings of CCS 2013."
   , deployedBlocksPerBucket := pathOramBlocksPerBucket
-  , deployedStashBoundFormula := "stash_bound = min(max(capacity, 1), 114)"
+  , deployedStashBoundFormula := "stash_bound = min(max(capacity, 1), 152)"
   , workingStashCapacityFormula :=
       "working_stash_capacity = stash_bound + buckets_per_access * blocks_per_bucket"
   , deployedJACMTailBoundExpression :=
-      "P[stash size > R] <= 14 * 0.6002^R for Z = 5 (JACM 2018 Theorem 5.1); R = 114 gives <= 2^-80 per access"
+      "P[stash size > R] <= 14 * 0.6002^R for Z = 5 (JACM 2018 Theorem 5.1); R = 152 gives <= 2^-108 per access and <= 2^-60 over 2^48 accesses"
   , deployedParametersFile := "crates/uo-core/src/manifest.rs"
   , staticDriftCheckName := "path_oram_deployed_stash_parameters_pinned"
   }
@@ -299,7 +300,7 @@ theorem pathOramLocalPosmapV1_stashOverflowProvenance_deployedBlocksPerBucket_va
 `path_oram_deployed_stash_parameters_pinned` probe static-drift check.
 This is the named hook that rejects representative drift if the Rust
 manifest stops constructing Path-ORAM objects with the deployed
-`Z = 5` / `stash_bound = min(max(capacity, 1), 114)` parameter regime. -/
+`Z = 5` / `stash_bound = min(max(capacity, 1), 152)` parameter regime. -/
 theorem pathOramLocalPosmapV1_stashOverflowProvenance_staticDriftCheckName :
     pathOramLocalPosmapV1_stashOverflowProvenance.staticDriftCheckName =
       "path_oram_deployed_stash_parameters_pinned" := by

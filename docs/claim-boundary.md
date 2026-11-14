@@ -339,7 +339,10 @@ proved.
   operation reads and writes its header and stash pages once. Its stash
   bound adds the `3h + 1` nodes an operation returns to the stash to the
   Path ORAM bound; that the stash stays within it with the Path ORAM tail is
-  part of `stashOverflowBounded`, assumed and not proved. The admitted route
+  part of `stashOverflowBounded`, assumed and not proved, and measured over
+  ten million node accesses (`results/stash_occupancy_full.json`). A stash
+  that overflows is an error that drops the call, so no block is lost (see
+  [`path-oram.md`](./path-oram.md)). The admitted route
   covers it. The AVL map's algorithm is proved in Lean over inductive trees
   (`UOToolchain/PathOramAvlMap.lean`): with the runtime's walk, successor
   delete, rotation rule and node-access counts, and the walk bounded by the
@@ -511,7 +514,7 @@ checked by recompiling the source.
 | --- | --- | --- |
 | `bucketEncryptionINDCPA` | hides Path ORAM bucket/path ciphertext contents | trusted; named in Lean and not formalized (see below): a `Prop` field of `PathOramLocalPosmapV1SecurityAssumptions`. Its provenance is the runtime `ChaCha20Poly1305` sealed-record boundary plus the cited AEAD analysis route. That route needs a nonce to seal once under a key: a record's nonce is the count of the seals under its key (`sealNonceRun_nodup` in `UOToolchain/RuntimeStoreCodecSemantics.lean` for a model of the counter; `seal_nonces_come_from_the_seal_count` in `runtime_boundary_validation.json` for the source) |
 | `metadataEncryptionINDCPA` | hides encrypted position-map metadata pages | trusted; named in Lean and not formalized, as the row above, and paired with the same concrete sealed-record crypto route |
-| `stashOverflowBounded` | bounds Path ORAM stash failure for deployed parameters | trusted; named in Lean and not formalized, as the first row, and paired with the JACM Path ORAM stash theorem at `Z = 5` and pinned deployed parameters |
+| `stashOverflowBounded` | bounds Path ORAM stash failure for deployed parameters | trusted; named in Lean and not formalized, as the first row, and paired with the JACM Path ORAM stash theorem at `Z = 5` and pinned deployed parameters: a cap of 152 blocks, for at most `2^-60` over `2^48` node accesses of a map. For the private scheme it also assumes that operations which hold their nodes until they end keep the theorem's tail, which a simulation of ten million node accesses measures and does not prove |
 | Runtime key derivation | gives each object a storage key, an initial placement and Path ORAM leaf coins that are pseudo-random and independent of the other objects', which the two encryption assumptions and the leaf-coin model take as given | trusted, not modeled in Lean: a 256-bit master secret from the OS, HKDF-SHA256 (RFC 5869) with one label per use, and the ChaCha20 generator. `runtime_secrets_derive_from_the_master_secret` in `runtime_boundary_validation.json` pins the derivation's call sites, and `runtime/uo-evm/src/secret.rs` tests the RFC's first test vector |
 | Return-channel AEAD | hides a value returned under `encrypted_to_client` from the host. The theorems erase the payload's ciphertext and tag as a declared release, so what those bytes show of the value is in no Lean statement | trusted, not named in Lean: `ChaCha20Poly1305` under the session key, with the associated data and the nonce that `runtime/uo-evm/src/return_channel.rs` builds. The nonce is the first 96 bits of a hash of the runtime's freshness epoch, rollback counter and call counter, the session binding and the hash of the associated data, so two calls of a deployment seal under different nonces unless those 96 bits collide. That the session key is fresh and known to the client alone comes from the attested key exchange of the deployment, which the repository does not implement (the next row) |
 | TEE deployment assumptions | enclave memory confidentiality/integrity, attestation authenticity, rollback resistance, freshness, crash recovery discipline, patch-level trust | explicit Lean bundle `SgxDeploymentAssumptions`, paired with Intel SGX provenance and probe drift checks |
@@ -557,10 +560,12 @@ advantage by
   refuses to seal once the count is exhausted (`sealNonceRun_nodup` for a
   model of the counter; tested for the Rust code).
 - `ε_stash` is the probability that one access overflows the stash, which
-  `stashOverflowBounded` names: at most `14 · 0.6002^114 < 2^-80` at the
-  deployed parameters, by the cited theorem. `Q` counts primitive accesses,
-  not calls: a private-scheme write at 16,384 entries makes 77 node
-  accesses.
+  `stashOverflowBounded` names: at most `14 · 0.6002^152 < 2^-108` at the
+  deployed parameters, by the cited theorem, so `Q · ε_stash` is at most
+  `2^-60` for the `2^48` accesses the cap budgets for a map. `Q` counts
+  primitive accesses, not calls: a private-scheme write at 16,384 entries
+  makes 77 node accesses. An overflow is an error that drops the call: the
+  host learns that it happened, and the map loses nothing.
 
 None of the four terms is Lean-proved. The first two are trusted
 cryptographic assumptions, the third follows from the nonce's construction,

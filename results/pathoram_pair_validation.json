@@ -56,7 +56,7 @@
       "accepted": true,
       "access_counters_equal": true,
       "boundary_schedule_equal": true,
-      "certificate_json_bytes": 933860,
+      "certificate_json_bytes": 954803,
       "controller_shape_equal": true,
       "entrypoint": "transferFrom(address,address,address,uint256)",
       "lean_stdout": "validated proof-grade seeded path-ORAM pair certificate for transferFrom(address,address,address,uint256)",

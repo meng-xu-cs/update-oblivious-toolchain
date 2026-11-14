@@ -170,13 +170,13 @@
       "oram": {
         "aborted": false,
         "executable": true,
-        "gas_used": 13952,
+        "gas_used": 14097,
         "getters": [
           "7",
           "3",
           "1"
         ],
-        "physical_writes": 176,
+        "physical_writes": 178,
         "rejected": false,
         "return": "1"
       },

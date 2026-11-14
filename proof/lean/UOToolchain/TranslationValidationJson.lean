@@ -893,7 +893,7 @@ def translationPathOramPrivatePosmapScheme : String := "path_oram_private_posmap
 def translationPathOramLocalPosmapMaxCapacity : Nat := 128
 
 /-- The largest Path ORAM stash bound (`pathOramStashBoundLimit`). -/
-def translationPathOramStashBoundLimit : Nat := 114
+def translationPathOramStashBoundLimit : Nat := 152
 
 /-- A Path ORAM map's stash bound: its capacity, capped at the limit. -/
 def translationPathOramStashBound (capacity : Nat) : Nat :=

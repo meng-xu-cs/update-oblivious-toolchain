@@ -153,7 +153,10 @@ impl ReplayMap {
             leaf_count,
             blocks_per_bucket: BLOCKS_PER_BUCKET,
             avl_height,
-            stash_bound: capacity.clamp(1, 114 + tree_put_accesses(avl_height)),
+            stash_bound: capacity.clamp(
+                1,
+                uo_core::manifest::PATH_ORAM_STASH_BOUND_LIMIT + tree_put_accesses(avl_height),
+            ),
             key_type: uint_type(),
             value_type: uint_type(),
             key_width: 32,

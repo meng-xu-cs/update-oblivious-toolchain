@@ -49,6 +49,10 @@ fn report_mode(report: &str) -> &'static str {
         // Written by scripts/run_capacity_sweep_full.sh, not the validation
         // script.
         | "capacity_sweep_full"
+        | "stash_occupancy"
+        // Written by scripts/run_stash_occupancy_full.sh, not the validation
+        // script.
+        | "stash_occupancy_full"
         // Written by scripts/measure_tree_eviction_instructions.sh, not the probe.
         | "tree_eviction_instructions"
         // Written by scripts/measure_kernel_operator_instructions.sh, not the
@@ -102,6 +106,10 @@ const ADVISORY_FIELDS: &[&str] = &[
     // (Renamed from the misleading `coverage_complete`, which read like a
     // coverage failure.)
     "seed_space_fully_enumerated",
+    // A cell of the stash-occupancy report says whether its run overflowed
+    // the stash. False is what a run should say. A run that overflows makes
+    // the report's `no_run_overflowed` check false, which is not advisory.
+    "overflowed",
 ];
 
 /// ORAM-intrinsic physical-trace fields. These only exist for the ORAM route
@@ -532,6 +540,38 @@ mod tests {
         assert_eq!(report["accepted"], json!(false));
         assert_eq!(report["required_failures"].as_array().unwrap().len(), 1);
         assert_eq!(report["class_counts"]["expected_negative"], json!(1));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// A stash-occupancy cell that did not overflow is not a failure, and
+    /// a report whose overflow check is false is one.
+    #[test]
+    fn stash_overflow_flag_is_advisory_and_its_check_is_not() {
+        let dir = temp_results_dir("stash");
+        write(
+            &dir,
+            "stash_occupancy_full.json",
+            json!({
+                "accepted": true,
+                "checks": {"no_run_overflowed": true},
+                "cells": [{"capacity": 256, "overflowed": false}]
+            }),
+        );
+        let report = run_acceptance_check_report(dir.to_str().unwrap()).unwrap();
+        assert_eq!(report["accepted"], json!(true));
+        assert!(run_acceptance_check_fail_closed(dir.to_str().unwrap()).is_ok());
+        write(
+            &dir,
+            "stash_occupancy_full.json",
+            json!({
+                "accepted": false,
+                "checks": {"no_run_overflowed": false},
+                "cells": [{"capacity": 256, "overflowed": true}]
+            }),
+        );
+        let report = run_acceptance_check_report(dir.to_str().unwrap()).unwrap();
+        assert_eq!(report["accepted"], json!(false));
+        assert!(run_acceptance_check_fail_closed(dir.to_str().unwrap()).is_err());
         let _ = fs::remove_dir_all(&dir);
     }
 

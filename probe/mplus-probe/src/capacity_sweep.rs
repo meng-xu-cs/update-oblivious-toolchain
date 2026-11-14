@@ -747,7 +747,7 @@ fn mean_statistic(samples: &[u128]) -> f64 {
 }
 
 /// The compiled sweep contract with its map on `backend` at `capacity`.
-fn sweep_map_artifact(
+pub(crate) fn sweep_map_artifact(
     capacity: usize,
     backend: &str,
     scheme: Option<&str>,

@@ -70,9 +70,10 @@ def pathOramBlocksPerBucket : Nat := 5
 
 /-- The largest Path ORAM stash bound. By the Path ORAM stash theorem, with
 `pathOramBlocksPerBucket = 5` blocks per bucket the stash exceeds `R` blocks
-after an access with probability at most `14 · 0.6002 ^ R`, below `2 ^ -80`
-from `R = 114`; `stashOverflowBounded` assumes this bound. -/
-def pathOramStashBoundLimit : Nat := 114
+after an access with probability at most `14 · 0.6002 ^ R`, below `2 ^ -108`
+at `R = 152`: at most `2 ^ -60` over the `2 ^ 48` node accesses budgeted for
+the lifetime of a map. `stashOverflowBounded` assumes this bound. -/
+def pathOramStashBoundLimit : Nat := 152
 
 /-- A Path ORAM map's stash bound: its capacity, capped at the limit. A map no
 larger than the limit cannot overflow its stash. -/

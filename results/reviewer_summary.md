@@ -4,75 +4,75 @@
 
 | Report | Milliseconds |
 | --- | ---: |
-| `total_probe_ms` | `2067969` |
-| `tamper_validation` | `895309` |
-| `canonical_pathoram_pair_validation` | `191486` |
-| `overheads` | `163558` |
-| `trace_equivalence` | `83638` |
-| `runtime_implementation_kernel_meeting_confinement_boundary_validation` | `79739` |
-| `fresh_coin_validation` | `76694` |
-| `leakage_auc` | `66824` |
-| `mutual_information` | `65119` |
-| `runtime_implementation_kernel_machine_confinement_boundary_validation` | `42714` |
-| `runtime_implementation_confinement_boundary_validation` | `41998` |
-| `runtime_implementation_shared_kernel_machine_refinement_boundary_validation` | `39974` |
-| `runtime_implementation_kernel_meeting_boundary_validation` | `39852` |
-| `runtime_implementation_shared_kernel_refinement_boundary_validation` | `39835` |
-| `runtime_implementation_small_confidential_kernel_machine_refinement_boundary_validation` | `38637` |
-| `runtime_implementation_public_bridge_observer_refinement_boundary_validation` | `27214` |
-| `runtime_implementation_residual_helper_shell_machine_refinement_boundary_validation` | `25605` |
-| `pathoram_pair_validation` | `10996` |
-| `seeded_witness_validation` | `8005` |
-| `kernel_model_alignment_validation` | `7154` |
-| `runtime_implementation_confidential_statement_trace_bridge_refinement_boundary_validation` | `4240` |
-| `runtime_implementation_slot_adapter_machine_refinement_boundary_validation` | `3839` |
-| `runtime_implementation_interface_validation` | `3171` |
-| `runtime_shared_confidential_kernel_boundary_validation` | `3113` |
-| `confidential_core_shell_boundary_slot_validation` | `2986` |
-| `confidential_proof_family_slot_boundary_validation` | `2961` |
-| `runtime_small_confidential_kernel_boundary_validation` | `2899` |
-| `confidential_proof_family_boundary_validation` | `2882` |
-| `confidential_proof_family_assurance_validation` | `2869` |
-| `confidential_proof_family_slot_assurance_validation` | `2858` |
-| `confidential_proof_family_kernel_interface_validation` | `2852` |
-| `confidential_core_kernel_interface_slot_validation` | `2810` |
-| `confidential_core_lowering_validation` | `2781` |
-| `confidential_proof_family_validation` | `2780` |
-| `confidential_core_slot_validation` | `2779` |
-| `runtime_kernel_machine_finish_boundary_validation` | `2706` |
-| `confidential_core_validation` | `2703` |
-| `kernel_dsl_validation` | `2700` |
-| `confidential_proof_family_refinement_boundary_validation` | `2697` |
-| `confidential_proof_family_finish_slot_boundary_validation` | `2692` |
-| `shell_boundary_slot_validation` | `2670` |
-| `confidential_core_kernel_interface_slot_finish_boundary_validation` | `2663` |
-| `kernel_slot_boundary_validation` | `2650` |
-| `controller_observer_validation` | `2646` |
-| `runtime_kernel_machine_finish_witness_validation` | `2645` |
-| `kernel_refinement_validation` | `2632` |
-| `confidential_core_shell_boundary_lowering_validation` | `2629` |
-| `kernel_lowering_validation` | `2624` |
-| `trusted_kernel_validation` | `2619` |
-| `confidential_core_kernel_finish_slot_validation` | `2592` |
-| `shell_boundary_validation` | `2592` |
-| `shell_boundary_lowering_validation` | `2589` |
-| `kernel_slot_dsl_validation` | `2567` |
-| `static_checks` | `2510` |
-| `correctness` | `2489` |
-| `kernel_validation` | `2463` |
-| `pathoram_hidden_validation` | `2202` |
-| `kernel_interface_confinement_boundary_validation` | `2197` |
-| `kernel_interface_singleton_boundary_validation` | `2148` |
-| `witness_validation` | `2068` |
-| `kernel_interface_validation` | `2060` |
-| `kernel_confinement_boundary_validation` | `2051` |
-| `runtime_residual_helper_shell_boundary_validation` | `1970` |
-| `kernel_finish_boundary_validation` | `1955` |
-| `kernel_refinement_boundary_validation` | `1902` |
-| `runtime_boundary_validation` | `1440` |
-| `runtime_confidential_statement_trace_bridge_boundary_validation` | `899` |
-| `runtime_public_bridge_boundary_validation` | `894` |
-| `runtime_slot_adapter_boundary_validation` | `666` |
+| `total_probe_ms` | `2157129` |
+| `tamper_validation` | `918790` |
+| `canonical_pathoram_pair_validation` | `214441` |
+| `overheads` | `171648` |
+| `trace_equivalence` | `95225` |
+| `runtime_implementation_kernel_meeting_confinement_boundary_validation` | `79667` |
+| `mutual_information` | `76485` |
+| `leakage_auc` | `74330` |
+| `fresh_coin_validation` | `73783` |
+| `runtime_implementation_confinement_boundary_validation` | `43403` |
+| `runtime_implementation_kernel_machine_confinement_boundary_validation` | `42222` |
+| `runtime_implementation_shared_kernel_refinement_boundary_validation` | `41657` |
+| `runtime_implementation_shared_kernel_machine_refinement_boundary_validation` | `41151` |
+| `runtime_implementation_kernel_meeting_boundary_validation` | `40301` |
+| `runtime_implementation_small_confidential_kernel_machine_refinement_boundary_validation` | `38444` |
+| `runtime_implementation_public_bridge_observer_refinement_boundary_validation` | `26964` |
+| `runtime_implementation_residual_helper_shell_machine_refinement_boundary_validation` | `25335` |
+| `pathoram_pair_validation` | `10852` |
+| `seeded_witness_validation` | `8013` |
+| `kernel_model_alignment_validation` | `7550` |
+| `runtime_implementation_confidential_statement_trace_bridge_refinement_boundary_validation` | `4020` |
+| `runtime_implementation_slot_adapter_machine_refinement_boundary_validation` | `3523` |
+| `runtime_implementation_interface_validation` | `3149` |
+| `confidential_proof_family_finish_slot_boundary_validation` | `3141` |
+| `confidential_proof_family_assurance_validation` | `3064` |
+| `confidential_proof_family_slot_assurance_validation` | `3023` |
+| `runtime_small_confidential_kernel_boundary_validation` | `3006` |
+| `confidential_proof_family_validation` | `3002` |
+| `confidential_proof_family_refinement_boundary_validation` | `2997` |
+| `confidential_proof_family_kernel_interface_validation` | `2939` |
+| `confidential_core_lowering_validation` | `2936` |
+| `confidential_core_validation` | `2920` |
+| `runtime_shared_confidential_kernel_boundary_validation` | `2903` |
+| `confidential_proof_family_boundary_validation` | `2874` |
+| `confidential_proof_family_slot_boundary_validation` | `2851` |
+| `confidential_core_slot_validation` | `2841` |
+| `confidential_core_kernel_interface_slot_finish_boundary_validation` | `2831` |
+| `shell_boundary_validation` | `2802` |
+| `confidential_core_kernel_interface_slot_validation` | `2800` |
+| `confidential_core_shell_boundary_slot_validation` | `2791` |
+| `runtime_kernel_machine_finish_boundary_validation` | `2787` |
+| `shell_boundary_slot_validation` | `2783` |
+| `kernel_slot_dsl_validation` | `2776` |
+| `kernel_slot_boundary_validation` | `2761` |
+| `trusted_kernel_validation` | `2760` |
+| `controller_observer_validation` | `2744` |
+| `confidential_core_shell_boundary_lowering_validation` | `2710` |
+| `kernel_refinement_validation` | `2710` |
+| `shell_boundary_lowering_validation` | `2705` |
+| `kernel_lowering_validation` | `2699` |
+| `runtime_kernel_machine_finish_witness_validation` | `2694` |
+| `confidential_core_kernel_finish_slot_validation` | `2677` |
+| `kernel_dsl_validation` | `2674` |
+| `correctness` | `2664` |
+| `static_checks` | `2660` |
+| `kernel_validation` | `2656` |
+| `kernel_interface_confinement_boundary_validation` | `2367` |
+| `witness_validation` | `2195` |
+| `kernel_refinement_boundary_validation` | `2177` |
+| `kernel_interface_validation` | `2130` |
+| `kernel_interface_singleton_boundary_validation` | `2125` |
+| `kernel_confinement_boundary_validation` | `2081` |
+| `pathoram_hidden_validation` | `2078` |
+| `kernel_finish_boundary_validation` | `2029` |
+| `runtime_residual_helper_shell_boundary_validation` | `1962` |
+| `runtime_boundary_validation` | `1519` |
+| `runtime_public_bridge_boundary_validation` | `794` |
+| `runtime_slot_adapter_boundary_validation` | `634` |
+| `runtime_confidential_statement_trace_bridge_boundary_validation` | `619` |
 | `confidential_fragment_validation` | `0` |
 | `paper_main_family_boundary_validation` | `0` |
 | `paper_main_slot_boundary_validation` | `0` |
@@ -82,25 +82,25 @@
 | Report Field | Bytes |
 | --- | ---: |
 | `fresh_coin_validation.scenarios[1].witness_family_json_bytes` | `64274811` |
-| `overheads.cases[4].oram_private_posmap_16384.trace_json_bytes` | `7760822` |
-| `overheads.cases[4].variants[5].trace_json_bytes` | `7760822` |
-| `overheads.matrix[19].trace_json_bytes` | `7760822` |
+| `overheads.cases[4].oram_private_posmap_16384.trace_json_bytes` | `8606366` |
+| `overheads.cases[4].variants[5].trace_json_bytes` | `8606366` |
+| `overheads.matrix[19].trace_json_bytes` | `8606366` |
+| `overheads.cases[4].oram_private_posmap_4096.trace_json_bytes` | `5786348` |
+| `overheads.cases[4].variants[4].trace_json_bytes` | `5786348` |
+| `overheads.matrix[18].trace_json_bytes` | `5786348` |
 | `canonical_pathoram_pair_validation.scenarios[0].certificate_json_bytes` | `5252718` |
-| `tamper_validation.scenarios[409].artifact_json_bytes` | `5252718` |
 | `tamper_validation.scenarios[410].artifact_json_bytes` | `5252718` |
-| `overheads.cases[4].oram_private_posmap_4096.trace_json_bytes` | `5070524` |
-| `overheads.cases[4].variants[4].trace_json_bytes` | `5070524` |
-| `overheads.matrix[18].trace_json_bytes` | `5070524` |
-| `canonical_pathoram_pair_validation.scenarios[4].theorem_input_json_bytes` | `4132372` |
-| `tamper_validation.scenarios[412].artifact_json_bytes` | `4132372` |
-| `overheads.cases[4].oram_private_posmap.trace_json_bytes` | `2849856` |
-| `overheads.cases[4].variants[3].trace_json_bytes` | `2849856` |
-| `overheads.matrix[17].trace_json_bytes` | `2849856` |
+| `tamper_validation.scenarios[411].artifact_json_bytes` | `5252718` |
+| `canonical_pathoram_pair_validation.scenarios[4].theorem_input_json_bytes` | `4881412` |
+| `tamper_validation.scenarios[413].artifact_json_bytes` | `4881412` |
+| `overheads.cases[4].oram_private_posmap.trace_json_bytes` | `3349480` |
+| `overheads.cases[4].variants[3].trace_json_bytes` | `3349480` |
+| `overheads.matrix[17].trace_json_bytes` | `3349480` |
 | `fresh_coin_validation.scenarios[0].witness_family_json_bytes` | `2623334` |
-| `tamper_validation.scenarios[406].artifact_json_bytes` | `2623334` |
-| `runtime_implementation_kernel_meeting_boundary_validation.scenarios[15].boundary_json_bytes` | `1727963` |
-| `runtime_implementation_kernel_meeting_confinement_boundary_validation.scenarios[15].boundary_json_bytes` | `1727963` |
-| `runtime_implementation_confinement_boundary_validation.scenarios[15].boundary_json_bytes` | `1722538` |
+| `tamper_validation.scenarios[407].artifact_json_bytes` | `2623334` |
+| `runtime_implementation_kernel_meeting_boundary_validation.scenarios[15].boundary_json_bytes` | `1730690` |
+| `runtime_implementation_kernel_meeting_confinement_boundary_validation.scenarios[15].boundary_json_bytes` | `1730690` |
+| `runtime_implementation_confinement_boundary_validation.scenarios[15].boundary_json_bytes` | `1725265` |
 
 ## Largest Estimated Artifacts
 
@@ -109,10 +109,10 @@
 | `canonical_pathoram_pair_validation.scenarios[4].estimated_certificate_json_bytes` | `18446744073709551615` |
 | `canonical_pathoram_pair_validation.scenarios[4].lhs_estimate.estimated_family_json_bytes` | `18446744073709551615` |
 | `canonical_pathoram_pair_validation.scenarios[4].rhs_estimate.estimated_family_json_bytes` | `18446744073709551615` |
-| `canonical_pathoram_pair_validation.scenarios[3].estimated_certificate_json_bytes` | `3746783783742865408` |
-| `canonical_pathoram_pair_validation.scenarios[3].lhs_estimate.estimated_family_json_bytes` | `1873391891870908416` |
-| `canonical_pathoram_pair_validation.scenarios[3].rhs_estimate.estimated_family_json_bytes` | `1873391891870908416` |
-| `fresh_coin_validation.scenarios[3].size_estimate.estimated_family_json_bytes` | `1873391891870908416` |
+| `canonical_pathoram_pair_validation.scenarios[3].estimated_certificate_json_bytes` | `3828868923826110464` |
+| `canonical_pathoram_pair_validation.scenarios[3].lhs_estimate.estimated_family_json_bytes` | `1914434461912530944` |
+| `canonical_pathoram_pair_validation.scenarios[3].rhs_estimate.estimated_family_json_bytes` | `1914434461912530944` |
+| `fresh_coin_validation.scenarios[3].size_estimate.estimated_family_json_bytes` | `1914434461912530944` |
 | `canonical_pathoram_pair_validation.scenarios[2].estimated_certificate_json_bytes` | `17542152192` |
 | `canonical_pathoram_pair_validation.scenarios[2].lhs_estimate.estimated_family_json_bytes` | `8770551808` |
 | `canonical_pathoram_pair_validation.scenarios[2].rhs_estimate.estimated_family_json_bytes` | `8770551808` |
@@ -132,12 +132,12 @@
 | `SingleAccessMap/pathoram/put-fresh-coins` | `accepted` | `2623334` | `2623334` | `true` |
 | `SingleAccessMap/pathoram/add-fresh-coins` | `accepted` | `64274811` | `64274811` | `true` |
 | `ConfidentialMixer/pathoram/deposit-fresh-coins` | `accepted_compact_theorem_input` | `8770551808` | `33880` | `true` |
-| `ERC20Lite/pathoram/transferFrom-fresh-coins` | `accepted_compact_theorem_input` | `1873391891870908416` | `107413` | `true` |
+| `ERC20Lite/pathoram/transferFrom-fresh-coins` | `accepted_compact_theorem_input` | `1914434461912530944` | `109746` | `true` |
 | `SingleAccessMap/pathoram/put-canonical-pair` | `accepted` | `5252718` | `5252718` | `true` |
 | `SingleAccessMap/pathoram/add-canonical-pair` | `accepted_compact_theorem_input` | `131637248` | `42128` | `true` |
 | `ConfidentialMixer/pathoram/deposit-canonical-pair` | `accepted_compact_theorem_input` | `17542152192` | `91102` | `true` |
-| `ERC20Lite/pathoram/transferFrom-canonical-pair` | `accepted_compact_theorem_input` | `3746783783742865408` | `295628` | `true` |
-| `ERC20Lite/oram_private_posmap/transferFrom-canonical-pair` | `accepted_compact_theorem_input` | `18446744073709551615` | `4132372` | `true` |
+| `ERC20Lite/pathoram/transferFrom-canonical-pair` | `accepted_compact_theorem_input` | `3828868923826110464` | `302573` | `true` |
+| `ERC20Lite/oram_private_posmap/transferFrom-canonical-pair` | `accepted_compact_theorem_input` | `18446744073709551615` | `4881412` | `true` |
 
 ## Runtime Overheads
 
@@ -151,18 +151,18 @@
 | `ConfidentialMixer/deposit` | `full_scan` | `8` | `2632` | `9` | `9` | `832` | `832` | `13651` | `18600` | `9` |
 | `ConfidentialMixer/deposit` | `full_scan_64` | `64` | `5880` | `65` | `65` | `6208` | `6208` | `13668` | `18608` | `65` |
 | `ConfidentialMixer/deposit` | `full_scan+oram` | `64` | `5445` | `49` | `49` | `29440` | `29440` | `70102` | `18876` | `49` |
-| `ConfidentialMixer/deposit` | `oram_private_posmap` | `256` | `81077` | `491` | `491` | `314784` | `314784` | `1397053` | `18904` | `1351` |
+| `ConfidentialMixer/deposit` | `oram_private_posmap` | `256` | `94272` | `501` | `501` | `324704` | `324704` | `1644543` | `18904` | `1576` |
 | `ConfidentialMixer/withdraw` | `raw` | `8` | `rejected` | `rejected` | `rejected` | `rejected` | `rejected` | `rejected` | `7622` | `9` |
 | `ConfidentialMixer/withdraw` | `full_scan` | `8` | `2689` | `9` | `9` | `832` | `832` | `13724` | `18600` | `9` |
 | `ConfidentialMixer/withdraw` | `full_scan_64` | `64` | `5937` | `65` | `65` | `6208` | `6208` | `13741` | `18608` | `65` |
 | `ConfidentialMixer/withdraw` | `full_scan+oram` | `64` | `5502` | `49` | `49` | `29440` | `29440` | `70145` | `18876` | `49` |
-| `ConfidentialMixer/withdraw` | `oram_private_posmap` | `256` | `81134` | `491` | `491` | `314784` | `314784` | `1397005` | `18904` | `1351` |
+| `ConfidentialMixer/withdraw` | `oram_private_posmap` | `256` | `94329` | `501` | `501` | `324704` | `324704` | `1644495` | `18904` | `1576` |
 | `ERC20Lite/transferFrom` | `raw` | `8+16` | `rejected` | `rejected` | `rejected` | `rejected` | `rejected` | `rejected` | `10797` | `24` |
 | `ERC20Lite/transferFrom` | `full_scan` | `8+16` | `3715` | `24` | `24` | `2304` | `2304` | `17577` | `30262` | `24` |
-| `ERC20Lite/transferFrom` | `oram` | `64+128` | `13952` | `176` | `176` | `102272` | `102272` | `218194` | `30806` | `176` |
-| `ERC20Lite/transferFrom` | `oram_private_posmap` | `128+256` | `165100` | `1060` | `1060` | `621376` | `621376` | `2849856` | `30834` | `2780` |
-| `ERC20Lite/transferFrom` | `oram_private_posmap_4096` | `128+4096` | `279998` | `1988` | `1988` | `1166144` | `1166144` | `5070524` | `30651` | `4760` |
-| `ERC20Lite/transferFrom` | `oram_private_posmap_16384` | `128+16384` | `356935` | `2636` | `2636` | `1548224` | `1548224` | `7760822` | `30654` | `6086` |
+| `ERC20Lite/transferFrom` | `oram` | `64+128` | `14097` | `178` | `178` | `103680` | `103680` | `222848` | `30806` | `178` |
+| `ERC20Lite/transferFrom` | `oram_private_posmap` | `128+256` | `191490` | `1082` | `1082` | `640704` | `640704` | `3349480` | `30834` | `3232` |
+| `ERC20Lite/transferFrom` | `oram_private_posmap_4096` | `128+4096` | `317988` | `2010` | `2010` | `1185472` | `1185472` | `5786348` | `30651` | `5412` |
+| `ERC20Lite/transferFrom` | `oram_private_posmap_16384` | `128+16384` | `401885` | `2658` | `2658` | `1567552` | `1567552` | `8606366` | `30654` | `6858` |
 | `RegistryCRUD/clearIfMatch` | `raw` | `8` | `rejected` | `rejected` | `rejected` | `rejected` | `rejected` | `rejected` | `5638` | `8` |
 | `RegistryCRUD/clearIfMatch` | `full_scan` | `8` | `2624` | `8` | `8` | `768` | `768` | `11722` | `13885` | `8` |
 
@@ -172,7 +172,7 @@
 | --- | ---: |
 | Trusted Rust runtime surface | `14387` |
 | Outer runtime risk surface | `3971` |
-| Lean theorem/checker repo surface | `126730` |
+| Lean theorem/checker repo surface | `126765` |
 
 ## Current TCB Table
 
@@ -192,7 +192,7 @@
 | --- | --- | --- |
 | `bucketEncryptionINDCPA` | hides bucket/path ciphertext contents for the concrete local-posmap backend | named Lean assumption in PathOramLocalPosmapV1SecurityAssumptions, not formalized: a Prop field that no proof uses and the checkers fill with True; W5.4 pairs the IND-CPA assumption with the runtime crypto provenance record (RFC 8439 ChaCha20-Poly1305, Procter 2014 IACR ePrint composition analysis) and the static-drift check `runtime_crypto_primitive_identity_pinned` pinning the Rust crypto surface |
 | `metadataEncryptionINDCPA` | hides encrypted position-map metadata pages | named Lean assumption in PathOramLocalPosmapV1SecurityAssumptions, not formalized: a Prop field that no proof uses and the checkers fill with True; W5.4 pairs the IND-CPA assumption with the runtime crypto provenance record (RFC 8439 ChaCha20-Poly1305, Procter 2014 IACR ePrint composition analysis) and the static-drift check `runtime_crypto_primitive_identity_pinned` pinning the Rust crypto surface |
-| `stashOverflowBounded` | bounds stash-overflow failure for the deployed parameters | named Lean assumption in PathOramLocalPosmapV1SecurityAssumptions, not formalized: a Prop field that no proof uses and the checkers fill with True; W5.3 pairs the assumption with the runtime stash-overflow provenance record (Stefanov et al. JACM 2018 Theorem 5.1 at Z = 5; CCS 2013 fallback) and the static-drift check `path_oram_deployed_stash_parameters_pinned` pinning the deployed Z = 5 / stash_bound = min(max(capacity, 1), 114) parameters in crates/uo-core/src/manifest.rs |
+| `stashOverflowBounded` | bounds stash-overflow failure for the deployed parameters | named Lean assumption in PathOramLocalPosmapV1SecurityAssumptions, not formalized: a Prop field that no proof uses and the checkers fill with True; W5.3 pairs the assumption with the runtime stash-overflow provenance record (Stefanov et al. JACM 2018 Theorem 5.1 at Z = 5; CCS 2013 fallback) and the static-drift check `path_oram_deployed_stash_parameters_pinned` pinning the deployed Z = 5 / stash_bound = min(max(capacity, 1), 152) parameters in crates/uo-core/src/manifest.rs |
 | `PaperMainRuntimeKernelBoundary / PaperMainRuntimeKernelSlotBoundary` | records the exact runtime-side paper boundary: one valid explicit runtime kernel-interface bundle per witness, and in the stronger slot route one fixed confidential slot program whose expected kernel steps match that bundle exactly | explicit Lean boundaries in PaperPathOramTheoremRoute.lean; they project mechanically to the native RuntimeProofGradeKernelInterface theorem, RuntimeKernelConfinementBoundary, and valid native shell-boundary bundles, while the WP3/WP6 source-backed runtime implementation and hostile-host closure routes discharge the real-runtime proof/interface boundary for the chosen paper surface |
 | `TEE deployment assumptions` | enclave memory confidentiality/integrity, attestation authenticity, rollback resistance, freshness guarantee, crash recovery discipline, and patch-level trust | explicit Lean assumption bundle `SgxDeploymentAssumptions` in `proof/lean/UOToolchain/SgxObserverFreeze.lean` carrying six `Prop` fields (`attestationAuthenticity`, `enclaveMemoryIsolation`, `rollbackResistance`, `freshnessGuarantee`, `crashRecoveryDiscipline`, `patchLevelTrust`); W6.5 pairs each field with an `SgxDeploymentAssumptionProvenance` record citing an Intel SGX specification; F17 adds `sgxDeploymentAssumptionMechanismMatrix` and `sgxDeploymentFirstMilestoneChecklist` in `RuntimeAuditSurfaces.lean`, so every assumption is mapped to implementation evidence, external/deployment-only evidence, or removal from the implemented claim; the encrypted return-channel milestone is mapped to runtime AEAD/session evidence plus a Lean no-plaintext-declassification policy theorem; static-drift checks `sgx_deployment_assumption_bundle_pinned`, `sgx_deployment_assumption_mechanism_matrix_pinned`, and `return_channel_crypto_evidence_pinned` pin the surface |
 
@@ -234,7 +234,7 @@ Every named static-drift check the probe runs at every gated validation slice. T
 | `sgx_deployment_assumption_mechanism_matrix_pinned` | `F17` | the SGX deployment assumption-to-mechanism matrix and first milestone checklist for attestation transcript, sealed storage/freshness, rollback counter, and encrypted return-channel evidence | `kernel_model_alignment_validation.sgx_deployment_assumption_mechanism_matrix_pinned` |
 | `return_channel_crypto_evidence_pinned` | `F17` | `encrypted_to_client` returns are admitted only for confidential entrypoints and produce ciphertext-only public outcomes with session binding, nonce/AAD evidence, and a Lean no-plaintext-declassification theorem | `kernel_model_alignment_validation.return_channel_crypto_evidence_pinned` |
 | `runtime_crypto_primitive_identity_pinned` | `W5.4` | the `chacha20poly1305` AEAD primitive and the `tiny_keccak::Keccak::v256()` hash primitive (with the workspace `Cargo.toml` versions) in the runtime crypto surface | `kernel_model_alignment_validation.runtime_crypto_primitive_identity_pinned` |
-| `path_oram_deployed_stash_parameters_pinned` | `W5.3` | the deployed Path-ORAM `Z = 5` / `stash_bound = min(max(capacity, 1), 114)` parameters in `crates/uo-core/src/manifest.rs` | `kernel_model_alignment_validation.path_oram_deployed_stash_parameters_pinned` |
+| `path_oram_deployed_stash_parameters_pinned` | `W5.3` | the deployed Path-ORAM `Z = 5` / `stash_bound = min(max(capacity, 1), 152)` parameters in `crates/uo-core/src/manifest.rs` | `kernel_model_alignment_validation.path_oram_deployed_stash_parameters_pinned` |
 
 ## Benchmark Overhead
 
@@ -247,16 +247,16 @@ Executable overhead rows for every benchmark backend. `gas_used` is a modeled re
 | `ConfidentialMixer/deposit` | `full_scan` | `2632` |
 | `ConfidentialMixer/deposit` | `full_scan_64` | `5880` |
 | `ConfidentialMixer/deposit` | `full_scan+oram` | `5445` |
-| `ConfidentialMixer/deposit` | `oram_private_posmap` | `81077` |
+| `ConfidentialMixer/deposit` | `oram_private_posmap` | `94272` |
 | `ConfidentialMixer/withdraw` | `full_scan` | `2689` |
 | `ConfidentialMixer/withdraw` | `full_scan_64` | `5937` |
 | `ConfidentialMixer/withdraw` | `full_scan+oram` | `5502` |
-| `ConfidentialMixer/withdraw` | `oram_private_posmap` | `81134` |
+| `ConfidentialMixer/withdraw` | `oram_private_posmap` | `94329` |
 | `ERC20Lite/transferFrom` | `full_scan` | `3715` |
-| `ERC20Lite/transferFrom` | `oram` | `13952` |
-| `ERC20Lite/transferFrom` | `oram_private_posmap` | `165100` |
-| `ERC20Lite/transferFrom` | `oram_private_posmap_4096` | `279998` |
-| `ERC20Lite/transferFrom` | `oram_private_posmap_16384` | `356935` |
+| `ERC20Lite/transferFrom` | `oram` | `14097` |
+| `ERC20Lite/transferFrom` | `oram_private_posmap` | `191490` |
+| `ERC20Lite/transferFrom` | `oram_private_posmap_4096` | `317988` |
+| `ERC20Lite/transferFrom` | `oram_private_posmap_16384` | `401885` |
 | `RegistryCRUD/clearIfMatch` | `full_scan` | `2624` |
 
 ## Rejected Backends

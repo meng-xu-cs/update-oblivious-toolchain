@@ -4731,7 +4731,7 @@
       "controller_phase_count": 33,
       "entrypoint": "transferFrom(address,address,address,uint256)",
       "exit_events": 40,
-      "gas_used": 13952,
+      "gas_used": 14097,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 9,
         "expected_kernel_step_public_object_schedule": [
@@ -4832,7 +4832,7 @@
           "io_scratch": {
             "live_bytes": 0,
             "peak_bytes": 648,
-            "wipe_count": 270
+            "wipe_count": 273
           },
           "peak_stack_words": 7,
           "value_scratch": {
@@ -4857,7 +4857,7 @@
         "hash_scratch_peak_bytes": 20,
         "hash_scratch_wipe_count": 3,
         "io_scratch_peak_bytes": 648,
-        "io_scratch_wipe_count": 270,
+        "io_scratch_wipe_count": 273,
         "kernel_op_count": 9,
         "kernel_step_public_object_schedule": [
           2,
@@ -4873,7 +4873,7 @@
           1,
           2
         ],
-        "resource_event_count": 560,
+        "resource_event_count": 566,
         "resource_events": [
           {
             "bytes": 8,
@@ -4925,7 +4925,7 @@
                 "words": null
               }
             ],
-            "repeat": 31
+            "repeat": 32
           },
           {
             "bytes": null,
@@ -5000,7 +5000,7 @@
                 "words": null
               }
             ],
-            "repeat": 31
+            "repeat": 32
           },
           {
             "bytes": 8,
@@ -5289,7 +5289,7 @@
                 "words": null
               }
             ],
-            "repeat": 31
+            "repeat": 32
           },
           {
             "bytes": null,
@@ -5352,7 +5352,7 @@
       "lean_checker_input": "kernel-interface bundle",
       "lean_checker_kind": "kernel interface",
       "lean_stdout": "validated proof-grade runtime kernel-interface bundle for transferFrom(address,address,address,uint256)",
-      "page_trace_events": 660,
+      "page_trace_events": 690,
       "runtime_kernel_refinement_witness": {
         "boundary_cold_object_schedules_complete": true,
         "canonical_loaded_object_schedule": [
@@ -5423,8 +5423,8 @@
       },
       "scenario": "ERC20Lite/pathoram/transferFrom",
       "setup_calls": 2,
-      "shared_resource_events": 693,
-      "witness_json_bytes": 106538
+      "shared_resource_events": 723,
+      "witness_json_bytes": 108871
     }
   ]
 }

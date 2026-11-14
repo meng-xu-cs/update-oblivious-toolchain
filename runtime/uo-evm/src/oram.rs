@@ -28,6 +28,10 @@ mod generated_oram_codecs;
 #[path = "avl_map_replay.rs"]
 pub(crate) mod avl_map_replay;
 
+#[cfg(feature = "diagnostics")]
+#[path = "stash_occupancy.rs"]
+pub(crate) mod stash_occupancy;
+
 use generated_object_helpers::{
     decode_oram_directory_page_into_slice, decode_scalar_value, encode_oram_directory_page_into,
     filler_boxed_oram_payload, fixed_scalar_width, reseal_oram_payload_and_record_write,
@@ -1347,8 +1351,12 @@ mod tests {
         assert_eq!(state.storage.access_counter_slot.as_ptr(), counter_ptr);
     }
 
+    /// A stash that holds more blocks than its bound is an overflow. The
+    /// access stops with an error and commits nothing, so the caller drops
+    /// the call and the committed map keeps every block: an overflow is not
+    /// reported in band, where the call would abort and keep the access.
     #[test]
-    fn path_oram_get_reports_working_stash_overflow_in_band() {
+    fn path_oram_get_fails_on_a_stash_overflow() {
         let spec = path_oram_spec();
         let mut rng = ChaCha20Rng::seed_from_u64(0x5010);
         let mut state = OramState::instantiate(&spec, &mut rng).unwrap();
@@ -1371,7 +1379,7 @@ mod tests {
 
         let mut allocator = allocator_for_path_oram(&state.parameters);
         let mut leaf_coins = PathOramLeafCoinSource::random();
-        let (value, _transcript, overflowed) = state
+        let error = state
             .get(
                 &spec,
                 &Value::Address([0xEE; 20]),
@@ -1379,11 +1387,12 @@ mod tests {
                 &mut leaf_coins,
                 &mut rng,
             )
-            .unwrap();
-        allocator.finish().unwrap();
-
-        assert_eq!(value, Value::uint(0));
-        assert!(overflowed);
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.contains("a Path ORAM stash overflowed its bound"),
+            "{error}"
+        );
     }
 
     /// A sealed record of a map's storage is shared by the states that
@@ -2306,7 +2315,11 @@ mod tests {
 
         /// The Path ORAM stash bound plus the nodes an operation returns.
         fn default_stash_bound(capacity: usize) -> usize {
-            capacity.clamp(1, 114 + tree_put_accesses(tree_avl_height(capacity)))
+            capacity.clamp(
+                1,
+                uo_core::manifest::PATH_ORAM_STASH_BOUND_LIMIT
+                    + tree_put_accesses(tree_avl_height(capacity)),
+            )
         }
 
         fn fixture(capacity: usize, seed: u64, stash_bound: usize) -> Fixture {
@@ -2489,7 +2502,7 @@ mod tests {
             seed: u64,
             operations: usize,
             stash_bound: usize,
-            failure_allowed: bool,
+            overflow_allowed: bool,
         ) -> bool {
             let mut fixture = fixture(capacity, seed, stash_bound);
             let mut expected = BTreeMap::new();
@@ -2500,18 +2513,18 @@ mod tests {
                 let key = address(fixture.rng.gen_range(1..=key_space));
                 let roll: f64 = fixture.rng.gen();
                 if roll < 0.3 {
-                    let (value, found, failed) = tree_get(
+                    let got = tree_get(
                         &fixture.shape,
                         &mut fixture.store,
                         &mut fixture.stash,
                         &mut fixture.header,
                         &key,
-                    )
-                    .unwrap();
-                    if failed {
-                        assert!(failure_allowed, "a get failed");
+                    );
+                    let Some((value, found, failed)) = unless_overflow(got, overflow_allowed)
+                    else {
                         return true;
-                    }
+                    };
+                    assert!(!failed, "a get found the stored tree wrong");
                     let want = expected
                         .get(&key_bytes(&key))
                         .cloned()
@@ -2526,7 +2539,7 @@ mod tests {
                         Value::uint(fixture.rng.gen_range(1..1000u64))
                     };
                     let apply = fixture.rng.gen::<f64>() < 0.9;
-                    let (overflow, failed) = tree_put(
+                    let put = tree_put(
                         &fixture.shape,
                         &mut fixture.store,
                         &mut fixture.stash,
@@ -2534,12 +2547,11 @@ mod tests {
                         &key,
                         &value,
                         apply,
-                    )
-                    .unwrap();
-                    if failed {
-                        assert!(failure_allowed, "a put failed");
+                    );
+                    let Some((overflow, failed)) = unless_overflow(put, overflow_allowed) else {
                         return true;
-                    }
+                    };
+                    assert!(!failed, "a put found the stored tree wrong");
                     fixture.assert_operation_shape(put_accesses);
                     let present = expected.contains_key(&key_bytes(&key));
                     let zero = value == Value::uint(0);
@@ -2556,6 +2568,22 @@ mod tests {
                 check(&fixture, &expected);
             }
             false
+        }
+
+        /// The result of a tree operation, or `None` if its stash overflowed,
+        /// which is an error of the operation and must be allowed.
+        fn unless_overflow<T>(result: Result<T>, overflow_allowed: bool) -> Option<T> {
+            match result {
+                Ok(value) => Some(value),
+                Err(error) => {
+                    let error = error.to_string();
+                    assert!(
+                        overflow_allowed && error.contains("stash overflowed its bound"),
+                        "{error}"
+                    );
+                    None
+                }
+            }
         }
 
         fn run(capacity: usize, seed: u64, operations: usize) {
@@ -2619,14 +2647,15 @@ mod tests {
         #[test]
         fn tree_map_with_a_stash_smaller_than_the_map_matches_a_reference_map() {
             // 40 nodes and a stash of 30 blocks: room for the 22 nodes a put
-            // may return to it and a few more, as the 114 + 3h + 1 bound
-            // leaves room for those nodes above Path ORAM's 114.
+            // may return to it and a few more, as the 152 + 3h + 1 bound
+            // leaves room for those nodes above Path ORAM's 152.
             assert!(!run_with(40, 7, 40, 30, false));
         }
 
         #[test]
-        fn tree_map_reports_a_stash_overflow() {
-            // A stash of two blocks cannot take back the nodes a put reads.
+        fn tree_map_fails_on_a_stash_overflow() {
+            // A stash of two blocks cannot take back the nodes a put reads:
+            // the operation stops with an error.
             assert!(run_with(16, 3, 40, 2, true));
         }
 

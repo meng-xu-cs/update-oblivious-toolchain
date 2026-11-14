@@ -1,6 +1,6 @@
 {
   "accepted": true,
-  "artifact_json_bytes": 1712163,
+  "artifact_json_bytes": 1714890,
   "checker": "proof/lean/.lake/build/bin/checkProofGradeRuntimeConfidentialStatementTraceBridgeBoundary",
   "confidential_statement_trace_bridge_boundary_theorem_checked": true,
   "lean_checker_input": "source-backed runtime confidential statement-trace bridge boundary",
@@ -13,7 +13,7 @@
     "generated_confidential_kernel": 24848,
     "generated_kernel_machine": 5241,
     "generated_object_helpers": 28328,
-    "generated_oram_codecs": 205923,
+    "generated_oram_codecs": 207183,
     "kernel_runtime": 24280,
     "kernel_slot_support": 3263,
     "state": 59879,

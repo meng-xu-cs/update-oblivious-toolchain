@@ -51,6 +51,7 @@ pub use acceptance::{
 };
 
 mod capacity_sweep;
+mod stash_occupancy;
 
 mod claim_consistency;
 pub use claim_consistency::{run_claim_consistency_report, CLAIM_CONSISTENCY_SCHEMA};
@@ -1393,6 +1394,18 @@ pub fn run_capacity_sweep_report() -> Result<JsonValue> {
 /// every occupancy level of every map.
 pub fn run_capacity_sweep_full_report() -> Result<JsonValue> {
     capacity_sweep::run_capacity_sweep(capacity_sweep::SweepProfile::Full)
+}
+
+/// The stash-occupancy report's quick profile, which the validation script
+/// runs from a release build.
+pub fn run_stash_occupancy_report() -> Result<JsonValue> {
+    stash_occupancy::run_stash_occupancy(stash_occupancy::StashProfile::Quick)
+}
+
+/// The stash-occupancy report's full profile: at least ten million node
+/// accesses of the private scheme's tree.
+pub fn run_stash_occupancy_full_report() -> Result<JsonValue> {
+    stash_occupancy::run_stash_occupancy(stash_occupancy::StashProfile::Full)
 }
 
 pub fn run_path_oram_avl_map_replay_report() -> Result<JsonValue> {
@@ -3517,7 +3530,7 @@ fn static_drift_check_inventory() -> JsonValue {
         {
             "name": "path_oram_deployed_stash_parameters_pinned",
             "work_package": "W5.3",
-            "target": "the deployed Path-ORAM `Z = 5` / `stash_bound = min(max(capacity, 1), 114)` parameters in `crates/uo-core/src/manifest.rs`",
+            "target": "the deployed Path-ORAM `Z = 5` / `stash_bound = min(max(capacity, 1), 152)` parameters in `crates/uo-core/src/manifest.rs`",
             "report_field": "kernel_model_alignment_validation.path_oram_deployed_stash_parameters_pinned",
         },
     ])
@@ -3705,7 +3718,7 @@ fn explicit_assumption_summary() -> JsonValue {
         {
             "assumption": "stashOverflowBounded",
             "meaning": "bounds stash-overflow failure for the deployed parameters",
-            "status": "named Lean assumption in PathOramLocalPosmapV1SecurityAssumptions, not formalized: a Prop field that no proof uses and the checkers fill with True; W5.3 pairs the assumption with the runtime stash-overflow provenance record (Stefanov et al. JACM 2018 Theorem 5.1 at Z = 5; CCS 2013 fallback) and the static-drift check `path_oram_deployed_stash_parameters_pinned` pinning the deployed Z = 5 / stash_bound = min(max(capacity, 1), 114) parameters in crates/uo-core/src/manifest.rs",
+            "status": "named Lean assumption in PathOramLocalPosmapV1SecurityAssumptions, not formalized: a Prop field that no proof uses and the checkers fill with True; W5.3 pairs the assumption with the runtime stash-overflow provenance record (Stefanov et al. JACM 2018 Theorem 5.1 at Z = 5; CCS 2013 fallback) and the static-drift check `path_oram_deployed_stash_parameters_pinned` pinning the deployed Z = 5 / stash_bound = min(max(capacity, 1), 152) parameters in crates/uo-core/src/manifest.rs",
         },
         {
             "assumption": "PaperMainRuntimeKernelBoundary / PaperMainRuntimeKernelSlotBoundary",
@@ -10231,6 +10244,31 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "benchmark": "SingleAccessMap/pathoram/put",
             "entrypoint": target.entrypoint,
             "mutation": "hash the items of a trace's logical accesses instead of their events, so the implementation interface must reject a trace hash that depends on how the events of a trace are grouped into runs",
+        }),
+    )?);
+    let mut tampered_runtime_implementation_stash_overflow_in_band =
+        runtime_implementation_interface.clone();
+    tampered_runtime_implementation_stash_overflow_in_band.generated_oram_codecs_source =
+        replace_exactly_once(
+            &tampered_runtime_implementation_stash_overflow_in_band.generated_oram_codecs_source,
+            "        if overflowed {\n            return Err(stash_overflow_error(persistent));\n        }\n        Ok(())",
+            "        Ok(())",
+            "runtime implementation stash-overflow tamper",
+        )?;
+    scenarios.push(validate_tampered_json_case(
+        "runtime_implementation_interface/stash_overflow_goes_on_drift",
+        &tampered_runtime_implementation_stash_overflow_in_band,
+        |interface_path| {
+            Ok(Command::new(&runtime_implementation_interface_checker)
+                .arg(interface_path)
+                .output()?)
+        },
+        json!({
+            "scenario": "runtime_implementation_interface/stash_overflow_goes_on_drift",
+            "artifact_kind": "proofgrade_runtime_implementation_interface",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "let a node access of the private scheme's tree go on when a block finds no room in the stash, so that the block is dropped and the access can commit; the implementation interface must reject a stash overflow that is not an error of the access",
         }),
     )?);
     let tampered_runtime_small_confidential_kernel_generated_object_helpers_commit =
@@ -30794,15 +30832,25 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
 			            .contains("let (writes, update_failed) = rewrite_path_for_access(")
 			        && generated_oram_codecs_source
 			            .contains("Ok((return_value, transcript, update_failed))")
-			        && generated_oram_codecs_source
-			            .contains("let mut update_failed = working_stash.overflowed();")
-			        && generated_oram_codecs_source.contains("let effect_failed = update(")
-			        && generated_oram_codecs_source.contains("update_failed |= effect_failed;")
-        && !generated_oram_codecs_source.contains(
-            "update_failed |= working_stash.len() > state.parameters.stash_bound + state.parameters.buckets_per_access;",
-        )
+        && generated_oram_codecs_source.contains("let update_failed = update(")
+        // A stash overflow is an error that drops the call, on both schemes.
         && generated_oram_codecs_source
-            .contains("update_failed |= working_stash.len() > state.parameters.stash_bound;")
+            .contains("let mut stash_overflowed = working_stash.overflowed();")
+        && generated_oram_codecs_source.contains(
+            "    if stash_overflowed {\n        return Err(stash_overflow_error(state.parameters.stash_bound));\n    }",
+        )
+        && generated_oram_codecs_source.contains(
+            "        if overflowed {\n            return Err(stash_overflow_error(persistent));\n        }\n        Ok(())",
+        )
+        && generated_oram_codecs_source.contains(
+            "    if overflowed {\n        return Err(stash_overflow_error(stash.persistent));\n    }\n    store.end_operation(header, stash)?;",
+        )
+        && generated_oram_codecs_source.contains("    stash.compact()?;\n")
+        && !generated_oram_codecs_source.contains("failed | overflowed")
+        && !generated_oram_codecs_source.contains("failed |= tree_finish(")
+        && !generated_oram_codecs_source.contains("update_failed |= working_stash")
+        && generated_oram_codecs_source
+            .contains("stash_overflowed |= working_stash.len() > state.parameters.stash_bound;")
 			        && generated_oram_codecs_source.contains("Ok((transcript, update_failed | capacity_overflowed))")
 		        && generated_oram_codecs_source.contains("slot_index: transition_slot.to_witness(),")
 		        && generated_oram_codecs_source.contains("next_leaf: transition_next_leaf.to_witness(),")
@@ -34012,9 +34060,9 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             .contains("tiny-keccak = { version = \"=2.0.2\", features = [\"keccak\"] }");
     // W5.3: pin the deployed Path-ORAM parameter regime in the manifest
     // source. The Path ORAM stash theorem applies at Z = 5 with
-    // stash_bound = min(max(capacity, 1), 114), which bounds a stash overflow
-    // by 14 * 0.6002^114 < 2^-80 per access, and the private scheme's bound
-    // min(max(capacity, 1), 114 + 3h + 1) adds the nodes its AVL map returns
+    // stash_bound = min(max(capacity, 1), 152), which bounds a stash overflow
+    // by 14 * 0.6002^152 < 2^-108 per access, and the private scheme's bound
+    // min(max(capacity, 1), 152 + 3h + 1) adds the nodes its AVL map returns
     // to the stash when an operation ends; the static-drift check below rejects
     // representative drift in the manifest's Path-ORAM construction or
     // validation logic. The matching Lean provenance record is
@@ -34024,7 +34072,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
     let path_oram_deployed_stash_parameters_pinned = manifest_alignment_source
         .contains("let blocks_per_bucket = 5usize;")
         && manifest_alignment_source
-            .contains("pub const PATH_ORAM_STASH_BOUND_LIMIT: usize = 114;")
+            .contains("pub const PATH_ORAM_STASH_BOUND_LIMIT: usize = 152;")
         && manifest_alignment_source.contains("capacity.clamp(1, PATH_ORAM_STASH_BOUND_LIMIT)")
         && manifest_alignment_source.contains("let stash_bound = path_oram_stash_bound(capacity);")
         && manifest_alignment_source.contains("if self.blocks_per_bucket != 5 {")
@@ -52473,7 +52521,7 @@ fn run_engineering_cost(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Resul
             "sparse_metadata_setting": "fixed public metadata pages",
             "dirty_bitmap_setting": "fixed public write schedules, not host-visible dirty-bit elision",
             "oram_z": 5,
-            "stash_bound": "min(max(capacity, 1), 114)",
+            "stash_bound": "min(max(capacity, 1), 152)",
             "position_map_policy": "local position map up to capacity 128; private position-map route above 128",
             "compact_budget_bytes": std::env::var("UO_CANONICAL_CERT_BUDGET_BYTES").unwrap_or_else(|_| (64 * 1024 * 1024u64).to_string()),
             "heavy_budget_bytes": std::env::var("UO_HEAVY_ARTIFACT_BUDGET_BYTES").unwrap_or_else(|_| (20 * 1024 * 1024 * 1024u64).to_string()),

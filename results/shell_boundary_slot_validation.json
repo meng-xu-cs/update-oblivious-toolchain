@@ -4574,7 +4574,7 @@
           "io_scratch": {
             "live_bytes": 0,
             "peak_bytes": 648,
-            "wipe_count": 270
+            "wipe_count": 273
           },
           "peak_stack_words": 7,
           "value_scratch": {
@@ -4599,7 +4599,7 @@
         "hash_scratch_peak_bytes": 20,
         "hash_scratch_wipe_count": 3,
         "io_scratch_peak_bytes": 648,
-        "io_scratch_wipe_count": 270,
+        "io_scratch_wipe_count": 273,
         "kernel_op_count": 9,
         "kernel_step_public_object_schedule": [
           2,
@@ -4615,7 +4615,7 @@
           1,
           2
         ],
-        "resource_event_count": 560,
+        "resource_event_count": 566,
         "resource_events": [
           {
             "bytes": 8,
@@ -4667,7 +4667,7 @@
                 "words": null
               }
             ],
-            "repeat": 31
+            "repeat": 32
           },
           {
             "bytes": null,
@@ -4742,7 +4742,7 @@
                 "words": null
               }
             ],
-            "repeat": 31
+            "repeat": 32
           },
           {
             "bytes": 8,
@@ -5031,7 +5031,7 @@
                 "words": null
               }
             ],
-            "repeat": 31
+            "repeat": 32
           },
           {
             "bytes": null,

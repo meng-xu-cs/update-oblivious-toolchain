@@ -112,8 +112,8 @@ its engineering part is Wave 4, its certified part is research.
 | 36 | Remove the whole-store witness snapshots from a call | 4 | M | 25 | done | `af5cf09` |
 | 37 | Stage a call without copying the store | 4 | M | | done | `02087ca` |
 | 38 | Compress scan schedules in traces and proof objects | 4 | M to L | 31, 32 | done | `9d93471` |
-| 39 | Admit encrypted returns in the kernel theorems | 5 | M | | done | |
-| 40 | Give the stash bound a lifetime budget and test deferred write-back | 5 | M | | todo | |
+| 39 | Admit encrypted returns in the kernel theorems | 5 | M | | done | `ece1167` |
+| 40 | Give the stash bound a lifetime budget and test deferred write-back | 5 | M | | done | |
 | 41 | Put storage behind an adapter that keeps its own I/O log | 6 | M to L | 24, 31, 32 | todo | |
 | 42 | Widen the runtime-versus-model tests of the tree and the tape substitution | 6 | M | | todo | |
 | 43 | Prove a store operation's post-state and its write class together | research | R | 33, 35 | todo | |

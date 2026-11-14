@@ -15,10 +15,11 @@ pub const PATH_ORAM_PRIVATE_POSMAP_SCHEME: &str = "path_oram_private_posmap_v1";
 pub const PATH_ORAM_LOCAL_POSMAP_MAX_CAPACITY: usize = 128;
 /// The largest Path ORAM stash bound. By Theorem 1 of Path ORAM (Stefanov et
 /// al.), with 5 blocks per bucket the stash exceeds `R` blocks after an access
-/// with probability at most `14 * 0.6002^R`, below `2^-80` from `R = 114`. A
-/// map's stash bound is its capacity capped at this limit, so a map no larger
-/// than the limit cannot overflow its stash.
-pub const PATH_ORAM_STASH_BOUND_LIMIT: usize = 114;
+/// with probability at most `14 * 0.6002^R`, which is below `2^-108` at
+/// `R = 152`: at most `2^-60` over the `2^48` node accesses budgeted for the
+/// lifetime of a map. A map's stash bound is its capacity capped at this
+/// limit, so a map no larger than the limit cannot overflow its stash.
+pub const PATH_ORAM_STASH_BOUND_LIMIT: usize = 152;
 
 /// The stash bound of a Path ORAM map of this capacity.
 pub fn path_oram_stash_bound(capacity: usize) -> usize {

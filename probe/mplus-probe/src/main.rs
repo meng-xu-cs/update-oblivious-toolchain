@@ -32,6 +32,8 @@ enum ReportKind {
     StorageGrowth,
     CapacitySweep,
     CapacitySweepFull,
+    StashOccupancy,
+    StashOccupancyFull,
     PathOramAvlMapReplay,
     AbortRollback,
     AdmissionMatrix,
@@ -251,6 +253,24 @@ fn main() -> Result<()> {
                 &cli.out_dir,
                 "capacity_sweep_full.json",
                 "capacity_sweep_full",
+                &report,
+            )?;
+        }
+        Some(ReportKind::StashOccupancy) => {
+            let report = mplus_probe::run_stash_occupancy_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "stash_occupancy.json",
+                "stash_occupancy",
+                &report,
+            )?;
+        }
+        Some(ReportKind::StashOccupancyFull) => {
+            let report = mplus_probe::run_stash_occupancy_full_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "stash_occupancy_full.json",
+                "stash_occupancy_full",
                 &report,
             )?;
         }

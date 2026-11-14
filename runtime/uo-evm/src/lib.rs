@@ -40,6 +40,8 @@ pub use oram::avl_map_replay::{
     path_oram_avl_map_replay, AvlMapReplay, AvlMapReplayOperation, AvlMapReplayRun,
     PATH_ORAM_AVL_MAP_REPLAY_SCHEMA,
 };
+#[cfg(feature = "diagnostics")]
+pub use oram::stash_occupancy::{simulate_stash_occupancy, StashOccupancyRun, StashWorkload};
 pub use return_channel::{open_encrypted_return, ReturnChannelSession, RETURN_CHANNEL_SCHEME};
 #[cfg(feature = "diagnostics")]
 pub use runtime::PathOramFreshCoinPlan;
@@ -1262,13 +1264,13 @@ bounds:
             2 * accesses + 2
         );
         // Each node access reads the counter and the 9 buckets of one path;
-        // each of the two operations' first also reads the 20 metadata
-        // pages: the header and 19 stash pages, for a stash bound of
-        // 114 + 34 = 148.
-        assert_eq!(uo_core::manifest::path_oram_tree_stash_bound(256), 114 + 34);
+        // each of the two operations' first also reads the 25 metadata
+        // pages: the header and 24 stash pages, for a stash bound of
+        // 152 + 34 = 186.
+        assert_eq!(uo_core::manifest::path_oram_tree_stash_bound(256), 152 + 34);
         assert_eq!(
             first_trace.trace.physical_reads.event_count(),
-            accesses * (1 + 9) + 2 * 20
+            accesses * (1 + 9) + 2 * 25
         );
         assert_eq!(
             first_trace

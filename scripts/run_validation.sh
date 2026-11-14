@@ -74,6 +74,13 @@ UO_CORRECTNESS_TRIALS="${UO_CORRECTNESS_TRIALS:-4}" \
 # runs the full profile into capacity_sweep_full.json. Override UO_SWEEP_* for
 # other grids.
 cargo run -q --release -p mplus-probe -- --only capacity-sweep "${PROBE_ARGS[@]}"
+# The stash of the private scheme: a simulation of the tree's node accesses
+# that counts the stash after each, and a forced overflow on the runtime,
+# which must fail the call and lose nothing. It makes 232 puts and as many
+# reads of a map of 256 entries, so it runs from the release build too (under
+# a minute). This is its quick profile; scripts/run_stash_occupancy_full.sh
+# makes the ten million node accesses of stash_occupancy_full.json.
+cargo run -q --release -p mplus-probe -- --only stash-occupancy "${PROBE_ARGS[@]}"
 cargo run -q -p mplus-probe -- --only path-oram-avl-map-replay "${PROBE_ARGS[@]}"
 cargo run -q -p mplus-probe -- --only abort-rollback "${PROBE_ARGS[@]}"
 # Compiler admission matrix (Issue 20): compile-and-run every accepted DSL
