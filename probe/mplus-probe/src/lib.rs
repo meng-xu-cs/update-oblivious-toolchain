@@ -53,6 +53,7 @@ pub use acceptance::{
 mod capacity_sweep;
 mod stash_occupancy;
 mod storage_boundary;
+mod tape_substitution;
 
 mod claim_consistency;
 pub use claim_consistency::{run_claim_consistency_report, CLAIM_CONSISTENCY_SCHEMA};
@@ -1417,7 +1418,25 @@ pub fn run_stash_occupancy_full_report() -> Result<JsonValue> {
 }
 
 pub fn run_path_oram_avl_map_replay_report() -> Result<JsonValue> {
-    run_path_oram_avl_map_replay()
+    run_path_oram_avl_map_replay(AvlReplayProfile::Quick)
+}
+
+/// The full profile of the AVL map replay, on maps of up to 2,048 nodes,
+/// which the validation script runs from a release build.
+pub fn run_path_oram_avl_map_replay_full_report() -> Result<JsonValue> {
+    run_path_oram_avl_map_replay(AvlReplayProfile::Full)
+}
+
+/// Runtime runs of a call on other tapes against the substituted run: the
+/// profile CI and the validation script run from a debug build.
+pub fn run_tape_substitution_report() -> Result<JsonValue> {
+    tape_substitution::run_tape_substitution(tape_substitution::TapeProfile::Quick)
+}
+
+/// The full profile of the tape-substitution report, which the validation
+/// script runs from a release build.
+pub fn run_tape_substitution_full_report() -> Result<JsonValue> {
+    tape_substitution::run_tape_substitution(tape_substitution::TapeProfile::Full)
 }
 
 pub fn run_abort_rollback_report() -> Result<JsonValue> {
@@ -49198,44 +49217,147 @@ fn ensure_lean_checker(target: &'static str, description: &'static str) -> Resul
     }
 }
 
-/// The AVL map replay's grid: maps of one to 31 nodes, trees up to seven
+/// The counts a Lean checker prints: `name=value` pairs on one line.
+pub(crate) fn lean_checker_counts(stdout: &str) -> BTreeMap<String, usize> {
+    stdout
+        .split_whitespace()
+        .filter_map(|pair| {
+            let (name, value) = pair.split_once('=')?;
+            Some((name.to_string(), value.parse().ok()?))
+        })
+        .collect()
+}
+
+/// How long an AVL map replay is.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum AvlReplayProfile {
+    /// Maps of one to 31 nodes, with the tree compared after every
+    /// operation. CI and the validation script run it from a debug build.
+    Quick,
+    /// Maps of up to 2,048 nodes, with the tree compared after every 64th
+    /// operation. The runtime's tree code is slow in a debug build, so the
+    /// validation script runs this from a release build.
+    Full,
+}
+
+/// The quick replay's grid: maps of one to 31 nodes, trees up to seven
 /// levels, two seeds each, with enough operations to fill, update and empty
-/// them. The runtime's tree code is slow in the debug build the probe runs.
+/// them.
 const AVL_MAP_REPLAY_CAPACITIES: [usize; 10] = [1, 2, 3, 4, 5, 7, 8, 12, 16, 31];
 const AVL_MAP_REPLAY_SEEDS: [u64; 2] = [0, 1];
 const AVL_MAP_REPLAY_OPERATIONS: usize = 120;
 
+/// The full replay's grid: maps of 127 to 2,048 nodes. A map is filled by
+/// writes of distinct random keys, as many as it holds, and then takes as
+/// many mixed operations. A node access of a map this large takes most of a
+/// millisecond, and the grid makes 290 thousand of them.
+const AVL_MAP_REPLAY_FULL_CAPACITIES: [usize; 4] = [127, 500, 1024, 2048];
+const AVL_MAP_REPLAY_FULL_SEEDS: [u64; 1] = [0];
+const AVL_MAP_REPLAY_FULL_TREE_EVERY: usize = 64;
+
+/// The tree the full replay must reach, in nodes.
+const AVL_MAP_REPLAY_LARGE_TREE: usize = 1024;
+
+impl AvlReplayProfile {
+    fn label(self) -> &'static str {
+        match self {
+            Self::Quick => "quick",
+            Self::Full => "full",
+        }
+    }
+
+    fn capacities(self) -> &'static [usize] {
+        match self {
+            Self::Quick => &AVL_MAP_REPLAY_CAPACITIES,
+            Self::Full => &AVL_MAP_REPLAY_FULL_CAPACITIES,
+        }
+    }
+
+    fn seeds(self) -> &'static [u64] {
+        match self {
+            Self::Quick => &AVL_MAP_REPLAY_SEEDS,
+            Self::Full => &AVL_MAP_REPLAY_FULL_SEEDS,
+        }
+    }
+
+    fn plan(self, capacity: usize) -> uo_evm::AvlMapReplayPlan {
+        match self {
+            Self::Quick => uo_evm::AvlMapReplayPlan {
+                fill_writes: 0,
+                mixed_operations: AVL_MAP_REPLAY_OPERATIONS,
+                tree_every: 1,
+            },
+            Self::Full => uo_evm::AvlMapReplayPlan {
+                fill_writes: capacity,
+                mixed_operations: capacity,
+                tree_every: AVL_MAP_REPLAY_FULL_TREE_EVERY,
+            },
+        }
+    }
+}
+
 /// Replay random operations on the runtime's oblivious AVL map and check them
 /// against its Lean model (`checkPathOramAvlMapReplay` over
 /// `UOToolchain/PathOramAvlMap.lean`): every result, every node access's kind,
-/// every size and every tree with the heights its pointers record.
-fn run_path_oram_avl_map_replay() -> Result<JsonValue> {
+/// every size and every recorded tree with the heights its pointers record.
+fn run_path_oram_avl_map_replay(profile: AvlReplayProfile) -> Result<JsonValue> {
     let checker = ensure_lean_checker("checkPathOramAvlMapReplay", "AVL map replay")?;
-    let replay = uo_evm::path_oram_avl_map_replay(
-        &AVL_MAP_REPLAY_CAPACITIES,
-        &AVL_MAP_REPLAY_SEEDS,
-        AVL_MAP_REPLAY_OPERATIONS,
-    )?;
-    let operations = replay.runs.iter().flat_map(|run| run.operations.iter());
+    let replay =
+        uo_evm::path_oram_avl_map_replay(profile.capacities(), profile.seeds(), |capacity| {
+            profile.plan(capacity)
+        })?;
     let mut counts = BTreeMap::<&str, usize>::new();
-    for operation in operations {
-        let kind = if operation.get {
-            "gets"
-        } else if !operation.apply {
-            "masked_puts"
-        } else if operation.overflow {
-            "overflowing_puts"
-        } else if operation.value == 0 {
-            "deleting_puts"
-        } else {
-            "writing_puts"
-        };
-        *counts.entry(kind).or_default() += 1;
-        *counts.entry("node_accesses").or_default() += operation.real.len();
-        *counts.entry("real_node_accesses").or_default() +=
-            operation.real.iter().filter(|real| **real).count();
+    let mut run_rows = Vec::with_capacity(replay.runs.len());
+    let (mut total, mut trees_recorded, mut largest_tree, mut on_large_trees) =
+        (0usize, 0usize, 0usize, 0usize);
+    // The nodes of the largest tree the replay records, which is the largest
+    // the checker compares.
+    let mut largest_recorded = 0usize;
+    for run in &replay.runs {
+        let plan = profile.plan(run.capacity);
+        let (mut run_trees, mut run_largest, mut run_on_large, mut run_overflows) =
+            (0usize, 0usize, 0usize, 0usize);
+        for operation in &run.operations {
+            let kind = if operation.get {
+                "gets"
+            } else if !operation.apply {
+                "masked_puts"
+            } else if operation.overflow {
+                "overflowing_puts"
+            } else if operation.value == 0 {
+                "deleting_puts"
+            } else {
+                "writing_puts"
+            };
+            *counts.entry(kind).or_default() += 1;
+            *counts.entry("node_accesses").or_default() += operation.real.len();
+            *counts.entry("real_node_accesses").or_default() +=
+                operation.real.iter().filter(|real| **real).count();
+            if let Some(tree) = &operation.tree {
+                run_trees += 1;
+                largest_recorded = largest_recorded.max(tree.iter().flatten().count());
+            }
+            run_largest = run_largest.max(operation.size);
+            run_on_large += usize::from(operation.size >= AVL_MAP_REPLAY_LARGE_TREE);
+            run_overflows += usize::from(!operation.get && operation.apply && operation.overflow);
+        }
+        total += run.operations.len();
+        trees_recorded += run_trees;
+        largest_tree = largest_tree.max(run_largest);
+        on_large_trees += run_on_large;
+        run_rows.push(json!({
+            "capacity": run.capacity,
+            "seed": run.seed,
+            "avl_height": run.avl_height,
+            "fill_writes": plan.fill_writes,
+            "mixed_operations": plan.mixed_operations,
+            "operations": run.operations.len(),
+            "trees_recorded": run_trees,
+            "largest_tree_nodes": run_largest,
+            "operations_that_leave_a_tree_of_at_least_1024_nodes": run_on_large,
+            "overflowing_puts": run_overflows,
+        }));
     }
-    let total: usize = replay.runs.iter().map(|run| run.operations.len()).sum();
     let (replay_path, replay_json_bytes) = write_temp_json("path-oram-avl-map-replay", &replay)?;
     let output = Command::new(&checker).arg(&replay_path).output()?;
     let _ = fs::remove_file(&replay_path);
@@ -49245,8 +49367,10 @@ fn run_path_oram_avl_map_replay() -> Result<JsonValue> {
             String::from_utf8_lossy(&output.stderr).trim()
         ));
     }
+    let lean_stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let lean_counts = lean_checker_counts(&lean_stdout);
     let mut rejected_tampers = Vec::new();
-    for (name, tampered) in avl_map_replay_tampers(&serde_json::to_value(&replay)?)? {
+    for (name, tampered) in avl_map_replay_tampers(&replay)? {
         let (path, _) = write_temp_json(name, &tampered)?;
         let output = Command::new(&checker).arg(&path).output()?;
         let _ = fs::remove_file(&path);
@@ -49257,42 +49381,84 @@ fn run_path_oram_avl_map_replay() -> Result<JsonValue> {
         }
         rejected_tampers.push(name);
     }
+    let mut checks = serde_json::Map::new();
+    checks.insert(
+        "the_checker_replayed_every_run_and_operation".into(),
+        json!(
+            lean_counts.get("runs") == Some(&replay.runs.len())
+                && lean_counts.get("operations") == Some(&total)
+        ),
+    );
+    checks.insert(
+        "the_checker_compared_every_recorded_tree".into(),
+        json!(lean_counts.get("trees") == Some(&trees_recorded) && trees_recorded > 0),
+    );
+    checks.insert(
+        "the_largest_tree_compared_is_the_largest_recorded".into(),
+        json!(lean_counts.get("largest_tree") == Some(&largest_recorded)),
+    );
+    checks.insert(
+        "puts_overflowed".into(),
+        json!(counts.get("overflowing_puts").copied().unwrap_or(0) > 0),
+    );
+    checks.insert(
+        "tampered_replays_are_rejected".into(),
+        json!(rejected_tampers.len() == 5),
+    );
+    if profile == AvlReplayProfile::Full {
+        checks.insert(
+            "a_compared_tree_has_at_least_1024_nodes".into(),
+            json!(lean_counts
+                .get("largest_tree")
+                .is_some_and(|nodes| *nodes >= AVL_MAP_REPLAY_LARGE_TREE)),
+        );
+    }
+    let accepted = checks.values().all(|check| check == &json!(true));
     Ok(json!({
         "checker": display_report_path(&checker),
         "schema": uo_evm::PATH_ORAM_AVL_MAP_REPLAY_SCHEMA,
+        "profile": profile.label(),
         "lean_model": "proof/lean/UOToolchain/PathOramAvlMap.lean",
-        "capacities": AVL_MAP_REPLAY_CAPACITIES,
-        "seeds": AVL_MAP_REPLAY_SEEDS,
-        "operations_per_run": AVL_MAP_REPLAY_OPERATIONS,
+        "capacities": profile.capacities(),
+        "seeds": profile.seeds(),
+        "tree_recorded_after_every": profile.plan(1).tree_every,
         "runs": replay.runs.len(),
         "operations": total,
         "operation_counts": counts,
+        "pointer_level_checks": total,
+        "trees_compared_with_the_lean_model": lean_counts.get("trees"),
+        "largest_tree_compared_nodes": lean_counts.get("largest_tree"),
+        "largest_tree_nodes": largest_tree,
+        "operations_that_leave_a_tree_of_at_least_1024_nodes": on_large_trees,
+        "runs_of_the_replay": run_rows,
         "replay_json_bytes": replay_json_bytes,
         "compared_with_the_lean_model": [
             "each get's value and whether it found the key",
             "each put's overflow flag",
             "each node access's kind, real or dummy",
             "the map's size after each operation",
-            "the tree after each operation, with the height each pointer records",
+            "each recorded tree, with the height each pointer records",
         ],
-        "runtime_pointer_level_checked": [
+        "runtime_pointer_level_checked_after_every_operation": [
             "every node block lies on its leaf's path and is stored once",
             "every tree and free-list pointer carries its node's current leaf",
-            "the tree and the free list hold every node",
+            "the tree and the free list are acyclic and together hold every node",
             "the stash stays within its bound",
         ],
         "rejected_tampers": rejected_tampers,
         "evidence_classification": "empirically tested",
         "rust_semantic_refinement_claimed": false,
-        "lean_stdout": String::from_utf8_lossy(&output.stdout).trim(),
-        "accepted": true,
+        "lean_stdout": lean_stdout,
+        "checks": checks,
+        "accepted": accepted,
     }))
 }
 
-/// Copies of a replay with one recorded fact changed, which the checker
-/// must reject: an access's kind, a stored height, a get's value, and a put's
-/// overflow.
-fn avl_map_replay_tampers(replay: &JsonValue) -> Result<Vec<(&'static str, JsonValue)>> {
+/// Copies of one run of a replay with one recorded fact changed, which the
+/// checker must reject: an access's kind, a stored height, a get's value, a
+/// put's overflow, and the tree after the last operation, dropped. Each is
+/// the first run that records such a fact, alone.
+fn avl_map_replay_tampers(replay: &uo_evm::AvlMapReplay) -> Result<Vec<(&'static str, JsonValue)>> {
     type Edit = fn(&mut JsonValue) -> bool;
     let edits: [(&'static str, Edit); 4] = [
         ("flipped_access_kind", |operation| {
@@ -49305,6 +49471,7 @@ fn avl_map_replay_tampers(replay: &JsonValue) -> Result<Vec<(&'static str, JsonV
             }
         }),
         ("changed_stored_height", |operation| {
+            // An operation whose tree the replay did not record has `null`.
             let Some(nodes) = operation["tree"].as_array_mut() else {
                 return false;
             };
@@ -49336,20 +49503,39 @@ fn avl_map_replay_tampers(replay: &JsonValue) -> Result<Vec<(&'static str, JsonV
     ];
     let mut tampers = Vec::new();
     for (name, edit) in edits {
-        let mut tampered = replay.clone();
-        let edited = tampered["runs"]
-            .as_array_mut()
-            .into_iter()
-            .flatten()
-            .flat_map(|run| run["operations"].as_array_mut().into_iter().flatten())
-            .any(edit);
-        if !edited {
-            return Err(anyhow!(
-                "the AVL map replay has nothing to tamper for {name}"
-            ));
+        let mut tampered = None;
+        for run in &replay.runs {
+            let mut run = serde_json::to_value(run)?;
+            let edited = run["operations"]
+                .as_array_mut()
+                .into_iter()
+                .flatten()
+                .any(edit);
+            if edited {
+                tampered = Some(json!({"schema": replay.schema, "runs": [run]}));
+                break;
+            }
         }
+        let tampered = tampered
+            .ok_or_else(|| anyhow!("the AVL map replay has nothing to tamper for {name}"))?;
         tampers.push((name, tampered));
     }
+    // A run whose last operation records no tree: the checker requires one,
+    // so that every operation is followed by a comparison of trees.
+    let first = replay
+        .runs
+        .first()
+        .ok_or_else(|| anyhow!("the AVL map replay has no run"))?;
+    let mut run = serde_json::to_value(first)?;
+    let last = run["operations"]
+        .as_array_mut()
+        .and_then(|operations| operations.last_mut())
+        .ok_or_else(|| anyhow!("the AVL map replay's first run has no operation"))?;
+    last["tree"] = JsonValue::Null;
+    tampers.push((
+        "dropped_last_tree",
+        json!({"schema": replay.schema, "runs": [run]}),
+    ));
     Ok(tampers)
 }
 

@@ -324,7 +324,12 @@ proved.
   compact theorem inputs the probe checks. That the runtime's run on every
   tape is the substituted run is tested, not proved: the checker compares
   four more runtime runs per side, on other deployment seeds and coins, with
-  their substituted runs. The older theorems that take a
+  their substituted runs, and `results/tape_substitution_full.json` makes
+  the comparison over 1,344 tapes: on maps of both schemes at three
+  capacities each, calls of seven kinds (reads, inserts, overwrites,
+  deletes and a write that aborts), each after a setup with deletes and
+  aborts and each run on 16 other deployment seeds (see
+  [`path-oram.md`](./path-oram.md)). The older theorems that take a
   `SeededRuntimePathOramProofBundle`, whose `cfgWellFormed` field quantifies
   over every `OramConfig`, hold vacuously
   (`seededRuntimePathOramProofBundle_empty` in
@@ -351,9 +356,15 @@ proved.
   the capacity, and overflows exactly when it would insert into a full map
   (`get_spec`, `put_spec`). That the runtime's `tree_get` and `tree_put`
   follow the model is tested, not proved: `checkPathOramAvlMapReplay`
-  replays 2,400 runtime operations on maps of 1 to 31 nodes against it,
-  comparing every result, every node access's kind, every size and every
-  tree with its stored heights (`results/path_oram_avl_map_replay.json`).
+  replays 2,400 runtime operations on maps of 1 to 31 nodes against it
+  (`results/path_oram_avl_map_replay.json`) and 7,398 on maps of 127 to
+  2,048 nodes, 3,559 of which leave a tree of at least 1,024 nodes
+  (`results/path_oram_avl_map_replay_full.json`). It compares every result,
+  every node access's kind, every size and the recorded trees with their
+  stored heights, and the replay checks after every operation that each
+  node is stored once on its leaf's path, that each pointer carries its
+  node's current leaf, and that the tree and the free list are acyclic and
+  hold every node.
   For configurations whose Path ORAM maps use either scheme, the same bundle
   gives the private scheme's theorems (`computationalUOWithOnAny`,
   `paperMain_privatePosmapV1_noninterference_moduloReleases`), and the probe

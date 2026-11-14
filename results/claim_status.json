@@ -72,6 +72,16 @@
       "ok": true
     },
     {
+      "detail": "doc_anchor \"tape_substitution_full.json\" for path-oram-tape-substitution-tested appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:path-oram-tape-substitution-tested",
+      "ok": true
+    },
+    {
+      "detail": "path-oram-tape-substitution-tested declares an allowed status (empirically-tested)",
+      "name": "status-allowed:path-oram-tape-substitution-tested",
+      "ok": true
+    },
+    {
       "detail": "doc_anchor \"admitted-package hash\" for admitted-package-identity-hash appears in docs/claim-boundary.md",
       "name": "anchor-in-doc:admitted-package-identity-hash",
       "ok": true
@@ -492,7 +502,7 @@
       "ok": true
     },
     {
-      "detail": "13 manifest entries in category claim",
+      "detail": "14 manifest entries in category claim",
       "name": "category-present:claim",
       "ok": true
     },
@@ -719,6 +729,26 @@
     {
       "detail": "artifact runtime/uo-evm/src/generated_oram_codecs.rs referenced by path-oram-private-avl-map-semantics exists",
       "name": "file-exists:path-oram-private-avl-map-semantics:runtime/uo-evm/src/generated_oram_codecs.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact probe/mplus-probe/src/tape_substitution.rs referenced by path-oram-tape-substitution-tested exists",
+      "name": "file-exists:path-oram-tape-substitution-tested:probe/mplus-probe/src/tape_substitution.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact proof/lean/UOToolchain/PathOramTapeWitness.lean referenced by path-oram-tape-substitution-tested exists",
+      "name": "file-exists:path-oram-tape-substitution-tested:proof/lean/UOToolchain/PathOramTapeWitness.lean",
+      "ok": true
+    },
+    {
+      "detail": "artifact proof/lean/CheckPathOramTapeSamples.lean referenced by path-oram-tape-substitution-tested exists",
+      "name": "file-exists:path-oram-tape-substitution-tested:proof/lean/CheckPathOramTapeSamples.lean",
+      "ok": true
+    },
+    {
+      "detail": "artifact runtime/uo-evm/src/oram.rs referenced by path-oram-tape-substitution-tested exists",
+      "name": "file-exists:path-oram-tape-substitution-tested:runtime/uo-evm/src/oram.rs",
       "ok": true
     },
     {
@@ -1057,7 +1087,7 @@
       "ok": true
     }
   ],
-  "claim_count": 37,
+  "claim_count": 38,
   "claims": [
     {
       "category": "claim",
@@ -1107,6 +1137,13 @@
       "status": "Lean-proved",
       "text": "The private scheme's AVL map algorithm, modeled over inductive trees with the runtime's walk, successor delete, rotation rule and node-access counts, implements a finite map: with the walk bounded by the capacity's largest AVL height, a get returns the key's value and a put writes, updates or deletes it, keeps the tree sorted, balanced and within the capacity, and overflows exactly when it would insert into a full map; the runtime's tree_get and tree_put are replayed against the model, not proved to follow it.",
       "validation_command": "cargo run -q -p mplus-probe -- --only path-oram-avl-map-replay --out-dir results"
+    },
+    {
+      "category": "claim",
+      "id": "path-oram-tape-substitution-tested",
+      "status": "empirically-tested",
+      "text": "That a runtime run of a call on another tape is the representative run with that tape's leaves substituted, which the tape-family theorems take from one runtime run, is tested and not proved of the Rust runtime: on maps of both Path ORAM schemes at three capacities each, calls of seven kinds (a read that hits, one that misses, an insert, an overwrite, a delete, a delete of an absent key and a write that aborts), each after a setup with deletes and aborts, run on 16 other deployment seeds each, and the Lean checker finds every one of the 1,344 runs equal to the substituted run.",
+      "validation_command": "cargo run -q --release -p mplus-probe -- --only tape-substitution-full --out-dir results"
     },
     {
       "category": "claim",
@@ -1324,7 +1361,7 @@
   "source_of_truth": "docs/claim-boundary.md",
   "status_counts": {
     "Lean-proved": 5,
-    "empirically-tested": 2,
+    "empirically-tested": 3,
     "experimental": 1,
     "generated-and-checked": 4,
     "non-claim": 7,

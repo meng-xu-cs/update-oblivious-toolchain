@@ -10,6 +10,13 @@
 //! here after every operation: every block is on its leaf's path and stored
 //! once, every pointer names its node's current leaf, the free list and the
 //! tree together hold every node, and the stash is within its bound.
+//!
+//! A replay of a large map starts with writes of distinct random keys, which
+//! fill the map sooner than the mixed operations do, and records the tree
+//! after every few operations and after the last, not after each: a tree of
+//! 2,048 nodes is nearly 40 KB of JSON. The model still replays every
+//! operation and compares its result, its node accesses and the map's size,
+//! and the pointer level is still checked here after each.
 
 use super::generated_oram_codecs::{
     bucket_on_leaf_path, clone_tree_node, tree_avl_height, tree_bootstrap_nodes, tree_get,
@@ -17,6 +24,7 @@ use super::generated_oram_codecs::{
     TreeNode, TreePathStore, TreeShape, TreeStash,
 };
 use anyhow::{anyhow, bail, Result};
+use rand::seq::SliceRandom;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 use serde::Serialize;
@@ -24,7 +32,7 @@ use std::collections::BTreeMap;
 use uo_core::{ScalarType, Type, Value};
 
 /// The replay's schema tag, which the Lean checker requires.
-pub const PATH_ORAM_AVL_MAP_REPLAY_SCHEMA: &str = "uo-path-oram-avl-map-replay-v1";
+pub const PATH_ORAM_AVL_MAP_REPLAY_SCHEMA: &str = "uo-path-oram-avl-map-replay-v2";
 
 const BLOCKS_PER_BUCKET: usize = 5;
 
@@ -49,8 +57,8 @@ pub struct AvlMapReplayOperation {
     /// The map's size afterwards.
     pub size: usize,
     /// The tree afterwards, in preorder: `[key, value, height]` per node and
-    /// `null` per absent child.
-    pub tree: Vec<Option<[u64; 3]>>,
+    /// `null` per absent child. `None` where the replay does not record it.
+    pub tree: Option<Vec<Option<[u64; 3]>>>,
 }
 
 /// The operations of one map, from empty.
@@ -288,14 +296,31 @@ fn preorder(
     preorder(nodes, &node.right, capacity, out, count)
 }
 
-fn replay_run(capacity: usize, seed: u64, operations: usize) -> Result<AvlMapReplayRun> {
+fn replay_run(capacity: usize, seed: u64, plan: AvlMapReplayPlan) -> Result<AvlMapReplayRun> {
     let mut map = ReplayMap::new(capacity, seed)?;
     let mut rng = ChaCha20Rng::seed_from_u64(seed.wrapping_mul(0x9e37_79b9_7f4a_7c15) ^ 0xa11);
     let key_space = 2 * capacity as u64 + 3;
+    let operations = plan.fill_writes + plan.mixed_operations;
+    // The filling writes store the keys in a random order, each once until
+    // all are stored, so as many of them as the map holds fill it.
+    let mut fill_keys: Vec<u64> = Vec::new();
+    if plan.fill_writes > 0 {
+        fill_keys.extend(1..=key_space);
+        fill_keys.shuffle(&mut rng);
+    }
     let mut recorded = Vec::with_capacity(operations);
-    for _ in 0..operations {
-        let key = rng.gen_range(1..=key_space);
-        let roll: f64 = rng.gen();
+    for index in 0..operations {
+        // The pointer level is checked after every operation; the tree is
+        // recorded after every `tree_every`-th and after the last.
+        let record_tree = (index + 1) % plan.tree_every.max(1) == 0 || index + 1 == operations;
+        // A filling operation is a write of a nonzero value that applies.
+        let filling = index < plan.fill_writes;
+        let key = if filling {
+            fill_keys[index % fill_keys.len()]
+        } else {
+            rng.gen_range(1..=key_space)
+        };
+        let roll: f64 = if filling { 1.0 } else { rng.gen() };
         map.store.real.clear();
         let operation = if roll < 0.3 {
             let (value, found, failed) = tree_get(
@@ -318,7 +343,7 @@ fn replay_run(capacity: usize, seed: u64, operations: usize) -> Result<AvlMapRep
                 overflow: false,
                 real: std::mem::take(&mut map.store.real),
                 size: map.header.size,
-                tree: map.snapshot()?,
+                tree: Some(map.snapshot()?).filter(|_| record_tree),
             }
         } else {
             let value = if roll < 0.55 {
@@ -326,7 +351,7 @@ fn replay_run(capacity: usize, seed: u64, operations: usize) -> Result<AvlMapRep
             } else {
                 rng.gen_range(1..1000u64)
             };
-            let apply = rng.gen::<f64>() < 0.9;
+            let apply = filling || rng.gen::<f64>() < 0.9;
             let (overflow, failed) = tree_put(
                 &map.shape,
                 &mut map.store,
@@ -349,7 +374,7 @@ fn replay_run(capacity: usize, seed: u64, operations: usize) -> Result<AvlMapRep
                 overflow,
                 real: std::mem::take(&mut map.store.real),
                 size: map.header.size,
-                tree: map.snapshot()?,
+                tree: Some(map.snapshot()?).filter(|_| record_tree),
             }
         };
         recorded.push(operation);
@@ -362,21 +387,98 @@ fn replay_run(capacity: usize, seed: u64, operations: usize) -> Result<AvlMapRep
     })
 }
 
-/// Replay `operations` random operations on an empty map of each capacity,
-/// once per seed.
+/// How long the replay of one map is, and how often it records the tree.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct AvlMapReplayPlan {
+    /// Writes of distinct random keys before the mixed operations. They
+    /// fill a large map sooner than the mixed operations do.
+    pub fill_writes: usize,
+    /// Mixed operations: gets, writes, deletes, and puts that are masked.
+    pub mixed_operations: usize,
+    /// The tree is recorded after every `tree_every`-th operation and after
+    /// the last.
+    pub tree_every: usize,
+}
+
+/// Replay random operations on an empty map of each capacity, once per
+/// seed, as `plan` says for the capacity.
 pub fn path_oram_avl_map_replay(
     capacities: &[usize],
     seeds: &[u64],
-    operations: usize,
+    plan: impl Fn(usize) -> AvlMapReplayPlan,
 ) -> Result<AvlMapReplay> {
     let mut runs = Vec::with_capacity(capacities.len() * seeds.len());
     for &capacity in capacities {
         for &seed in seeds {
-            runs.push(replay_run(capacity, seed, operations)?);
+            runs.push(replay_run(capacity, seed, plan(capacity))?);
         }
     }
     Ok(AvlMapReplay {
         schema: PATH_ORAM_AVL_MAP_REPLAY_SCHEMA,
         runs,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The filling writes store distinct keys, so as many of them as the map
+    /// holds fill it without an overflow, and the tree is recorded after
+    /// every `tree_every`-th operation and after the last.
+    #[test]
+    fn a_plan_fills_the_map_and_thins_the_trees() {
+        let plan = AvlMapReplayPlan {
+            fill_writes: 31,
+            mixed_operations: 40,
+            tree_every: 8,
+        };
+        let replay = path_oram_avl_map_replay(&[31], &[3], |_| plan).unwrap();
+        assert_eq!(replay.schema, PATH_ORAM_AVL_MAP_REPLAY_SCHEMA);
+        let run = &replay.runs[0];
+        assert_eq!(run.operations.len(), 71);
+        for (index, operation) in run.operations.iter().enumerate() {
+            if index < 31 {
+                assert!(!operation.get && operation.apply && operation.value != 0);
+                assert!(!operation.overflow, "filling write {index} overflowed");
+                assert_eq!(operation.size, index + 1);
+            }
+            let recorded = (index + 1) % 8 == 0 || index + 1 == 71;
+            assert_eq!(operation.tree.is_some(), recorded, "operation {index}");
+            if let Some(tree) = &operation.tree {
+                assert_eq!(tree.iter().flatten().count(), operation.size);
+                // A binary tree has one absent child more than it has nodes.
+                assert_eq!(tree.len(), 2 * operation.size + 1);
+            }
+        }
+        // The map is full after the filling writes, so a mixed write of an
+        // absent key overflows.
+        assert!(run.operations[31..]
+            .iter()
+            .any(|operation| operation.overflow));
+    }
+
+    /// Without filling writes a plan makes the mixed operations alone, with
+    /// a tree after each when `tree_every` is one.
+    #[test]
+    fn a_plan_without_filling_writes_records_every_tree() {
+        let plan = AvlMapReplayPlan {
+            fill_writes: 0,
+            mixed_operations: 24,
+            tree_every: 1,
+        };
+        let replay = path_oram_avl_map_replay(&[4, 7], &[0, 1], |_| plan).unwrap();
+        assert_eq!(replay.runs.len(), 4);
+        for run in &replay.runs {
+            assert_eq!(run.operations.len(), 24);
+            assert!(run
+                .operations
+                .iter()
+                .all(|operation| operation.tree.is_some()));
+            assert!(run
+                .operations
+                .iter()
+                .all(|operation| operation.size <= run.capacity));
+        }
+    }
 }

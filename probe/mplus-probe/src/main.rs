@@ -35,7 +35,10 @@ enum ReportKind {
     StashOccupancy,
     StashOccupancyFull,
     StorageBoundary,
+    TapeSubstitution,
+    TapeSubstitutionFull,
     PathOramAvlMapReplay,
+    PathOramAvlMapReplayFull,
     AbortRollback,
     AdmissionMatrix,
     AblationStudy,
@@ -284,12 +287,39 @@ fn main() -> Result<()> {
                 &report,
             )?;
         }
+        Some(ReportKind::TapeSubstitution) => {
+            let report = mplus_probe::run_tape_substitution_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "tape_substitution.json",
+                "tape_substitution",
+                &report,
+            )?;
+        }
+        Some(ReportKind::TapeSubstitutionFull) => {
+            let report = mplus_probe::run_tape_substitution_full_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "tape_substitution_full.json",
+                "tape_substitution_full",
+                &report,
+            )?;
+        }
         Some(ReportKind::PathOramAvlMapReplay) => {
             let report = mplus_probe::run_path_oram_avl_map_replay_report()?;
             write_single_report(
                 &cli.out_dir,
                 "path_oram_avl_map_replay.json",
                 "path_oram_avl_map_replay",
+                &report,
+            )?;
+        }
+        Some(ReportKind::PathOramAvlMapReplayFull) => {
+            let report = mplus_probe::run_path_oram_avl_map_replay_full_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "path_oram_avl_map_replay_full.json",
+                "path_oram_avl_map_replay_full",
                 &report,
             )?;
         }

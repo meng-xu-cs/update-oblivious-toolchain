@@ -182,8 +182,29 @@ const CLAIM_ENTRIES: &[ClaimEntry] = &[
             "proof/lean/UOToolchain/PathOramAvlMapReplay.lean",
         ],
         runtime_compiler_files: &["runtime/uo-evm/src/generated_oram_codecs.rs"],
-        benchmark_result_files: &["results/path_oram_avl_map_replay.json"],
+        benchmark_result_files: &[
+            "results/path_oram_avl_map_replay.json",
+            "results/path_oram_avl_map_replay_full.json",
+        ],
         validation_command: "cargo run -q -p mplus-probe -- --only path-oram-avl-map-replay --out-dir results",
+    },
+    ClaimEntry {
+        id: "path-oram-tape-substitution-tested",
+        category: "claim",
+        text: "That a runtime run of a call on another tape is the representative run with that tape's leaves substituted, which the tape-family theorems take from one runtime run, is tested and not proved of the Rust runtime: on maps of both Path ORAM schemes at three capacities each, calls of seven kinds (a read that hits, one that misses, an insert, an overwrite, a delete, a delete of an absent key and a write that aborts), each after a setup with deletes and aborts, run on 16 other deployment seeds each, and the Lean checker finds every one of the 1,344 runs equal to the substituted run.",
+        status: STATUS_EMPIRICAL,
+        doc_anchor: "tape_substitution_full.json",
+        source_files: &["probe/mplus-probe/src/tape_substitution.rs"],
+        lean_modules: &[
+            "proof/lean/UOToolchain/PathOramTapeWitness.lean",
+            "proof/lean/CheckPathOramTapeSamples.lean",
+        ],
+        runtime_compiler_files: &["runtime/uo-evm/src/oram.rs"],
+        benchmark_result_files: &[
+            "results/tape_substitution.json",
+            "results/tape_substitution_full.json",
+        ],
+        validation_command: "cargo run -q --release -p mplus-probe -- --only tape-substitution-full --out-dir results",
     },
     ClaimEntry {
         id: "admitted-package-identity-hash",

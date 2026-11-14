@@ -240,7 +240,13 @@ entry points are:
 - `tamper_validation.json`: negative tests proving drifted artifacts are
   rejected
 - `path_oram_avl_map_replay.json`: runtime AVL map operations replayed
-  against the Lean model by `checkPathOramAvlMapReplay`
+  against the Lean model by `checkPathOramAvlMapReplay`, on maps of up to 31
+  nodes; `path_oram_avl_map_replay_full.json` is the replay on maps of up to
+  2,048 nodes, from a release build
+- `tape_substitution.json` and `tape_substitution_full.json`: runtime runs
+  of a call on other deployment seeds, each compared by
+  `checkPathOramTapeSamples` with the representative run under its own tape.
+  Both replays are tests of the runtime against a model, not proofs
 - `capacity_sweep.json`: what seven kinds of map call cost on the full scan
   and both Path ORAM schemes from 1 to 16,384 entries and at five occupancy
   levels, their read/write mixes, computed and executed, and the capacities

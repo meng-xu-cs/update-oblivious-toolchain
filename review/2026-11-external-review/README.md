@@ -85,11 +85,16 @@ Issue 22 has the options and the reasoning.
 6. **Wave 5, theorem coverage** (Issues 39 and 40). Done; the full profile
    was run again with the stash cap of 152, and a control measures what the
    cap costs a tree access: 13% to 17% of its own work.
-7. **Wave 6, evidence at a storage boundary** (Issues 41 and 42). Issue 41
-   is done: the storage adapter's log agrees with the traces' writes and
-   with their reads of exact objects, and shows that a trace names a Path
-   ORAM map's counter and metadata pages more often than they are read
-   (Issue 57).
+7. **Wave 6, evidence at a storage boundary** (Issues 41 and 42). Done:
+   the storage adapter's log agrees with the traces' writes and with their
+   reads of exact objects, and shows that a trace names a Path ORAM map's
+   counter and metadata pages more often than they are read (Issue 57);
+   the tape substitution is tested over 1,344 tapes and the AVL map on
+   trees of up to 2,048 nodes, with no divergence.
+
+Every scheduled issue is done. What remains is the research issues, the
+backlog, and the folding of this directory into the topic documents (see
+Using the Tracker), which waits for the maintainer.
 
 The research issues (43 to 46) start once the issues they depend on are
 done. The backlog (47 to 59) is not scheduled.
@@ -121,8 +126,8 @@ its engineering part is Wave 4, its certified part is research.
 | 38 | Compress scan schedules in traces and proof objects | 4 | M to L | 31, 32 | done | `9d93471` |
 | 39 | Admit encrypted returns in the kernel theorems | 5 | M | | done | `ece1167` |
 | 40 | Give the stash bound a lifetime budget and test deferred write-back | 5 | M | | done | `305c1a2` |
-| 41 | Put storage behind an adapter that keeps its own I/O log | 6 | M to L | 24, 31, 32 | done | |
-| 42 | Widen the runtime-versus-model tests of the tree and the tape substitution | 6 | M | | todo | |
+| 41 | Put storage behind an adapter that keeps its own I/O log | 6 | M to L | 24, 31, 32 | done | `6aecff2` |
+| 42 | Widen the runtime-versus-model tests of the tree and the tape substitution | 6 | M | | done | |
 | 43 | Prove a store operation's post-state and its write class together | research | R | 33, 35 | todo | |
 | 44 | Certify state transitions incrementally | research | R | 36, 37, 41 | todo | |
 | 45 | State security over call histories with a quantified bound | research | R | 24, 39, 40 | todo | |

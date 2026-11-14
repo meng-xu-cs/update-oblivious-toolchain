@@ -1,0 +1,225 @@
+{
+  "accepted": true,
+  "checker": "proof/lean/.lake/build/bin/checkPathOramTapeSamples",
+  "checks": {
+    "every_sample_ran": true,
+    "every_sample_run_is_its_representative_run_under_its_own_tape": true,
+    "samples_ran_on_other_tapes": true,
+    "tampered_samples_are_rejected": true
+  },
+  "contract": "SweepMap",
+  "evidence_classification": "empirically tested",
+  "lean_check": "sampleCheck in proof/lean/UOToolchain/PathOramTapeWitness.lean",
+  "maps": [
+    {
+      "calls": 14,
+      "capacity": 8,
+      "every_run_is_the_substituted_run": true,
+      "rejections": [],
+      "runs_on_another_tape": 224,
+      "runs_the_checker_compared": 224,
+      "runs_with_other_leaves_before_the_call": 224,
+      "sample_runs": 224,
+      "sample_runs_by_kind": {
+        "abort": 32,
+        "delete": 32,
+        "delete_absent": 32,
+        "insert": 32,
+        "overwrite": 32,
+        "read_hit": 32,
+        "read_miss": 32
+      },
+      "samples_json_bytes": 2014391,
+      "scheme": "path_oram_local_posmap_v1",
+      "setup_calls": {
+        "aborts": 3,
+        "deletes": 4,
+        "puts": 15,
+        "reads": 4
+      },
+      "workloads": 2
+    },
+    {
+      "calls": 14,
+      "capacity": 32,
+      "every_run_is_the_substituted_run": true,
+      "rejections": [],
+      "runs_on_another_tape": 224,
+      "runs_the_checker_compared": 224,
+      "runs_with_other_leaves_before_the_call": 224,
+      "sample_runs": 224,
+      "sample_runs_by_kind": {
+        "abort": 32,
+        "delete": 32,
+        "delete_absent": 32,
+        "insert": 32,
+        "overwrite": 32,
+        "read_hit": 32,
+        "read_miss": 32
+      },
+      "samples_json_bytes": 3215762,
+      "scheme": "path_oram_local_posmap_v1",
+      "setup_calls": {
+        "aborts": 3,
+        "deletes": 6,
+        "puts": 16,
+        "reads": 1
+      },
+      "workloads": 2
+    },
+    {
+      "calls": 14,
+      "capacity": 128,
+      "every_run_is_the_substituted_run": true,
+      "rejections": [],
+      "runs_on_another_tape": 224,
+      "runs_the_checker_compared": 224,
+      "runs_with_other_leaves_before_the_call": 224,
+      "sample_runs": 224,
+      "sample_runs_by_kind": {
+        "abort": 32,
+        "delete": 32,
+        "delete_absent": 32,
+        "insert": 32,
+        "overwrite": 32,
+        "read_hit": 32,
+        "read_miss": 32
+      },
+      "samples_json_bytes": 7638634,
+      "scheme": "path_oram_local_posmap_v1",
+      "setup_calls": {
+        "aborts": 1,
+        "deletes": 4,
+        "puts": 19,
+        "reads": 2
+      },
+      "workloads": 2
+    },
+    {
+      "calls": 14,
+      "capacity": 16,
+      "every_run_is_the_substituted_run": true,
+      "rejections": [],
+      "runs_on_another_tape": 224,
+      "runs_the_checker_compared": 224,
+      "runs_with_other_leaves_before_the_call": 224,
+      "sample_runs": 224,
+      "sample_runs_by_kind": {
+        "abort": 32,
+        "delete": 32,
+        "delete_absent": 32,
+        "insert": 32,
+        "overwrite": 32,
+        "read_hit": 32,
+        "read_miss": 32
+      },
+      "samples_json_bytes": 18024007,
+      "scheme": "path_oram_private_posmap_v1",
+      "setup_calls": {
+        "aborts": 1,
+        "deletes": 6,
+        "puts": 16,
+        "reads": 3
+      },
+      "workloads": 2
+    },
+    {
+      "calls": 14,
+      "capacity": 64,
+      "every_run_is_the_substituted_run": true,
+      "rejections": [],
+      "runs_on_another_tape": 224,
+      "runs_the_checker_compared": 224,
+      "runs_with_other_leaves_before_the_call": 224,
+      "sample_runs": 224,
+      "sample_runs_by_kind": {
+        "abort": 32,
+        "delete": 32,
+        "delete_absent": 32,
+        "insert": 32,
+        "overwrite": 32,
+        "read_hit": 32,
+        "read_miss": 32
+      },
+      "samples_json_bytes": 52929730,
+      "scheme": "path_oram_private_posmap_v1",
+      "setup_calls": {
+        "aborts": 2,
+        "deletes": 6,
+        "puts": 14,
+        "reads": 4
+      },
+      "workloads": 2
+    },
+    {
+      "calls": 14,
+      "capacity": 256,
+      "every_run_is_the_substituted_run": true,
+      "rejections": [],
+      "runs_on_another_tape": 224,
+      "runs_the_checker_compared": 224,
+      "runs_with_other_leaves_before_the_call": 224,
+      "sample_runs": 224,
+      "sample_runs_by_kind": {
+        "abort": 32,
+        "delete": 32,
+        "delete_absent": 32,
+        "insert": 32,
+        "overwrite": 32,
+        "read_hit": 32,
+        "read_miss": 32
+      },
+      "samples_json_bytes": 152778214,
+      "scheme": "path_oram_private_posmap_v1",
+      "setup_calls": {
+        "aborts": 1,
+        "deletes": 5,
+        "puts": 16,
+        "reads": 4
+      },
+      "workloads": 2
+    }
+  ],
+  "parameters": {
+    "local_scheme_capacities": [
+      8,
+      32,
+      128
+    ],
+    "private_scheme_capacities": [
+      16,
+      64,
+      256
+    ],
+    "sample_seeds_per_call": 16,
+    "seed": "0x5441504553554231",
+    "setup_calls_per_workload": 13,
+    "target_kinds": [
+      "read_hit",
+      "read_miss",
+      "insert",
+      "overwrite",
+      "delete",
+      "delete_absent",
+      "abort"
+    ],
+    "workloads_per_map": 2
+  },
+  "profile": "full",
+  "rejected_tampers": [
+    "moved_bucket_read",
+    "sample_of_another_call",
+    "dropped_read"
+  ],
+  "rust_semantic_refinement_claimed": false,
+  "schema": "uo-tape-substitution-v1",
+  "totals": {
+    "calls": 84,
+    "maps": 6,
+    "runs_on_another_tape": 1344,
+    "runs_with_other_leaves_before_the_call": 1344,
+    "sample_runs": 1344,
+    "tapes_tested": 1344
+  },
+  "what_is_tested": "a runtime run of a call on another deployment seed, which holds other leaves and draws other coins, equals the representative run of the call with that run's own tape substituted"
+}

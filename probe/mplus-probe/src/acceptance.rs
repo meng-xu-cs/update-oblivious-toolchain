@@ -617,6 +617,61 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
     }
 
+    /// The reports that test the runtime against a model state no Rust
+    /// refinement, which is not a failure. A sample run that is not the
+    /// substituted run is one, and so is an AVL map replay whose checker
+    /// did not compare every recorded tree.
+    #[test]
+    fn a_runtime_against_model_divergence_fails_closed() {
+        let dir = temp_results_dir("runtime-against-model");
+        let tape = |agrees: bool| {
+            json!({
+                "accepted": agrees,
+                "rust_semantic_refinement_claimed": false,
+                "checks": {
+                    "every_sample_run_is_its_representative_run_under_its_own_tape": agrees,
+                    "every_sample_ran": true,
+                },
+                "maps": [{"every_run_is_the_substituted_run": agrees, "rejections": []}],
+            })
+        };
+        let replay = |compared: bool| {
+            json!({
+                "accepted": compared,
+                "rust_semantic_refinement_claimed": false,
+                "checks": {"the_checker_compared_every_recorded_tree": compared},
+            })
+        };
+        let files = [
+            ("tape_substitution.json", tape(true), tape(false)),
+            ("tape_substitution_full.json", tape(true), tape(false)),
+            ("path_oram_avl_map_replay.json", replay(true), replay(false)),
+            (
+                "path_oram_avl_map_replay_full.json",
+                replay(true),
+                replay(false),
+            ),
+        ];
+        for (name, good, _) in &files {
+            write(&dir, name, good.clone());
+        }
+        let accepted = run_acceptance_check_report(dir.to_str().unwrap()).unwrap();
+        assert_eq!(accepted["accepted"], json!(true));
+        assert_eq!(accepted["class_counts"]["advisory_nonclaim"], json!(4));
+        assert!(run_acceptance_check_fail_closed(dir.to_str().unwrap()).is_ok());
+        for (name, good, bad) in &files {
+            write(&dir, name, bad.clone());
+            let rejected = run_acceptance_check_report(dir.to_str().unwrap()).unwrap();
+            assert_eq!(rejected["accepted"], json!(false), "{name}");
+            assert!(
+                run_acceptance_check_fail_closed(dir.to_str().unwrap()).is_err(),
+                "{name}"
+            );
+            write(&dir, name, good.clone());
+        }
+        let _ = fs::remove_dir_all(&dir);
+    }
+
     #[test]
     fn unknown_false_field_is_unclassified_and_fails_closed() {
         let dir = temp_results_dir("unknown");

@@ -219,6 +219,12 @@
       "uses_proofgrade_umbrella": true
     },
     {
+      "file": "proof/lean/CheckPathOramTapeSamples.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
       "file": "proof/lean/CheckProofGradeAxiomReport.lean",
       "restricted": true,
       "uses_legacy_umbrella": false,

@@ -15,7 +15,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1760687,
+      "boundary_json_bytes": 1760705,
       "confidential_slot_program": {
         "entrypoint_id": "classify(uint256)",
         "expected_runtime_step_count": 4,
@@ -49,7 +49,7 @@
         "objects": 131987,
         "oram": 100700,
         "precompiles": 240,
-        "runtime_evm_lib": 84222,
+        "runtime_evm_lib": 84240,
         "runtime_module": 4272,
         "shell": 21767,
         "state": 60580,
@@ -261,7 +261,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1760687,
+      "boundary_json_bytes": 1760705,
       "confidential_slot_program": {
         "entrypoint_id": "classify(uint256)",
         "expected_runtime_step_count": 4,
@@ -295,7 +295,7 @@
         "objects": 131987,
         "oram": 100700,
         "precompiles": 240,
-        "runtime_evm_lib": 84222,
+        "runtime_evm_lib": 84240,
         "runtime_module": 4272,
         "shell": 21767,
         "state": 60580,
@@ -507,7 +507,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1763482,
+      "boundary_json_bytes": 1763500,
       "confidential_slot_program": {
         "entrypoint_id": "auth(bytes32)",
         "expected_runtime_step_count": 8,
@@ -541,7 +541,7 @@
         "objects": 131987,
         "oram": 100700,
         "precompiles": 240,
-        "runtime_evm_lib": 84222,
+        "runtime_evm_lib": 84240,
         "runtime_module": 4272,
         "shell": 21767,
         "state": 60580,
@@ -865,7 +865,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1763482,
+      "boundary_json_bytes": 1763500,
       "confidential_slot_program": {
         "entrypoint_id": "auth(bytes32)",
         "expected_runtime_step_count": 8,
@@ -899,7 +899,7 @@
         "objects": 131987,
         "oram": 100700,
         "precompiles": 240,
-        "runtime_evm_lib": 84222,
+        "runtime_evm_lib": 84240,
         "runtime_module": 4272,
         "shell": 21767,
         "state": 60580,
@@ -1223,7 +1223,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1760561,
+      "boundary_json_bytes": 1760579,
       "confidential_slot_program": {
         "entrypoint_id": "upsert(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -1257,7 +1257,7 @@
         "objects": 131987,
         "oram": 100700,
         "precompiles": 240,
-        "runtime_evm_lib": 84222,
+        "runtime_evm_lib": 84240,
         "runtime_module": 4272,
         "shell": 21767,
         "state": 60580,
@@ -1473,7 +1473,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1760561,
+      "boundary_json_bytes": 1760579,
       "confidential_slot_program": {
         "entrypoint_id": "upsert(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -1507,7 +1507,7 @@
         "objects": 131987,
         "oram": 100700,
         "precompiles": 240,
-        "runtime_evm_lib": 84222,
+        "runtime_evm_lib": 84240,
         "runtime_module": 4272,
         "shell": 21767,
         "state": 60580,
@@ -1723,7 +1723,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1762026,
+      "boundary_json_bytes": 1762044,
       "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
@@ -1757,7 +1757,7 @@
         "objects": 131987,
         "oram": 100700,
         "precompiles": 240,
-        "runtime_evm_lib": 84222,
+        "runtime_evm_lib": 84240,
         "runtime_module": 4272,
         "shell": 21767,
         "state": 60580,
@@ -2050,7 +2050,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1762026,
+      "boundary_json_bytes": 1762044,
       "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
@@ -2084,7 +2084,7 @@
         "objects": 131987,
         "oram": 100700,
         "precompiles": 240,
-        "runtime_evm_lib": 84222,
+        "runtime_evm_lib": 84240,
         "runtime_module": 4272,
         "shell": 21767,
         "state": 60580,
@@ -2377,7 +2377,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1761014,
+      "boundary_json_bytes": 1761032,
       "confidential_slot_program": {
         "entrypoint_id": "approve(address,address,uint256)",
         "expected_runtime_step_count": 4,
@@ -2411,7 +2411,7 @@
         "objects": 131987,
         "oram": 100700,
         "precompiles": 240,
-        "runtime_evm_lib": 84222,
+        "runtime_evm_lib": 84240,
         "runtime_module": 4272,
         "shell": 21767,
         "state": 60580,
@@ -2658,7 +2658,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1761014,
+      "boundary_json_bytes": 1761032,
       "confidential_slot_program": {
         "entrypoint_id": "approve(address,address,uint256)",
         "expected_runtime_step_count": 4,
@@ -2692,7 +2692,7 @@
         "objects": 131987,
         "oram": 100700,
         "precompiles": 240,
-        "runtime_evm_lib": 84222,
+        "runtime_evm_lib": 84240,
         "runtime_module": 4272,
         "shell": 21767,
         "state": 60580,
@@ -2939,7 +2939,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "boundary_json_bytes": 1761017,
+      "boundary_json_bytes": 1761035,
       "confidential_slot_program": {
         "entrypoint_id": "put(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -2973,7 +2973,7 @@
         "objects": 131987,
         "oram": 100700,
         "precompiles": 240,
-        "runtime_evm_lib": 84222,
+        "runtime_evm_lib": 84240,
         "runtime_module": 4272,
         "shell": 21767,
         "state": 60580,
@@ -3230,7 +3230,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "boundary_json_bytes": 1761017,
+      "boundary_json_bytes": 1761035,
       "confidential_slot_program": {
         "entrypoint_id": "put(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -3264,7 +3264,7 @@
         "objects": 131987,
         "oram": 100700,
         "precompiles": 240,
-        "runtime_evm_lib": 84222,
+        "runtime_evm_lib": 84240,
         "runtime_module": 4272,
         "shell": 21767,
         "state": 60580,
@@ -3521,7 +3521,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 1762013,
+      "boundary_json_bytes": 1762031,
       "confidential_slot_program": {
         "entrypoint_id": "add(bytes32,uint256)",
         "expected_runtime_step_count": 5,
@@ -3555,7 +3555,7 @@
         "objects": 131987,
         "oram": 100700,
         "precompiles": 240,
-        "runtime_evm_lib": 84222,
+        "runtime_evm_lib": 84240,
         "runtime_module": 4272,
         "shell": 21767,
         "state": 60580,
@@ -3881,7 +3881,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 1762013,
+      "boundary_json_bytes": 1762031,
       "confidential_slot_program": {
         "entrypoint_id": "add(bytes32,uint256)",
         "expected_runtime_step_count": 5,
@@ -3915,7 +3915,7 @@
         "objects": 131987,
         "oram": 100700,
         "precompiles": 240,
-        "runtime_evm_lib": 84222,
+        "runtime_evm_lib": 84240,
         "runtime_module": 4272,
         "shell": 21767,
         "state": 60580,
@@ -4241,7 +4241,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 1762976,
+      "boundary_json_bytes": 1762994,
       "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
@@ -4275,7 +4275,7 @@
         "objects": 131987,
         "oram": 100700,
         "precompiles": 240,
-        "runtime_evm_lib": 84222,
+        "runtime_evm_lib": 84240,
         "runtime_module": 4272,
         "shell": 21767,
         "state": 60580,
@@ -4655,7 +4655,7 @@
     {
       "accepted": true,
       "boundary_events": 14,
-      "boundary_json_bytes": 1766923,
+      "boundary_json_bytes": 1766941,
       "confidential_slot_program": {
         "entrypoint_id": "transferFrom(address,address,address,uint256)",
         "expected_runtime_step_count": 9,
@@ -4689,7 +4689,7 @@
         "objects": 131987,
         "oram": 100700,
         "precompiles": 240,
-        "runtime_evm_lib": 84222,
+        "runtime_evm_lib": 84240,
         "runtime_module": 4272,
         "shell": 21767,
         "state": 60580,

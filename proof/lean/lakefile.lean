@@ -15,6 +15,10 @@ lean_exe checkPathOramAvlMapReplay where
   root := `CheckPathOramAvlMapReplay
 
 @[default_target]
+lean_exe checkPathOramTapeSamples where
+  root := `CheckPathOramTapeSamples
+
+@[default_target]
 lean_exe checkProofGradeAxiomReport where
   root := `CheckProofGradeAxiomReport
 

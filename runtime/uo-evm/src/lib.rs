@@ -38,8 +38,8 @@ pub use instrumentation::{
 };
 #[cfg(feature = "diagnostics")]
 pub use oram::avl_map_replay::{
-    path_oram_avl_map_replay, AvlMapReplay, AvlMapReplayOperation, AvlMapReplayRun,
-    PATH_ORAM_AVL_MAP_REPLAY_SCHEMA,
+    path_oram_avl_map_replay, AvlMapReplay, AvlMapReplayOperation, AvlMapReplayPlan,
+    AvlMapReplayRun, PATH_ORAM_AVL_MAP_REPLAY_SCHEMA,
 };
 #[cfg(feature = "diagnostics")]
 pub use oram::stash_occupancy::{simulate_stash_occupancy, StashOccupancyRun, StashWorkload};

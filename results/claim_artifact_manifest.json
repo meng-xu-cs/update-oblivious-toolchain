@@ -72,6 +72,16 @@
       "ok": true
     },
     {
+      "detail": "doc_anchor \"tape_substitution_full.json\" for path-oram-tape-substitution-tested appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:path-oram-tape-substitution-tested",
+      "ok": true
+    },
+    {
+      "detail": "path-oram-tape-substitution-tested declares an allowed status (empirically-tested)",
+      "name": "status-allowed:path-oram-tape-substitution-tested",
+      "ok": true
+    },
+    {
       "detail": "doc_anchor \"admitted-package hash\" for admitted-package-identity-hash appears in docs/claim-boundary.md",
       "name": "anchor-in-doc:admitted-package-identity-hash",
       "ok": true
@@ -492,7 +502,7 @@
       "ok": true
     },
     {
-      "detail": "13 manifest entries in category claim",
+      "detail": "14 manifest entries in category claim",
       "name": "category-present:claim",
       "ok": true
     },
@@ -719,6 +729,26 @@
     {
       "detail": "artifact runtime/uo-evm/src/generated_oram_codecs.rs referenced by path-oram-private-avl-map-semantics exists",
       "name": "file-exists:path-oram-private-avl-map-semantics:runtime/uo-evm/src/generated_oram_codecs.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact probe/mplus-probe/src/tape_substitution.rs referenced by path-oram-tape-substitution-tested exists",
+      "name": "file-exists:path-oram-tape-substitution-tested:probe/mplus-probe/src/tape_substitution.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact proof/lean/UOToolchain/PathOramTapeWitness.lean referenced by path-oram-tape-substitution-tested exists",
+      "name": "file-exists:path-oram-tape-substitution-tested:proof/lean/UOToolchain/PathOramTapeWitness.lean",
+      "ok": true
+    },
+    {
+      "detail": "artifact proof/lean/CheckPathOramTapeSamples.lean referenced by path-oram-tape-substitution-tested exists",
+      "name": "file-exists:path-oram-tape-substitution-tested:proof/lean/CheckPathOramTapeSamples.lean",
+      "ok": true
+    },
+    {
+      "detail": "artifact runtime/uo-evm/src/oram.rs referenced by path-oram-tape-substitution-tested exists",
+      "name": "file-exists:path-oram-tape-substitution-tested:runtime/uo-evm/src/oram.rs",
       "ok": true
     },
     {
@@ -1206,7 +1236,8 @@
     },
     {
       "benchmark_result_files": [
-        "results/path_oram_avl_map_replay.json"
+        "results/path_oram_avl_map_replay.json",
+        "results/path_oram_avl_map_replay_full.json"
       ],
       "category": "claim",
       "doc_anchor": "UOToolchain/PathOramAvlMap.lean",
@@ -1224,6 +1255,28 @@
       "status": "Lean-proved",
       "text": "The private scheme's AVL map algorithm, modeled over inductive trees with the runtime's walk, successor delete, rotation rule and node-access counts, implements a finite map: with the walk bounded by the capacity's largest AVL height, a get returns the key's value and a put writes, updates or deletes it, keeps the tree sorted, balanced and within the capacity, and overflows exactly when it would insert into a full map; the runtime's tree_get and tree_put are replayed against the model, not proved to follow it.",
       "validation_command": "cargo run -q -p mplus-probe -- --only path-oram-avl-map-replay --out-dir results"
+    },
+    {
+      "benchmark_result_files": [
+        "results/tape_substitution.json",
+        "results/tape_substitution_full.json"
+      ],
+      "category": "claim",
+      "doc_anchor": "tape_substitution_full.json",
+      "id": "path-oram-tape-substitution-tested",
+      "lean_modules": [
+        "proof/lean/UOToolchain/PathOramTapeWitness.lean",
+        "proof/lean/CheckPathOramTapeSamples.lean"
+      ],
+      "runtime_compiler_files": [
+        "runtime/uo-evm/src/oram.rs"
+      ],
+      "source_files": [
+        "probe/mplus-probe/src/tape_substitution.rs"
+      ],
+      "status": "empirically-tested",
+      "text": "That a runtime run of a call on another tape is the representative run with that tape's leaves substituted, which the tape-family theorems take from one runtime run, is tested and not proved of the Rust runtime: on maps of both Path ORAM schemes at three capacities each, calls of seven kinds (a read that hits, one that misses, an insert, an overwrite, a delete, a delete of an absent key and a write that aborts), each after a setup with deletes and aborts, run on 16 other deployment seeds each, and the Lean checker finds every one of the 1,344 runs equal to the substituted run.",
+      "validation_command": "cargo run -q --release -p mplus-probe -- --only tape-substitution-full --out-dir results"
     },
     {
       "benchmark_result_files": [
@@ -1759,7 +1812,7 @@
       "validation_command": "cargo run -q -p mplus-probe -- --only acceptance-check --out-dir results"
     }
   ],
-  "entry_count": 37,
+  "entry_count": 38,
   "schema": "uo.claim_artifact_manifest.v1",
   "source_of_truth": "docs/claim-boundary.md"
 }

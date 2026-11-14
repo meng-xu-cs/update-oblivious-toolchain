@@ -13,9 +13,22 @@ establish and what they do not).
   `results/reproducibility_manifest.json` records the Rust and Lean toolchains
   and the SHA-256 of every file in the bundle. CI regenerates the reports it
   can afford (static checks, the Lean assumption budget, correctness, abort
-  rollback, AVL map replay, the storage boundary, acceptance, claim
-  consistency and claim status) and fails if any differs from the committed
-  one.
+  rollback, the quick profiles of the AVL map replay and of the tape
+  substitution, the storage boundary, acceptance, claim consistency and
+  claim status) and fails if any differs from the committed one.
+- The two reports that test the runtime against a model have a quick and a
+  full profile each, with one schema per report
+  (`uo-path-oram-avl-map-replay-v2`, `uo-tape-substitution-v1`). The quick
+  ones run from the debug build, in the validation script and in CI: 2,400
+  operations on AVL maps of at most 31 nodes into
+  `results/path_oram_avl_map_replay.json`, and 14 calls on 3 other deployment
+  seeds each into `results/tape_substitution.json`. The full ones run from the
+  release build, in the validation script only, because the runtime is about
+  twenty times slower in a debug build: 7,398 operations on maps of up to
+  2,048 nodes into `results/path_oram_avl_map_replay_full.json` (about four
+  minutes on four cores), and 84 calls on 16 other deployment seeds each into
+  `results/tape_substitution_full.json` (about eight minutes). All four are
+  functions of their seeds, and each states its counts.
 - `scripts/measure_tree_eviction_instructions.sh` writes
   `results/tree_eviction_instructions.json`. `run_validation.sh` does not
   regenerate it: the script exports two revisions, builds each in release and
@@ -76,7 +89,8 @@ establish and what they do not).
 | Question | Result files |
 | --- | --- |
 | Leakage: do admitted artifacts remove the update-class channels? | `leakage_auc.json` and `mutual_information.json` (per-metric AUC and mutual information on the exact backends and on both Path ORAM schemes, the rows `oram` and `oram_private_posmap`, with raw-backend positive controls built with `--features insecure-eval-raw`); `trace_equivalence.json` (per benchmark pair, opcode, logical and physical trace comparisons, equality being an obligation on the exact backends and not on the Path ORAM route, plus a raw positive control; for an `encrypted_to_client` entrypoint, what its runs show of the return channel) |
-| Correctness | `correctness.json` (differential runs against the raw baseline), `abort_rollback.json` (aborting and committing calls on the exact backend and on both Path ORAM schemes), `path_oram_avl_map_replay.json` (runtime AVL map operations replayed against the Lean model), and the model columns of `trace_equivalence.json` (each run's public outcome and final public state against their Lean models, and the exact store's encoding on the exact backends) |
+| Correctness | `correctness.json` (differential runs against the raw baseline), `abort_rollback.json` (aborting and committing calls on the exact backend and on both Path ORAM schemes), and the model columns of `trace_equivalence.json` (each run's public outcome and final public state against their Lean models, and the exact store's encoding on the exact backends) |
+| Does the runtime's Path ORAM follow its Lean models? Tested, not proved | `path_oram_avl_map_replay.json` and `path_oram_avl_map_replay_full.json` (random operations on the runtime's AVL map replayed on the Lean model: every result, every node access's kind, every size and the recorded trees, on maps of up to 31 and up to 2,048 nodes, with the map's pointers, free list and stash checked after every operation); `tape_substitution.json` and `tape_substitution_full.json` (calls of seven kinds on maps of both schemes, each run on other deployment seeds and compared, whole, with the representative run under that run's own tape: 42 and 1,344 tapes) |
 | Runtime and storage cost | `overheads.json` (modeled gas, physical reads and writes, bytes moved, trace and artifact sizes per benchmark and backend) |
 | Scalability | `capacity_sweep.json` and `capacity_sweep_full.json` (one map of 1 to 16,384 entries on every backend, at five occupancy levels: the traced counts of seven kinds of call, the untraced reads at a call's start and in the decode of the position-map witness, which the runtime keeps from call to call, with an audit of the kept witness after every level, read/write mixes computed and executed, break-even capacities, and release-build latencies with medians, 95th percentiles and bootstrap intervals, split into staging, loading, the runtime's own work, witnesses, proof objects, JSON serialization and Lean's check of a sampled call, with peak resident memory and evidence sizes) |
 | What crosses the storage boundary, and does a runtime start again from its files? | `storage_boundary.json` (every benchmark on every sealed backend: the log a storage adapter keeps of the sealed records the runtime opens and seals against the reads and writes of each call's trace, with the reads of a Path ORAM map's counter and metadata pages that the trace names again counted; a call dropped after it handed records over; a record refused before its nonce is reserved; and each benchmark restarted from a store in files, which must answer as before and repeat no nonce) |

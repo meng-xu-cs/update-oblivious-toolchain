@@ -1,0 +1,115 @@
+{
+  "accepted": true,
+  "capacities": [
+    127,
+    500,
+    1024,
+    2048
+  ],
+  "checker": "proof/lean/.lake/build/bin/checkPathOramAvlMapReplay",
+  "checks": {
+    "a_compared_tree_has_at_least_1024_nodes": true,
+    "puts_overflowed": true,
+    "tampered_replays_are_rejected": true,
+    "the_checker_compared_every_recorded_tree": true,
+    "the_checker_replayed_every_run_and_operation": true,
+    "the_largest_tree_compared_is_the_largest_recorded": true
+  },
+  "compared_with_the_lean_model": [
+    "each get's value and whether it found the key",
+    "each put's overflow flag",
+    "each node access's kind, real or dummy",
+    "the map's size after each operation",
+    "each recorded tree, with the height each pointer records"
+  ],
+  "evidence_classification": "empirically tested",
+  "largest_tree_compared_nodes": 2048,
+  "largest_tree_nodes": 2048,
+  "lean_model": "proof/lean/UOToolchain/PathOramAvlMap.lean",
+  "lean_stdout": "runs=4 operations=7398 trees=116 largest_tree=2048",
+  "operation_counts": {
+    "deleting_puts": 805,
+    "gets": 1125,
+    "masked_puts": 257,
+    "node_accesses": 287861,
+    "overflowing_puts": 408,
+    "real_node_accesses": 75268,
+    "writing_puts": 4803
+  },
+  "operations": 7398,
+  "operations_that_leave_a_tree_of_at_least_1024_nodes": 3559,
+  "pointer_level_checks": 7398,
+  "profile": "full",
+  "rejected_tampers": [
+    "flipped_access_kind",
+    "changed_stored_height",
+    "changed_get_value",
+    "dropped_overflow",
+    "dropped_last_tree"
+  ],
+  "replay_json_bytes": 4906482,
+  "runs": 4,
+  "runs_of_the_replay": [
+    {
+      "avl_height": 9,
+      "capacity": 127,
+      "fill_writes": 127,
+      "largest_tree_nodes": 127,
+      "mixed_operations": 127,
+      "operations": 254,
+      "operations_that_leave_a_tree_of_at_least_1024_nodes": 0,
+      "overflowing_puts": 14,
+      "seed": 0,
+      "trees_recorded": 4
+    },
+    {
+      "avl_height": 12,
+      "capacity": 500,
+      "fill_writes": 500,
+      "largest_tree_nodes": 500,
+      "mixed_operations": 500,
+      "operations": 1000,
+      "operations_that_leave_a_tree_of_at_least_1024_nodes": 0,
+      "overflowing_puts": 65,
+      "seed": 0,
+      "trees_recorded": 16
+    },
+    {
+      "avl_height": 14,
+      "capacity": 1024,
+      "fill_writes": 1024,
+      "largest_tree_nodes": 1024,
+      "mixed_operations": 1024,
+      "operations": 2048,
+      "operations_that_leave_a_tree_of_at_least_1024_nodes": 486,
+      "overflowing_puts": 98,
+      "seed": 0,
+      "trees_recorded": 32
+    },
+    {
+      "avl_height": 15,
+      "capacity": 2048,
+      "fill_writes": 2048,
+      "largest_tree_nodes": 2048,
+      "mixed_operations": 2048,
+      "operations": 4096,
+      "operations_that_leave_a_tree_of_at_least_1024_nodes": 3073,
+      "overflowing_puts": 231,
+      "seed": 0,
+      "trees_recorded": 64
+    }
+  ],
+  "runtime_pointer_level_checked_after_every_operation": [
+    "every node block lies on its leaf's path and is stored once",
+    "every tree and free-list pointer carries its node's current leaf",
+    "the tree and the free list are acyclic and together hold every node",
+    "the stash stays within its bound"
+  ],
+  "rust_semantic_refinement_claimed": false,
+  "schema": "uo-path-oram-avl-map-replay-v2",
+  "seeds": [
+    0
+  ],
+  "tree_recorded_after_every": 64,
+  "trees_compared_with_the_lean_model": 116
+}

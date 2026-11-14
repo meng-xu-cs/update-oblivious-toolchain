@@ -13,16 +13,25 @@
     31
   ],
   "checker": "proof/lean/.lake/build/bin/checkPathOramAvlMapReplay",
+  "checks": {
+    "puts_overflowed": true,
+    "tampered_replays_are_rejected": true,
+    "the_checker_compared_every_recorded_tree": true,
+    "the_checker_replayed_every_run_and_operation": true,
+    "the_largest_tree_compared_is_the_largest_recorded": true
+  },
   "compared_with_the_lean_model": [
     "each get's value and whether it found the key",
     "each put's overflow flag",
     "each node access's kind, real or dummy",
     "the map's size after each operation",
-    "the tree after each operation, with the height each pointer records"
+    "each recorded tree, with the height each pointer records"
   ],
   "evidence_classification": "empirically tested",
+  "largest_tree_compared_nodes": 31,
+  "largest_tree_nodes": 31,
   "lean_model": "proof/lean/UOToolchain/PathOramAvlMap.lean",
-  "lean_stdout": "runs=20 operations=2400",
+  "lean_stdout": "runs=20 operations=2400 trees=2400 largest_tree=31",
   "operation_counts": {
     "deleting_puts": 505,
     "gets": 744,
@@ -33,25 +42,272 @@
     "writing_puts": 610
   },
   "operations": 2400,
-  "operations_per_run": 120,
+  "operations_that_leave_a_tree_of_at_least_1024_nodes": 0,
+  "pointer_level_checks": 2400,
+  "profile": "quick",
   "rejected_tampers": [
     "flipped_access_kind",
     "changed_stored_height",
     "changed_get_value",
-    "dropped_overflow"
+    "dropped_overflow",
+    "dropped_last_tree"
   ],
   "replay_json_bytes": 660761,
   "runs": 20,
-  "runtime_pointer_level_checked": [
+  "runs_of_the_replay": [
+    {
+      "avl_height": 1,
+      "capacity": 1,
+      "fill_writes": 0,
+      "largest_tree_nodes": 1,
+      "mixed_operations": 120,
+      "operations": 120,
+      "operations_that_leave_a_tree_of_at_least_1024_nodes": 0,
+      "overflowing_puts": 28,
+      "seed": 0,
+      "trees_recorded": 120
+    },
+    {
+      "avl_height": 1,
+      "capacity": 1,
+      "fill_writes": 0,
+      "largest_tree_nodes": 1,
+      "mixed_operations": 120,
+      "operations": 120,
+      "operations_that_leave_a_tree_of_at_least_1024_nodes": 0,
+      "overflowing_puts": 36,
+      "seed": 1,
+      "trees_recorded": 120
+    },
+    {
+      "avl_height": 2,
+      "capacity": 2,
+      "fill_writes": 0,
+      "largest_tree_nodes": 2,
+      "mixed_operations": 120,
+      "operations": 120,
+      "operations_that_leave_a_tree_of_at_least_1024_nodes": 0,
+      "overflowing_puts": 25,
+      "seed": 0,
+      "trees_recorded": 120
+    },
+    {
+      "avl_height": 2,
+      "capacity": 2,
+      "fill_writes": 0,
+      "largest_tree_nodes": 2,
+      "mixed_operations": 120,
+      "operations": 120,
+      "operations_that_leave_a_tree_of_at_least_1024_nodes": 0,
+      "overflowing_puts": 33,
+      "seed": 1,
+      "trees_recorded": 120
+    },
+    {
+      "avl_height": 2,
+      "capacity": 3,
+      "fill_writes": 0,
+      "largest_tree_nodes": 3,
+      "mixed_operations": 120,
+      "operations": 120,
+      "operations_that_leave_a_tree_of_at_least_1024_nodes": 0,
+      "overflowing_puts": 32,
+      "seed": 0,
+      "trees_recorded": 120
+    },
+    {
+      "avl_height": 2,
+      "capacity": 3,
+      "fill_writes": 0,
+      "largest_tree_nodes": 3,
+      "mixed_operations": 120,
+      "operations": 120,
+      "operations_that_leave_a_tree_of_at_least_1024_nodes": 0,
+      "overflowing_puts": 17,
+      "seed": 1,
+      "trees_recorded": 120
+    },
+    {
+      "avl_height": 3,
+      "capacity": 4,
+      "fill_writes": 0,
+      "largest_tree_nodes": 4,
+      "mixed_operations": 120,
+      "operations": 120,
+      "operations_that_leave_a_tree_of_at_least_1024_nodes": 0,
+      "overflowing_puts": 29,
+      "seed": 0,
+      "trees_recorded": 120
+    },
+    {
+      "avl_height": 3,
+      "capacity": 4,
+      "fill_writes": 0,
+      "largest_tree_nodes": 4,
+      "mixed_operations": 120,
+      "operations": 120,
+      "operations_that_leave_a_tree_of_at_least_1024_nodes": 0,
+      "overflowing_puts": 25,
+      "seed": 1,
+      "trees_recorded": 120
+    },
+    {
+      "avl_height": 3,
+      "capacity": 5,
+      "fill_writes": 0,
+      "largest_tree_nodes": 5,
+      "mixed_operations": 120,
+      "operations": 120,
+      "operations_that_leave_a_tree_of_at_least_1024_nodes": 0,
+      "overflowing_puts": 18,
+      "seed": 0,
+      "trees_recorded": 120
+    },
+    {
+      "avl_height": 3,
+      "capacity": 5,
+      "fill_writes": 0,
+      "largest_tree_nodes": 5,
+      "mixed_operations": 120,
+      "operations": 120,
+      "operations_that_leave_a_tree_of_at_least_1024_nodes": 0,
+      "overflowing_puts": 18,
+      "seed": 1,
+      "trees_recorded": 120
+    },
+    {
+      "avl_height": 4,
+      "capacity": 7,
+      "fill_writes": 0,
+      "largest_tree_nodes": 7,
+      "mixed_operations": 120,
+      "operations": 120,
+      "operations_that_leave_a_tree_of_at_least_1024_nodes": 0,
+      "overflowing_puts": 22,
+      "seed": 0,
+      "trees_recorded": 120
+    },
+    {
+      "avl_height": 4,
+      "capacity": 7,
+      "fill_writes": 0,
+      "largest_tree_nodes": 7,
+      "mixed_operations": 120,
+      "operations": 120,
+      "operations_that_leave_a_tree_of_at_least_1024_nodes": 0,
+      "overflowing_puts": 14,
+      "seed": 1,
+      "trees_recorded": 120
+    },
+    {
+      "avl_height": 4,
+      "capacity": 8,
+      "fill_writes": 0,
+      "largest_tree_nodes": 8,
+      "mixed_operations": 120,
+      "operations": 120,
+      "operations_that_leave_a_tree_of_at_least_1024_nodes": 0,
+      "overflowing_puts": 14,
+      "seed": 0,
+      "trees_recorded": 120
+    },
+    {
+      "avl_height": 4,
+      "capacity": 8,
+      "fill_writes": 0,
+      "largest_tree_nodes": 8,
+      "mixed_operations": 120,
+      "operations": 120,
+      "operations_that_leave_a_tree_of_at_least_1024_nodes": 0,
+      "overflowing_puts": 14,
+      "seed": 1,
+      "trees_recorded": 120
+    },
+    {
+      "avl_height": 5,
+      "capacity": 12,
+      "fill_writes": 0,
+      "largest_tree_nodes": 12,
+      "mixed_operations": 120,
+      "operations": 120,
+      "operations_that_leave_a_tree_of_at_least_1024_nodes": 0,
+      "overflowing_puts": 13,
+      "seed": 0,
+      "trees_recorded": 120
+    },
+    {
+      "avl_height": 5,
+      "capacity": 12,
+      "fill_writes": 0,
+      "largest_tree_nodes": 12,
+      "mixed_operations": 120,
+      "operations": 120,
+      "operations_that_leave_a_tree_of_at_least_1024_nodes": 0,
+      "overflowing_puts": 5,
+      "seed": 1,
+      "trees_recorded": 120
+    },
+    {
+      "avl_height": 5,
+      "capacity": 16,
+      "fill_writes": 0,
+      "largest_tree_nodes": 16,
+      "mixed_operations": 120,
+      "operations": 120,
+      "operations_that_leave_a_tree_of_at_least_1024_nodes": 0,
+      "overflowing_puts": 5,
+      "seed": 0,
+      "trees_recorded": 120
+    },
+    {
+      "avl_height": 5,
+      "capacity": 16,
+      "fill_writes": 0,
+      "largest_tree_nodes": 16,
+      "mixed_operations": 120,
+      "operations": 120,
+      "operations_that_leave_a_tree_of_at_least_1024_nodes": 0,
+      "overflowing_puts": 8,
+      "seed": 1,
+      "trees_recorded": 120
+    },
+    {
+      "avl_height": 6,
+      "capacity": 31,
+      "fill_writes": 0,
+      "largest_tree_nodes": 31,
+      "mixed_operations": 120,
+      "operations": 120,
+      "operations_that_leave_a_tree_of_at_least_1024_nodes": 0,
+      "overflowing_puts": 3,
+      "seed": 0,
+      "trees_recorded": 120
+    },
+    {
+      "avl_height": 6,
+      "capacity": 31,
+      "fill_writes": 0,
+      "largest_tree_nodes": 31,
+      "mixed_operations": 120,
+      "operations": 120,
+      "operations_that_leave_a_tree_of_at_least_1024_nodes": 0,
+      "overflowing_puts": 1,
+      "seed": 1,
+      "trees_recorded": 120
+    }
+  ],
+  "runtime_pointer_level_checked_after_every_operation": [
     "every node block lies on its leaf's path and is stored once",
     "every tree and free-list pointer carries its node's current leaf",
-    "the tree and the free list hold every node",
+    "the tree and the free list are acyclic and together hold every node",
     "the stash stays within its bound"
   ],
   "rust_semantic_refinement_claimed": false,
-  "schema": "uo-path-oram-avl-map-replay-v1",
+  "schema": "uo-path-oram-avl-map-replay-v2",
   "seeds": [
     0,
     1
-  ]
+  ],
+  "tree_recorded_after_every": 1,
+  "trees_compared_with_the_lean_model": 2400
 }

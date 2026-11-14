@@ -1250,7 +1250,7 @@ that was run again with the cap are under Wave 5 above.
 
 ## Wave 6: evidence at a storage boundary
 
-Issue 41 is done; Issue 42 is next.
+Issues 41 and 42 are done.
 
 ### Issue 41 — Put storage behind an adapter that keeps its own I/O log
 
@@ -1418,6 +1418,74 @@ deletes and aborts in the full validation, and a subset in CI. Replay the
 AVL map on trees of at least 1,024 nodes, and check after every operation
 that the free list is acyclic, each node is stored once and every stored
 leaf is the one its parent holds.
+
+As built. Both tests have a quick profile, which CI regenerates from the
+debug build, and a full one, which the validation script runs from the
+release build: the runtime is about twenty times slower in a debug build,
+and CI builds none other. Each report states its counts, compares them with
+what the Lean checker says it checked, and has `accepted` false on a
+difference.
+
+The tape substitution has a report of its own, `--only tape-substitution`
+and `--only tape-substitution-full`
+(`probe/mplus-probe/src/tape_substitution.rs`, schema
+`uo-tape-substitution-v1`), with a new Lean checker,
+`checkPathOramTapeSamples`: it requires the tape-family checks of a
+representative run (`tapeWitnessCheck`) and that each sampled run is the
+representative run with the sample's own tape substituted (`sampleCheck`),
+whole witnesses but for their seed tag, and prints how many samples ran on
+another tape and with other leaves before the call. The contract is SweepMap
+on both schemes. A workload is drawn from a seed: a setup of 13 calls (puts,
+deletes, reads, and writes behind a guard that fails), then one call of each
+of seven kinds: a read that hits, a read that misses, an insert, an
+overwrite, a delete, a delete of an absent key and a write that aborts. Each
+call runs once as the representative and then on other deployment seeds, the
+setup replayed on each. The full profile has maps of 8, 32 and 128 entries
+on the local scheme and of 16, 64 and 256 on the private one, two workloads
+a map and 16 other seeds a call: 84 calls and 1,344 runs, every one on a
+tape other than its representative's and with other leaves before the call,
+and every one equal to the substituted run (eight minutes). The quick
+profile has one map a scheme (8 and 16 entries), one workload and 3 seeds a
+call: 42 runs, 41 on another tape. The checker rejects a sample with one
+bucket read moved, a sample of another call and a sample with a read
+dropped. The checker runs once a call: the 17 witnesses of one call on the
+map of 256 entries are 11 MB of JSON.
+
+The AVL replay (`runtime/uo-evm/src/avl_map_replay.rs`, schema
+`uo-path-oram-avl-map-replay-v2`) takes a plan for each capacity: writes of
+distinct random keys that fill the map, then mixed operations, and how often
+the tree is recorded. A tree of 2,048 nodes is nearly 40 KB of JSON, so a
+large replay records it after every 64th operation and after the last; the
+model still replays every operation and compares its result, its node
+accesses' kinds and the map's size, and the checker requires a tree after
+the last operation. The pointer level was already checked after every
+operation and still is, on every map: each node block lies on its leaf's
+path and is stored once, each tree and free-list pointer carries its node's
+current leaf, the tree and the free list are acyclic and together hold every
+node, and the stash is within its bound. The quick profile is the replay as
+it was (2,400 operations on maps of 1 to 31 nodes, a tree after each). The
+full profile (`--only path-oram-avl-map-replay-full`) fills maps of 127,
+500, 1,024 and 2,048 nodes and makes as many mixed operations on each as it
+holds: 7,398 operations and 287,861 node accesses, 3,559 operations that
+leave a tree of at least 1,024 nodes, 408 puts that overflow a full map, and
+116 trees compared, the largest of 2,048 nodes (four minutes). The checker
+now prints the trees it compared and the nodes of the largest, and the
+report requires them to be what the replay recorded.
+
+No divergence was found: every run on another tape was the substituted
+run, and every operation agreed with the model. Nothing is promoted: the
+claim manifest has the tape substitution as an empirically tested claim
+(`path-oram-tape-substitution-tested`), the documents say "tested over
+1,344 tapes", and a proof that the runtime follows the models stays
+research (Issues 43 and 46).
+
+A rejected sample makes the tape report's `accepted` false, and a count
+that the checker does not confirm makes either report's; the acceptance
+gate fails on both (`a_runtime_against_model_divergence_fails_closed`). A
+replay the model rejects stops the probe. The issue changes no code that a
+call runs (the replay is diagnostics code), so the full profiles of the
+capacity sweep and of the stash occupancy were not run again; their
+`provenance` names the builds that measured them.
 
 #### Acceptance criteria
 

@@ -93,6 +93,8 @@ jobs:
         run: cargo run -q -p mplus-probe -- --only abort-rollback --out-dir results
       - name: AVL map replay against the Lean model
         run: cargo run -q -p mplus-probe -- --only path-oram-avl-map-replay --out-dir results
+      - name: tape substitution (runs on other seeds against the substituted run)
+        run: cargo run -q -p mplus-probe -- --only tape-substitution --out-dir results
       - name: storage boundary (store log against traces, restart from files)
         run: cargo run -q -p mplus-probe -- --only storage-boundary --out-dir results
       - name: fail-closed acceptance aggregate

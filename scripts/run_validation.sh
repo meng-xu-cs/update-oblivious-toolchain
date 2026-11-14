@@ -86,7 +86,19 @@ cargo run -q --release -p mplus-probe -- --only stash-occupancy "${PROBE_ARGS[@]
 # compared with each call's trace, and a runtime restarted from a store in
 # files. Its counts are a function of its seed (about a minute).
 cargo run -q -p mplus-probe -- --only storage-boundary "${PROBE_ARGS[@]}"
+# Runtime against model (Issue 42). The AVL map replay runs random operations
+# on the runtime's oblivious AVL map and checks each against the Lean model;
+# the tape-substitution report runs calls on other deployment seeds and
+# checks each run against the substituted run of the Path ORAM theorems.
+# Both are tests, not proofs, and their reports state their counts. The quick
+# profiles are the ones CI regenerates (each under a minute from the debug
+# build). The full profiles replay maps of up to 2,048 nodes and run each of
+# 84 calls on 16 other seeds. A debug build is about twenty times slower, so
+# they run from the release build (about four and eight minutes).
 cargo run -q -p mplus-probe -- --only path-oram-avl-map-replay "${PROBE_ARGS[@]}"
+cargo run -q -p mplus-probe -- --only tape-substitution "${PROBE_ARGS[@]}"
+cargo run -q --release -p mplus-probe -- --only path-oram-avl-map-replay-full "${PROBE_ARGS[@]}"
+cargo run -q --release -p mplus-probe -- --only tape-substitution-full "${PROBE_ARGS[@]}"
 cargo run -q -p mplus-probe -- --only abort-rollback "${PROBE_ARGS[@]}"
 # Compiler admission matrix (Issue 20): compile-and-run every accepted DSL
 # feature and reject every unsupported one with a diagnostic that names the

@@ -1,0 +1,106 @@
+{
+  "accepted": true,
+  "checker": "proof/lean/.lake/build/bin/checkPathOramTapeSamples",
+  "checks": {
+    "every_sample_ran": true,
+    "every_sample_run_is_its_representative_run_under_its_own_tape": true,
+    "samples_ran_on_other_tapes": true,
+    "tampered_samples_are_rejected": true
+  },
+  "contract": "SweepMap",
+  "evidence_classification": "empirically tested",
+  "lean_check": "sampleCheck in proof/lean/UOToolchain/PathOramTapeWitness.lean",
+  "maps": [
+    {
+      "calls": 7,
+      "capacity": 8,
+      "every_run_is_the_substituted_run": true,
+      "rejections": [],
+      "runs_on_another_tape": 20,
+      "runs_the_checker_compared": 21,
+      "runs_with_other_leaves_before_the_call": 20,
+      "sample_runs": 21,
+      "sample_runs_by_kind": {
+        "abort": 3,
+        "delete": 3,
+        "delete_absent": 3,
+        "insert": 3,
+        "overwrite": 3,
+        "read_hit": 3,
+        "read_miss": 3
+      },
+      "samples_json_bytes": 237817,
+      "scheme": "path_oram_local_posmap_v1",
+      "setup_calls": {
+        "deletes": 2,
+        "puts": 5
+      },
+      "workloads": 1
+    },
+    {
+      "calls": 7,
+      "capacity": 16,
+      "every_run_is_the_substituted_run": true,
+      "rejections": [],
+      "runs_on_another_tape": 21,
+      "runs_the_checker_compared": 21,
+      "runs_with_other_leaves_before_the_call": 21,
+      "sample_runs": 21,
+      "sample_runs_by_kind": {
+        "abort": 3,
+        "delete": 3,
+        "delete_absent": 3,
+        "insert": 3,
+        "overwrite": 3,
+        "read_hit": 3,
+        "read_miss": 3
+      },
+      "samples_json_bytes": 2121428,
+      "scheme": "path_oram_private_posmap_v1",
+      "setup_calls": {
+        "aborts": 1,
+        "deletes": 1,
+        "puts": 5
+      },
+      "workloads": 1
+    }
+  ],
+  "parameters": {
+    "local_scheme_capacities": [
+      8
+    ],
+    "private_scheme_capacities": [
+      16
+    ],
+    "sample_seeds_per_call": 3,
+    "seed": "0x5441504553554231",
+    "setup_calls_per_workload": 7,
+    "target_kinds": [
+      "read_hit",
+      "read_miss",
+      "insert",
+      "overwrite",
+      "delete",
+      "delete_absent",
+      "abort"
+    ],
+    "workloads_per_map": 1
+  },
+  "profile": "quick",
+  "rejected_tampers": [
+    "moved_bucket_read",
+    "sample_of_another_call",
+    "dropped_read"
+  ],
+  "rust_semantic_refinement_claimed": false,
+  "schema": "uo-tape-substitution-v1",
+  "totals": {
+    "calls": 14,
+    "maps": 2,
+    "runs_on_another_tape": 41,
+    "runs_with_other_leaves_before_the_call": 41,
+    "sample_runs": 42,
+    "tapes_tested": 42
+  },
+  "what_is_tested": "a runtime run of a call on another deployment seed, which holds other leaves and draws other coins, equals the representative run of the call with that run's own tape substituted"
+}

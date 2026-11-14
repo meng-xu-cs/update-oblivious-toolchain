@@ -300,9 +300,30 @@ The Lean development states more than it currently proves for Path ORAM:
   check compares whole witnesses, all but their seed tag, and the tamper
   suite moves one bucket read
   of a sample to see it rejected
-  (`canonical_pathoram_pair_tape_samples/bucket_drift`). That the runtime's
-  run on every tape is the substituted run is what these samples test; it is
-  not proved of the Rust runtime.
+  (`canonical_pathoram_pair_tape_samples/bucket_drift`).
+- That the runtime's run on every tape is the substituted run is tested, not
+  proved of the Rust runtime. The samples of the pairs test it, and the
+  tape-substitution report tests it over many seeds
+  (`--only tape-substitution`, `results/tape_substitution.json`; its full
+  profile is `--only tape-substitution-full`,
+  `results/tape_substitution_full.json`, which the validation script runs
+  from a release build). For a SweepMap of
+  each scheme at three capacities (8, 32 and 128 on the local scheme, 16, 64
+  and 256 on the private one) the full profile draws two workloads from a
+  seed. A workload is a setup of 13 calls (puts, deletes, reads, and writes
+  behind a guard that fails) and then one call of each of seven kinds: a read
+  that hits, a read that misses, an insert, an overwrite, a delete, a delete
+  of an absent key, and a write that aborts. Each of the 84 calls runs once as
+  the representative and then on 16 other deployment seeds, and
+  `checkPathOramTapeSamples` finds each of the 1,344 runs equal to the
+  representative run with its own tape substituted (`sampleCheck`). So the
+  substitution is tested over 1,344 tapes, each with other leaves before the
+  call than the representative's. The quick profile, which CI regenerates,
+  runs 14 calls on 3 other seeds each: 42 tapes, 41 of them other than the
+  representative's. The checker rejects a sample with one bucket read moved, a
+  sample that is a run of another call, and a sample with a read dropped. A
+  run that differs makes the report's `accepted` false, which fails the
+  acceptance gate.
 
 The AVL map's algorithm is proved in Lean over inductive trees
 (`UOToolchain/PathOramAvlMap.lean`). The model takes the runtime's steps: a
@@ -316,13 +337,30 @@ its capacity, with `h` the capacity's largest AVL height, `get_spec` and
 updates or deletes it, keeps all of that, and overflows exactly when it would
 insert into a full map; `height_le_avlHeight` is why `h` levels suffice, and
 `getAccesses_length_shape` and `putAccesses_length_shape` give each
-operation the trace shape's node-access count. The runtime is checked
-against the model by replay: `checkPathOramAvlMapReplay` reruns 2,400
-runtime operations on maps of 1 to 31 nodes (`--only path-oram-avl-map-replay`,
-`results/path_oram_avl_map_replay.json`) and compares every result, every
-node access's kind, every size and every tree with its stored heights; the
-replay also checks the pointer level the model leaves out, and the checker
-rejects a replay with one of those facts changed.
+operation the trace shape's node-access count. The runtime is tested
+against the model by replay, not proved to follow it. A replay runs random
+gets, writes, deletes and masked puts on the runtime's `tree_get` and
+`tree_put` over buckets in memory, and `checkPathOramAvlMapReplay` reruns
+them on the model and compares every result, every node access's kind,
+every size, and every recorded tree with its stored heights. The quick
+profile (`--only path-oram-avl-map-replay`,
+`results/path_oram_avl_map_replay.json`), which CI regenerates, makes 2,400
+operations on maps of 1 to 31 nodes and compares the tree after each. The
+full profile (`--only path-oram-avl-map-replay-full`,
+`results/path_oram_avl_map_replay_full.json`), which the validation script
+runs from a release build, makes 7,398 operations and 287,861 node accesses
+on maps of 127, 500, 1,024 and 2,048 nodes: each map is filled by writes of
+distinct random keys and then takes as many mixed operations as it holds.
+3,559 of its operations leave a tree of at least 1,024 nodes, 408 are puts
+that overflow a full map, and the tree is compared after every 64th
+operation and after the last (116 trees, the largest of 2,048 nodes). After
+every operation of either profile the replay also checks the pointer level
+the model leaves out: every node block lies on its leaf's path and is stored
+once, every tree and free-list pointer carries its node's current leaf, the
+tree and the free list are acyclic and together hold every node, and the
+stash is within its bound. The checker rejects a replay with a node access's
+kind, a stored height, a get's value or a put's overflow changed, and one
+with no tree after its last operation.
 
 The capacity sweep (`--only capacity-sweep`, `results/capacity_sweep.json`,
 schema `uo-capacity-sweep-v4`) measures one map of 1 to 16,384 entries on the
