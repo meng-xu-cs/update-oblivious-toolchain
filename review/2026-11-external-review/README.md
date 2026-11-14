@@ -9,6 +9,7 @@ directory holds the response.
 | [`tasks.md`](./tasks.md) | Issues 22 to 56: description, fix and acceptance criteria |
 | [`capacity_sweep_baseline.json`](./capacity_sweep_baseline.json) | the capacity sweep's full profile as Issue 27 measured it, before any optimization: what Issues 30 to 38 compare their savings with |
 | [`capacity_sweep_control_before_wave4.json`](./capacity_sweep_control_before_wave4.json), [`capacity_sweep_control_after_wave4.json`](./capacity_sweep_control_after_wave4.json) | a control for Issues 36 to 38: the full profile's rounds on the maps of 4,096, 8,192 and 16,384 entries at 2 keys, on the code before those issues (`cb92f8c`) and on the code after them (`9d93471`), one run after the other on one machine |
+| [`capacity_sweep_control_before_cap152.json`](./capacity_sweep_control_before_cap152.json), [`capacity_sweep_control_after_cap152.json`](./capacity_sweep_control_after_cap152.json) | the same control for the stash cap of Issue 40: on the code before it (`ece1167`, a cap of 114) and on the code after it (`305c1a2`, a cap of 152) |
 | this file | the positions in brief, the order of work, and the tracker |
 
 The review text is not in the repository; `validation.md` restates each
@@ -80,8 +81,9 @@ Issue 22 has the options and the reasoning.
    figures and break-evens. The machine was slower than for the earlier
    profiles, so what the wave saved is measured by a control, the code
    before the wave and the code after it run one after the other.
-6. **Wave 5, theorem coverage** (Issues 39 and 40). Independent of Waves 3
-   and 4; it can run beside them.
+6. **Wave 5, theorem coverage** (Issues 39 and 40). Done; the full profile
+   was run again with the stash cap of 152, and a control measures what the
+   cap costs a tree access: 13% to 17% of its own work.
 7. **Wave 6, evidence at a storage boundary** (Issues 41 and 42).
 
 The research issues (43 to 46) start once the issues they depend on are
@@ -113,7 +115,7 @@ its engineering part is Wave 4, its certified part is research.
 | 37 | Stage a call without copying the store | 4 | M | | done | `02087ca` |
 | 38 | Compress scan schedules in traces and proof objects | 4 | M to L | 31, 32 | done | `9d93471` |
 | 39 | Admit encrypted returns in the kernel theorems | 5 | M | | done | `ece1167` |
-| 40 | Give the stash bound a lifetime budget and test deferred write-back | 5 | M | | done | |
+| 40 | Give the stash bound a lifetime budget and test deferred write-back | 5 | M | | done | `305c1a2` |
 | 41 | Put storage behind an adapter that keeps its own I/O log | 6 | M to L | 24, 31, 32 | todo | |
 | 42 | Widen the runtime-versus-model tests of the tree and the tape substitution | 6 | M | | todo | |
 | 43 | Prove a store operation's post-state and its write class together | research | R | 33, 35 | todo | |

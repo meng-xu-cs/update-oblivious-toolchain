@@ -77,12 +77,13 @@ about 7 billion transfers.
 
 The extra work is at 16,384 entries, estimated from the loop bounds of
 eviction and compaction, which are linear in the stash and are 86% of a node
-access's instructions; it is not measured. A stash page holds 8 blocks and is
-read and written once per operation, so a read moves about 2% more bytes at
-152. A cap of 128 or more gives every local-scheme map a stash as large as
-itself, so the local scheme needs no stash assumption. The decision takes
-152, stated as at most `2^-60` over `2^48` node accesses of a map, with the
-overflow handling of Issue 40.
+access's instructions; it was not measured then. Issue 40 measured it: 15% to
+17% of a tree call's own work at 16,384 entries (see Wave 5). A stash page
+holds 8 blocks and is read and written once per operation, so a read moves
+about 2% more bytes at 152. A cap of 128 or more gives every local-scheme map
+a stash as large as itself, so the local scheme needs no stash assumption. The
+decision takes 152, stated as at most `2^-60` over `2^48` node accesses of a
+map, with the overflow handling of Issue 40.
 
 #### How to fix
 
@@ -997,6 +998,39 @@ before and are now.
 
 ## Wave 5: theorem coverage
 
+Done. The full profile of the sweep was run again after this wave, since
+the stash cap of Issue 40 costs the tree time
+(`results/capacity_sweep_full.json`, 62 minutes; `docs/path-oram.md` has
+its figures). What the cap costs is read off a control, like the savings of
+Wave 4:
+[`capacity_sweep_control_before_cap152.json`](./capacity_sweep_control_before_cap152.json)
+is the full profile's rounds on the maps of 4,096, 8,192 and 16,384 entries
+at 2 keys on the code before Issue 40 (`ece1167`, a cap of 114), and
+[`capacity_sweep_control_after_cap152.json`](./capacity_sweep_control_after_cap152.json)
+the same on the code after it (`305c1a2`, a cap of 152), run one after the
+other. Medians of 30 rounds, a call's own work:
+
+| Call | 4,096 entries | 8,192 | 16,384 |
+| --- | --- | --- | --- |
+| tree read | 11.2 ms to 12.7 ms | 14.1 ms to 16.3 ms | 16.8 ms to 19.6 ms |
+| tree overwrite | 42.7 ms to 48.2 ms | 52.9 ms to 61.7 ms | 61.6 ms to 70.8 ms |
+| full-scan read | 9.9 ms to 9.8 ms | 20.1 ms to 20.0 ms | 41.0 ms to 41.5 ms |
+| full-scan overwrite | 19.8 ms to 19.8 ms | 40.0 ms to 40.1 ms | 81.4 ms to 83.2 ms |
+
+A tree call's own work is 13% to 17% slower, and 15% to 17% at 16,384 entries,
+where Issue 22 estimated about 15%. The full scan moved by 3% at most. The
+proof bundles of a tree call's trace grew as much, so a whole measured call
+did too: 61.3 ms to 72.0 ms for a read at 16,384 entries and 214.6 ms to 253.9
+ms for an overwrite.
+
+In the new profile the two backends have, by the median of a kind of call,
+the order they had after Wave 4 in every one of the 525 cells of a
+capacity, a kind and an occupancy level: on a call's own work the full scan
+is the faster backend up to 4,096 entries, the tree is faster in every read
+at 8,192 and in every kind of call at 16,384 (19.8 ms against 43.7 ms for a
+read, 74.2 ms against 85.5 ms for an overwrite). Whole measured calls are
+slower on the tree at every capacity.
+
 ### Issue 39 — Admit encrypted returns in the kernel theorems
 
 Source: F6 (§7). Size: M. Depends on: nothing.
@@ -1198,8 +1232,9 @@ where it traced 654. That is 5.7% and 2.3% more bytes. The gas break-even
 of the tree against the full scan for reads alone moved from 1,024 entries
 to 2,048; the break-evens in bytes and physical operations did not move.
 On the local scheme only the map of 128 entries changed: its stash is now
-as large as itself. The latencies are in the full profile, which is run
-again after this issue.
+as large as itself. In latency a tree access's own work is 13% to 17%
+slower and the full scan is as it was: the control and the full profile
+that was run again with the cap are under Wave 5 above.
 
 #### Acceptance criteria
 

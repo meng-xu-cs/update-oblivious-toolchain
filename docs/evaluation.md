@@ -55,12 +55,13 @@ establish and what they do not).
   `review/2026-11-external-review/capacity_sweep_baseline.json` is the full
   profile from before the optimizations that review asked for; its gas is
   that of cost model v1, which charged no reads. The committed full report
-  was measured when Issues 30 to 38 of that review were in, and its
+  was measured when Issues 30 to 40 of that review were in, and its
   `provenance` names the build that measured it. The latencies of two
   reports compare only if one machine in one state measured both, so the
-  review directory also holds a control for Issues 36 to 38: the largest
-  maps measured on the code before them and on the code after them, one run
-  after the other (see [`path-oram.md`](./path-oram.md)).
+  review directory also holds two controls, one for Issues 36 to 38 and one
+  for the stash cap of Issue 40: the largest maps measured on the code
+  before the change and on the code after it, one run after the other (see
+  [`path-oram.md`](./path-oram.md)).
 
 ## Index
 
