@@ -51,6 +51,7 @@ pub use acceptance::{
 };
 
 mod capacity_sweep;
+mod matched_baselines;
 mod public_state;
 mod rust_source;
 mod stash_occupancy;
@@ -1413,6 +1414,18 @@ pub fn run_capacity_sweep_report() -> Result<JsonValue> {
 /// every occupancy level of every map.
 pub fn run_capacity_sweep_full_report() -> Result<JsonValue> {
     capacity_sweep::run_capacity_sweep(capacity_sweep::SweepProfile::Full)
+}
+
+/// The matched baselines' quick profile, which the validation script runs
+/// from a release build: maps of 16 to 16,384 entries, those of up to 1,024
+/// filled to half and all of their capacity.
+pub fn run_matched_baselines_report() -> Result<JsonValue> {
+    matched_baselines::run_matched_baselines(&matched_baselines::MatchedParameters::from_env(false))
+}
+
+/// The matched baselines' full profile: every map filled to every level.
+pub fn run_matched_baselines_full_report() -> Result<JsonValue> {
+    matched_baselines::run_matched_baselines(&matched_baselines::MatchedParameters::from_env(true))
 }
 
 /// The stash-occupancy report's quick profile, which the validation script
@@ -52700,6 +52713,74 @@ bounds:
             entrypoint: "f(bytes32,uint256)",
             args: vec![b32(7), Value::uint(5)],
         },
+    });
+    // A confidential map may leave its backend to the compiler's planner
+    // (Issue 49 of the external review), which places a map of 8 entries on
+    // the full scan; a public map may not.
+    cases.push(AdmissionCase {
+        feature: "confidential mapping whose backend the planner chooses (backend: auto)",
+        category: "mapping",
+        mode: ProgramMode::Uo,
+        source: r#"pragma solidity ^0.8.0;
+contract C {
+    mapping(bytes32 => uint256) private m;
+    function f(bytes32 k, uint256 v) public { m[k] = v; }
+}
+"#,
+        metadata: r#"contract: C
+entrypoints:
+  f(bytes32,uint256):
+    secret_args: [k, v]
+    confidential: true
+    returns: forbidden
+    status: declassified
+    declassifies: [success]
+state:
+  m:
+    kind: map
+    key: bytes32
+    value: uint256
+    capacity: 8
+    backend: auto
+    confidential: true
+    plan:
+      read_percent: 90
+bounds:
+  loops: {}
+"#,
+        expectation: AcceptedRuns {
+            entrypoint: "f(bytes32,uint256)",
+            args: vec![b32(7), Value::uint(5)],
+        },
+    });
+    cases.push(AdmissionCase {
+        feature: "public mapping whose backend the planner would choose (backend: auto)",
+        category: "mapping",
+        mode: ProgramMode::Uo,
+        source: r#"pragma solidity ^0.8.0;
+contract C {
+    mapping(bytes32 => uint256) private m;
+    function f(bytes32 k, uint256 v) public { m[k] = v; }
+}
+"#,
+        metadata: r#"contract: C
+entrypoints:
+  f(bytes32,uint256):
+    confidential: false
+    returns: forbidden
+    status: public
+state:
+  m:
+    kind: map
+    key: bytes32
+    value: uint256
+    capacity: 8
+    backend: auto
+    confidential: false
+bounds:
+  loops: {}
+"#,
+        expectation: Rejected { names: "planner" },
     });
     cases.push(AdmissionCase {
         feature: "keccak256(abi.encodePacked(..)) over fixed-size args",

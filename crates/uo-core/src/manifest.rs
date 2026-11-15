@@ -113,6 +113,10 @@ pub struct StateObjectManifest {
     pub key_type: Option<String>,
     #[serde(default)]
     pub oram: Option<OramManifest>,
+    /// The backend planner's choice for a map whose metadata says `auto`:
+    /// what it read, what it weighed, and what it chose.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plan: Option<crate::backend_plan::BackendPlan>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -862,6 +866,7 @@ mod tests {
                 value_type: Some("uint256".into()),
                 key_type: Some("bytes32".into()),
                 oram: Some(oram.clone()),
+                plan: None,
             }],
             entrypoints,
         };

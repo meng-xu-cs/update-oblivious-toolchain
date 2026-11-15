@@ -32,6 +32,8 @@ enum ReportKind {
     StorageGrowth,
     CapacitySweep,
     CapacitySweepFull,
+    MatchedBaselines,
+    MatchedBaselinesFull,
     StashOccupancy,
     StashOccupancyFull,
     StorageBoundary,
@@ -258,6 +260,24 @@ fn main() -> Result<()> {
                 &cli.out_dir,
                 "capacity_sweep_full.json",
                 "capacity_sweep_full",
+                &report,
+            )?;
+        }
+        Some(ReportKind::MatchedBaselines) => {
+            let report = mplus_probe::run_matched_baselines_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "matched_baselines.json",
+                "matched_baselines",
+                &report,
+            )?;
+        }
+        Some(ReportKind::MatchedBaselinesFull) => {
+            let report = mplus_probe::run_matched_baselines_full_report()?;
+            write_single_report(
+                &cli.out_dir,
+                "matched_baselines_full.json",
+                "matched_baselines_full",
                 &report,
             )?;
         }

@@ -626,6 +626,81 @@ the load bound in the source artifact and the artifact alike
 (`translation/max_load_ops_drift`). The statement and expression terms are
 checked by recompiling the source.
 
+### The Backend Planner
+
+A confidential map may leave its backend to the compiler. Its metadata says
+`backend: auto` and may declare the share of its operations that read and
+the enclave memory a call may hold for it:
+
+```yaml
+records:
+  kind: map
+  key: bytes32
+  value: uint256
+  capacity: 4096
+  backend: auto
+  confidential: true
+  plan:
+    read_percent: 90                     # 50 if absent
+    enclave_memory_budget_bytes: 1048576 # no limit if absent
+```
+
+The planner (`uo_core::backend_plan`, model `uo-backend-plan-v1`) reads
+these, the capacity and the widths of the map's keys and values, all of
+them public. For each backend that can hold the map (the full scan, the
+local Path ORAM scheme up to 128 entries, and the private scheme; a Path
+ORAM map takes scalar keys and values) it models the bytes of the sealed
+records that a call moves when it reads the map once and when it writes it
+once, and the enclave memory a call holds for the map. It takes the backend
+that moves the fewest bytes per call at the declared share of reads, among
+those that fit the budget. Ties go to the full scan, then to the local
+scheme, and a map that no backend fits does not compile. With the metadata
+above, a read of the full scan moves 393,216 bytes and a write 786,432; a
+read of the private scheme moves 334,208 and a write 1,220,256. At nine
+reads in ten the full scan moves 432,537.6 bytes per call and the private
+scheme 422,812.8, so the map goes on the private scheme. At the default of
+half reads the full scan moves 589,824 and the private scheme 777,232, and
+the map stays on the full scan. Both fit the budget: the model gives the
+full scan 925,696 bytes of enclave memory and the private scheme 66,174, so
+a budget of 512 KiB would put the map on the private scheme at any share of
+reads.
+
+The manifest records the plan in the map's entry (`plan`: the inputs, each
+backend weighed with its bytes and memory, and the choice). `uo-check`
+plans the map again from the recorded inputs and rejects a manifest whose
+plan differs and a map that is not on the backend its plan chose. The Lean
+checkers read a planned map as any other. The plan decides the map's route,
+and the route's claims are those of Backend Scope: a map the planner puts
+on Path ORAM has the Path ORAM route's claim, not exact UO.
+
+The model is tested, not proved (`results/matched_baselines.json`). Three
+maps, with 32-byte keys and values, with 20-byte keys, and with 1-byte
+values, are compiled on each backend at seven capacities from 16 to 16,384
+entries, filled to two keys and, up to 1,024 entries, to half and all of
+their capacity, and called: a read of a stored key and of an absent one, an
+overwrite and an insert. Every call moves the bytes the model gives its
+backend, whatever the occupancy and whether its key is stored. At six
+shares of reads the planner chooses the backend whose measured calls moved
+the fewest bytes. Each map compiled with `backend: auto`, at the default
+share and at nine reads in ten, records the plan the planner makes, is on
+the backend it chose, moves the bytes of its model and reads back what it
+wrote. The model also gives the bytes of each of the 1,141 calls the
+capacity sweep's full profile measured for SweepMap, on every backend and
+at every capacity from 1 to 16,384 entries and every occupancy, deletes and
+aborted writes among them
+(`the_model_gives_every_call_the_full_sweep_measured`), and the planner
+chooses there what the sweep measured to move the fewest
+(`the_planner_chooses_what_the_full_sweep_measured_least`).
+
+What the planner does not do: it minimizes bytes, a model of the traffic
+between the enclave and its storage, and not time, which the capacity
+sweep measures. Its enclave memory is a model of the sealed records and the
+plaintext a call holds for the map, at their canonical widths, and not a
+measurement; it leaves out the runtime's other buffers. And the share of
+reads is the one the metadata declares: the planner does not derive it
+from the program, whose entrypoints say what a call may do and not how
+often it is made.
+
 ## Explicit Assumptions
 
 | Assumption | Role | Current treatment |
@@ -715,6 +790,47 @@ appears outside that allowlist or a documented assumption stops being grounded.
 | `uo-solc` | not trusted as a proof oracle for accepted artifacts; parser/preprocessing remains trusted |
 | `uo-check` | diagnostics/debug wrapper, outside the proof-grade TCB |
 | `mplus-probe` | orchestration and reporting, outside the proof-grade TCB |
+
+## Related Work
+
+The techniques below are not claimed as new here. This repository combines
+them for a contract runtime's storage and checks the combination as the
+sections above state.
+
+- Ciphertext side channels. A host that sees a TEE's encrypted memory can
+  tell when the ciphertext at a location changes, and so when its value
+  does (CipherLeaks, on AMD SEV: Li, Zhang, Wang, Li and Cheng, USENIX
+  Security 2021). The known defense makes every store of a secret fresh: by
+  binary instrumentation that masks secrets before they are stored
+  (Cipherfix: Wichelmann, Pätschke, Wilke and Eisenbarth, USENIX Security
+  2023), or in the compiler, by probabilistic encryption with decoy
+  accesses (CipherGuard: Jiang, Deng, Li, Wang, Zhang and Zhang, arXiv
+  2502.13401) or by interleaving secrets with fresh values, which also
+  defeats silent stores (Zebrafix: Pätschke, Wichelmann and Eisenbarth,
+  RAID 2025). Here every sealed record is written under a fresh nonce and a
+  call rewrites a fixed set of records whatever it changes (The Storage
+  Boundary); the idea is theirs.
+- Oblivious RAM and oblivious data structures. The local scheme is Path
+  ORAM (Stefanov, van Dijk, Shi, Fletcher, Ren, Yu and Devadas, CCS 2013)
+  with a flat position map. The private scheme keeps a map as an AVL tree
+  whose nodes hold their children's leaves, so that the position map
+  recurses through the tree: the oblivious data structures of Wang, Nayak,
+  Liu, Chan, Shi, Stefanov and Huang (CCS 2014).
+- Oblivious maps in enclaves. An ORAM client in the enclave whose own
+  accesses are oblivious is ZeroTrace's design (Sasy, Gorbunov and
+  Fletcher, NDSS 2018), and a doubly oblivious AVL tree in an enclave is
+  Oblix's (Mishra, Poddar, Chen, Chiesa and Popa, IEEE S&P 2018). EnigMap
+  (Tinoco, Gao and Shi, USENIX Security 2023) is an oblivious map for
+  enclaves built for maps larger than enclave memory, whose cost is the
+  pages it moves in and out. The maps here are smaller, and their baselines
+  are this repository's own backends, compared at the same key and value
+  widths, capacities and occupancy, with the enclave memory each holds (The
+  Backend Planner); no external system was run.
+- Leakage as a structured trace. Stating what a run may leak as a trace,
+  and proving that compilation keeps it, is the approach of structured
+  leakage (Barthe, Grégoire, Laporte and Priya, CCS 2021). The observer, its
+  declared releases and the translation validation here are instances of
+  it, not a new notion.
 
 ## Non-Claims
 

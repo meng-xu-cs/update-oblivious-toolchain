@@ -10,7 +10,7 @@ belongs.
 | --- | --- |
 | Project overview and quick commands | [`README.md`](../README.md) |
 | Operator commands and artifact modes | [`runbook.md`](../runbook.md) |
-| Paper theorem, observer, assumptions, TCB, and non-claims | [`claim-boundary.md`](./claim-boundary.md) |
+| Paper theorem, observer, assumptions, TCB, related work, and non-claims | [`claim-boundary.md`](./claim-boundary.md) |
 | Accepted Solidity-like DSL/metadata subset | [`supported-subset.md`](./supported-subset.md) |
 | Lean/proof architecture and validation reports | [`proof-architecture.md`](./proof-architecture.md) |
 | Path ORAM theorem route, provenance, and bibliography | [`path-oram.md`](./path-oram.md), [`path-oram-theorem-sources.bib`](./path-oram-theorem-sources.bib) |
@@ -46,7 +46,7 @@ belongs.
 | [`README.md`](../README.md) | maintained | high-level project map and commands |
 | [`runbook.md`](../runbook.md) | maintained | operator command reference |
 | [`docs/README.md`](./README.md) | maintained | documentation inventory and topic index |
-| [`docs/claim-boundary.md`](./claim-boundary.md) | maintained | theorem, observer, TCB, assumptions, and non-claims |
+| [`docs/claim-boundary.md`](./claim-boundary.md) | maintained | theorem, observer, TCB, assumptions, related work, and non-claims |
 | [`docs/proof-architecture.md`](./proof-architecture.md) | maintained | proof/checker layers and validation reports |
 | [`docs/path-oram.md`](./path-oram.md) | maintained | Path ORAM theorem route and provenance |
 | [`docs/evaluation.md`](./evaluation.md) | maintained | index of result files by evaluation question |

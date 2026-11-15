@@ -1,6 +1,6 @@
 {
   "accepted": true,
-  "accepted_feature_count": 13,
+  "accepted_feature_count": 14,
   "accepted_features": [
     {
       "category": "scalar",
@@ -113,6 +113,17 @@
       "runs": true
     },
     {
+      "category": "mapping",
+      "compiles": true,
+      "detail": "",
+      "entrypoint": "f(bytes32,uint256)",
+      "expectation": "accepted",
+      "feature": "confidential mapping whose backend the planner chooses (backend: auto)",
+      "matches_expectation": true,
+      "mode": "uo",
+      "runs": true
+    },
+    {
       "category": "keccak",
       "compiles": true,
       "detail": "",
@@ -146,8 +157,19 @@
       "runs": true
     }
   ],
-  "rejected_feature_count": 24,
+  "rejected_feature_count": 25,
   "rejected_features": [
+    {
+      "category": "mapping",
+      "diagnostic": "map m leaves its backend to the planner but is not confidential",
+      "diagnostic_names_feature": true,
+      "expectation": "rejected",
+      "expected_diagnostic_substring": "planner",
+      "feature": "public mapping whose backend the planner would choose (backend: auto)",
+      "matches_expectation": true,
+      "mode": "uo",
+      "rejected": true
+    },
     {
       "category": "inline-assembly",
       "diagnostic": "inline assembly is unsupported",

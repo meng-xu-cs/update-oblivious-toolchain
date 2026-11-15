@@ -2,6 +2,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
+use uo_core::backend_plan::{plan_backend, BackendPlan};
 use uo_core::ir::{
     accessed_objects, written_objects, BackendKind, BinaryOp, CompiledContract, CompiledFunction,
     ContainerKind, Expr, ProgramMode, PublicEnvField, StateObject, Statement, UnaryOp,
@@ -32,6 +33,8 @@ struct Frontend {
     contract_name: String,
     structs: BTreeMap<String, Type>,
     state_by_name: BTreeMap<String, StateObject>,
+    /// The backend planner's choice for each map whose metadata says `auto`.
+    backend_plans: BTreeMap<String, BackendPlan>,
     entrypoint_metadata: BTreeMap<String, uo_core::EntrypointMetadata>,
     has_initializer: bool,
     functions: Vec<pt::FunctionDefinition>,
@@ -198,6 +201,7 @@ fn compile_impl(
                     } else {
                         None
                     },
+                    plan: frontend.backend_plans.get(&object.name).cloned(),
                 })
             })
             .collect::<Result<Vec<_>>>()?,
@@ -325,6 +329,7 @@ fn parse_frontend(
     }
     let mut structs = BTreeMap::new();
     let mut state_by_name = BTreeMap::new();
+    let mut backend_plans = BTreeMap::new();
     let mut functions = Vec::new();
     let mut helpers = BTreeMap::new();
     let diagnostics = Vec::new();
@@ -366,10 +371,11 @@ fn parse_frontend(
                     .get(&name)
                     .ok_or_else(|| anyhow!("state variable {} is missing metadata", name))?;
                 let id = (state_by_name.len() + 1) as u32;
-                state_by_name.insert(
-                    name.clone(),
-                    lower_state_object(id, &name, def, state_meta, &structs)?,
-                );
+                let (object, plan) = lower_state_object(id, &name, def, state_meta, &structs)?;
+                if let Some(plan) = plan {
+                    backend_plans.insert(name.clone(), plan);
+                }
+                state_by_name.insert(name.clone(), object);
             }
             pt::ContractPart::FunctionDefinition(def) => {
                 reject_function_shape(def)?;
@@ -447,6 +453,7 @@ fn parse_frontend(
         contract_name: metadata.contract.clone(),
         structs,
         state_by_name,
+        backend_plans,
         entrypoint_metadata,
         has_initializer: initializer_signature.is_some(),
         functions,
@@ -1200,22 +1207,53 @@ fn lower_type_expr(expression: &pt::Expression, structs: &BTreeMap<String, Type>
     }
 }
 
+/// A state object, and for a map whose metadata leaves its backend to the
+/// planner (`backend: auto`), the plan that chose it (`uo_core::backend_plan`).
 fn lower_state_object(
     id: u32,
     name: &str,
     def: &pt::VariableDefinition,
     state_meta: &StateMetadata,
     structs: &BTreeMap<String, Type>,
-) -> Result<StateObject> {
+) -> Result<(StateObject, Option<BackendPlan>)> {
     let kind = match state_meta.kind.as_str() {
         "cell" => ContainerKind::Cell,
         "array" => ContainerKind::Array,
         "map" => ContainerKind::Map,
         other => bail!("unsupported state kind {}", other),
     };
+    // A confidential map may leave its backend to the planner, which picks
+    // it from public parameters once the map's types are known.
+    let planned = state_meta.backend == "auto";
+    if planned {
+        if kind != ContainerKind::Map {
+            bail!(
+                "state {} leaves its backend to the planner, which plans maps only",
+                name
+            );
+        }
+        if !state_meta.confidential {
+            bail!(
+                "map {} leaves its backend to the planner but is not confidential",
+                name
+            );
+        }
+        if state_meta.oram_scheme.is_some() {
+            bail!(
+                "map {} leaves its backend to the planner and must not declare oram_scheme",
+                name
+            );
+        }
+    } else if state_meta.plan.is_some() {
+        bail!(
+            "state {} declares a plan, which only a map whose backend is auto takes",
+            name
+        );
+    }
     let backend = match state_meta.backend.as_str() {
         "raw" => BackendKind::Raw,
-        "full_scan" => BackendKind::FullScan,
+        // A planned map's backend is chosen below.
+        "full_scan" | "auto" => BackendKind::FullScan,
         "oram" => BackendKind::Oram,
         other => bail!("unsupported backend {}", other),
     };
@@ -1239,17 +1277,20 @@ fn lower_state_object(
             if state_meta.capacity.is_some() {
                 bail!("cell state {} must not declare metadata capacity", name);
             }
-            Ok(StateObject {
-                id,
-                name: name.into(),
-                kind,
-                backend,
-                oram_scheme,
-                value_type,
-                key_type: None,
-                capacity: None,
-                confidential: state_meta.confidential,
-            })
+            Ok((
+                StateObject {
+                    id,
+                    name: name.into(),
+                    kind,
+                    backend,
+                    oram_scheme,
+                    value_type,
+                    key_type: None,
+                    capacity: None,
+                    confidential: state_meta.confidential,
+                },
+                None,
+            ))
         }
         ContainerKind::Array => {
             let (element_ty, capacity) = match &def.ty {
@@ -1279,17 +1320,20 @@ fn lower_state_object(
             if state_meta.key.is_some() {
                 bail!("array state {} must not declare metadata key type", name);
             }
-            Ok(StateObject {
-                id,
-                name: name.into(),
-                kind,
-                backend,
-                oram_scheme,
-                value_type: element_ty,
-                key_type: None,
-                capacity: Some(capacity),
-                confidential: state_meta.confidential,
-            })
+            Ok((
+                StateObject {
+                    id,
+                    name: name.into(),
+                    kind,
+                    backend,
+                    oram_scheme,
+                    value_type: element_ty,
+                    key_type: None,
+                    capacity: Some(capacity),
+                    confidential: state_meta.confidential,
+                },
+                None,
+            ))
         }
         ContainerKind::Map => {
             let capacity = state_meta
@@ -1307,17 +1351,43 @@ fn lower_state_object(
                     })?;
                     validate_metadata_type(name, "key", metadata_key, &key_type)?;
                     validate_metadata_type(name, "value", &state_meta.value, &value_type)?;
-                    Ok(StateObject {
-                        id,
-                        name: name.into(),
-                        kind,
-                        backend,
-                        oram_scheme,
-                        value_type,
-                        key_type: Some(key_type),
-                        capacity: Some(capacity),
-                        confidential: state_meta.confidential,
-                    })
+                    let (backend, oram_scheme, plan) = if planned {
+                        let declared = state_meta.plan.clone().unwrap_or_default();
+                        let plan = plan_backend(
+                            capacity,
+                            &key_type,
+                            &value_type,
+                            declared.read_percent,
+                            declared.enclave_memory_budget_bytes,
+                        )
+                        .with_context(|| format!("planning the backend of map {name}"))?;
+                        let backend = if plan.backend == "oram" {
+                            BackendKind::Oram
+                        } else {
+                            BackendKind::FullScan
+                        };
+                        let scheme = plan
+                            .oram_scheme
+                            .clone()
+                            .unwrap_or_else(|| SURROGATE_ORAM_SCHEME.into());
+                        (backend, scheme, Some(plan))
+                    } else {
+                        (backend, oram_scheme, None)
+                    };
+                    Ok((
+                        StateObject {
+                            id,
+                            name: name.into(),
+                            kind,
+                            backend,
+                            oram_scheme,
+                            value_type,
+                            key_type: Some(key_type),
+                            capacity: Some(capacity),
+                            confidential: state_meta.confidential,
+                        },
+                        plan,
+                    ))
                 }
                 _ => bail!("map state {} must use mapping syntax", name),
             }
@@ -4949,6 +5019,121 @@ bounds:
         let msg = err.to_string();
         assert!(msg.contains("public_gas_budget"), "unexpected: {msg}");
         assert!(msg.contains("modeled cost"), "unexpected: {msg}");
+    }
+
+    const PLANNED_MAP_SOURCE: &str = r#"
+            contract Planned {
+                mapping(bytes32 => uint256) private records;
+                function put(bytes32 key, uint256 value) public { records[key] = value; }
+                function read(bytes32 key) public returns (uint256) { return records[key]; }
+            }
+            "#;
+
+    fn planned_map_metadata(capacity: usize, state_extra: &str) -> ContractMetadata {
+        parse_metadata(&format!(
+            r#"
+contract: Planned
+entrypoints:
+  put(bytes32,uint256):
+    secret_args: [key, value]
+    confidential: true
+    returns: forbidden
+    status: declassified
+    declassifies: [success]
+  read(bytes32):
+    secret_args: [key]
+    confidential: true
+    returns: declassified
+    status: public
+    declassifies: [return]
+state:
+  records:
+    kind: map
+    key: bytes32
+    value: uint256
+    capacity: {capacity}
+    backend: auto
+    confidential: true{state_extra}
+bounds:
+  loops: {{}}
+"#
+        ))
+    }
+
+    /// A confidential map whose metadata says `backend: auto` takes the
+    /// backend the planner chooses from public parameters, and the manifest
+    /// records the plan (Issue 49 of the external review): the full scan for
+    /// a small map, the private scheme for a large one, the private scheme at
+    /// 4,096 entries when nine operations in ten read or when the full scan
+    /// would hold more enclave memory than the budget, and the full scan at
+    /// 4,096 entries otherwise.
+    #[test]
+    fn auto_backend_maps_take_the_planned_backend() {
+        let source = write_temp("planned-map", PLANNED_MAP_SOURCE);
+        let planned = |capacity: usize, extra: &str| {
+            let artifact = compile(
+                source.to_str().unwrap(),
+                &planned_map_metadata(capacity, extra),
+                ProgramMode::Uo,
+            )
+            .unwrap();
+            let object = artifact.contract.state[0].clone();
+            let plan = artifact.contract.manifest.objects[0].plan.clone().unwrap();
+            assert_eq!(
+                plan.oram_scheme.clone().unwrap_or(plan.backend.clone()),
+                if object.backend == uo_core::ir::BackendKind::Oram {
+                    object.oram_scheme.clone()
+                } else {
+                    "full_scan".into()
+                }
+            );
+            (object, plan)
+        };
+        let (small, plan) = planned(64, "");
+        assert_eq!(small.backend, uo_core::ir::BackendKind::FullScan);
+        assert_eq!(plan.inputs.read_percent, 50);
+        assert!(!plan.inputs.read_percent_declared);
+        let (large, _) = planned(16384, "");
+        assert_eq!(large.backend, uo_core::ir::BackendKind::Oram);
+        assert_eq!(large.oram_scheme, uo_core::PATH_ORAM_PRIVATE_POSMAP_SCHEME);
+        let half = "\n    plan:\n      read_percent: 50";
+        let (scanned, _) = planned(4096, half);
+        assert_eq!(scanned.backend, uo_core::ir::BackendKind::FullScan);
+        let (reads, plan) = planned(4096, "\n    plan:\n      read_percent: 90");
+        assert_eq!(reads.backend, uo_core::ir::BackendKind::Oram);
+        assert!(plan.inputs.read_percent_declared);
+        let budget = format!("{half}\n      enclave_memory_budget_bytes: 262144");
+        let (budgeted, plan) = planned(4096, &budget);
+        assert_eq!(budgeted.backend, uo_core::ir::BackendKind::Oram);
+        assert_eq!(plan.inputs.enclave_memory_budget_bytes, Some(262_144));
+        assert!(plan
+            .candidates
+            .iter()
+            .any(|candidate| candidate.backend == "full_scan" && !candidate.fits_budget));
+    }
+
+    /// Only a confidential map may leave its backend to the planner, without
+    /// a scheme of its own, and only such a map declares a plan.
+    #[test]
+    fn auto_backend_is_for_confidential_maps_alone() {
+        let source = write_temp("planned-map-misuse", PLANNED_MAP_SOURCE);
+        let compile_with = |metadata: &ContractMetadata| {
+            let err = compile(source.to_str().unwrap(), metadata, ProgramMode::Uo).unwrap_err();
+            format!("{err:#}")
+        };
+        let mut metadata = planned_map_metadata(64, "");
+        metadata.state.get_mut("records").unwrap().confidential = false;
+        assert!(compile_with(&metadata).contains("not confidential"));
+        let mut metadata = planned_map_metadata(64, "");
+        metadata.state.get_mut("records").unwrap().oram_scheme =
+            Some(uo_core::manifest::PATH_ORAM_SCHEME.into());
+        assert!(compile_with(&metadata).contains("must not declare oram_scheme"));
+        let mut metadata = planned_map_metadata(64, "\n    plan:\n      read_percent: 10");
+        metadata.state.get_mut("records").unwrap().backend = "full_scan".into();
+        assert!(compile_with(&metadata).contains("declares a plan"));
+        let metadata =
+            planned_map_metadata(4096, "\n    plan:\n      enclave_memory_budget_bytes: 1024");
+        assert!(compile_with(&metadata).contains("no backend holds"));
     }
 
     #[test]

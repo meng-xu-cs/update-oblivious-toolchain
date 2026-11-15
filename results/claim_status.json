@@ -92,6 +92,16 @@
       "ok": true
     },
     {
+      "detail": "doc_anchor \"matched_baselines.json\" for backend-planner-bytes-model appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:backend-planner-bytes-model",
+      "ok": true
+    },
+    {
+      "detail": "backend-planner-bytes-model declares an allowed status (empirically-tested)",
+      "name": "status-allowed:backend-planner-bytes-model",
+      "ok": true
+    },
+    {
       "detail": "doc_anchor \"admitted-package hash\" for admitted-package-identity-hash appears in docs/claim-boundary.md",
       "name": "anchor-in-doc:admitted-package-identity-hash",
       "ok": true
@@ -527,7 +537,7 @@
       "ok": true
     },
     {
-      "detail": "15 manifest entries in category claim",
+      "detail": "16 manifest entries in category claim",
       "name": "category-present:claim",
       "ok": true
     },
@@ -799,6 +809,26 @@
     {
       "detail": "artifact runtime/uo-evm/src/oram.rs referenced by path-oram-tape-substitution-tested exists",
       "name": "file-exists:path-oram-tape-substitution-tested:runtime/uo-evm/src/oram.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact crates/uo-core/src/backend_plan.rs referenced by backend-planner-bytes-model exists",
+      "name": "file-exists:backend-planner-bytes-model:crates/uo-core/src/backend_plan.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact probe/mplus-probe/src/matched_baselines.rs referenced by backend-planner-bytes-model exists",
+      "name": "file-exists:backend-planner-bytes-model:probe/mplus-probe/src/matched_baselines.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact compiler/uo-solc/src/lib.rs referenced by backend-planner-bytes-model exists",
+      "name": "file-exists:backend-planner-bytes-model:compiler/uo-solc/src/lib.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact checker/uo-check/src/lib.rs referenced by backend-planner-bytes-model exists",
+      "name": "file-exists:backend-planner-bytes-model:checker/uo-check/src/lib.rs",
       "ok": true
     },
     {
@@ -1157,7 +1187,7 @@
       "ok": true
     }
   ],
-  "claim_count": 40,
+  "claim_count": 41,
   "claims": [
     {
       "category": "claim",
@@ -1221,6 +1251,13 @@
       "status": "empirically-tested",
       "text": "That a runtime run of a call on another tape is the representative run with that tape's leaves substituted, which the tape-family theorems take from one runtime run, is tested and not proved of the Rust runtime: on maps of both Path ORAM schemes at three capacities each, calls of seven kinds (a read that hits, one that misses, an insert, an overwrite, a delete, a delete of an absent key and a write that aborts), each after a setup with deletes and aborts, run on 16 other deployment seeds each, and the Lean checker finds every one of the 1,344 runs equal to the substituted run.",
       "validation_command": "cargo run -q --release -p mplus-probe -- --only tape-substitution-full --out-dir results"
+    },
+    {
+      "category": "claim",
+      "id": "backend-planner-bytes-model",
+      "status": "empirically-tested",
+      "text": "The backend planner's model of the bytes of sealed records a call moves is tested, not proved: maps of three key and value widths on the full scan and both Path ORAM schemes, at seven capacities and up to three occupancy levels, move in every read of a stored or an absent key, overwrite and insert exactly the bytes the model gives their backend; at six shares of reads the planner chooses the backend whose measured calls moved the fewest bytes; and a map compiled with backend auto is on the backend its plan chose and moves the bytes of its model. The planner minimizes modeled bytes, not time, and its enclave memory is a model of the records and plaintext a call holds, not a measurement.",
+      "validation_command": "cargo run -q --release -p mplus-probe -- --only matched-baselines --out-dir results"
     },
     {
       "category": "claim",
@@ -1445,7 +1482,7 @@
   "source_of_truth": "docs/claim-boundary.md",
   "status_counts": {
     "Lean-proved": 6,
-    "empirically-tested": 3,
+    "empirically-tested": 4,
     "experimental": 1,
     "generated-and-checked": 4,
     "non-claim": 7,

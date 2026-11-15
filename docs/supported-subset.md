@@ -110,6 +110,14 @@ Sidecar metadata requirements:
   per call); the surrogate scheme is single-access, and a multi-access
   surrogate entrypoint is rejected at compile time with a diagnostic naming
   the limitation
+- a confidential map may declare `backend: auto`, and no `oram_scheme`, to
+  leave its backend to the compiler's planner, with an optional `plan` of
+  `read_percent` (0 to 100, 50 if absent) and `enclave_memory_budget_bytes`.
+  The planner chooses the full scan or a Path ORAM scheme from these and the
+  map's capacity and key and value types, and the manifest records the plan
+  (The Backend Planner in [`claim-boundary.md`](./claim-boundary.md)). The
+  compiler rejects `auto` on a state object that is not a confidential map
+  or that declares an `oram_scheme`, and a `plan` without `auto`
 - gas is not declared in the sidecar: a `public_gas_budget` entry is rejected.
   The compiler derives each entrypoint's public gas into the emitted manifest,
   and the recorded `public_gas_budget` and the runtime `gas_used` are a MODELED

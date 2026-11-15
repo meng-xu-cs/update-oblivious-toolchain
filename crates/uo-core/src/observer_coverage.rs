@@ -52,6 +52,7 @@ pub const STATE_OBJECT_MANIFEST_FIELDS: &[&str] = &[
     "value_type",
     "key_type",
     "oram",
+    "plan",
 ];
 
 pub const RUNTIME_KERNEL_STEP_MANIFEST_FIELDS: &[&str] = &["opcode", "object_id"];
@@ -382,6 +383,13 @@ pub const OBSERVER_SCHEMA_COVERAGE: &[ObserverSchemaCoverage] = &[
 ];
 
 pub const OBSERVER_FIELD_COVERAGE_OVERRIDES: &[ObserverFieldCoverageOverride] = &[
+    ObserverFieldCoverageOverride {
+        schema: "StateObjectManifest",
+        field: "plan",
+        classification: ObserverCoverageClassification::PublicInput,
+        lean_anchor: "ProofRelevantManifestObjectView (backend)",
+        rationale: "the backend planner's record for a map whose metadata says auto is computed from the map's public capacity, key and value types and declared plan alone, and names the backend that the Lean manifest view takes from the object",
+    },
     ObserverFieldCoverageOverride {
         schema: "EncryptedReturnPayload",
         field: "nonce",

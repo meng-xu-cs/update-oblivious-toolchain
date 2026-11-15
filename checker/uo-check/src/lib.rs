@@ -112,7 +112,7 @@ pub fn check_artifact(artifact: &CompiledArtifact) -> Result<Vec<String>> {
             .iter()
             .find(|candidate| candidate.id == object.id)
             .ok_or_else(|| anyhow::anyhow!("manifest is missing object {}", object.name))?;
-        let expected = expected_state_object_manifest(object)?;
+        let expected = expected_state_object_manifest(object, manifest_object.plan.as_ref())?;
         if manifest_object != &expected {
             bail!("manifest object mismatch for {}", object.name);
         }
@@ -422,7 +422,48 @@ fn manifest_mode(mode: &ProgramMode) -> &'static str {
     }
 }
 
-fn expected_state_object_manifest(object: &StateObject) -> Result<StateObjectManifest> {
+/// The manifest entry of `object`. A map the backend planner placed records
+/// its plan: the planner, given the plan's inputs and the map's types, must
+/// make the same plan, and the map must be on the backend it chose.
+fn expected_state_object_manifest(
+    object: &StateObject,
+    recorded_plan: Option<&uo_core::backend_plan::BackendPlan>,
+) -> Result<StateObjectManifest> {
+    let plan = match recorded_plan {
+        None => None,
+        Some(recorded) => {
+            let (Some(key_type), Some(capacity)) = (object.key_type.as_ref(), object.capacity)
+            else {
+                bail!(
+                    "object {} records a backend plan but is not a map",
+                    object.name
+                );
+            };
+            let inputs = &recorded.inputs;
+            let plan = uo_core::backend_plan::plan_backend(
+                capacity,
+                key_type,
+                &object.value_type,
+                inputs.read_percent_declared.then_some(inputs.read_percent),
+                inputs.enclave_memory_budget_bytes,
+            )?;
+            let on_chosen = match object.backend {
+                BackendKind::FullScan => plan.backend == "full_scan",
+                BackendKind::Oram => {
+                    plan.backend == "oram"
+                        && plan.oram_scheme.as_deref() == Some(object.oram_scheme.as_str())
+                }
+                BackendKind::Raw => false,
+            };
+            if !on_chosen {
+                bail!(
+                    "object {} is not on the backend its plan chose",
+                    object.name
+                );
+            }
+            Some(plan)
+        }
+    };
     Ok(StateObjectManifest {
         id: object.id,
         name: object.name.clone(),
@@ -444,6 +485,7 @@ fn expected_state_object_manifest(object: &StateObject) -> Result<StateObjectMan
         } else {
             None
         },
+        plan,
     })
 }
 
@@ -1693,6 +1735,76 @@ bounds:
         assert!(err
             .to_string()
             .contains("manifest secret_args mismatch for entrypoint"));
+    }
+
+    /// A map the backend planner placed records its plan, and uo-check plans
+    /// it again (Issue 49 of the external review): a plan whose inputs or
+    /// whose choice was changed is rejected, and so is a map that is not on
+    /// the backend its plan chose.
+    #[test]
+    fn artifact_checker_plans_a_planned_map_again() {
+        let source = write_temp(
+            "planned-map",
+            "sol",
+            r#"
+            contract Planned {
+                mapping(bytes32 => uint256) private records;
+                function put(bytes32 key, uint256 value) public { records[key] = value; }
+                function read(bytes32 key) public returns (uint256) { return records[key]; }
+            }
+            "#,
+        );
+        let metadata = parse_metadata(
+            r#"
+contract: Planned
+entrypoints:
+  put(bytes32,uint256):
+    secret_args: [key, value]
+    confidential: true
+    returns: forbidden
+    status: declassified
+    declassifies: [success]
+  read(bytes32):
+    secret_args: [key]
+    confidential: true
+    returns: declassified
+    status: public
+    declassifies: [return]
+state:
+  records:
+    kind: map
+    key: bytes32
+    value: uint256
+    capacity: 16384
+    backend: auto
+    confidential: true
+bounds:
+  loops: {}
+"#,
+        );
+        let artifact =
+            uo_solc::compile(source.to_str().unwrap(), &metadata, ProgramMode::Uo).unwrap();
+        let report = check_artifact(&artifact).unwrap();
+        assert!(report.contains(&"manifest/object exactness: ok".to_string()));
+
+        let mut inputs = artifact.clone();
+        let plan = inputs.contract.manifest.objects[0].plan.as_mut().unwrap();
+        plan.inputs.read_percent = 100;
+        plan.inputs.read_percent_declared = true;
+        let err = check_artifact(&inputs).unwrap_err().to_string();
+        assert!(err.contains("manifest object mismatch"), "{err}");
+
+        let mut choice = artifact.clone();
+        let plan = choice.contract.manifest.objects[0].plan.as_mut().unwrap();
+        plan.backend = "full_scan".into();
+        plan.oram_scheme = None;
+        let err = check_artifact(&choice).unwrap_err().to_string();
+        assert!(err.contains("manifest object mismatch"), "{err}");
+
+        let mut moved = artifact.clone();
+        moved.contract.state[0].oram_scheme = uo_core::manifest::PATH_ORAM_SCHEME.into();
+        let err = check_artifact(&moved).unwrap_err().to_string();
+        assert!(err.contains("not on the backend its plan chose"), "{err}");
     }
 
     #[test]

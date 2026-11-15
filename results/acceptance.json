@@ -1849,6 +1849,50 @@
     },
     {
       "accepted": true,
+      "advisory_false_paths": [],
+      "class_counts": {
+        "advisory_nonclaim": 0,
+        "deprecated_report": 0,
+        "expected_computational_difference": 0,
+        "expected_negative": 0,
+        "required_failure": 0,
+        "unclassified": 0
+      },
+      "declared_accepted": true,
+      "expected_false_paths": [],
+      "false_count": 0,
+      "false_paths": 0,
+      "mode": "evaluation",
+      "report": "matched_baselines",
+      "required": false,
+      "required_failures": [],
+      "schema": "uo.acceptance.report.v1",
+      "unclassified_false_paths": []
+    },
+    {
+      "accepted": true,
+      "advisory_false_paths": [],
+      "class_counts": {
+        "advisory_nonclaim": 0,
+        "deprecated_report": 0,
+        "expected_computational_difference": 0,
+        "expected_negative": 0,
+        "required_failure": 0,
+        "unclassified": 0
+      },
+      "declared_accepted": true,
+      "expected_false_paths": [],
+      "false_count": 0,
+      "false_paths": 0,
+      "mode": "evaluation",
+      "report": "matched_baselines_full",
+      "required": false,
+      "required_failures": [],
+      "schema": "uo.acceptance.report.v1",
+      "unclassified_false_paths": []
+    },
+    {
+      "accepted": true,
       "advisory_false_paths": [
         "reports.0.executable",
         "reports.1.rejected",
@@ -4005,6 +4049,8 @@
     "kernel_validation",
     "leakage_auc",
     "lean_assumption_budget",
+    "matched_baselines",
+    "matched_baselines_full",
     "mutual_information",
     "overheads",
     "paper_main_family_boundary_validation",

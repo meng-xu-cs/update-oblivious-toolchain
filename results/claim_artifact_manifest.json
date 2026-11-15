@@ -92,6 +92,16 @@
       "ok": true
     },
     {
+      "detail": "doc_anchor \"matched_baselines.json\" for backend-planner-bytes-model appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:backend-planner-bytes-model",
+      "ok": true
+    },
+    {
+      "detail": "backend-planner-bytes-model declares an allowed status (empirically-tested)",
+      "name": "status-allowed:backend-planner-bytes-model",
+      "ok": true
+    },
+    {
       "detail": "doc_anchor \"admitted-package hash\" for admitted-package-identity-hash appears in docs/claim-boundary.md",
       "name": "anchor-in-doc:admitted-package-identity-hash",
       "ok": true
@@ -527,7 +537,7 @@
       "ok": true
     },
     {
-      "detail": "15 manifest entries in category claim",
+      "detail": "16 manifest entries in category claim",
       "name": "category-present:claim",
       "ok": true
     },
@@ -799,6 +809,26 @@
     {
       "detail": "artifact runtime/uo-evm/src/oram.rs referenced by path-oram-tape-substitution-tested exists",
       "name": "file-exists:path-oram-tape-substitution-tested:runtime/uo-evm/src/oram.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact crates/uo-core/src/backend_plan.rs referenced by backend-planner-bytes-model exists",
+      "name": "file-exists:backend-planner-bytes-model:crates/uo-core/src/backend_plan.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact probe/mplus-probe/src/matched_baselines.rs referenced by backend-planner-bytes-model exists",
+      "name": "file-exists:backend-planner-bytes-model:probe/mplus-probe/src/matched_baselines.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact compiler/uo-solc/src/lib.rs referenced by backend-planner-bytes-model exists",
+      "name": "file-exists:backend-planner-bytes-model:compiler/uo-solc/src/lib.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact checker/uo-check/src/lib.rs referenced by backend-planner-bytes-model exists",
+      "name": "file-exists:backend-planner-bytes-model:checker/uo-check/src/lib.rs",
       "ok": true
     },
     {
@@ -1372,6 +1402,27 @@
     },
     {
       "benchmark_result_files": [
+        "results/matched_baselines.json",
+        "results/matched_baselines_full.json"
+      ],
+      "category": "claim",
+      "doc_anchor": "matched_baselines.json",
+      "id": "backend-planner-bytes-model",
+      "lean_modules": [],
+      "runtime_compiler_files": [
+        "compiler/uo-solc/src/lib.rs",
+        "checker/uo-check/src/lib.rs"
+      ],
+      "source_files": [
+        "crates/uo-core/src/backend_plan.rs",
+        "probe/mplus-probe/src/matched_baselines.rs"
+      ],
+      "status": "empirically-tested",
+      "text": "The backend planner's model of the bytes of sealed records a call moves is tested, not proved: maps of three key and value widths on the full scan and both Path ORAM schemes, at seven capacities and up to three occupancy levels, move in every read of a stored or an absent key, overwrite and insert exactly the bytes the model gives their backend; at six shares of reads the planner chooses the backend whose measured calls moved the fewest bytes; and a map compiled with backend auto is on the backend its plan chose and moves the bytes of its model. The planner minimizes modeled bytes, not time, and its enclave memory is a model of the records and plaintext a call holds, not a measurement.",
+      "validation_command": "cargo run -q --release -p mplus-probe -- --only matched-baselines --out-dir results"
+    },
+    {
+      "benchmark_result_files": [
         "results/bridge_validation.json"
       ],
       "category": "claim",
@@ -1925,7 +1976,7 @@
       "validation_command": "cargo run -q -p mplus-probe -- --only acceptance-check --out-dir results"
     }
   ],
-  "entry_count": 40,
+  "entry_count": 41,
   "schema": "uo.claim_artifact_manifest.v1",
   "source_of_truth": "docs/claim-boundary.md"
 }

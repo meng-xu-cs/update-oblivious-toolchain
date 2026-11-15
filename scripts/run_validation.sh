@@ -74,6 +74,14 @@ UO_CORRECTNESS_TRIALS="${UO_CORRECTNESS_TRIALS:-4}" \
 # runs the full profile into capacity_sweep_full.json. Override UO_SWEEP_* for
 # other grids.
 cargo run -q --release -p mplus-probe -- --only capacity-sweep "${PROBE_ARGS[@]}"
+# The matched baselines (Issue 49): three maps of different key and value
+# widths on the full scan and both Path ORAM schemes at seven capacities, each
+# call's bytes against the backend planner's model, the planner's choice
+# against the measured calls, and maps compiled with `backend: auto`. Its
+# counts are bytes, a function of the programs and the capacities. This is its
+# quick profile, from the release build (about a minute); the
+# matched-baselines-full report fills every map to every level.
+cargo run -q --release -p mplus-probe -- --only matched-baselines "${PROBE_ARGS[@]}"
 # The stash of the private scheme: a simulation of the tree's node accesses
 # that counts the stash after each, and a forced overflow on the runtime,
 # which must fail the call and lose nothing. It makes 232 puts and as many

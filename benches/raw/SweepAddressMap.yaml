@@ -1,0 +1,27 @@
+contract: SweepAddressMap
+# The matched baselines compile this map on every backend and capacity they
+# compare; the backend, scheme and capacity here are replaced.
+entrypoints:
+  put(address,uint256):
+    secret_args: [key, value]
+    confidential: true
+    returns: forbidden
+    status: declassified
+    declassifies: [success]
+  read(address):
+    secret_args: [key]
+    confidential: true
+    returns: declassified
+    status: public
+    declassifies: [return]
+state:
+  records:
+    kind: map
+    key: address
+    value: uint256
+    capacity: 16
+    backend: oram
+    oram_scheme: path_oram_local_posmap_v1
+    confidential: true
+bounds:
+  loops: {}

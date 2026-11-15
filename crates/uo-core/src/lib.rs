@@ -1,4 +1,5 @@
 pub mod artifact;
+pub mod backend_plan;
 pub mod confidential_core;
 pub mod confidential_kernel;
 pub mod fact_reuse;

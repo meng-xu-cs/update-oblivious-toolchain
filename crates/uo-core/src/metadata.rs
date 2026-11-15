@@ -74,6 +74,22 @@ pub struct StateMetadata {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub oram_scheme: Option<String>,
     pub confidential: bool,
+    /// For a map whose backend is `auto`: what the backend planner reads
+    /// besides the map's capacity and types (`uo_core::backend_plan`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plan: Option<BackendPlanMetadata>,
+}
+
+/// What a map whose backend is `auto` declares to the backend planner.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct BackendPlanMetadata {
+    /// Reads among the map's operations, in percent: 50 if absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub read_percent: Option<u64>,
+    /// The enclave memory a call may hold for the map, in bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enclave_memory_budget_bytes: Option<usize>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]

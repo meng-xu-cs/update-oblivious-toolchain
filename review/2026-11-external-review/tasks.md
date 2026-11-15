@@ -1695,6 +1695,47 @@ oblivious maps), then baselines matched in key and value sizes, occupancy and
 enclave memory. A backend and schedule planner that reads only public
 parameters follows from the baselines.
 
+**As built.** The maintainer chose the repository's own backends as the
+baselines (D5), a planner in the compiler (D6), and the bytes a call moves
+as what it minimizes (D7). `docs/claim-boundary.md` has a Related Work
+section: making every store of a secret fresh against ciphertext side
+channels (CipherLeaks, Cipherfix, CipherGuard, Zebrafix), Path ORAM and
+oblivious data structures, the enclave oblivious maps of ZeroTrace, Oblix
+and EnigMap, and structured leakage are not claimed as new.
+
+`uo_core::backend_plan` models, for each backend that can hold a map, the
+bytes of the sealed records a call moves when it reads the map once and
+when it writes it once, and the enclave memory a call holds for the map,
+from the capacity and the key and value widths alone. A confidential map
+whose metadata says `backend: auto` gets from the compiler the backend that
+moves the fewest bytes per call at its declared share of reads
+(`plan.read_percent`, 50 if absent), among those whose enclave memory fits
+`plan.enclave_memory_budget_bytes`. The manifest records the plan, and
+`uo-check` makes it again and rejects a plan or a placement that differs.
+The Lean translation and admission checkers accept a planned map as any
+other, and the admission matrix runs one and rejects `auto` on a public
+map. The planner does not derive the share of reads from the program, and
+it plans backends, not schedules: a call's schedule is the backend's.
+
+`results/matched_baselines.json` (in `run_validation.sh`; the full profile,
+`matched_baselines_full.json`, fills every map to every level) runs SweepMap
+and two maps of other widths, `benches/raw/SweepAddressMap.sol` (20-byte
+keys) and `benches/raw/SweepFlagMap.sol` (1-byte values), on the three
+backends at seven capacities from 16 to 16,384 entries. Its 360 calls move
+the bytes of the model, as do the full profile's 528, which fill every map
+to every level; at 126 combinations of width, capacity and share of
+reads the planner chooses the backend whose measured calls moved the fewest
+bytes; and 42 maps compiled with `backend: auto` record their plans, are on
+the backends they chose, move the bytes of their models and read back what
+they wrote. The private scheme moves fewer bytes than the full scan from
+8,192 entries at up to three reads in four and from 4,096 at nine in ten,
+for 32-byte and 20-byte keys alike; with 1-byte values it moves fewer only
+from 16,384 entries for writes alone and from 8,192 at nine reads in ten.
+Two probe tests hold the model and the planner to the capacity sweep's full
+profile as well: the model gives each of its 1,141 calls, and the planner
+chooses what its mixes measured to move the fewest bytes. The claim manifest
+lists the model as tested (`backend-planner-bytes-model`).
+
 ### Issue 50 — Bridge a scoped subset to Solidity 0.8 semantics
 
 Source: F5 (§6). Size: L. Deferred.

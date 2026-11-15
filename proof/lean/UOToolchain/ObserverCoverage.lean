@@ -74,6 +74,7 @@ def observerCoveragePublicInputKeys : List String :=
   , "ReturnChannelAad.public_args"
   , "ReturnChannelAad.binding"
   , "PublicOutcomeTrace.public_env"
+  , "StateObjectManifest.plan"
   ]
 
 def observerCoverageClassificationFor
@@ -100,6 +101,7 @@ def observerCoverageKeys : List String :=
   , "StateObjectManifest.value_type"
   , "StateObjectManifest.key_type"
   , "StateObjectManifest.oram"
+  , "StateObjectManifest.plan"
   , "RuntimeKernelStepManifest.opcode"
   , "RuntimeKernelStepManifest.object_id"
   , "EntrypointManifest.secret_args"
@@ -361,6 +363,7 @@ theorem observerCoverage_publicInputKeysPinned :
       , "ReturnChannelAad.public_args"
       , "ReturnChannelAad.binding"
       , "PublicOutcomeTrace.public_env"
+      , "StateObjectManifest.plan"
       ] := by
   rfl
 

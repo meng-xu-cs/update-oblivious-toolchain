@@ -698,6 +698,29 @@ stash cap of 152 moved its break-even for reads alone from 1,024 entries to
 2,048 under cost model v2, and cost model v3, which counts each read once
 (Issue 57), puts it at 1,024 again.
 
+The matched baselines (Issue 49 of the review,
+`results/matched_baselines.json`) compare the backends by the bytes of
+sealed records a call moves, which repeat exactly from run to run, at three
+key and value widths, and the compiler's backend planner chooses a map's
+backend by the same model (The Backend Planner in
+[`claim-boundary.md`](./claim-boundary.md)). On each backend every read
+moves the same bytes, and so does every write, whatever the map's occupancy
+and whether the key is stored. With SweepMap's 32-byte keys and values the
+private scheme moves fewer bytes than the full scan from 8,192 entries when
+at most three operations in four read, and from 4,096 when nine in ten or
+all of them do. With 20-byte keys the break-evens are the same: a full-scan
+slot of 53 bytes seals into 96 bytes, as one of 65 does, and the tree's
+calls move about a tenth fewer bytes. With 1-byte values a full-scan slot
+seals into 64 bytes, and the private scheme moves fewer bytes from 16,384
+entries for writes alone, from 8,192 for mixes up to nine reads in ten, and
+from 4,096 for reads alone. The local scheme moves more bytes than the full
+scan at every capacity it holds: at 128 entries both kinds of call move
+52,864 bytes, where a full-scan read moves 12,288 and a write 24,576. In
+the enclave memory of the planner's model, the full scan holds the least at
+16 entries (3.6 KB, against 9.8 KB for the local scheme and 11.1 KB for the
+private one) and the private scheme far the least at 16,384 (71 KB, against
+3.7 MB for the full scan).
+
 The sweep also found a defect, which is fixed. An aborting call opened every
 slot of an exact map again to restore it, and the allocator's budget of
 resource events did not count that: above about 4,600 entries such a call

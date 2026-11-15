@@ -1679,7 +1679,7 @@ fn capacity_sweep_break_even(
     )
 }
 
-fn break_even_over<T>(
+pub(crate) fn break_even_over<T>(
     costs: &BTreeMap<(&'static str, usize), T>,
     capacities: &[usize],
     read_percents: &[u64],

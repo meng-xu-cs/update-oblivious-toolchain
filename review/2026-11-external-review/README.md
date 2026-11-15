@@ -57,8 +57,8 @@ validation and the capacity sweep.
 
 ## Decisions
 
-Issue 22 has the options and the reasoning for D1 to D3, and Issue 48 for
-D4.
+Issue 22 has the options and the reasoning for D1 to D3, Issue 48 for D4,
+and Issue 49 for D5 to D7.
 
 | Decision | Status | Outcome |
 | --- | --- | --- |
@@ -66,6 +66,9 @@ D4.
 | D2, where private evidence may go | decided 2026-11-12 | position maps and leaf schedules do not leave the runtime: a production build exports no private evidence, and only the diagnostics build exports it, to the Lean checkers |
 | D3, the lifetime budget of the stash bound | decided 2026-11-12 | a cap of 152: at most `2^-60` over `2^48` node accesses of a map |
 | D4, what Issue 48 builds | decided 2026-11-15 | fact reuse alone: a lookup reuses what an earlier lookup of its key found; a read and an update of one key are not fused into one access |
+| D5, the baselines of Issue 49 | decided 2026-11-15 | the repository's own backends, the full scan and both Path ORAM schemes, compared at the same key and value widths, capacities and occupancy, with the enclave memory each holds; no external system is run |
+| D6, where the backend planner runs | decided 2026-11-15 | in the compiler: a confidential map whose metadata says `backend: auto` gets the backend the planner chooses from public parameters, and the manifest records the plan, which `uo-check` makes again |
+| D7, what the planner minimizes | decided 2026-11-15 | the bytes of sealed records a call moves, at the share of reads the map declares (half if it declares none), among the backends whose enclave memory fits the map's budget |
 
 ## Order of Work
 
@@ -116,7 +119,10 @@ D4.
    call's own work is 2.1 to 2.4 times faster. Issue 48 is done: a lookup
    of a Path ORAM map reuses what an earlier lookup of its key found, and
    Lean proves that which lookups do is a function of the program; no
-   benchmark's counts move.
+   benchmark's counts move. Issue 49 is done: the claim boundary names the
+   related work, a map may leave its backend to a planner in the compiler,
+   which takes the one that moves the fewest bytes, and the matched
+   baselines check the planner's model against every call they make.
 
 The research issues (43 to 46) start once the issues they depend on are
 done. Issue 50 is deferred, and the folding of this directory into the
@@ -156,8 +162,8 @@ its engineering part is Wave 4, its certified part is research.
 | 45 | State security over call histories with a quantified bound | research | R | 24, 39, 40 | todo | |
 | 46 | Prove that the runtime's run on every tape is the substituted run | research | R | 42 | todo | |
 | 47 | Try an oblivious routing network for tree eviction | 8 | M | 27 | done | `ba0b958` |
-| 48 | Fuse scans and generalize the reuse analysis | 8 | M | 31, 32 | done | |
-| 49 | Write the related-work boundary and add matched baselines | 8 | M | 27 | todo | |
+| 48 | Fuse scans and generalize the reuse analysis | 8 | M | 31, 32 | done | `5dc9380` |
+| 49 | Write the related-work boundary and add matched baselines | 8 | M | 27 | done | |
 | 50 | Bridge a scoped subset to Solidity 0.8 semantics | backlog | L | | deferred | |
 | 51 | Remove the generator that a seal no longer reads | 7 | S to M | 24 | done | `48915bb` |
 | 52 | Make the seal count of a dropped call a function of its entrypoint | 7 | M | 24 | done | `b68dfbc` |

@@ -43,6 +43,20 @@ mod tests {
     use rand_chacha::ChaCha20Rng;
     use std::collections::BTreeSet;
 
+    /// The backend planner (`uo_core::backend_plan`) counts the bytes of
+    /// sealed records without the store: its length of a record is the
+    /// store's.
+    #[test]
+    fn the_planners_record_length_is_the_stores() {
+        for payload in 0..4096 {
+            assert_eq!(
+                uo_core::backend_plan::sealed_record_bytes(payload),
+                super::sealed_record_len(payload),
+                "payload of {payload} bytes"
+            );
+        }
+    }
+
     /// Seal `payload` and return the nonce the sealed record carries.
     fn sealed_nonce(cipher: &StoreCipher, payload: &[u8]) -> Vec<u8> {
         let mut payload_for_seal = payload.to_vec();

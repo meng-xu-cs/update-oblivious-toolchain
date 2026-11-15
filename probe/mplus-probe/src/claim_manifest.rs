@@ -225,6 +225,25 @@ const CLAIM_ENTRIES: &[ClaimEntry] = &[
         validation_command: "cargo run -q --release -p mplus-probe -- --only tape-substitution-full --out-dir results",
     },
     ClaimEntry {
+        id: "backend-planner-bytes-model",
+        category: "claim",
+        text: "The backend planner's model of the bytes of sealed records a call moves is tested, not proved: maps of three key and value widths on the full scan and both Path ORAM schemes, at seven capacities and up to three occupancy levels, move in every read of a stored or an absent key, overwrite and insert exactly the bytes the model gives their backend; at six shares of reads the planner chooses the backend whose measured calls moved the fewest bytes; and a map compiled with backend auto is on the backend its plan chose and moves the bytes of its model. The planner minimizes modeled bytes, not time, and its enclave memory is a model of the records and plaintext a call holds, not a measurement.",
+        status: STATUS_EMPIRICAL,
+        doc_anchor: "matched_baselines.json",
+        source_files: &[
+            "crates/uo-core/src/backend_plan.rs",
+            "probe/mplus-probe/src/matched_baselines.rs",
+        ],
+        lean_modules: &[],
+        runtime_compiler_files: &["compiler/uo-solc/src/lib.rs", "checker/uo-check/src/lib.rs"],
+        benchmark_result_files: &[
+            "results/matched_baselines.json",
+            "results/matched_baselines_full.json",
+        ],
+        validation_command:
+            "cargo run -q --release -p mplus-probe -- --only matched-baselines --out-dir results",
+    },
+    ClaimEntry {
         id: "admitted-package-identity-hash",
         category: "claim",
         text: "The artifact-level admitted-package hash is a canonical SHA-256 binding over source-language tag, semantics-profile tag, source bytes, sidecar metadata, compilation mode, compiler version, toolchain digest, and package schema tag.",

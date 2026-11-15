@@ -84,6 +84,18 @@ establish and what they do not).
   47: the largest maps measured on the code before the change and on the
   code after it, one run after the other. No control covers Issues 51 to
   59 (see [`path-oram.md`](./path-oram.md)).
+- The matched baselines have two profiles with one schema
+  (`uo-matched-baselines-v1`). `run_validation.sh` runs the quick one into
+  `results/matched_baselines.json` from a release build: three maps, with
+  32-byte keys and values, with 20-byte keys and with 1-byte values, on the
+  full scan and both Path ORAM schemes at seven capacities from 16 to 16,384
+  entries, filled to two keys and, up to 1,024 entries, to half and all of
+  their capacity (about a minute). The full one fills every map to every
+  level into `results/matched_baselines_full.json`
+  (`mplus-probe --only matched-baselines-full`, about 27 minutes on four
+  cores, most of them filling the trees). Both count bytes, which are a
+  function of the programs and the capacities and repeat on every run and
+  machine, and neither times anything.
 
 ## Index
 
@@ -94,6 +106,7 @@ establish and what they do not).
 | Does the runtime's Path ORAM follow its Lean models? Tested, not proved | `path_oram_avl_map_replay.json` and `path_oram_avl_map_replay_full.json` (random operations on the runtime's AVL map replayed on the Lean model: every result, every node access's kind, every size and the recorded trees, on maps of up to 31 and up to 2,048 nodes, with the map's pointers, free list and stash checked after every operation); `tape_substitution.json` and `tape_substitution_full.json` (calls of seven kinds on maps of both schemes, each run on other deployment seeds and compared, whole, with the representative run under that run's own tape: 42 and 1,344 tapes) |
 | Runtime and storage cost | `overheads.json` (modeled gas, physical reads and writes, bytes moved, trace and artifact sizes per benchmark and backend) |
 | Scalability | `capacity_sweep.json` and `capacity_sweep_full.json` (one map of 1 to 16,384 entries on every backend, at five occupancy levels: the traced counts of seven kinds of call, the untraced reads in the decode of the position-map witness, which the runtime keeps from call to call, with an audit of the kept witness after every level, read/write mixes computed and executed, break-even capacities, and release-build latencies with medians, 95th percentiles and bootstrap intervals, split into staging, loading, the runtime's own work, witnesses, proof objects, JSON serialization and Lean's check of a sampled call, with peak resident memory and evidence sizes) |
+| Which backend moves the fewest bytes at a map's key and value widths, and does the compiler's backend planner choose it? | `matched_baselines.json` and `matched_baselines_full.json` (three maps of different key and value widths on every backend at seven capacities and up to three occupancy levels: each call's bytes against the planner's model, the planner's choice against the measured calls at six shares of reads, maps compiled with `backend: auto`, the break-even capacities of each width, and each backend's modeled enclave memory) |
 | Does a call's public-state snapshot cost more as public objects it does not load grow? | `public_state.json` (a contract with a public array of 16 to 16,384 sealed slots, a public cell and a confidential cell: for a call on each, the public objects its snapshots decode and the bytes of their state, which do not depend on the array's size for the calls that do not load it, and the time of each call) |
 | What crosses the storage boundary, and does a runtime start again from its files? | `storage_boundary.json` (every benchmark on every sealed backend: the log a storage adapter keeps of the sealed records the runtime opens and seals against the reads and writes of each call's trace, one for one; a call dropped after it handed records over; a record refused before its nonce is reserved; and each benchmark restarted from a store in files, which must answer as before and repeat no nonce) |
 | How full does the private scheme's stash get, and what does an overflow do? | `stash_occupancy.json` and `stash_occupancy_full.json` (the stash counted after every node access of a simulation that runs the runtime's tree operations without the cryptography, against the assumed tail; and a stash overflow forced on the runtime: the call fails, the committed ciphertext is unchanged, and every stored key reads back) |

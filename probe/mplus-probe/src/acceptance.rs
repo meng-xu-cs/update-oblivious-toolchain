@@ -49,6 +49,8 @@ fn report_mode(report: &str) -> &'static str {
         // Written by scripts/run_capacity_sweep_full.sh, not the validation
         // script.
         | "capacity_sweep_full"
+        | "matched_baselines"
+        | "matched_baselines_full"
         | "stash_occupancy"
         // Written by scripts/run_stash_occupancy_full.sh, not the validation
         // script.

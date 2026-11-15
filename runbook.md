@@ -51,6 +51,15 @@ part of `run_validation.sh`):
 ./scripts/measure_tree_eviction_instructions.sh
 ```
 
+The matched baselines' full profile (Issue 49): three maps of different key
+and value widths on every backend and capacity, filled to every occupancy
+level (about 27 minutes on four cores; `run_validation.sh` runs the quick
+profile):
+
+```bash
+cargo run -q --release -p mplus-probe -- --only matched-baselines-full --out-dir results
+```
+
 ## Direct Entry Points
 
 Compile a benchmark:
