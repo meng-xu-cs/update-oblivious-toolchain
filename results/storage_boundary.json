@@ -1241,7 +1241,7 @@
   "oram_reads": "a call reads the counter and the metadata pages of an ORAM map once, where it loads the map, and holds them through the call; each access reads its buckets; the trace names each of those reads where the call makes it",
   "provenance": {
     "restart": "a seeded deployment restarts from a store in files; the sync policy is off, so the report times no device",
-    "toolchain_manifest_sha256": "dbca0034cf15045bcf51b1eede921ec9618bba1b1456256ee363b01486a28290"
+    "toolchain_manifest_sha256": "f777132590bfb34bc2367189fa512a093642b55fe8bedc52eb2bc7951e1a5ed6"
   },
   "restarts": [
     {

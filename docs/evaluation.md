@@ -79,11 +79,11 @@ establish and what they do not).
   and its `provenance` names the build that measured it and where the
   records were kept. The latencies of two reports compare only if one
   machine in one state measured both, so the review directory also holds
-  three controls, for Issues 36 to 38, for the stash cap of Issue 40 and
-  for the storage adapter of Issue 41: the largest maps measured on the
-  code before the change and on the code after it, one run after the
-  other. No control covers Issues 51 to 59 (see
-  [`path-oram.md`](./path-oram.md)).
+  four controls, for Issues 36 to 38, for the stash cap of Issue 40, for
+  the storage adapter of Issue 41 and for the eviction networks of Issue
+  47: the largest maps measured on the code before the change and on the
+  code after it, one run after the other. No control covers Issues 51 to
+  59 (see [`path-oram.md`](./path-oram.md)).
 
 ## Index
 
@@ -97,7 +97,7 @@ establish and what they do not).
 | Does a call's public-state snapshot cost more as public objects it does not load grow? | `public_state.json` (a contract with a public array of 16 to 16,384 sealed slots, a public cell and a confidential cell: for a call on each, the public objects its snapshots decode and the bytes of their state, which do not depend on the array's size for the calls that do not load it, and the time of each call) |
 | What crosses the storage boundary, and does a runtime start again from its files? | `storage_boundary.json` (every benchmark on every sealed backend: the log a storage adapter keeps of the sealed records the runtime opens and seals against the reads and writes of each call's trace, one for one; a call dropped after it handed records over; a record refused before its nonce is reserved; and each benchmark restarted from a store in files, which must answer as before and repeat no nonce) |
 | How full does the private scheme's stash get, and what does an overflow do? | `stash_occupancy.json` and `stash_occupancy_full.json` (the stash counted after every node access of a simulation that runs the runtime's tree operations without the cryptography, against the assumed tail; and a stash overflow forced on the runtime: the call fails, the committed ciphertext is unchanged, and every stored key reads back) |
-| Cost of a tree node access | `tree_eviction_instructions.json` (callgrind instruction counts per node access of the private scheme, before and after the eviction rewrite) |
+| Cost of a tree node access | `tree_eviction_instructions.json` (callgrind instruction counts and masked node moves per node access of the private scheme, before and after the eviction networks of Issue 47 of the external review) |
 | Do the kernel's operators branch on their operands? | `kernel_operator_instructions.json` (callgrind instruction counts of one evaluation of each binary operator of the confidential kernel, and of an array index's conversion, for every class of operands, before and after the operators were made branch-free), with `kernel_operators_do_not_branch_on_operands` in `runtime_boundary_validation.json` for the source |
 | Verification and TCB cost | `reviewer_summary.json` (proof-checking time per report, proof-artifact size budget, trusted line counts), `tamper_validation.json`, `lean_assumption_budget.json`, `static_checks.json` (including the kernel admission of every confidential entrypoint) |
 | Theorem instances and runtime-to-theorem bridges | `bridge_validation.json`, `pathoram_pair_validation.json`, `canonical_pathoram_pair_validation.json`, `fresh_coin_validation.json`, `pathoram_hidden_validation.json`, and the `*_boundary_validation.json` and `*_refinement*_validation.json` reports |

@@ -452,17 +452,18 @@ memory. The figures below come from the full profile
 occupancy level of every map, and a workload of 20 calls at each read
 fraction, with the maps' sealed records kept in files and every commit
 synced. Each figure is a median with its 95% bootstrap interval. A call's
-time splits into staging the call on the committed state, loading the
-call's objects, the rest of the runtime's own work, the position-map
-witness, the proof bundles of the trace, and the store's commit of the
-records the call wrote; the report also times the JSON serialization of the
-trace and Lean's check of one call of each kind, and gives the peak
-resident memory. The profile was run when Issues 30 to 42 and 51 to 59 of
-the external review were in, so with the stash cap of 152 and with every
-sealed record kept by a storage adapter alone (see The Storage Boundary in
-[`claim-boundary.md`](./claim-boundary.md)).
-`review/2026-11-external-review/capacity_sweep_baseline.json` is the same
-profile as it was measured before them, and
+time splits into staging the call on the committed state, loading the call's
+objects, the rest of the runtime's own work, the position-map witness, the
+proof bundles of the trace, and the store's commit of the records the call
+wrote; the report also times the JSON serialization of the trace and Lean's
+check of one call of each kind, and gives the peak resident memory. The
+profile was run when Issues 30 to 42 and 51 to 59 of the external review
+were in, so with the stash cap of 152 and with every sealed record kept by a
+storage adapter alone (see The Storage Boundary in
+[`claim-boundary.md`](./claim-boundary.md)). It predates Issue 47 of the
+review, whose eviction networks halved a tree call's own work: its control
+is below. `review/2026-11-external-review/capacity_sweep_baseline.json` is
+the same profile as it was measured before them, and
 `scripts/compare_capacity_sweep.py` compares two reports.
 
 Two profiles compare only if one machine in one state measured both, and the
@@ -612,6 +613,25 @@ cap of 114, with the cap of 152, and with the records in files. This
 profile, with Issues 51 to 59 in, has that order in 524 of the 525 cells,
 all but the read at 4,096 entries above.
 
+The eviction networks of Issue 47 halve a tree call's own work and leave the
+full scan as it was. In their control, the first run is the code before the
+issue and the second the code after it: a tree read took 12.6 ms at 4,096
+entries, 15.8 ms at 8,192 and 18.2 ms at 16,384, and takes 6.0 ms, 7.4 ms
+and 8.3 ms; an overwrite took 48.4 ms, 60.1 ms and 70.5 ms and takes 21.7
+ms, 26.6 ms and 29.7 ms. That is 2.1 to 2.4 times faster for every kind of
+call, where callgrind counts 3.0 times fewer instructions in a node access
+at 4,096 entries. The proof bundles of the trace did not change, so a whole
+measured call is 1.2 times faster (69.0 ms to 57.7 ms for the read at 16,384
+entries, 244.9 ms to 203.2 ms for the overwrite) and still slower on the
+tree than on the full scan, whose calls moved by 4% at most between the two
+runs. On its own work the tree is now the faster backend for reads at all
+three capacities of the control (6.0 ms against 10.5 ms at 4,096 entries)
+and for writes at 8,192 and 16,384 (26.6 ms against 43.1 ms for an overwrite
+at 8,192); at 4,096 entries the two overwrites have overlapping intervals
+(21.7 ms [21.5, 21.9] on the tree against 20.9 ms [20.6, 21.9]). The two
+runs have one digest of their counts. The full profile above, run before the
+issue, has the backends in the order they had before it.
+
 Issues 36 to 38 of the review took out of a call three costs that grew with
 the store: the witness snapshots, the copy of the store, and a trace event
 for every slot of an exact object. Their control has the stash cap of 114.
@@ -668,17 +688,32 @@ operations beside its commit operations, two events for each
 `UOToolchain/RuntimeAllocatorDiscipline.lean`), and a call opens each slot
 once: an aborting call restores the map from the copy it loaded.
 
-A node access evicts the stash
-bucket by bucket, placing a block in the
-bucket at a given depth exactly when its leaf and the read leaf agree above
-that depth (the leaf count is a power of two), and moves blocks with in-place
-masked selects; at 4,096 entries this takes 2.2 times fewer instructions per
-node access than walking each block's path and cloning its key and value (2.4
-times fewer in the bucket eviction itself), with every block placed where it
-was before. The counts are callgrind's, from release builds before and after
-the change, and repeat exactly from run to run
-(`results/tree_eviction_instructions.json`, written by
-`scripts/measure_tree_eviction_instructions.sh`).
+A node access evicts the stash over the path it read and compacts it in one
+step (`TreeStash::evict_path`). Each bucket of the path, deepest first,
+takes in stash order the first blocks still in the stash whose leaves agree
+with the read leaf above its depth (the leaf count is a power of two), up to
+its size, and the path's blocks left in the stash then move, in order, into
+its first empty persistent slots. That placement is computed on each block's
+occupancy and leaf alone, and the blocks move through fixed networks of
+masked moves, whose pairs of slots depend only on the stash's public sizes
+(Issue 47 of the review): an order-preserving compaction gathers the blocks
+the path takes, Batcher's odd-even merge sort orders them by their slots on
+the path, and an expansion, the compaction run backwards, spreads them over
+the path; the blocks left behind are gathered and spread over the free
+persistent slots the same way. Before, each bucket moved every block of the
+stash under a mask, and the compaction every block of the path into every
+persistent slot. Every block lands where it did: a test compares the two
+evictions field by field on random stashes, with room and without, and the
+stash-occupancy and AVL-replay reports did not change. At 4,096 entries a
+node access makes 8,329 masked node moves where it made 36,974, and takes
+2.8 million instructions where it took 8.6 million, 3.0 times fewer (4.4
+times fewer in the eviction itself). The counts are callgrind's, from
+release builds before and after the change, and repeat exactly from run to
+run (`results/tree_eviction_instructions.json`, written by
+`scripts/measure_tree_eviction_instructions.sh`). The rewrite before it,
+which stopped walking each block's path and cloning its key and value, had
+taken a node access from 16.2 million instructions to 7.3 million, with the
+stash cap of 114.
 
 What remains open on the private scheme: the runtime's pointer-level
 implementation of the AVL map (node ids, leaves, the free list, the stash)

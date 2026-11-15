@@ -37,13 +37,13 @@
         108
       ],
       "timing": {
-        "max_ns": 91557,
-        "median_load_ns": 2212,
-        "median_ns": 45503,
-        "median_proof_objects_ns": 17798,
-        "median_staging_ns": 59,
-        "median_storage_commit_ns": 63,
-        "min_ns": 43875,
+        "max_ns": 72190,
+        "median_load_ns": 2590,
+        "median_ns": 54717,
+        "median_proof_objects_ns": 21287,
+        "median_staging_ns": 88,
+        "median_storage_commit_ns": 78,
+        "min_ns": 50908,
         "rounds": 9
       }
     },
@@ -65,13 +65,13 @@
         0
       ],
       "timing": {
-        "max_ns": 181473,
-        "median_load_ns": 2268,
-        "median_ns": 145356,
-        "median_proof_objects_ns": 113273,
-        "median_staging_ns": 64,
-        "median_storage_commit_ns": 72,
-        "min_ns": 140651,
+        "max_ns": 228406,
+        "median_load_ns": 3269,
+        "median_ns": 186943,
+        "median_proof_objects_ns": 137953,
+        "median_staging_ns": 99,
+        "median_storage_commit_ns": 87,
+        "min_ns": 164001,
         "rounds": 9
       }
     },
@@ -93,13 +93,13 @@
         507
       ],
       "timing": {
-        "max_ns": 215856,
-        "median_load_ns": 28726,
-        "median_ns": 170644,
-        "median_proof_objects_ns": 19184,
-        "median_staging_ns": 72,
-        "median_storage_commit_ns": 219,
-        "min_ns": 155358,
+        "max_ns": 231219,
+        "median_load_ns": 35116,
+        "median_ns": 201607,
+        "median_proof_objects_ns": 22671,
+        "median_staging_ns": 89,
+        "median_storage_commit_ns": 264,
+        "min_ns": 189219,
         "rounds": 9
       }
     },
@@ -121,13 +121,13 @@
         108
       ],
       "timing": {
-        "max_ns": 55489,
-        "median_load_ns": 2115,
-        "median_ns": 43363,
-        "median_proof_objects_ns": 16813,
-        "median_staging_ns": 73,
-        "median_storage_commit_ns": 80,
-        "min_ns": 40679,
+        "max_ns": 82506,
+        "median_load_ns": 2702,
+        "median_ns": 53932,
+        "median_proof_objects_ns": 21081,
+        "median_staging_ns": 75,
+        "median_storage_commit_ns": 86,
+        "min_ns": 51096,
         "rounds": 9
       }
     },
@@ -149,13 +149,13 @@
         0
       ],
       "timing": {
-        "max_ns": 177182,
-        "median_load_ns": 2344,
-        "median_ns": 151680,
-        "median_proof_objects_ns": 114815,
-        "median_staging_ns": 75,
-        "median_storage_commit_ns": 90,
-        "min_ns": 132837,
+        "max_ns": 222758,
+        "median_load_ns": 3491,
+        "median_ns": 190027,
+        "median_proof_objects_ns": 149134,
+        "median_staging_ns": 94,
+        "median_storage_commit_ns": 138,
+        "min_ns": 178085,
         "rounds": 9
       }
     },
@@ -177,13 +177,13 @@
         6747
       ],
       "timing": {
-        "max_ns": 2136928,
-        "median_load_ns": 460827,
-        "median_ns": 2039643,
-        "median_proof_objects_ns": 22242,
-        "median_staging_ns": 85,
-        "median_storage_commit_ns": 1808,
-        "min_ns": 1933519,
+        "max_ns": 2974007,
+        "median_load_ns": 566945,
+        "median_ns": 2822066,
+        "median_proof_objects_ns": 45869,
+        "median_staging_ns": 256,
+        "median_storage_commit_ns": 3675,
+        "min_ns": 2418265,
         "rounds": 9
       }
     },
@@ -205,13 +205,13 @@
         108
       ],
       "timing": {
-        "max_ns": 110076,
-        "median_load_ns": 2458,
-        "median_ns": 52228,
-        "median_proof_objects_ns": 18490,
-        "median_staging_ns": 68,
-        "median_storage_commit_ns": 85,
-        "min_ns": 45402,
+        "max_ns": 79763,
+        "median_load_ns": 2612,
+        "median_ns": 53168,
+        "median_proof_objects_ns": 20313,
+        "median_staging_ns": 84,
+        "median_storage_commit_ns": 84,
+        "min_ns": 50608,
         "rounds": 9
       }
     },
@@ -233,13 +233,13 @@
         0
       ],
       "timing": {
-        "max_ns": 185482,
-        "median_load_ns": 2607,
-        "median_ns": 155617,
-        "median_proof_objects_ns": 125052,
-        "median_staging_ns": 81,
-        "median_storage_commit_ns": 80,
-        "min_ns": 152620,
+        "max_ns": 241825,
+        "median_load_ns": 2994,
+        "median_ns": 180181,
+        "median_proof_objects_ns": 140805,
+        "median_staging_ns": 73,
+        "median_storage_commit_ns": 121,
+        "min_ns": 168665,
         "rounds": 9
       }
     },
@@ -261,13 +261,13 @@
         106587
       ],
       "timing": {
-        "max_ns": 39577785,
-        "median_load_ns": 7500881,
-        "median_ns": 33298962,
-        "median_proof_objects_ns": 52397,
-        "median_staging_ns": 353,
-        "median_storage_commit_ns": 48676,
-        "min_ns": 32271100,
+        "max_ns": 42408487,
+        "median_load_ns": 8938076,
+        "median_ns": 40391842,
+        "median_proof_objects_ns": 58778,
+        "median_staging_ns": 494,
+        "median_storage_commit_ns": 53857,
+        "min_ns": 39228292,
         "rounds": 9
       }
     },
@@ -289,13 +289,13 @@
         108
       ],
       "timing": {
-        "max_ns": 90317,
-        "median_load_ns": 2779,
-        "median_ns": 57025,
-        "median_proof_objects_ns": 21304,
-        "median_staging_ns": 88,
-        "median_storage_commit_ns": 110,
-        "min_ns": 52847,
+        "max_ns": 78097,
+        "median_load_ns": 2730,
+        "median_ns": 53174,
+        "median_proof_objects_ns": 20220,
+        "median_staging_ns": 83,
+        "median_storage_commit_ns": 86,
+        "min_ns": 50035,
         "rounds": 9
       }
     },
@@ -317,13 +317,13 @@
         0
       ],
       "timing": {
-        "max_ns": 269179,
-        "median_load_ns": 3374,
-        "median_ns": 188581,
-        "median_proof_objects_ns": 144145,
-        "median_staging_ns": 79,
-        "median_storage_commit_ns": 150,
-        "min_ns": 171475,
+        "max_ns": 231681,
+        "median_load_ns": 3105,
+        "median_ns": 198650,
+        "median_proof_objects_ns": 143099,
+        "median_staging_ns": 90,
+        "median_storage_commit_ns": 142,
+        "min_ns": 169412,
         "rounds": 9
       }
     },
@@ -345,13 +345,13 @@
         426075
       ],
       "timing": {
-        "max_ns": 182257509,
-        "median_load_ns": 33392422,
-        "median_ns": 155784671,
-        "median_proof_objects_ns": 58881,
-        "median_staging_ns": 613,
-        "median_storage_commit_ns": 302858,
-        "min_ns": 146175310,
+        "max_ns": 171390661,
+        "median_load_ns": 36351854,
+        "median_ns": 167982007,
+        "median_proof_objects_ns": 58163,
+        "median_staging_ns": 627,
+        "median_storage_commit_ns": 315410,
+        "min_ns": 137187269,
         "rounds": 9
       }
     }

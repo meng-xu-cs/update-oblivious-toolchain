@@ -3934,45 +3934,32 @@ impl TreeStash {
         Ok((taken, count))
     }
 
-    /// Fill the bucket at `depth` on the path of `read_leaf` with blocks whose
-    /// paths pass through it, taking them out of the stash in stash order.
-    /// The leaf count is a power of two, so a block's path passes through
-    /// that bucket exactly when its leaf and `read_leaf` agree above the
-    /// bucket's depth: `bucket_on_leaf_path` without walking the path.
-    pub(super) fn evict_bucket(
+    /// Evict the stash over the path of `read_leaf` and compact it. Each
+    /// bucket of the path, deepest first, takes in stash order the first
+    /// blocks still in the stash whose paths pass through it, up to its
+    /// size. The leaf count is a power of two, so a block's path passes
+    /// through the bucket at a depth exactly when its leaf and `read_leaf`
+    /// agree above that depth: `bucket_on_leaf_path` without walking the
+    /// path. The path's blocks left in the stash then move, in order, into
+    /// its first empty persistent slots, and the appended slots are emptied.
+    ///
+    /// The placement is computed on each block's tags, its occupancy and its
+    /// leaf, and each block then moves through fixed networks of masked
+    /// moves: the blocks the path takes are gathered in stash order
+    /// (`compaction_network`), sorted by their slots on the path
+    /// (`odd_even_merge_sort_network`) and spread over those slots
+    /// (`expansion_network`); the path's blocks left behind are gathered and
+    /// spread over the free persistent slots the same way. Which slots each
+    /// step touches depends only on the stash's public sizes.
+    ///
+    /// Returns the path's buckets, deepest first, and whether a block left
+    /// behind found no persistent slot: an overflow of the stash, which the
+    /// caller reports once it has written the path.
+    pub(super) fn evict_path(
         &mut self,
         shape: &TreeShape,
         read_leaf: usize,
-        depth: usize,
-    ) -> Result<Box<[TreeNode]>> {
-        let mut bucket = FixedBoxBuilder::new(shape.blocks_per_bucket);
-        for _ in 0..shape.blocks_per_bucket {
-            bucket.push(clone_tree_node(&self.empty))?;
-        }
-        let mut bucket = bucket.finish()?;
-        let below = tree_levels_below(shape, depth)?;
-        let leaf_mask = shape.leaf_count - 1;
-        let read_prefix = (read_leaf & leaf_mask) >> below;
-        let fill = self.fill;
-        for candidate in self.blocks.iter_mut().take(fill) {
-            let fits =
-                candidate.occupied & (((candidate.leaf & leaf_mask) >> below) == read_prefix);
-            let mut placed = false;
-            for slot in bucket.iter_mut() {
-                let here = fits & !placed & !slot.occupied;
-                assign_tree_node(here, slot, candidate)?;
-                placed |= here;
-            }
-            assign_tree_node(placed, candidate, &self.empty)?;
-        }
-        Ok(bucket)
-    }
-
-    /// Move the appended blocks still occupied into empty persistent slots.
-    /// A block that finds no room is an overflow of the stash: the access
-    /// stops with an error, so the call that made it is dropped, nothing of
-    /// it is committed and no block is lost.
-    pub(super) fn compact(&mut self) -> Result<()> {
+    ) -> Result<(Box<[Box<[TreeNode]>]>, bool)> {
         let persistent = self.persistent;
         let fill = self.fill;
         if fill > self.blocks.len() || persistent > fill {
@@ -3983,23 +3970,383 @@ impl TreeStash {
                 self.blocks.len()
             );
         }
-        let (slots, appended) = self.blocks.split_at_mut(persistent);
-        let mut overflowed = false;
-        for moving in appended.iter_mut().take(fill - persistent) {
-            let mut placed = false;
-            for slot in slots.iter_mut() {
-                let here = moving.occupied & !placed & !slot.occupied;
-                assign_tree_node(here, slot, moving)?;
-                placed |= here;
+        if !shape.leaf_count.is_power_of_two() {
+            bail!("tree leaf count {} is not a power of two", shape.leaf_count);
+        }
+        let levels = levels_for_leaf_count(shape.leaf_count);
+        let per_bucket = shape.blocks_per_bucket;
+        let path_slots = levels
+            .checked_mul(per_bucket)
+            .ok_or_else(|| anyhow!("tree path of {} levels overflowed its slots", levels))?;
+        let leaf_mask = shape.leaf_count - 1;
+        let read_leaf = read_leaf & leaf_mask;
+
+        // Where the path takes each block: `to_path`, and its slot on the
+        // path, `offset * per_bucket + slot` for the bucket `offset` levels
+        // above the leaf. Tags only.
+        let mut to_path = FixedBoxBuilder::from_fn(fill, |_| false);
+        let mut place = FixedBoxBuilder::from_fn(fill, |_| 0usize);
+        for offset in 0..levels {
+            let read_prefix = read_leaf >> offset;
+            let mut taken = 0usize;
+            for (index, block) in self.blocks.iter().take(fill).enumerate() {
+                let fits = block.occupied
+                    & !to_path[index]
+                    & (((block.leaf & leaf_mask) >> offset) == read_prefix);
+                let here = fits & (taken < per_bucket);
+                place[index] = masked_select_usize(here, offset * per_bucket + taken, place[index]);
+                to_path[index] |= here;
+                taken += usize::from(here);
             }
-            overflowed |= moving.occupied & !placed;
-            assign_tree_node(true, moving, &self.empty)?;
+        }
+
+        // The blocks the path takes leave the stash for a buffer, in stash
+        // order, and are gathered at its front.
+        let mut gathered = FixedBoxBuilder::new(fill);
+        for (index, block) in self.blocks.iter_mut().take(fill).enumerate() {
+            gathered.push(clone_tree_node(block))?;
+            assign_tree_node(to_path[index], block, &self.empty)?;
+        }
+        let mut gathered = gathered.finish()?;
+        compaction_network(&mut to_path, |moves, from, to| {
+            let (front, back) = gathered.split_at_mut(from);
+            let source = back
+                .first()
+                .ok_or_else(|| anyhow!("tree eviction slot {} missing", from))?;
+            let target = front
+                .get_mut(to)
+                .ok_or_else(|| anyhow!("tree eviction slot {} missing", to))?;
+            assign_tree_node(moves, target, source)?;
+            place[to] = masked_select_usize(moves, place[from], place[to]);
+            Ok(())
+        })?;
+
+        // At most `per_bucket` blocks per level: they fit in the path's
+        // slots. Sort them by slot, then spread them over the slots.
+        let mut path = FixedBoxBuilder::new(path_slots);
+        let mut path_keep = FixedBoxBuilder::from_fn(path_slots, |_| false);
+        let mut path_place = FixedBoxBuilder::from_fn(path_slots, |_| usize::MAX);
+        let mut gathered = gathered.into_vec().into_iter();
+        for slot in 0..path_slots {
+            let block = gathered
+                .next()
+                .unwrap_or_else(|| clone_tree_node(&self.empty));
+            path.push(block)?;
+            if slot < fill {
+                path_keep[slot] = to_path[slot];
+                path_place[slot] = masked_select_usize(to_path[slot], place[slot], usize::MAX);
+            }
+        }
+        drop(gathered);
+        let mut path = path.finish()?;
+        odd_even_merge_sort_network(path_slots, |low, high| {
+            let swap = path_place[low] > path_place[high];
+            let (front, back) = path.split_at_mut(high);
+            let first = front
+                .get_mut(low)
+                .ok_or_else(|| anyhow!("tree eviction slot {} missing", low))?;
+            let second = back
+                .first_mut()
+                .ok_or_else(|| anyhow!("tree eviction slot {} missing", high))?;
+            swap_tree_nodes(swap, first, second)?;
+            let (keep_low, keep_high) = (path_keep[low], path_keep[high]);
+            path_keep[low] = masked_select_bool(swap, keep_high, keep_low);
+            path_keep[high] = masked_select_bool(swap, keep_low, keep_high);
+            let (place_low, place_high) = (path_place[low], path_place[high]);
+            path_place[low] = masked_select_usize(swap, place_high, place_low);
+            path_place[high] = masked_select_usize(swap, place_low, place_high);
+            Ok(())
+        })?;
+        let mut distance = FixedBoxBuilder::from_fn(path_slots, |slot| {
+            masked_select_usize(path_keep[slot], path_place[slot].wrapping_sub(slot), 0)
+        });
+        expansion_network(&mut path_keep, &mut distance, |moves, from, to| {
+            let (front, back) = path.split_at_mut(to);
+            let source = front
+                .get(from)
+                .ok_or_else(|| anyhow!("tree eviction slot {} missing", from))?;
+            let target = back
+                .first_mut()
+                .ok_or_else(|| anyhow!("tree eviction slot {} missing", to))?;
+            assign_tree_node(moves, target, source)?;
+            Ok(())
+        })?;
+        for (slot, block) in path.iter_mut().enumerate() {
+            assign_tree_node(!path_keep[slot], block, &self.empty)?;
+        }
+        let mut path = path.into_vec().into_iter();
+        let mut buckets = FixedBoxBuilder::new(levels);
+        for _ in 0..levels {
+            let mut bucket = FixedBoxBuilder::new(per_bucket);
+            for _ in 0..per_bucket {
+                bucket.push(
+                    path.next()
+                        .ok_or_else(|| anyhow!("tree path slots ran out"))?,
+                )?;
+            }
+            buckets.push(bucket.finish()?)?;
+        }
+        let buckets = buckets.finish()?;
+
+        // The path's blocks left in the stash, gathered at the front of the
+        // appended slots, move in order into the free persistent slots.
+        let appended = fill - persistent;
+        let (slots, tail) = self.blocks.split_at_mut(persistent);
+        let tail = tail
+            .get_mut(..appended)
+            .ok_or_else(|| anyhow!("tree stash appended slots missing"))?;
+        let mut left = FixedBoxBuilder::from_fn(appended, |slot| tail[slot].occupied);
+        let left_count = left
+            .iter()
+            .fold(0usize, |acc, here| acc + usize::from(*here));
+        compaction_network(&mut left, |moves, from, to| {
+            let (front, back) = tail.split_at_mut(from);
+            let source = back
+                .first()
+                .ok_or_else(|| anyhow!("tree stash slot {} missing", from))?;
+            let target = front
+                .get_mut(to)
+                .ok_or_else(|| anyhow!("tree stash slot {} missing", to))?;
+            assign_tree_node(moves, target, source)?;
+            Ok(())
+        })?;
+        // The free persistent slots, in order: the `rank`-th block left
+        // behind goes to the `rank`-th of them.
+        let mut free = FixedBoxBuilder::from_fn(persistent, |slot| !slots[slot].occupied);
+        let free_count = free
+            .iter()
+            .fold(0usize, |acc, here| acc + usize::from(*here));
+        let mut free_slot = FixedBoxBuilder::from_fn(persistent, |slot| slot);
+        compaction_network(&mut free, |moves, from, to| {
+            free_slot[to] = masked_select_usize(moves, free_slot[from], free_slot[to]);
+            Ok(())
+        })?;
+        let overflowed = left_count > free_count;
+        let mut spread = FixedBoxBuilder::new(persistent);
+        let mut spread_keep = FixedBoxBuilder::from_fn(persistent, |_| false);
+        let mut distance = FixedBoxBuilder::from_fn(persistent, |_| 0usize);
+        for rank in 0..persistent {
+            match tail.get(rank) {
+                Some(block) => {
+                    spread.push(clone_tree_node(block))?;
+                    let here = (rank < left_count) & (rank < free_count);
+                    spread_keep[rank] = here;
+                    distance[rank] =
+                        masked_select_usize(here, free_slot[rank].wrapping_sub(rank), 0);
+                }
+                None => spread.push(clone_tree_node(&self.empty))?,
+            }
+        }
+        let mut spread = spread.finish()?;
+        expansion_network(&mut spread_keep, &mut distance, |moves, from, to| {
+            let (front, back) = spread.split_at_mut(to);
+            let source = front
+                .get(from)
+                .ok_or_else(|| anyhow!("tree stash slot {} missing", from))?;
+            let target = back
+                .first_mut()
+                .ok_or_else(|| anyhow!("tree stash slot {} missing", to))?;
+            assign_tree_node(moves, target, source)?;
+            Ok(())
+        })?;
+        for (slot, block) in slots.iter_mut().enumerate() {
+            let source = spread
+                .get(slot)
+                .ok_or_else(|| anyhow!("tree stash slot {} missing", slot))?;
+            assign_tree_node(spread_keep[slot], block, source)?;
+        }
+        for block in tail.iter_mut() {
+            assign_tree_node(true, block, &self.empty)?;
         }
         self.fill = persistent;
-        if overflowed {
-            return Err(stash_overflow_error(persistent));
+        Ok((buckets, overflowed))
+    }
+}
+
+/// The moves of an order-preserving compaction over `keep.len()` slots: the
+/// slots marked `keep` end at the front, in their order. At level `k` a kept
+/// slot moves `2^k` slots toward the front when bit `k` of its distance, the
+/// unkept slots before it, is set. Distances never decrease along the kept
+/// slots, so no two kept slots meet, and the slots processed in increasing
+/// order are each read before they are overwritten. Each step calls
+/// `shift(moves, from, to)`, `to < from`, which moves the item at `from` to
+/// `to` if `moves`; which pairs it is given depends on the length alone.
+/// `keep` follows the items.
+pub(super) fn compaction_network<F>(keep: &mut [bool], mut shift: F) -> Result<()>
+where
+    F: FnMut(bool, usize, usize) -> Result<()>,
+{
+    let len = keep.len();
+    let mut distance = FixedBoxBuilder::from_fn(len, |_| 0usize);
+    let mut gaps = 0usize;
+    for slot in 0..len {
+        distance[slot] = masked_select_usize(keep[slot], gaps, 0);
+        gaps += usize::from(!keep[slot]);
+    }
+    let mut level = 0usize;
+    while level < usize::BITS as usize && (1usize << level) < len {
+        let step = 1usize << level;
+        for slot in 0..len - step {
+            let from = slot + step;
+            let moves = keep[from] & (((distance[from] >> level) & 1) == 1);
+            shift(moves, from, slot)?;
+            keep[slot] |= moves;
+            keep[from] &= !moves;
+            distance[slot] = masked_select_usize(moves, distance[from], distance[slot]);
         }
-        Ok(())
+        level += 1;
+    }
+    Ok(())
+}
+
+/// The moves of an expansion, the compaction run backwards: each kept item
+/// at the front moves `distance` slots toward the back, to a slot at or
+/// behind its own; the targets increase along the kept items. Levels go
+/// from the highest down, and at level `k` a kept item moves `2^k` slots
+/// when bit `k` of its distance is set; the slots processed in decreasing
+/// order are each read before they are overwritten. Each step calls
+/// `shift(moves, from, to)`, `from < to`; which pairs it is given depends on
+/// the length alone. `keep` and `distance` follow the items.
+pub(super) fn expansion_network<F>(
+    keep: &mut [bool],
+    distance: &mut [usize],
+    mut shift: F,
+) -> Result<()>
+where
+    F: FnMut(bool, usize, usize) -> Result<()>,
+{
+    let len = keep.len();
+    if distance.len() != len {
+        bail!(
+            "expansion distances {} differ from its {} slots",
+            distance.len(),
+            len
+        );
+    }
+    let mut levels = 0usize;
+    while levels < usize::BITS as usize && (1usize << levels) < len {
+        levels += 1;
+    }
+    for level in (0..levels).rev() {
+        let step = 1usize << level;
+        for slot in (step..len).rev() {
+            let from = slot - step;
+            let moves = keep[from] & (((distance[from] >> level) & 1) == 1);
+            shift(moves, from, slot)?;
+            keep[slot] |= moves;
+            keep[from] &= !moves;
+            distance[slot] = masked_select_usize(moves, distance[from], distance[slot]);
+        }
+    }
+    Ok(())
+}
+
+/// The compare-exchanges of Batcher's odd-even merge sort over `len` slots,
+/// as if padded to a power of two with slots holding the largest key. Each
+/// calls `exchange(low, high)`, `low < high`, which must put the smaller key
+/// at `low`; one with a padded slot could not move anything and is left
+/// out. Which pairs are given depends on `len` alone.
+pub(super) fn odd_even_merge_sort_network<F>(len: usize, mut exchange: F) -> Result<()>
+where
+    F: FnMut(usize, usize) -> Result<()>,
+{
+    let padded = len.max(1).next_power_of_two();
+    let mut span = 1usize;
+    while span < padded {
+        let mut gap = span;
+        while gap > 0 {
+            let mut start = gap % span;
+            while start + gap < padded {
+                for offset in 0..gap {
+                    let low = start + offset;
+                    let high = low + gap;
+                    if high < len && low / (2 * span) == high / (2 * span) {
+                        exchange(low, high)?;
+                    }
+                }
+                start += 2 * gap;
+            }
+            gap /= 2;
+        }
+        span *= 2;
+    }
+    Ok(())
+}
+
+/// `(a, b) = if cond { (b, a) } else { (a, b) }`, field by field, without a
+/// secret branch.
+fn swap_tree_nodes(cond: bool, a: &mut TreeNode, b: &mut TreeNode) -> Result<()> {
+    swap_masked_bool(cond, &mut a.occupied, &mut b.occupied);
+    swap_masked_usize(cond, &mut a.id, &mut b.id);
+    swap_masked_usize(cond, &mut a.leaf, &mut b.leaf);
+    swap_masked_bool(cond, &mut a.in_tree, &mut b.in_tree);
+    swap_tree_value(cond, &mut a.key, &mut b.key)?;
+    swap_tree_value(cond, &mut a.value, &mut b.value)?;
+    swap_tree_link(cond, &mut a.left, &mut b.left);
+    swap_tree_link(cond, &mut a.right, &mut b.right);
+    Ok(())
+}
+
+fn swap_tree_link(cond: bool, a: &mut TreeLink, b: &mut TreeLink) {
+    swap_masked_bool(cond, &mut a.present, &mut b.present);
+    swap_masked_usize(cond, &mut a.id, &mut b.id);
+    swap_masked_usize(cond, &mut a.leaf, &mut b.leaf);
+    swap_masked_usize(cond, &mut a.height, &mut b.height);
+}
+
+/// Swap two of a tree's keys or values if `cond`. Fixed-width scalars are
+/// swapped in place byte by byte; any other value goes through
+/// `Value::confidential_select`, which rejects a mismatched type.
+fn swap_tree_value(cond: bool, a: &mut Value, b: &mut Value) -> Result<()> {
+    match (&mut *a, &mut *b) {
+        (Value::Bool(first), Value::Bool(second)) => {
+            swap_masked_bool(cond, first, second);
+            return Ok(());
+        }
+        (Value::Uint(first), Value::Uint(second)) => {
+            let mut first_bytes = first.to_be_bytes();
+            let mut second_bytes = second.to_be_bytes();
+            swap_masked_bytes(cond, &mut first_bytes, &mut second_bytes);
+            *first = uo_core::Uint256::from_be_bytes(first_bytes);
+            *second = uo_core::Uint256::from_be_bytes(second_bytes);
+            return Ok(());
+        }
+        (Value::Bytes32(first), Value::Bytes32(second)) => {
+            swap_masked_bytes(cond, first, second);
+            return Ok(());
+        }
+        (Value::Address(first), Value::Address(second)) => {
+            swap_masked_bytes(cond, first, second);
+            return Ok(());
+        }
+        _ => {}
+    }
+    let first = Value::confidential_select(cond, b.clone(), a.clone())?;
+    let second = Value::confidential_select(cond, a.clone(), b.clone())?;
+    *a = first;
+    *b = second;
+    Ok(())
+}
+
+fn swap_masked_bool(cond: bool, a: &mut bool, b: &mut bool) {
+    let diff = (*a ^ *b) & cond;
+    *a ^= diff;
+    *b ^= diff;
+}
+
+fn swap_masked_usize(cond: bool, a: &mut usize, b: &mut usize) {
+    let mask = 0usize.wrapping_sub(usize::from(cond));
+    let diff = (*a ^ *b) & mask;
+    *a ^= diff;
+    *b ^= diff;
+}
+
+fn swap_masked_bytes<const N: usize>(cond: bool, a: &mut [u8; N], b: &mut [u8; N]) {
+    let mask = 0u8.wrapping_sub(u8::from(cond));
+    for (first, second) in a.iter_mut().zip(b.iter_mut()) {
+        let diff = (*first ^ *second) & mask;
+        *first ^= diff;
+        *second ^= diff;
     }
 }
 
@@ -4162,8 +4509,12 @@ fn load_tree_path<S: TreePathStore>(
     result
 }
 
-/// Evict the stash over the path of `leaf`, deepest bucket first, and write
-/// each bucket as it is filled.
+/// Evict the stash over the path of `leaf` and compact it
+/// (`TreeStash::evict_path`), then write the path's buckets, deepest first.
+/// A block left behind that finds no persistent slot is an overflow of the
+/// stash: once the path is written the access stops with an error, so the
+/// call that made it is dropped, nothing of it is committed and no block is
+/// lost.
 fn evict_tree_path<S: TreePathStore>(
     shape: &TreeShape,
     store: &mut S,
@@ -4171,26 +4522,16 @@ fn evict_tree_path<S: TreePathStore>(
     leaf: usize,
 ) -> Result<()> {
     let levels = levels_for_leaf_count(shape.leaf_count);
-    for offset in 0..levels {
+    let (buckets, overflowed) = stash.evict_path(shape, leaf)?;
+    for (offset, blocks) in buckets.iter().enumerate() {
         let depth = levels - 1 - offset;
         let index = path_bucket_at_depth(shape.leaf_count, leaf, depth);
-        let blocks = stash.evict_bucket(shape, leaf, depth)?;
-        store.store_bucket(index, &blocks)?;
+        store.store_bucket(index, blocks)?;
+    }
+    if overflowed {
+        return Err(stash_overflow_error(stash.persistent));
     }
     Ok(())
-}
-
-/// How many levels of the tree lie below the bucket at `depth` on a path: the
-/// low bits in which two leaves under that bucket may differ.
-fn tree_levels_below(shape: &TreeShape, depth: usize) -> Result<usize> {
-    if !shape.leaf_count.is_power_of_two() {
-        bail!("tree leaf count {} is not a power of two", shape.leaf_count);
-    }
-    let levels = levels_for_leaf_count(shape.leaf_count);
-    if depth >= levels {
-        bail!("tree bucket depth {} outside {} levels", depth, levels);
-    }
-    Ok(levels - 1 - depth)
 }
 
 /// One node access: read the path of `link` if `want` and the operation has
@@ -4234,7 +4575,6 @@ fn tree_access<S: TreePathStore>(
     let (node, count) = stash.take(link.id, real)?;
     let failed = real & ((count != 1) | (node.leaf != link.leaf));
     evict_tree_path(shape, store, stash, read_leaf)?;
-    stash.compact()?;
     let record = TreeAccessRecord {
         real,
         node_id: masked_select_usize(real, link.id, 0),

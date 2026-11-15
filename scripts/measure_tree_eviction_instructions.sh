@@ -5,9 +5,10 @@
 #
 #   scripts/measure_tree_eviction_instructions.sh [BEFORE_REV [AFTER_REV]]
 #
-# BEFORE_REV defaults to 9522bd5, the last commit before a node access evicted
-# its stash bucket by bucket with in-place masked moves (4b71895); AFTER_REV
-# defaults to HEAD. Each revision is exported with `git archive` into a scratch
+# BEFORE_REV defaults to 990b054, the last commit before a node access evicted
+# and compacted its stash through fixed networks of masked moves (Issue 47 of
+# the external review), when it filled each bucket of the path with masked
+# moves over the whole stash; AFTER_REV defaults to HEAD. Each revision is exported with `git archive` into a scratch
 # directory, its mplus-probe is built in release, and the capacity sweep runs
 # under callgrind on one map capacity (UO_SWEEP_CAPACITIES, default 4096) with
 # one trial, UO_MEASURE_REPEATS times (default 2). A revision whose sweep has
@@ -15,8 +16,9 @@
 # keys and one call of each kind. The report gives, per
 # revision and run, the calls and inclusive instruction counts (Ir) of the
 # tree's node access (`tree_access`) and of the eviction, stash and copy
-# functions under it, the counts per node access, and the before/after ratios
-# per node access; it states whether the repeated runs counted the same.
+# functions under it, the counts per node access, the eviction's instructions
+# and its masked node moves per node access, and the before/after ratios per
+# node access; it states whether the repeated runs counted the same.
 #
 # Needs git, cargo, valgrind and python3, and lean and lake on PATH (the probe
 # records their versions in its reproducibility manifest). Set UO_KEEP_WORK=1
@@ -26,7 +28,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-BEFORE_REV="${1:-9522bd5}"
+BEFORE_REV="${1:-990b054}"
 AFTER_REV="${2:-HEAD}"
 CAPACITY="${UO_SWEEP_CAPACITIES:-4096}"
 REPEATS="${UO_MEASURE_REPEATS:-2}"
@@ -103,13 +105,21 @@ repeats = int(repeats)
 
 PREFIX = "uo_evm::oram::generated_oram_codecs::"
 # The tree's node access and the functions under it whose cost the eviction
-# rewrite changed (evict_tree_path is inlined into tree_access in release).
+# changes (evict_tree_path is inlined into tree_access in release). Before
+# Issue 47 a node access evicted with `evict_bucket`, once per bucket, and
+# compacted with `compact`; since, `evict_path` does both. A masked node move
+# is a call of `assign_tree_node`, or a masked swap of two nodes, which calls
+# `swap_tree_value` twice, for the key and for the value.
 FUNCTIONS = [
     ("tree_access", PREFIX + "tree_access"),
     ("evict_bucket", PREFIX + "TreeStash::evict_bucket"),
     ("compact", PREFIX + "TreeStash::compact"),
+    ("evict_path", PREFIX + "TreeStash::evict_path"),
+    ("take", PREFIX + "TreeStash::take"),
     ("assign_tree_node", PREFIX + "assign_tree_node"),
+    ("swap_tree_value", PREFIX + "swap_tree_value"),
 ]
+EVICTION = ("evict_bucket", "compact", "evict_path")
 NAME_REF = re.compile(r"^\((\d+)\)(?:\s+(.*))?$")
 HASH_SUFFIX = re.compile(r"::h[0-9a-f]{16}$")
 
@@ -176,7 +186,16 @@ for label, commit in (("before", before_commit), ("after", after_commit)):
                 "inclusive_ir": inclusive,
                 "inclusive_ir_per_node_access": per_access(inclusive, accesses),
             }
-        runs.append({"node_accesses": accesses, "functions": functions})
+        eviction = sum(functions[key]["inclusive_ir"] for key in EVICTION)
+        moves = functions["assign_tree_node"]["calls"] + functions["swap_tree_value"]["calls"] // 2
+        runs.append(
+            {
+                "node_accesses": accesses,
+                "functions": functions,
+                "eviction_ir_per_node_access": per_access(eviction, accesses),
+                "masked_node_moves_per_node_access": per_access(moves, accesses),
+            }
+        )
     revisions.append(
         {
             "label": label,
@@ -187,14 +206,28 @@ for label, commit in (("before", before_commit), ("after", after_commit)):
     )
 
 before, after = (revision["runs"][0] for revision in revisions)
-ratios = {}
-for key, _ in FUNCTIONS:
-    old = before["functions"][key]["inclusive_ir_per_node_access"]
-    new = after["functions"][key]["inclusive_ir_per_node_access"]
-    ratios[key] = round(old / new, 2) if old and new else None
+
+
+def ratio(old, new):
+    return round(old / new, 2) if old and new else None
+
+
+ratios = {
+    "tree_access": ratio(
+        before["functions"]["tree_access"]["inclusive_ir_per_node_access"],
+        after["functions"]["tree_access"]["inclusive_ir_per_node_access"],
+    ),
+    "eviction": ratio(
+        before["eviction_ir_per_node_access"], after["eviction_ir_per_node_access"]
+    ),
+    "masked_node_moves": ratio(
+        before["masked_node_moves_per_node_access"],
+        after["masked_node_moves_per_node_access"],
+    ),
+}
 
 report = {
-    "schema": "uo-tree-eviction-instructions-v1",
+    "schema": "uo-tree-eviction-instructions-v2",
     "metric": "callgrind instruction reads (Ir), inclusive of callees",
     "workload": {
         "command": "mplus-probe --only capacity-sweep (release build)",
@@ -202,9 +235,12 @@ report = {
         "UO_SWEEP_TRIALS": 1,
         "scheme": "path_oram_private_posmap_v1",
         "note": (
-            "SingleAccessMap read and put on every backend of the sweep; the "
-            "counts below are those of the private scheme's tree functions, "
-            "and node_accesses is the number of calls to tree_access"
+            "SingleAccessMap's calls on every backend of the sweep; the counts "
+            "below are those of the private scheme's tree functions, "
+            "node_accesses is the number of calls to tree_access, the eviction "
+            "is evict_bucket and compact before Issue 47 and evict_path since, "
+            "and a masked node move is a call of assign_tree_node or a masked "
+            "swap of two nodes (two calls of swap_tree_value)"
         ),
     },
     "tools": {"valgrind": valgrind, "rustc": rustc, "arch": arch},

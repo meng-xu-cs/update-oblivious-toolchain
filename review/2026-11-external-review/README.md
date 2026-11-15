@@ -11,6 +11,7 @@ directory holds the response.
 | [`capacity_sweep_control_before_wave4.json`](./capacity_sweep_control_before_wave4.json), [`capacity_sweep_control_after_wave4.json`](./capacity_sweep_control_after_wave4.json) | a control for Issues 36 to 38: the full profile's rounds on the maps of 4,096, 8,192 and 16,384 entries at 2 keys, on the code before those issues (`cb92f8c`) and on the code after them (`9d93471`), one run after the other on one machine |
 | [`capacity_sweep_control_before_cap152.json`](./capacity_sweep_control_before_cap152.json), [`capacity_sweep_control_after_cap152.json`](./capacity_sweep_control_after_cap152.json) | the same control for the stash cap of Issue 40: on the code before it (`ece1167`, a cap of 114) and on the code after it (`305c1a2`, a cap of 152) |
 | [`capacity_sweep_control_before_store.json`](./capacity_sweep_control_before_store.json), [`capacity_sweep_control_after_store_memory.json`](./capacity_sweep_control_after_store_memory.json), [`capacity_sweep_control_after_store_files.json`](./capacity_sweep_control_after_store_files.json), [`capacity_sweep_control_after_store_files_synced.json`](./capacity_sweep_control_after_store_files_synced.json) | the same control for the storage adapter of Issue 41: on the code before it (`b6b9fce`), and on the code after it with the maps' records in memory, in files, and in files with every commit synced |
+| [`capacity_sweep_control_before_eviction_networks.json`](./capacity_sweep_control_before_eviction_networks.json), [`capacity_sweep_control_after_eviction_networks.json`](./capacity_sweep_control_after_eviction_networks.json) | the same control for the eviction networks of Issue 47: on the code before them (`990b054`) and on the code after them |
 | this file | the positions in brief, the order of work, and the tracker |
 
 The review text is not in the repository; `validation.md` restates each
@@ -105,11 +106,16 @@ Issue 22 has the options and the reasoning.
    counts: at 16,384 entries the probe's resident memory in the tree's
    calls is 115 MB to 118 MB, where it was 153 MB to 172 MB. No control was
    run, so the wave's latencies are not set against the profile before it.
+9. **Wave 8, the backlog of Issues 47 to 49**, which the maintainer
+   scheduled on 2026-11-15, in this order: 47, 48, 49. Issue 49's baselines
+   and planner rest on what the sweep measures, so they come after the two
+   issues that change it. Issue 47 is done: a node access evicts through
+   fixed networks, with every block where it was, and in a control a tree
+   call's own work is 2.1 to 2.4 times faster.
 
 The research issues (43 to 46) start once the issues they depend on are
-done. The rest of the backlog (47 to 50) is not scheduled, and the folding
-of this directory into the topic documents (see Using the Tracker) waits
-for the maintainer.
+done. Issue 50 is deferred, and the folding of this directory into the
+topic documents (see Using the Tracker) waits for the maintainer.
 
 This differs from the review's sequence in two ways. The measurement work
 comes before the optimizations, not after. And incremental state is split:
@@ -144,9 +150,9 @@ its engineering part is Wave 4, its certified part is research.
 | 44 | Certify state transitions incrementally | research | R | 36, 37, 41 | todo | |
 | 45 | State security over call histories with a quantified bound | research | R | 24, 39, 40 | todo | |
 | 46 | Prove that the runtime's run on every tape is the substituted run | research | R | 42 | todo | |
-| 47 | Try an oblivious routing network for tree eviction | backlog | M | 27 | todo | |
-| 48 | Fuse scans and generalize the reuse analysis | backlog | M | 31, 32 | todo | |
-| 49 | Write the related-work boundary and add matched baselines | backlog | M | 27 | todo | |
+| 47 | Try an oblivious routing network for tree eviction | 8 | M | 27 | done | |
+| 48 | Fuse scans and generalize the reuse analysis | 8 | M | 31, 32 | todo | |
+| 49 | Write the related-work boundary and add matched baselines | 8 | M | 27 | todo | |
 | 50 | Bridge a scoped subset to Solidity 0.8 semantics | backlog | L | | deferred | |
 | 51 | Remove the generator that a seal no longer reads | 7 | S to M | 24 | done | `48915bb` |
 | 52 | Make the seal count of a dropped call a function of its entrypoint | 7 | M | 24 | done | `b68dfbc` |

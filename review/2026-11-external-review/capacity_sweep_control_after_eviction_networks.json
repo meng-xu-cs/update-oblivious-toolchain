@@ -1,0 +1,2881 @@
+{
+  "artifacts": [
+    {
+      "artifact_json_bytes": 11423,
+      "backend": "full_scan",
+      "capacity": 4096,
+      "resource_bounds_json_bytes": {
+        "clear(bytes32)": 89,
+        "put(bytes32,uint256)": 95,
+        "putBelow(bytes32,uint256,uint256)": 108,
+        "read(bytes32)": 85
+      },
+      "stash_bound": 0,
+      "status": "ok",
+      "timing": {
+        "compile_ms": 0
+      }
+    },
+    {
+      "artifact_json_bytes": 11699,
+      "backend": "path_oram_private_posmap_v1",
+      "capacity": 4096,
+      "resource_bounds_json_bytes": {
+        "clear(bytes32)": 373,
+        "put(bytes32,uint256)": 379,
+        "putBelow(bytes32,uint256,uint256)": 392,
+        "read(bytes32)": 370
+      },
+      "stash_bound": 201,
+      "status": "ok",
+      "timing": {
+        "compile_ms": 0
+      }
+    },
+    {
+      "artifact_json_bytes": 11423,
+      "backend": "full_scan",
+      "capacity": 8192,
+      "resource_bounds_json_bytes": {
+        "clear(bytes32)": 89,
+        "put(bytes32,uint256)": 95,
+        "putBelow(bytes32,uint256,uint256)": 108,
+        "read(bytes32)": 85
+      },
+      "stash_bound": 0,
+      "status": "ok",
+      "timing": {
+        "compile_ms": 0
+      }
+    },
+    {
+      "artifact_json_bytes": 11703,
+      "backend": "path_oram_private_posmap_v1",
+      "capacity": 8192,
+      "resource_bounds_json_bytes": {
+        "clear(bytes32)": 375,
+        "put(bytes32,uint256)": 381,
+        "putBelow(bytes32,uint256,uint256)": 394,
+        "read(bytes32)": 370
+      },
+      "stash_bound": 207,
+      "status": "ok",
+      "timing": {
+        "compile_ms": 0
+      }
+    },
+    {
+      "artifact_json_bytes": 11432,
+      "backend": "full_scan",
+      "capacity": 16384,
+      "resource_bounds_json_bytes": {
+        "clear(bytes32)": 91,
+        "put(bytes32,uint256)": 97,
+        "putBelow(bytes32,uint256,uint256)": 110,
+        "read(bytes32)": 86
+      },
+      "stash_bound": 0,
+      "status": "ok",
+      "timing": {
+        "compile_ms": 0
+      }
+    },
+    {
+      "artifact_json_bytes": 11705,
+      "backend": "path_oram_private_posmap_v1",
+      "capacity": 16384,
+      "resource_bounds_json_bytes": {
+        "clear(bytes32)": 376,
+        "put(bytes32,uint256)": 382,
+        "putBelow(bytes32,uint256,uint256)": 395,
+        "read(bytes32)": 371
+      },
+      "stash_bound": 210,
+      "status": "ok",
+      "timing": {
+        "compile_ms": 0
+      }
+    }
+  ],
+  "break_even": [
+    {
+      "baseline": "full_scan",
+      "bytes_moved_from_capacity": null,
+      "candidate": "path_oram_local_posmap_v1",
+      "capacities_compared": [],
+      "gas_from_capacity": null,
+      "physical_operations_from_capacity": null,
+      "read_fraction": 0.0
+    },
+    {
+      "baseline": "full_scan",
+      "bytes_moved_from_capacity": null,
+      "candidate": "path_oram_local_posmap_v1",
+      "capacities_compared": [],
+      "gas_from_capacity": null,
+      "physical_operations_from_capacity": null,
+      "read_fraction": 0.25
+    },
+    {
+      "baseline": "full_scan",
+      "bytes_moved_from_capacity": null,
+      "candidate": "path_oram_local_posmap_v1",
+      "capacities_compared": [],
+      "gas_from_capacity": null,
+      "physical_operations_from_capacity": null,
+      "read_fraction": 0.5
+    },
+    {
+      "baseline": "full_scan",
+      "bytes_moved_from_capacity": null,
+      "candidate": "path_oram_local_posmap_v1",
+      "capacities_compared": [],
+      "gas_from_capacity": null,
+      "physical_operations_from_capacity": null,
+      "read_fraction": 0.75
+    },
+    {
+      "baseline": "full_scan",
+      "bytes_moved_from_capacity": null,
+      "candidate": "path_oram_local_posmap_v1",
+      "capacities_compared": [],
+      "gas_from_capacity": null,
+      "physical_operations_from_capacity": null,
+      "read_fraction": 0.9
+    },
+    {
+      "baseline": "full_scan",
+      "bytes_moved_from_capacity": null,
+      "candidate": "path_oram_local_posmap_v1",
+      "capacities_compared": [],
+      "gas_from_capacity": null,
+      "physical_operations_from_capacity": null,
+      "read_fraction": 1.0
+    },
+    {
+      "baseline": "full_scan",
+      "bytes_moved_from_capacity": 8192,
+      "candidate": "path_oram_private_posmap_v1",
+      "capacities_compared": [
+        4096,
+        8192,
+        16384
+      ],
+      "gas_from_capacity": 4096,
+      "physical_operations_from_capacity": 4096,
+      "read_fraction": 0.0
+    },
+    {
+      "baseline": "full_scan",
+      "bytes_moved_from_capacity": 8192,
+      "candidate": "path_oram_private_posmap_v1",
+      "capacities_compared": [
+        4096,
+        8192,
+        16384
+      ],
+      "gas_from_capacity": 4096,
+      "physical_operations_from_capacity": 4096,
+      "read_fraction": 0.25
+    },
+    {
+      "baseline": "full_scan",
+      "bytes_moved_from_capacity": 8192,
+      "candidate": "path_oram_private_posmap_v1",
+      "capacities_compared": [
+        4096,
+        8192,
+        16384
+      ],
+      "gas_from_capacity": 4096,
+      "physical_operations_from_capacity": 4096,
+      "read_fraction": 0.5
+    },
+    {
+      "baseline": "full_scan",
+      "bytes_moved_from_capacity": 8192,
+      "candidate": "path_oram_private_posmap_v1",
+      "capacities_compared": [
+        4096,
+        8192,
+        16384
+      ],
+      "gas_from_capacity": 4096,
+      "physical_operations_from_capacity": 4096,
+      "read_fraction": 0.75
+    },
+    {
+      "baseline": "full_scan",
+      "bytes_moved_from_capacity": 4096,
+      "candidate": "path_oram_private_posmap_v1",
+      "capacities_compared": [
+        4096,
+        8192,
+        16384
+      ],
+      "gas_from_capacity": 4096,
+      "physical_operations_from_capacity": 4096,
+      "read_fraction": 0.9
+    },
+    {
+      "baseline": "full_scan",
+      "bytes_moved_from_capacity": 4096,
+      "candidate": "path_oram_private_posmap_v1",
+      "capacities_compared": [
+        4096,
+        8192,
+        16384
+      ],
+      "gas_from_capacity": 4096,
+      "physical_operations_from_capacity": 4096,
+      "read_fraction": 1.0
+    },
+    {
+      "baseline": "path_oram_local_posmap_v1",
+      "bytes_moved_from_capacity": null,
+      "candidate": "path_oram_private_posmap_v1",
+      "capacities_compared": [],
+      "gas_from_capacity": null,
+      "physical_operations_from_capacity": null,
+      "read_fraction": 0.0
+    },
+    {
+      "baseline": "path_oram_local_posmap_v1",
+      "bytes_moved_from_capacity": null,
+      "candidate": "path_oram_private_posmap_v1",
+      "capacities_compared": [],
+      "gas_from_capacity": null,
+      "physical_operations_from_capacity": null,
+      "read_fraction": 0.25
+    },
+    {
+      "baseline": "path_oram_local_posmap_v1",
+      "bytes_moved_from_capacity": null,
+      "candidate": "path_oram_private_posmap_v1",
+      "capacities_compared": [],
+      "gas_from_capacity": null,
+      "physical_operations_from_capacity": null,
+      "read_fraction": 0.5
+    },
+    {
+      "baseline": "path_oram_local_posmap_v1",
+      "bytes_moved_from_capacity": null,
+      "candidate": "path_oram_private_posmap_v1",
+      "capacities_compared": [],
+      "gas_from_capacity": null,
+      "physical_operations_from_capacity": null,
+      "read_fraction": 0.75
+    },
+    {
+      "baseline": "path_oram_local_posmap_v1",
+      "bytes_moved_from_capacity": null,
+      "candidate": "path_oram_private_posmap_v1",
+      "capacities_compared": [],
+      "gas_from_capacity": null,
+      "physical_operations_from_capacity": null,
+      "read_fraction": 0.9
+    },
+    {
+      "baseline": "path_oram_local_posmap_v1",
+      "bytes_moved_from_capacity": null,
+      "candidate": "path_oram_private_posmap_v1",
+      "capacities_compared": [],
+      "gas_from_capacity": null,
+      "physical_operations_from_capacity": null,
+      "read_fraction": 1.0
+    }
+  ],
+  "build_profile": "release",
+  "contract": "SweepMap",
+  "cost_model": "uo-modeled-resource-cost-v3",
+  "count_checks": {
+    "cost_same_at_every_occupancy": true,
+    "cost_same_for_every_kind_of_an_entrypoint": true,
+    "cost_same_for_every_trial": true,
+    "every_cell_measured": true,
+    "kept_witness_matches_store_after_every_level": true,
+    "reads_and_writes_within_manifest_bounds": true
+  },
+  "counts_sha256": "e2b84987dcbac49a2c4253b869b739e7952ec84c2183436b743ac26b618648bb",
+  "fills": [
+    {
+      "backend": "full_scan",
+      "capacity": 4096,
+      "keys_loaded": 2,
+      "occupancy": [
+        "2_keys"
+      ],
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "fill_ms": 24,
+        "p50_store_digest_ns": 903,
+        "rss_after_fill_bytes": 12955648
+      },
+      "witness_decode_records": 0
+    },
+    {
+      "backend": "path_oram_private_posmap_v1",
+      "capacity": 4096,
+      "keys_loaded": 2,
+      "occupancy": [
+        "2_keys"
+      ],
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "fill_ms": 89,
+        "p50_store_digest_ns": 1078,
+        "rss_after_fill_bytes": 25468928
+      },
+      "witness_decode_records": 8218
+    },
+    {
+      "backend": "full_scan",
+      "capacity": 8192,
+      "keys_loaded": 2,
+      "occupancy": [
+        "2_keys"
+      ],
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "fill_ms": 43,
+        "p50_store_digest_ns": 947,
+        "rss_after_fill_bytes": 56143872
+      },
+      "witness_decode_records": 0
+    },
+    {
+      "backend": "path_oram_private_posmap_v1",
+      "capacity": 8192,
+      "keys_loaded": 2,
+      "occupancy": [
+        "2_keys"
+      ],
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "fill_ms": 206,
+        "p50_store_digest_ns": 1446,
+        "rss_after_fill_bytes": 61485056
+      },
+      "witness_decode_records": 16410
+    },
+    {
+      "backend": "full_scan",
+      "capacity": 16384,
+      "keys_loaded": 2,
+      "occupancy": [
+        "2_keys"
+      ],
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "fill_ms": 86,
+        "p50_store_digest_ns": 1183,
+        "rss_after_fill_bytes": 76922880
+      },
+      "witness_decode_records": 0
+    },
+    {
+      "backend": "path_oram_private_posmap_v1",
+      "capacity": 16384,
+      "keys_loaded": 2,
+      "occupancy": [
+        "2_keys"
+      ],
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "fill_ms": 245,
+        "p50_store_digest_ns": 1159,
+        "rss_after_fill_bytes": 94208000
+      },
+      "witness_decode_records": 32795
+    }
+  ],
+  "latency_break_even": [],
+  "mix": [
+    {
+      "backend": "full_scan",
+      "bytes_moved": 786432.0,
+      "capacity": 4096,
+      "gas": 239600.0,
+      "physical_operations": 8192.0,
+      "read_fraction": 0.0
+    },
+    {
+      "backend": "full_scan",
+      "bytes_moved": 688128.0,
+      "capacity": 4096,
+      "gas": 209902.25,
+      "physical_operations": 7168.0,
+      "read_fraction": 0.25
+    },
+    {
+      "backend": "full_scan",
+      "bytes_moved": 589824.0,
+      "capacity": 4096,
+      "gas": 180204.5,
+      "physical_operations": 6144.0,
+      "read_fraction": 0.5
+    },
+    {
+      "backend": "full_scan",
+      "bytes_moved": 491520.0,
+      "capacity": 4096,
+      "gas": 150506.75,
+      "physical_operations": 5120.0,
+      "read_fraction": 0.75
+    },
+    {
+      "backend": "full_scan",
+      "bytes_moved": 432537.6,
+      "capacity": 4096,
+      "gas": 132688.1,
+      "physical_operations": 4505.6,
+      "read_fraction": 0.9
+    },
+    {
+      "backend": "full_scan",
+      "bytes_moved": 393216.0,
+      "capacity": 4096,
+      "gas": 120809.0,
+      "physical_operations": 4096.0,
+      "read_fraction": 1.0
+    },
+    {
+      "backend": "full_scan",
+      "bytes_moved": 1572864.0,
+      "capacity": 8192,
+      "gas": 477168.0,
+      "physical_operations": 16384.0,
+      "read_fraction": 0.0
+    },
+    {
+      "backend": "full_scan",
+      "bytes_moved": 1376256.0,
+      "capacity": 8192,
+      "gas": 417774.25,
+      "physical_operations": 14336.0,
+      "read_fraction": 0.25
+    },
+    {
+      "backend": "full_scan",
+      "bytes_moved": 1179648.0,
+      "capacity": 8192,
+      "gas": 358380.5,
+      "physical_operations": 12288.0,
+      "read_fraction": 0.5
+    },
+    {
+      "backend": "full_scan",
+      "bytes_moved": 983040.0,
+      "capacity": 8192,
+      "gas": 298986.75,
+      "physical_operations": 10240.0,
+      "read_fraction": 0.75
+    },
+    {
+      "backend": "full_scan",
+      "bytes_moved": 865075.2,
+      "capacity": 8192,
+      "gas": 263350.5,
+      "physical_operations": 9011.2,
+      "read_fraction": 0.9
+    },
+    {
+      "backend": "full_scan",
+      "bytes_moved": 786432.0,
+      "capacity": 8192,
+      "gas": 239593.0,
+      "physical_operations": 8192.0,
+      "read_fraction": 1.0
+    },
+    {
+      "backend": "full_scan",
+      "bytes_moved": 3145728.0,
+      "capacity": 16384,
+      "gas": 952304.0,
+      "physical_operations": 32768.0,
+      "read_fraction": 0.0
+    },
+    {
+      "backend": "full_scan",
+      "bytes_moved": 2752512.0,
+      "capacity": 16384,
+      "gas": 833518.25,
+      "physical_operations": 28672.0,
+      "read_fraction": 0.25
+    },
+    {
+      "backend": "full_scan",
+      "bytes_moved": 2359296.0,
+      "capacity": 16384,
+      "gas": 714732.5,
+      "physical_operations": 24576.0,
+      "read_fraction": 0.5
+    },
+    {
+      "backend": "full_scan",
+      "bytes_moved": 1966080.0,
+      "capacity": 16384,
+      "gas": 595946.75,
+      "physical_operations": 20480.0,
+      "read_fraction": 0.75
+    },
+    {
+      "backend": "full_scan",
+      "bytes_moved": 1730150.4,
+      "capacity": 16384,
+      "gas": 524675.3,
+      "physical_operations": 18022.4,
+      "read_fraction": 0.9
+    },
+    {
+      "backend": "full_scan",
+      "bytes_moved": 1572864.0,
+      "capacity": 16384,
+      "gas": 477161.0,
+      "physical_operations": 16384.0,
+      "read_fraction": 1.0
+    },
+    {
+      "backend": "path_oram_private_posmap_v1",
+      "bytes_moved": 1220256.0,
+      "capacity": 4096,
+      "gas": 104634.0,
+      "physical_operations": 1837.0,
+      "read_fraction": 0.0
+    },
+    {
+      "backend": "path_oram_private_posmap_v1",
+      "bytes_moved": 998744.0,
+      "capacity": 4096,
+      "gas": 85448.75,
+      "physical_operations": 1499.5,
+      "read_fraction": 0.25
+    },
+    {
+      "backend": "path_oram_private_posmap_v1",
+      "bytes_moved": 777232.0,
+      "capacity": 4096,
+      "gas": 66263.5,
+      "physical_operations": 1162.0,
+      "read_fraction": 0.5
+    },
+    {
+      "backend": "path_oram_private_posmap_v1",
+      "bytes_moved": 555720.0,
+      "capacity": 4096,
+      "gas": 47078.25,
+      "physical_operations": 824.5,
+      "read_fraction": 0.75
+    },
+    {
+      "backend": "path_oram_private_posmap_v1",
+      "bytes_moved": 422812.8,
+      "capacity": 4096,
+      "gas": 35567.1,
+      "physical_operations": 622.0,
+      "read_fraction": 0.9
+    },
+    {
+      "backend": "path_oram_private_posmap_v1",
+      "bytes_moved": 334208.0,
+      "capacity": 4096,
+      "gas": 27893.0,
+      "physical_operations": 487.0,
+      "read_fraction": 1.0
+    },
+    {
+      "backend": "path_oram_private_posmap_v1",
+      "bytes_moved": 1458656.0,
+      "capacity": 8192,
+      "gas": 121396.0,
+      "physical_operations": 2199.0,
+      "read_fraction": 0.0
+    },
+    {
+      "backend": "path_oram_private_posmap_v1",
+      "bytes_moved": 1192360.0,
+      "capacity": 8192,
+      "gas": 99064.25,
+      "physical_operations": 1793.5,
+      "read_fraction": 0.25
+    },
+    {
+      "backend": "path_oram_private_posmap_v1",
+      "bytes_moved": 926064.0,
+      "capacity": 8192,
+      "gas": 76732.5,
+      "physical_operations": 1388.0,
+      "read_fraction": 0.5
+    },
+    {
+      "backend": "path_oram_private_posmap_v1",
+      "bytes_moved": 659768.0,
+      "capacity": 8192,
+      "gas": 54400.75,
+      "physical_operations": 982.5,
+      "read_fraction": 0.75
+    },
+    {
+      "backend": "path_oram_private_posmap_v1",
+      "bytes_moved": 499990.4,
+      "capacity": 8192,
+      "gas": 41001.7,
+      "physical_operations": 739.2,
+      "read_fraction": 0.9
+    },
+    {
+      "backend": "path_oram_private_posmap_v1",
+      "bytes_moved": 393472.0,
+      "capacity": 8192,
+      "gas": 32069.0,
+      "physical_operations": 577.0,
+      "read_fraction": 1.0
+    },
+    {
+      "backend": "path_oram_private_posmap_v1",
+      "bytes_moved": 1640640.0,
+      "capacity": 16384,
+      "gas": 134620.0,
+      "physical_operations": 2472.0,
+      "read_fraction": 0.0
+    },
+    {
+      "backend": "path_oram_private_posmap_v1",
+      "bytes_moved": 1340448.0,
+      "capacity": 16384,
+      "gas": 109808.75,
+      "physical_operations": 2015.5,
+      "read_fraction": 0.25
+    },
+    {
+      "backend": "path_oram_private_posmap_v1",
+      "bytes_moved": 1040256.0,
+      "capacity": 16384,
+      "gas": 84997.5,
+      "physical_operations": 1559.0,
+      "read_fraction": 0.5
+    },
+    {
+      "backend": "path_oram_private_posmap_v1",
+      "bytes_moved": 740064.0,
+      "capacity": 16384,
+      "gas": 60186.25,
+      "physical_operations": 1102.5,
+      "read_fraction": 0.75
+    },
+    {
+      "backend": "path_oram_private_posmap_v1",
+      "bytes_moved": 559948.8,
+      "capacity": 16384,
+      "gas": 45299.5,
+      "physical_operations": 828.6,
+      "read_fraction": 0.9
+    },
+    {
+      "backend": "path_oram_private_posmap_v1",
+      "bytes_moved": 439872.0,
+      "capacity": 16384,
+      "gas": 35375.0,
+      "physical_operations": 646.0,
+      "read_fraction": 1.0
+    }
+  ],
+  "operations": {
+    "abort": "putBelow(bytes32,uint256,uint256) of a stored key with a limit of zero: the guard fails and the call aborts",
+    "delete": "clear(bytes32) of a stored key: one map write of zero",
+    "insert": "put(bytes32,uint256) of an absent key: one map write",
+    "noop_write": "put(bytes32,uint256) of a stored key with the value it has: one map write",
+    "overwrite": "put(bytes32,uint256) of a stored key with another value: one map write",
+    "read_hit": "read(bytes32) of a stored key: one map get",
+    "read_miss": "read(bytes32) of an absent key: one map get"
+  },
+  "parameters": {
+    "bootstrap_resamples": 1000,
+    "capacities": [
+      4096,
+      8192,
+      16384
+    ],
+    "key_seed": "0x53574545505f4b31",
+    "lean_checked_capacities": [
+      0
+    ],
+    "occupancy_capacity_limit": 0,
+    "occupancy_levels": [
+      "2_keys",
+      "25_percent",
+      "50_percent",
+      "90_percent",
+      "100_percent"
+    ],
+    "read_fractions": [
+      0.0,
+      0.25,
+      0.5,
+      0.75,
+      0.9,
+      1.0
+    ],
+    "trials": 30,
+    "warmup_rounds": 5,
+    "workload_calls": 0
+  },
+  "profile": "full",
+  "provenance": {
+    "peak_rss": "the resident-set high-water mark of the probe process, started again before each call",
+    "storage": "the maps keep their sealed records in files; a commit appends the call's records to a journal and syncs it before the call returns",
+    "toolchain_manifest_sha256": "cd34f3ee132f25d05c2fcd7e73c493e84811a146653ea4c978f4c6eeed83c734"
+  },
+  "rows": [
+    {
+      "backend": "full_scan",
+      "bytes_moved": 393216,
+      "bytes_read": 393216,
+      "bytes_written": 0,
+      "capacity": 4096,
+      "completed_trials": 30,
+      "cost_same_for_every_trial": true,
+      "entrypoint": "read(bytes32)",
+      "evidence_json_bytes": 7181,
+      "gas": 120809,
+      "max_commit_ops": 0,
+      "max_load_ops": 4096,
+      "occupancy": [
+        "2_keys"
+      ],
+      "operation": "read_hit",
+      "outcome": "committed",
+      "physical_reads": 4096,
+      "physical_writes": 0,
+      "receipt_json_bytes": 1988,
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "ci95_latency_ns": [
+          10837469.0,
+          11938643.0
+        ],
+        "ci95_runtime_ns": [
+          10133125.0,
+          11092081.0
+        ],
+        "max_peak_rss_bytes": 14942208,
+        "p50_execution_ns": 617482,
+        "p50_json_serialization_ns": 30619,
+        "p50_latency_ns": 11203516,
+        "p50_load_ns": 9818661,
+        "p50_peak_rss_bytes": 14942208,
+        "p50_persisted_bytes": 309,
+        "p50_persistence_ns": 558431,
+        "p50_proof_objects_ns": 208293,
+        "p50_rss_before_bytes": 14942208,
+        "p50_runtime_ns": 10484699,
+        "p50_staging_ns": 493,
+        "p50_witness_ns": 2981,
+        "p95_latency_ns": 14241689,
+        "p95_runtime_ns": 13250771
+      },
+      "trace_json_bytes": 9169,
+      "witness_scan_records": 0
+    },
+    {
+      "backend": "full_scan",
+      "bytes_moved": 393216,
+      "bytes_read": 393216,
+      "bytes_written": 0,
+      "capacity": 4096,
+      "completed_trials": 30,
+      "cost_same_for_every_trial": true,
+      "entrypoint": "read(bytes32)",
+      "evidence_json_bytes": 7180,
+      "gas": 120809,
+      "max_commit_ops": 0,
+      "max_load_ops": 4096,
+      "occupancy": [
+        "2_keys"
+      ],
+      "operation": "read_miss",
+      "outcome": "committed",
+      "physical_reads": 4096,
+      "physical_writes": 0,
+      "receipt_json_bytes": 1987,
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "ci95_latency_ns": [
+          10844179.0,
+          11470610.0
+        ],
+        "ci95_runtime_ns": [
+          10081878.0,
+          10880093.0
+        ],
+        "max_peak_rss_bytes": 14942208,
+        "p50_execution_ns": 601830,
+        "p50_json_serialization_ns": 32105,
+        "p50_latency_ns": 11026362,
+        "p50_load_ns": 9721891,
+        "p50_peak_rss_bytes": 14942208,
+        "p50_persisted_bytes": 309,
+        "p50_persistence_ns": 504399,
+        "p50_proof_objects_ns": 195042,
+        "p50_rss_before_bytes": 14942208,
+        "p50_runtime_ns": 10273677,
+        "p50_staging_ns": 398,
+        "p50_witness_ns": 2547,
+        "p95_latency_ns": 14570649,
+        "p95_runtime_ns": 13622401
+      },
+      "trace_json_bytes": 9167,
+      "witness_scan_records": 0
+    },
+    {
+      "backend": "full_scan",
+      "bytes_moved": 786432,
+      "bytes_read": 393216,
+      "bytes_written": 393216,
+      "capacity": 4096,
+      "completed_trials": 30,
+      "cost_same_for_every_trial": true,
+      "entrypoint": "put(bytes32,uint256)",
+      "evidence_json_bytes": 8023,
+      "gas": 239600,
+      "max_commit_ops": 4096,
+      "max_load_ops": 4096,
+      "occupancy": [
+        "2_keys"
+      ],
+      "operation": "overwrite",
+      "outcome": "committed",
+      "physical_reads": 4096,
+      "physical_writes": 4096,
+      "receipt_json_bytes": 2140,
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "ci95_latency_ns": [
+          22774418.0,
+          24156513.0
+        ],
+        "ci95_runtime_ns": [
+          20569670.0,
+          21853351.0
+        ],
+        "max_peak_rss_bytes": 14942208,
+        "p50_execution_ns": 11413682,
+        "p50_json_serialization_ns": 33479,
+        "p50_latency_ns": 23075235,
+        "p50_load_ns": 9626311,
+        "p50_peak_rss_bytes": 14942208,
+        "p50_persisted_bytes": 519391,
+        "p50_persistence_ns": 2018566,
+        "p50_proof_objects_ns": 201407,
+        "p50_rss_before_bytes": 14942208,
+        "p50_runtime_ns": 20871275,
+        "p50_staging_ns": 430,
+        "p50_witness_ns": 2453,
+        "p95_latency_ns": 35025545,
+        "p95_runtime_ns": 27180274
+      },
+      "trace_json_bytes": 10163,
+      "witness_scan_records": 0
+    },
+    {
+      "backend": "full_scan",
+      "bytes_moved": 786432,
+      "bytes_read": 393216,
+      "bytes_written": 393216,
+      "capacity": 4096,
+      "completed_trials": 30,
+      "cost_same_for_every_trial": true,
+      "entrypoint": "put(bytes32,uint256)",
+      "evidence_json_bytes": 8023,
+      "gas": 239600,
+      "max_commit_ops": 4096,
+      "max_load_ops": 4096,
+      "occupancy": [
+        "2_keys"
+      ],
+      "operation": "noop_write",
+      "outcome": "committed",
+      "physical_reads": 4096,
+      "physical_writes": 4096,
+      "receipt_json_bytes": 2140,
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "ci95_latency_ns": [
+          21974942.0,
+          23364903.0
+        ],
+        "ci95_runtime_ns": [
+          19728835.0,
+          21186079.0
+        ],
+        "max_peak_rss_bytes": 14942208,
+        "p50_execution_ns": 10928944,
+        "p50_json_serialization_ns": 32399,
+        "p50_latency_ns": 22749248,
+        "p50_load_ns": 9569506,
+        "p50_peak_rss_bytes": 14942208,
+        "p50_persisted_bytes": 519391,
+        "p50_persistence_ns": 2048215,
+        "p50_proof_objects_ns": 199758,
+        "p50_rss_before_bytes": 14942208,
+        "p50_runtime_ns": 20494903,
+        "p50_staging_ns": 456,
+        "p50_witness_ns": 2609,
+        "p95_latency_ns": 29443165,
+        "p95_runtime_ns": 26603117
+      },
+      "trace_json_bytes": 10163,
+      "witness_scan_records": 0
+    },
+    {
+      "backend": "full_scan",
+      "bytes_moved": 786432,
+      "bytes_read": 393216,
+      "bytes_written": 393216,
+      "capacity": 4096,
+      "completed_trials": 30,
+      "cost_same_for_every_trial": true,
+      "entrypoint": "clear(bytes32)",
+      "evidence_json_bytes": 7987,
+      "gas": 239600,
+      "max_commit_ops": 4096,
+      "max_load_ops": 4096,
+      "occupancy": [
+        "2_keys"
+      ],
+      "operation": "delete",
+      "outcome": "committed",
+      "physical_reads": 4096,
+      "physical_writes": 4096,
+      "receipt_json_bytes": 2122,
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "ci95_latency_ns": [
+          22808182.0,
+          24289385.0
+        ],
+        "ci95_runtime_ns": [
+          20616754.0,
+          21686625.0
+        ],
+        "max_peak_rss_bytes": 14942208,
+        "p50_execution_ns": 11474368,
+        "p50_json_serialization_ns": 33330,
+        "p50_latency_ns": 23192258,
+        "p50_load_ns": 9584185,
+        "p50_peak_rss_bytes": 14942208,
+        "p50_persisted_bytes": 519391,
+        "p50_persistence_ns": 2106926,
+        "p50_proof_objects_ns": 196609,
+        "p50_rss_before_bytes": 14942208,
+        "p50_runtime_ns": 20851422,
+        "p50_staging_ns": 458,
+        "p50_witness_ns": 2850,
+        "p95_latency_ns": 30422328,
+        "p95_runtime_ns": 26626160
+      },
+      "trace_json_bytes": 10109,
+      "witness_scan_records": 0
+    },
+    {
+      "backend": "full_scan",
+      "bytes_moved": 786432,
+      "bytes_read": 393216,
+      "bytes_written": 393216,
+      "capacity": 4096,
+      "completed_trials": 30,
+      "cost_same_for_every_trial": true,
+      "entrypoint": "put(bytes32,uint256)",
+      "evidence_json_bytes": 8023,
+      "gas": 239600,
+      "max_commit_ops": 4096,
+      "max_load_ops": 4096,
+      "occupancy": [
+        "2_keys"
+      ],
+      "operation": "insert",
+      "outcome": "committed",
+      "physical_reads": 4096,
+      "physical_writes": 4096,
+      "receipt_json_bytes": 2140,
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "ci95_latency_ns": [
+          22712415.0,
+          25864409.0
+        ],
+        "ci95_runtime_ns": [
+          20398967.0,
+          22770187.0
+        ],
+        "max_peak_rss_bytes": 14942208,
+        "p50_execution_ns": 11549773,
+        "p50_json_serialization_ns": 34415,
+        "p50_latency_ns": 23424637,
+        "p50_load_ns": 9533368,
+        "p50_peak_rss_bytes": 14942208,
+        "p50_persisted_bytes": 519391,
+        "p50_persistence_ns": 2041020,
+        "p50_proof_objects_ns": 207693,
+        "p50_rss_before_bytes": 14942208,
+        "p50_runtime_ns": 21076049,
+        "p50_staging_ns": 441,
+        "p50_witness_ns": 2991,
+        "p95_latency_ns": 30552228,
+        "p95_runtime_ns": 27463327
+      },
+      "trace_json_bytes": 10163,
+      "witness_scan_records": 0
+    },
+    {
+      "backend": "full_scan",
+      "bytes_moved": 786432,
+      "bytes_read": 393216,
+      "bytes_written": 393216,
+      "capacity": 4096,
+      "completed_trials": 30,
+      "cost_same_for_every_trial": true,
+      "entrypoint": "putBelow(bytes32,uint256,uint256)",
+      "evidence_json_bytes": 8113,
+      "gas": 239639,
+      "max_commit_ops": 4096,
+      "max_load_ops": 4096,
+      "occupancy": [
+        "2_keys"
+      ],
+      "operation": "abort",
+      "outcome": "aborted",
+      "physical_reads": 4096,
+      "physical_writes": 4096,
+      "receipt_json_bytes": 2190,
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "ci95_latency_ns": [
+          22068998.0,
+          25561391.0
+        ],
+        "ci95_runtime_ns": [
+          19865241.0,
+          22733620.0
+        ],
+        "max_peak_rss_bytes": 14942208,
+        "p50_execution_ns": 11165965,
+        "p50_json_serialization_ns": 36712,
+        "p50_latency_ns": 23027707,
+        "p50_load_ns": 9524574,
+        "p50_peak_rss_bytes": 14942208,
+        "p50_persisted_bytes": 519391,
+        "p50_persistence_ns": 2054795,
+        "p50_proof_objects_ns": 214313,
+        "p50_rss_before_bytes": 14942208,
+        "p50_runtime_ns": 21036663,
+        "p50_staging_ns": 490,
+        "p50_witness_ns": 3020,
+        "p95_latency_ns": 29627862,
+        "p95_runtime_ns": 26802175
+      },
+      "trace_json_bytes": 10303,
+      "witness_scan_records": 0
+    },
+    {
+      "backend": "path_oram_private_posmap_v1",
+      "bytes_moved": 334208,
+      "bytes_read": 166624,
+      "bytes_written": 167584,
+      "capacity": 4096,
+      "completed_trials": 30,
+      "cost_same_for_every_trial": true,
+      "entrypoint": "read(bytes32)",
+      "evidence_json_bytes": 831484,
+      "gas": 27893,
+      "max_commit_ops": 656,
+      "max_load_ops": 236,
+      "occupancy": [
+        "2_keys"
+      ],
+      "operation": "read_hit",
+      "outcome": "committed",
+      "physical_reads": 236,
+      "physical_writes": 251,
+      "receipt_json_bytes": 305553,
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "ci95_latency_ns": [
+          39380377.0,
+          40387806.0
+        ],
+        "ci95_runtime_ns": [
+          5892929.0,
+          6060947.0
+        ],
+        "max_peak_rss_bytes": 56123392,
+        "p50_execution_ns": 5757986,
+        "p50_json_serialization_ns": 1363195,
+        "p50_latency_ns": 39628020,
+        "p50_load_ns": 211792,
+        "p50_peak_rss_bytes": 55291904,
+        "p50_persisted_bytes": 132844,
+        "p50_persistence_ns": 1366781,
+        "p50_proof_objects_ns": 32258870,
+        "p50_rss_before_bytes": 55291904,
+        "p50_runtime_ns": 5973539,
+        "p50_staging_ns": 915,
+        "p50_witness_ns": 132028,
+        "p95_latency_ns": 43205079,
+        "p95_runtime_ns": 6597598
+      },
+      "trace_json_bytes": 1137037,
+      "witness_scan_records": 0
+    },
+    {
+      "backend": "path_oram_private_posmap_v1",
+      "bytes_moved": 334208,
+      "bytes_read": 166624,
+      "bytes_written": 167584,
+      "capacity": 4096,
+      "completed_trials": 30,
+      "cost_same_for_every_trial": true,
+      "entrypoint": "read(bytes32)",
+      "evidence_json_bytes": 831482,
+      "gas": 27893,
+      "max_commit_ops": 656,
+      "max_load_ops": 236,
+      "occupancy": [
+        "2_keys"
+      ],
+      "operation": "read_miss",
+      "outcome": "committed",
+      "physical_reads": 236,
+      "physical_writes": 251,
+      "receipt_json_bytes": 305555,
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "ci95_latency_ns": [
+          38853299.0,
+          40304687.0
+        ],
+        "ci95_runtime_ns": [
+          5830924.0,
+          5971528.0
+        ],
+        "max_peak_rss_bytes": 56123392,
+        "p50_execution_ns": 5669952,
+        "p50_json_serialization_ns": 1375207,
+        "p50_latency_ns": 39688666,
+        "p50_load_ns": 212290,
+        "p50_peak_rss_bytes": 55291904,
+        "p50_persisted_bytes": 132849,
+        "p50_persistence_ns": 1359359,
+        "p50_proof_objects_ns": 32334536,
+        "p50_rss_before_bytes": 55291904,
+        "p50_runtime_ns": 5887743,
+        "p50_staging_ns": 626,
+        "p50_witness_ns": 72711,
+        "p95_latency_ns": 50307140,
+        "p95_runtime_ns": 8441134
+      },
+      "trace_json_bytes": 1137037,
+      "witness_scan_records": 0
+    },
+    {
+      "backend": "path_oram_private_posmap_v1",
+      "bytes_moved": 1220256,
+      "bytes_read": 594688,
+      "bytes_written": 625568,
+      "capacity": 4096,
+      "completed_trials": 30,
+      "cost_same_for_every_trial": true,
+      "entrypoint": "put(bytes32,uint256)",
+      "evidence_json_bytes": 1845373,
+      "gas": 104634,
+      "max_commit_ops": 2665,
+      "max_load_ops": 873,
+      "occupancy": [
+        "2_keys"
+      ],
+      "operation": "overwrite",
+      "outcome": "committed",
+      "physical_reads": 873,
+      "physical_writes": 964,
+      "receipt_json_bytes": 1222524,
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "ci95_latency_ns": [
+          148427134.0,
+          158266211.0
+        ],
+        "ci95_runtime_ns": [
+          21475076.0,
+          21939273.0
+        ],
+        "max_peak_rss_bytes": 56123392,
+        "p50_execution_ns": 21462319,
+        "p50_json_serialization_ns": 3080242,
+        "p50_latency_ns": 152079730,
+        "p50_load_ns": 222222,
+        "p50_peak_rss_bytes": 55291904,
+        "p50_persisted_bytes": 354565,
+        "p50_persistence_ns": 1996544,
+        "p50_proof_objects_ns": 127125950,
+        "p50_rss_before_bytes": 55291904,
+        "p50_runtime_ns": 21702826,
+        "p50_staging_ns": 661,
+        "p50_witness_ns": 37019,
+        "p95_latency_ns": 174436386,
+        "p95_runtime_ns": 27869305
+      },
+      "trace_json_bytes": 3067897,
+      "witness_scan_records": 0
+    },
+    {
+      "backend": "path_oram_private_posmap_v1",
+      "bytes_moved": 1220256,
+      "bytes_read": 594688,
+      "bytes_written": 625568,
+      "capacity": 4096,
+      "completed_trials": 30,
+      "cost_same_for_every_trial": true,
+      "entrypoint": "put(bytes32,uint256)",
+      "evidence_json_bytes": 1845382,
+      "gas": 104634,
+      "max_commit_ops": 2665,
+      "max_load_ops": 873,
+      "occupancy": [
+        "2_keys"
+      ],
+      "operation": "noop_write",
+      "outcome": "committed",
+      "physical_reads": 873,
+      "physical_writes": 964,
+      "receipt_json_bytes": 1222521,
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "ci95_latency_ns": [
+          146187528.0,
+          151036984.0
+        ],
+        "ci95_runtime_ns": [
+          21381631.0,
+          22137365.0
+        ],
+        "max_peak_rss_bytes": 56123392,
+        "p50_execution_ns": 21505672,
+        "p50_json_serialization_ns": 3055481,
+        "p50_latency_ns": 149846607,
+        "p50_load_ns": 216721,
+        "p50_peak_rss_bytes": 55291904,
+        "p50_persisted_bytes": 355267,
+        "p50_persistence_ns": 2026347,
+        "p50_proof_objects_ns": 125610453,
+        "p50_rss_before_bytes": 55291904,
+        "p50_runtime_ns": 21721675,
+        "p50_staging_ns": 936,
+        "p50_witness_ns": 36846,
+        "p95_latency_ns": 217797632,
+        "p95_runtime_ns": 29999540
+      },
+      "trace_json_bytes": 3067903,
+      "witness_scan_records": 0
+    },
+    {
+      "backend": "path_oram_private_posmap_v1",
+      "bytes_moved": 1220256,
+      "bytes_read": 594688,
+      "bytes_written": 625568,
+      "capacity": 4096,
+      "completed_trials": 30,
+      "cost_same_for_every_trial": true,
+      "entrypoint": "clear(bytes32)",
+      "evidence_json_bytes": 1845338,
+      "gas": 104634,
+      "max_commit_ops": 2665,
+      "max_load_ops": 873,
+      "occupancy": [
+        "2_keys"
+      ],
+      "operation": "delete",
+      "outcome": "committed",
+      "physical_reads": 873,
+      "physical_writes": 964,
+      "receipt_json_bytes": 1222497,
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "ci95_latency_ns": [
+          141392954.0,
+          151016560.0
+        ],
+        "ci95_runtime_ns": [
+          20326742.0,
+          21933051.0
+        ],
+        "max_peak_rss_bytes": 56123392,
+        "p50_execution_ns": 21377046,
+        "p50_json_serialization_ns": 3078186,
+        "p50_latency_ns": 148781842,
+        "p50_load_ns": 230750,
+        "p50_peak_rss_bytes": 55291904,
+        "p50_persisted_bytes": 355977,
+        "p50_persistence_ns": 1984562,
+        "p50_proof_objects_ns": 123935742,
+        "p50_rss_before_bytes": 55291904,
+        "p50_runtime_ns": 21590791,
+        "p50_staging_ns": 984,
+        "p50_witness_ns": 127051,
+        "p95_latency_ns": 206093442,
+        "p95_runtime_ns": 28746257
+      },
+      "trace_json_bytes": 3067835,
+      "witness_scan_records": 0
+    },
+    {
+      "backend": "path_oram_private_posmap_v1",
+      "bytes_moved": 1220256,
+      "bytes_read": 594688,
+      "bytes_written": 625568,
+      "capacity": 4096,
+      "completed_trials": 30,
+      "cost_same_for_every_trial": true,
+      "entrypoint": "put(bytes32,uint256)",
+      "evidence_json_bytes": 1845389,
+      "gas": 104634,
+      "max_commit_ops": 2665,
+      "max_load_ops": 873,
+      "occupancy": [
+        "2_keys"
+      ],
+      "operation": "insert",
+      "outcome": "committed",
+      "physical_reads": 873,
+      "physical_writes": 964,
+      "receipt_json_bytes": 1222524,
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "ci95_latency_ns": [
+          138378402.0,
+          152176528.0
+        ],
+        "ci95_runtime_ns": [
+          19483660.0,
+          21980737.0
+        ],
+        "max_peak_rss_bytes": 56123392,
+        "p50_execution_ns": 20996063,
+        "p50_json_serialization_ns": 3107694,
+        "p50_latency_ns": 149003030,
+        "p50_load_ns": 216632,
+        "p50_peak_rss_bytes": 55291904,
+        "p50_persisted_bytes": 352432,
+        "p50_persistence_ns": 1976916,
+        "p50_proof_objects_ns": 123840445,
+        "p50_rss_before_bytes": 55291904,
+        "p50_runtime_ns": 21256344,
+        "p50_staging_ns": 965,
+        "p50_witness_ns": 37191,
+        "p95_latency_ns": 180479742,
+        "p95_runtime_ns": 29961913
+      },
+      "trace_json_bytes": 3067913,
+      "witness_scan_records": 0
+    },
+    {
+      "backend": "path_oram_private_posmap_v1",
+      "bytes_moved": 1220256,
+      "bytes_read": 594688,
+      "bytes_written": 625568,
+      "capacity": 4096,
+      "completed_trials": 30,
+      "cost_same_for_every_trial": true,
+      "entrypoint": "putBelow(bytes32,uint256,uint256)",
+      "evidence_json_bytes": 1845479,
+      "gas": 104673,
+      "max_commit_ops": 2665,
+      "max_load_ops": 873,
+      "occupancy": [
+        "2_keys"
+      ],
+      "operation": "abort",
+      "outcome": "aborted",
+      "physical_reads": 873,
+      "physical_writes": 964,
+      "receipt_json_bytes": 1222574,
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "ci95_latency_ns": [
+          147717286.0,
+          151575334.0
+        ],
+        "ci95_runtime_ns": [
+          21524664.0,
+          21885340.0
+        ],
+        "max_peak_rss_bytes": 61775872,
+        "p50_execution_ns": 21464931,
+        "p50_json_serialization_ns": 3056164,
+        "p50_latency_ns": 149919676,
+        "p50_load_ns": 224469,
+        "p50_peak_rss_bytes": 55291904,
+        "p50_persisted_bytes": 353860,
+        "p50_persistence_ns": 2040113,
+        "p50_proof_objects_ns": 125759395,
+        "p50_rss_before_bytes": 55291904,
+        "p50_runtime_ns": 21689089,
+        "p50_staging_ns": 883,
+        "p50_witness_ns": 34124,
+        "p95_latency_ns": 178057447,
+        "p95_runtime_ns": 25468082
+      },
+      "trace_json_bytes": 3068053,
+      "witness_scan_records": 0
+    },
+    {
+      "backend": "full_scan",
+      "bytes_moved": 786432,
+      "bytes_read": 786432,
+      "bytes_written": 0,
+      "capacity": 8192,
+      "completed_trials": 30,
+      "cost_same_for_every_trial": true,
+      "entrypoint": "read(bytes32)",
+      "evidence_json_bytes": 7181,
+      "gas": 239593,
+      "max_commit_ops": 0,
+      "max_load_ops": 8192,
+      "occupancy": [
+        "2_keys"
+      ],
+      "operation": "read_hit",
+      "outcome": "committed",
+      "physical_reads": 8192,
+      "physical_writes": 0,
+      "receipt_json_bytes": 1988,
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "ci95_latency_ns": [
+          21244614.0,
+          22094199.0
+        ],
+        "ci95_runtime_ns": [
+          20400542.0,
+          21156384.0
+        ],
+        "max_peak_rss_bytes": 56143872,
+        "p50_execution_ns": 1428344,
+        "p50_json_serialization_ns": 42511,
+        "p50_latency_ns": 21799605,
+        "p50_load_ns": 19310190,
+        "p50_peak_rss_bytes": 56143872,
+        "p50_persisted_bytes": 309,
+        "p50_persistence_ns": 750543,
+        "p50_proof_objects_ns": 252109,
+        "p50_rss_before_bytes": 56143872,
+        "p50_runtime_ns": 20787450,
+        "p50_staging_ns": 640,
+        "p50_witness_ns": 3823,
+        "p95_latency_ns": 26933987,
+        "p95_runtime_ns": 25694403
+      },
+      "trace_json_bytes": 9169,
+      "witness_scan_records": 0
+    },
+    {
+      "backend": "full_scan",
+      "bytes_moved": 786432,
+      "bytes_read": 786432,
+      "bytes_written": 0,
+      "capacity": 8192,
+      "completed_trials": 30,
+      "cost_same_for_every_trial": true,
+      "entrypoint": "read(bytes32)",
+      "evidence_json_bytes": 7180,
+      "gas": 239593,
+      "max_commit_ops": 0,
+      "max_load_ops": 8192,
+      "occupancy": [
+        "2_keys"
+      ],
+      "operation": "read_miss",
+      "outcome": "committed",
+      "physical_reads": 8192,
+      "physical_writes": 0,
+      "receipt_json_bytes": 1987,
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "ci95_latency_ns": [
+          21368296.0,
+          22148117.0
+        ],
+        "ci95_runtime_ns": [
+          20410687.0,
+          21273767.0
+        ],
+        "max_peak_rss_bytes": 56143872,
+        "p50_execution_ns": 1310201,
+        "p50_json_serialization_ns": 38806,
+        "p50_latency_ns": 21751322,
+        "p50_load_ns": 19533498,
+        "p50_peak_rss_bytes": 56143872,
+        "p50_persisted_bytes": 309,
+        "p50_persistence_ns": 638910,
+        "p50_proof_objects_ns": 218584,
+        "p50_rss_before_bytes": 56143872,
+        "p50_runtime_ns": 20860942,
+        "p50_staging_ns": 617,
+        "p50_witness_ns": 3172,
+        "p95_latency_ns": 27056540,
+        "p95_runtime_ns": 26119356
+      },
+      "trace_json_bytes": 9167,
+      "witness_scan_records": 0
+    },
+    {
+      "backend": "full_scan",
+      "bytes_moved": 1572864,
+      "bytes_read": 786432,
+      "bytes_written": 786432,
+      "capacity": 8192,
+      "completed_trials": 30,
+      "cost_same_for_every_trial": true,
+      "entrypoint": "put(bytes32,uint256)",
+      "evidence_json_bytes": 8026,
+      "gas": 477168,
+      "max_commit_ops": 8192,
+      "max_load_ops": 8192,
+      "occupancy": [
+        "2_keys"
+      ],
+      "operation": "overwrite",
+      "outcome": "committed",
+      "physical_reads": 8192,
+      "physical_writes": 8192,
+      "receipt_json_bytes": 2140,
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "ci95_latency_ns": [
+          46515604.0,
+          48010935.0
+        ],
+        "ci95_runtime_ns": [
+          42333872.0,
+          43734805.0
+        ],
+        "max_peak_rss_bytes": 56143872,
+        "p50_execution_ns": 23363828,
+        "p50_json_serialization_ns": 44798,
+        "p50_latency_ns": 47306604,
+        "p50_load_ns": 19650106,
+        "p50_peak_rss_bytes": 56143872,
+        "p50_persisted_bytes": 1039583,
+        "p50_persistence_ns": 3909093,
+        "p50_proof_objects_ns": 241189,
+        "p50_rss_before_bytes": 56143872,
+        "p50_runtime_ns": 43082031,
+        "p50_staging_ns": 565,
+        "p50_witness_ns": 3384,
+        "p95_latency_ns": 57644973,
+        "p95_runtime_ns": 52787336
+      },
+      "trace_json_bytes": 10166,
+      "witness_scan_records": 0
+    },
+    {
+      "backend": "full_scan",
+      "bytes_moved": 1572864,
+      "bytes_read": 786432,
+      "bytes_written": 786432,
+      "capacity": 8192,
+      "completed_trials": 30,
+      "cost_same_for_every_trial": true,
+      "entrypoint": "put(bytes32,uint256)",
+      "evidence_json_bytes": 8026,
+      "gas": 477168,
+      "max_commit_ops": 8192,
+      "max_load_ops": 8192,
+      "occupancy": [
+        "2_keys"
+      ],
+      "operation": "noop_write",
+      "outcome": "committed",
+      "physical_reads": 8192,
+      "physical_writes": 8192,
+      "receipt_json_bytes": 2140,
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "ci95_latency_ns": [
+          46367265.0,
+          47588341.0
+        ],
+        "ci95_runtime_ns": [
+          42343353.0,
+          43502361.0
+        ],
+        "max_peak_rss_bytes": 56143872,
+        "p50_execution_ns": 23518355,
+        "p50_json_serialization_ns": 43399,
+        "p50_latency_ns": 46920642,
+        "p50_load_ns": 19492213,
+        "p50_peak_rss_bytes": 56143872,
+        "p50_persisted_bytes": 1039583,
+        "p50_persistence_ns": 3866817,
+        "p50_proof_objects_ns": 237402,
+        "p50_rss_before_bytes": 56143872,
+        "p50_runtime_ns": 42931422,
+        "p50_staging_ns": 596,
+        "p50_witness_ns": 4170,
+        "p95_latency_ns": 58563088,
+        "p95_runtime_ns": 54438044
+      },
+      "trace_json_bytes": 10166,
+      "witness_scan_records": 0
+    },
+    {
+      "backend": "full_scan",
+      "bytes_moved": 1572864,
+      "bytes_read": 786432,
+      "bytes_written": 786432,
+      "capacity": 8192,
+      "completed_trials": 30,
+      "cost_same_for_every_trial": true,
+      "entrypoint": "clear(bytes32)",
+      "evidence_json_bytes": 7990,
+      "gas": 477168,
+      "max_commit_ops": 8192,
+      "max_load_ops": 8192,
+      "occupancy": [
+        "2_keys"
+      ],
+      "operation": "delete",
+      "outcome": "committed",
+      "physical_reads": 8192,
+      "physical_writes": 8192,
+      "receipt_json_bytes": 2122,
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "ci95_latency_ns": [
+          46503224.0,
+          47886143.0
+        ],
+        "ci95_runtime_ns": [
+          42028264.0,
+          43613736.0
+        ],
+        "max_peak_rss_bytes": 56143872,
+        "p50_execution_ns": 23419993,
+        "p50_json_serialization_ns": 44691,
+        "p50_latency_ns": 47085510,
+        "p50_load_ns": 19449756,
+        "p50_peak_rss_bytes": 56143872,
+        "p50_persisted_bytes": 1039583,
+        "p50_persistence_ns": 3898498,
+        "p50_proof_objects_ns": 234286,
+        "p50_rss_before_bytes": 56143872,
+        "p50_runtime_ns": 43086426,
+        "p50_staging_ns": 569,
+        "p50_witness_ns": 3959,
+        "p95_latency_ns": 83929911,
+        "p95_runtime_ns": 55028147
+      },
+      "trace_json_bytes": 10112,
+      "witness_scan_records": 0
+    },
+    {
+      "backend": "full_scan",
+      "bytes_moved": 1572864,
+      "bytes_read": 786432,
+      "bytes_written": 786432,
+      "capacity": 8192,
+      "completed_trials": 30,
+      "cost_same_for_every_trial": true,
+      "entrypoint": "put(bytes32,uint256)",
+      "evidence_json_bytes": 8026,
+      "gas": 477168,
+      "max_commit_ops": 8192,
+      "max_load_ops": 8192,
+      "occupancy": [
+        "2_keys"
+      ],
+      "operation": "insert",
+      "outcome": "committed",
+      "physical_reads": 8192,
+      "physical_writes": 8192,
+      "receipt_json_bytes": 2140,
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "ci95_latency_ns": [
+          46483007.0,
+          48074556.0
+        ],
+        "ci95_runtime_ns": [
+          42365638.0,
+          44223239.0
+        ],
+        "max_peak_rss_bytes": 56143872,
+        "p50_execution_ns": 23789540,
+        "p50_json_serialization_ns": 46100,
+        "p50_latency_ns": 47140393,
+        "p50_load_ns": 19335945,
+        "p50_peak_rss_bytes": 56143872,
+        "p50_persisted_bytes": 1039583,
+        "p50_persistence_ns": 3914485,
+        "p50_proof_objects_ns": 234511,
+        "p50_rss_before_bytes": 56143872,
+        "p50_runtime_ns": 43202795,
+        "p50_staging_ns": 598,
+        "p50_witness_ns": 4272,
+        "p95_latency_ns": 57975300,
+        "p95_runtime_ns": 53457280
+      },
+      "trace_json_bytes": 10166,
+      "witness_scan_records": 0
+    },
+    {
+      "backend": "full_scan",
+      "bytes_moved": 1572864,
+      "bytes_read": 786432,
+      "bytes_written": 786432,
+      "capacity": 8192,
+      "completed_trials": 30,
+      "cost_same_for_every_trial": true,
+      "entrypoint": "putBelow(bytes32,uint256,uint256)",
+      "evidence_json_bytes": 8116,
+      "gas": 477207,
+      "max_commit_ops": 8192,
+      "max_load_ops": 8192,
+      "occupancy": [
+        "2_keys"
+      ],
+      "operation": "abort",
+      "outcome": "aborted",
+      "physical_reads": 8192,
+      "physical_writes": 8192,
+      "receipt_json_bytes": 2190,
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "ci95_latency_ns": [
+          45741998.0,
+          47308053.0
+        ],
+        "ci95_runtime_ns": [
+          41757213.0,
+          43113675.0
+        ],
+        "max_peak_rss_bytes": 56143872,
+        "p50_execution_ns": 23151640,
+        "p50_json_serialization_ns": 46782,
+        "p50_latency_ns": 46770554,
+        "p50_load_ns": 19295213,
+        "p50_peak_rss_bytes": 56143872,
+        "p50_persisted_bytes": 1039583,
+        "p50_persistence_ns": 3946166,
+        "p50_proof_objects_ns": 238693,
+        "p50_rss_before_bytes": 56143872,
+        "p50_runtime_ns": 42730295,
+        "p50_staging_ns": 578,
+        "p50_witness_ns": 4112,
+        "p95_latency_ns": 60514028,
+        "p95_runtime_ns": 55880391
+      },
+      "trace_json_bytes": 10306,
+      "witness_scan_records": 0
+    },
+    {
+      "backend": "path_oram_private_posmap_v1",
+      "bytes_moved": 393472,
+      "bytes_read": 196192,
+      "bytes_written": 197280,
+      "capacity": 8192,
+      "completed_trials": 30,
+      "cost_same_for_every_trial": true,
+      "entrypoint": "read(bytes32)",
+      "evidence_json_bytes": 1376073,
+      "gas": 32069,
+      "max_commit_ops": 756,
+      "max_load_ops": 280,
+      "occupancy": [
+        "2_keys"
+      ],
+      "operation": "read_hit",
+      "outcome": "committed",
+      "physical_reads": 280,
+      "physical_writes": 297,
+      "receipt_json_bytes": 354552,
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "ci95_latency_ns": [
+          48582925.0,
+          50228498.0
+        ],
+        "ci95_runtime_ns": [
+          7278110.0,
+          7537046.0
+        ],
+        "max_peak_rss_bytes": 76922880,
+        "p50_execution_ns": 7165630,
+        "p50_json_serialization_ns": 1990676,
+        "p50_latency_ns": 49683905,
+        "p50_load_ns": 233880,
+        "p50_peak_rss_bytes": 69271552,
+        "p50_persisted_bytes": 154130,
+        "p50_persistence_ns": 1455381,
+        "p50_proof_objects_ns": 40145598,
+        "p50_rss_before_bytes": 69271552,
+        "p50_runtime_ns": 7435755,
+        "p50_staging_ns": 948,
+        "p50_witness_ns": 205523,
+        "p95_latency_ns": 55017636,
+        "p95_runtime_ns": 10365857
+      },
+      "trace_json_bytes": 1730625,
+      "witness_scan_records": 0
+    },
+    {
+      "backend": "path_oram_private_posmap_v1",
+      "bytes_moved": 393472,
+      "bytes_read": 196192,
+      "bytes_written": 197280,
+      "capacity": 8192,
+      "completed_trials": 30,
+      "cost_same_for_every_trial": true,
+      "entrypoint": "read(bytes32)",
+      "evidence_json_bytes": 1376068,
+      "gas": 32069,
+      "max_commit_ops": 756,
+      "max_load_ops": 280,
+      "occupancy": [
+        "2_keys"
+      ],
+      "operation": "read_miss",
+      "outcome": "committed",
+      "physical_reads": 280,
+      "physical_writes": 297,
+      "receipt_json_bytes": 354545,
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "ci95_latency_ns": [
+          48174264.0,
+          50033846.0
+        ],
+        "ci95_runtime_ns": [
+          7198310.0,
+          7362132.0
+        ],
+        "max_peak_rss_bytes": 76922880,
+        "p50_execution_ns": 7040816,
+        "p50_json_serialization_ns": 1983989,
+        "p50_latency_ns": 49309533,
+        "p50_load_ns": 220626,
+        "p50_peak_rss_bytes": 69271552,
+        "p50_persisted_bytes": 154830,
+        "p50_persistence_ns": 1480474,
+        "p50_proof_objects_ns": 40123015,
+        "p50_rss_before_bytes": 69271552,
+        "p50_runtime_ns": 7264605,
+        "p50_staging_ns": 823,
+        "p50_witness_ns": 159364,
+        "p95_latency_ns": 60468909,
+        "p95_runtime_ns": 10154998
+      },
+      "trace_json_bytes": 1730613,
+      "witness_scan_records": 0
+    },
+    {
+      "backend": "path_oram_private_posmap_v1",
+      "bytes_moved": 1458656,
+      "bytes_read": 713632,
+      "bytes_written": 745024,
+      "capacity": 8192,
+      "completed_trials": 30,
+      "cost_same_for_every_trial": true,
+      "entrypoint": "put(bytes32,uint256)",
+      "evidence_json_bytes": 2550031,
+      "gas": 121396,
+      "max_commit_ops": 3066,
+      "max_load_ops": 1050,
+      "occupancy": [
+        "2_keys"
+      ],
+      "operation": "overwrite",
+      "outcome": "committed",
+      "physical_reads": 1050,
+      "physical_writes": 1149,
+      "receipt_json_bytes": 1419165,
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "ci95_latency_ns": [
+          180175032.0,
+          184851304.0
+        ],
+        "ci95_runtime_ns": [
+          26306074.0,
+          27184056.0
+        ],
+        "max_peak_rss_bytes": 76922880,
+        "p50_execution_ns": 26416008,
+        "p50_json_serialization_ns": 4092814,
+        "p50_latency_ns": 181986321,
+        "p50_load_ns": 221227,
+        "p50_peak_rss_bytes": 69271552,
+        "p50_persisted_bytes": 438251,
+        "p50_persistence_ns": 2259244,
+        "p50_proof_objects_ns": 153647361,
+        "p50_rss_before_bytes": 69271552,
+        "p50_runtime_ns": 26637680,
+        "p50_staging_ns": 680,
+        "p50_witness_ns": 59557,
+        "p95_latency_ns": 251577549,
+        "p95_runtime_ns": 36822720
+      },
+      "trace_json_bytes": 3969196,
+      "witness_scan_records": 0
+    },
+    {
+      "backend": "path_oram_private_posmap_v1",
+      "bytes_moved": 1458656,
+      "bytes_read": 713632,
+      "bytes_written": 745024,
+      "capacity": 8192,
+      "completed_trials": 30,
+      "cost_same_for_every_trial": true,
+      "entrypoint": "put(bytes32,uint256)",
+      "evidence_json_bytes": 2550038,
+      "gas": 121396,
+      "max_commit_ops": 3066,
+      "max_load_ops": 1050,
+      "occupancy": [
+        "2_keys"
+      ],
+      "operation": "noop_write",
+      "outcome": "committed",
+      "physical_reads": 1050,
+      "physical_writes": 1149,
+      "receipt_json_bytes": 1419162,
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "ci95_latency_ns": [
+          181347733.0,
+          187730379.0
+        ],
+        "ci95_runtime_ns": [
+          26222923.0,
+          26990564.0
+        ],
+        "max_peak_rss_bytes": 76922880,
+        "p50_execution_ns": 26257763,
+        "p50_json_serialization_ns": 3881075,
+        "p50_latency_ns": 183270045,
+        "p50_load_ns": 222888,
+        "p50_peak_rss_bytes": 69271552,
+        "p50_persisted_bytes": 437544,
+        "p50_persistence_ns": 2210840,
+        "p50_proof_objects_ns": 154294092,
+        "p50_rss_before_bytes": 69271552,
+        "p50_runtime_ns": 26476816,
+        "p50_staging_ns": 1084,
+        "p50_witness_ns": 73801,
+        "p95_latency_ns": 240707058,
+        "p95_runtime_ns": 36307435
+      },
+      "trace_json_bytes": 3969200,
+      "witness_scan_records": 0
+    },
+    {
+      "backend": "path_oram_private_posmap_v1",
+      "bytes_moved": 1458656,
+      "bytes_read": 713632,
+      "bytes_written": 745024,
+      "capacity": 8192,
+      "completed_trials": 30,
+      "cost_same_for_every_trial": true,
+      "entrypoint": "clear(bytes32)",
+      "evidence_json_bytes": 2550019,
+      "gas": 121396,
+      "max_commit_ops": 3066,
+      "max_load_ops": 1050,
+      "occupancy": [
+        "2_keys"
+      ],
+      "operation": "delete",
+      "outcome": "committed",
+      "physical_reads": 1050,
+      "physical_writes": 1149,
+      "receipt_json_bytes": 1419159,
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "ci95_latency_ns": [
+          169221712.0,
+          180712647.0
+        ],
+        "ci95_runtime_ns": [
+          24162075.0,
+          26457653.0
+        ],
+        "max_peak_rss_bytes": 76922880,
+        "p50_execution_ns": 25485467,
+        "p50_json_serialization_ns": 3996116,
+        "p50_latency_ns": 176672099,
+        "p50_load_ns": 222104,
+        "p50_peak_rss_bytes": 69271552,
+        "p50_persisted_bytes": 441076,
+        "p50_persistence_ns": 2202989,
+        "p50_proof_objects_ns": 149722850,
+        "p50_rss_before_bytes": 69271552,
+        "p50_runtime_ns": 25703419,
+        "p50_staging_ns": 956,
+        "p50_witness_ns": 134686,
+        "p95_latency_ns": 214396431,
+        "p95_runtime_ns": 37381169
+      },
+      "trace_json_bytes": 3969178,
+      "witness_scan_records": 0
+    },
+    {
+      "backend": "path_oram_private_posmap_v1",
+      "bytes_moved": 1458656,
+      "bytes_read": 713632,
+      "bytes_written": 745024,
+      "capacity": 8192,
+      "completed_trials": 30,
+      "cost_same_for_every_trial": true,
+      "entrypoint": "put(bytes32,uint256)",
+      "evidence_json_bytes": 2550024,
+      "gas": 121396,
+      "max_commit_ops": 3066,
+      "max_load_ops": 1050,
+      "occupancy": [
+        "2_keys"
+      ],
+      "operation": "insert",
+      "outcome": "committed",
+      "physical_reads": 1050,
+      "physical_writes": 1149,
+      "receipt_json_bytes": 1419156,
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "ci95_latency_ns": [
+          171905029.0,
+          180821436.0
+        ],
+        "ci95_runtime_ns": [
+          24725590.0,
+          26378956.0
+        ],
+        "max_peak_rss_bytes": 76922880,
+        "p50_execution_ns": 25864581,
+        "p50_json_serialization_ns": 3984350,
+        "p50_latency_ns": 178529363,
+        "p50_load_ns": 227953,
+        "p50_peak_rss_bytes": 69271552,
+        "p50_persisted_bytes": 440374,
+        "p50_persistence_ns": 2281230,
+        "p50_proof_objects_ns": 149791628,
+        "p50_rss_before_bytes": 69271552,
+        "p50_runtime_ns": 26082361,
+        "p50_staging_ns": 879,
+        "p50_witness_ns": 65807,
+        "p95_latency_ns": 206905273,
+        "p95_runtime_ns": 32949896
+      },
+      "trace_json_bytes": 3969180,
+      "witness_scan_records": 0
+    },
+    {
+      "backend": "path_oram_private_posmap_v1",
+      "bytes_moved": 1458656,
+      "bytes_read": 713632,
+      "bytes_written": 745024,
+      "capacity": 8192,
+      "completed_trials": 30,
+      "cost_same_for_every_trial": true,
+      "entrypoint": "putBelow(bytes32,uint256,uint256)",
+      "evidence_json_bytes": 2550123,
+      "gas": 121435,
+      "max_commit_ops": 3066,
+      "max_load_ops": 1050,
+      "occupancy": [
+        "2_keys"
+      ],
+      "operation": "abort",
+      "outcome": "aborted",
+      "physical_reads": 1050,
+      "physical_writes": 1149,
+      "receipt_json_bytes": 1419209,
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "ci95_latency_ns": [
+          173551881.0,
+          181771928.0
+        ],
+        "ci95_runtime_ns": [
+          26183788.0,
+          26906011.0
+        ],
+        "max_peak_rss_bytes": 88485888,
+        "p50_execution_ns": 26249558,
+        "p50_json_serialization_ns": 4063950,
+        "p50_latency_ns": 177791918,
+        "p50_load_ns": 225571,
+        "p50_peak_rss_bytes": 69271552,
+        "p50_persisted_bytes": 438258,
+        "p50_persistence_ns": 2237856,
+        "p50_proof_objects_ns": 148573049,
+        "p50_rss_before_bytes": 69271552,
+        "p50_runtime_ns": 26478791,
+        "p50_staging_ns": 946,
+        "p50_witness_ns": 63962,
+        "p95_latency_ns": 229323217,
+        "p95_runtime_ns": 33279397
+      },
+      "trace_json_bytes": 3969332,
+      "witness_scan_records": 0
+    },
+    {
+      "backend": "full_scan",
+      "bytes_moved": 1572864,
+      "bytes_read": 1572864,
+      "bytes_written": 0,
+      "capacity": 16384,
+      "completed_trials": 30,
+      "cost_same_for_every_trial": true,
+      "entrypoint": "read(bytes32)",
+      "evidence_json_bytes": 7189,
+      "gas": 477161,
+      "max_commit_ops": 0,
+      "max_load_ops": 16384,
+      "occupancy": [
+        "2_keys"
+      ],
+      "operation": "read_hit",
+      "outcome": "committed",
+      "physical_reads": 16384,
+      "physical_writes": 0,
+      "receipt_json_bytes": 1990,
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "ci95_latency_ns": [
+          41050983.0,
+          44971821.0
+        ],
+        "ci95_runtime_ns": [
+          40078260.0,
+          43891552.0
+        ],
+        "max_peak_rss_bytes": 76922880,
+        "p50_execution_ns": 3382841,
+        "p50_json_serialization_ns": 46842,
+        "p50_latency_ns": 44218821,
+        "p50_load_ns": 39654672,
+        "p50_peak_rss_bytes": 76922880,
+        "p50_persisted_bytes": 309,
+        "p50_persistence_ns": 824465,
+        "p50_proof_objects_ns": 250248,
+        "p50_rss_before_bytes": 76922880,
+        "p50_runtime_ns": 42995972,
+        "p50_staging_ns": 626,
+        "p50_witness_ns": 3882,
+        "p95_latency_ns": 54297785,
+        "p95_runtime_ns": 52970272
+      },
+      "trace_json_bytes": 9179,
+      "witness_scan_records": 0
+    },
+    {
+      "backend": "full_scan",
+      "bytes_moved": 1572864,
+      "bytes_read": 1572864,
+      "bytes_written": 0,
+      "capacity": 16384,
+      "completed_trials": 30,
+      "cost_same_for_every_trial": true,
+      "entrypoint": "read(bytes32)",
+      "evidence_json_bytes": 7188,
+      "gas": 477161,
+      "max_commit_ops": 0,
+      "max_load_ops": 16384,
+      "occupancy": [
+        "2_keys"
+      ],
+      "operation": "read_miss",
+      "outcome": "committed",
+      "physical_reads": 16384,
+      "physical_writes": 0,
+      "receipt_json_bytes": 1989,
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "ci95_latency_ns": [
+          41654628.0,
+          44030708.0
+        ],
+        "ci95_runtime_ns": [
+          40629651.0,
+          43054580.0
+        ],
+        "max_peak_rss_bytes": 76922880,
+        "p50_execution_ns": 3194713,
+        "p50_json_serialization_ns": 45824,
+        "p50_latency_ns": 42498035,
+        "p50_load_ns": 38438060,
+        "p50_peak_rss_bytes": 76922880,
+        "p50_persisted_bytes": 309,
+        "p50_persistence_ns": 765127,
+        "p50_proof_objects_ns": 244869,
+        "p50_rss_before_bytes": 76922880,
+        "p50_runtime_ns": 41556329,
+        "p50_staging_ns": 555,
+        "p50_witness_ns": 3629,
+        "p95_latency_ns": 50079610,
+        "p95_runtime_ns": 49046171
+      },
+      "trace_json_bytes": 9177,
+      "witness_scan_records": 0
+    },
+    {
+      "backend": "full_scan",
+      "bytes_moved": 3145728,
+      "bytes_read": 1572864,
+      "bytes_written": 1572864,
+      "capacity": 16384,
+      "completed_trials": 30,
+      "cost_same_for_every_trial": true,
+      "entrypoint": "put(bytes32,uint256)",
+      "evidence_json_bytes": 8035,
+      "gas": 952304,
+      "max_commit_ops": 16384,
+      "max_load_ops": 16384,
+      "occupancy": [
+        "2_keys"
+      ],
+      "operation": "overwrite",
+      "outcome": "committed",
+      "physical_reads": 16384,
+      "physical_writes": 16384,
+      "receipt_json_bytes": 2143,
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "ci95_latency_ns": [
+          92290407.0,
+          98266001.0
+        ],
+        "ci95_runtime_ns": [
+          84815336.0,
+          90645220.0
+        ],
+        "max_peak_rss_bytes": 76922880,
+        "p50_execution_ns": 48217379,
+        "p50_json_serialization_ns": 47329,
+        "p50_latency_ns": 96132801,
+        "p50_load_ns": 39869853,
+        "p50_peak_rss_bytes": 76922880,
+        "p50_persisted_bytes": 2086351,
+        "p50_persistence_ns": 7303513,
+        "p50_proof_objects_ns": 246799,
+        "p50_rss_before_bytes": 76922880,
+        "p50_runtime_ns": 88485293,
+        "p50_staging_ns": 570,
+        "p50_witness_ns": 4498,
+        "p95_latency_ns": 139782554,
+        "p95_runtime_ns": 105331568
+      },
+      "trace_json_bytes": 10178,
+      "witness_scan_records": 0
+    },
+    {
+      "backend": "full_scan",
+      "bytes_moved": 3145728,
+      "bytes_read": 1572864,
+      "bytes_written": 1572864,
+      "capacity": 16384,
+      "completed_trials": 30,
+      "cost_same_for_every_trial": true,
+      "entrypoint": "put(bytes32,uint256)",
+      "evidence_json_bytes": 8035,
+      "gas": 952304,
+      "max_commit_ops": 16384,
+      "max_load_ops": 16384,
+      "occupancy": [
+        "2_keys"
+      ],
+      "operation": "noop_write",
+      "outcome": "committed",
+      "physical_reads": 16384,
+      "physical_writes": 16384,
+      "receipt_json_bytes": 2143,
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "ci95_latency_ns": [
+          94935620.0,
+          98919288.0
+        ],
+        "ci95_runtime_ns": [
+          87361779.0,
+          91325892.0
+        ],
+        "max_peak_rss_bytes": 76922880,
+        "p50_execution_ns": 49516690,
+        "p50_json_serialization_ns": 46612,
+        "p50_latency_ns": 97508990,
+        "p50_load_ns": 40205450,
+        "p50_peak_rss_bytes": 76922880,
+        "p50_persisted_bytes": 2086351,
+        "p50_persistence_ns": 7368918,
+        "p50_proof_objects_ns": 260199,
+        "p50_rss_before_bytes": 76922880,
+        "p50_runtime_ns": 89415283,
+        "p50_staging_ns": 646,
+        "p50_witness_ns": 5082,
+        "p95_latency_ns": 137772725,
+        "p95_runtime_ns": 117966927
+      },
+      "trace_json_bytes": 10178,
+      "witness_scan_records": 0
+    },
+    {
+      "backend": "full_scan",
+      "bytes_moved": 3145728,
+      "bytes_read": 1572864,
+      "bytes_written": 1572864,
+      "capacity": 16384,
+      "completed_trials": 30,
+      "cost_same_for_every_trial": true,
+      "entrypoint": "clear(bytes32)",
+      "evidence_json_bytes": 7999,
+      "gas": 952304,
+      "max_commit_ops": 16384,
+      "max_load_ops": 16384,
+      "occupancy": [
+        "2_keys"
+      ],
+      "operation": "delete",
+      "outcome": "committed",
+      "physical_reads": 16384,
+      "physical_writes": 16384,
+      "receipt_json_bytes": 2125,
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "ci95_latency_ns": [
+          93015452.0,
+          98600317.0
+        ],
+        "ci95_runtime_ns": [
+          86169080.0,
+          91089139.0
+        ],
+        "max_peak_rss_bytes": 76922880,
+        "p50_execution_ns": 48564266,
+        "p50_json_serialization_ns": 46026,
+        "p50_latency_ns": 96814613,
+        "p50_load_ns": 40318040,
+        "p50_peak_rss_bytes": 76922880,
+        "p50_persisted_bytes": 2086351,
+        "p50_persistence_ns": 7194771,
+        "p50_proof_objects_ns": 247015,
+        "p50_rss_before_bytes": 76922880,
+        "p50_runtime_ns": 89693126,
+        "p50_staging_ns": 640,
+        "p50_witness_ns": 4904,
+        "p95_latency_ns": 113657143,
+        "p95_runtime_ns": 105435924
+      },
+      "trace_json_bytes": 10124,
+      "witness_scan_records": 0
+    },
+    {
+      "backend": "full_scan",
+      "bytes_moved": 3145728,
+      "bytes_read": 1572864,
+      "bytes_written": 1572864,
+      "capacity": 16384,
+      "completed_trials": 30,
+      "cost_same_for_every_trial": true,
+      "entrypoint": "put(bytes32,uint256)",
+      "evidence_json_bytes": 8035,
+      "gas": 952304,
+      "max_commit_ops": 16384,
+      "max_load_ops": 16384,
+      "occupancy": [
+        "2_keys"
+      ],
+      "operation": "insert",
+      "outcome": "committed",
+      "physical_reads": 16384,
+      "physical_writes": 16384,
+      "receipt_json_bytes": 2143,
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "ci95_latency_ns": [
+          93430975.0,
+          97604801.0
+        ],
+        "ci95_runtime_ns": [
+          85617910.0,
+          89710720.0
+        ],
+        "max_peak_rss_bytes": 76922880,
+        "p50_execution_ns": 48716445,
+        "p50_json_serialization_ns": 49843,
+        "p50_latency_ns": 95914082,
+        "p50_load_ns": 39682747,
+        "p50_peak_rss_bytes": 76922880,
+        "p50_persisted_bytes": 2086351,
+        "p50_persistence_ns": 7358923,
+        "p50_proof_objects_ns": 254843,
+        "p50_rss_before_bytes": 76922880,
+        "p50_runtime_ns": 88121027,
+        "p50_staging_ns": 635,
+        "p50_witness_ns": 4831,
+        "p95_latency_ns": 135590722,
+        "p95_runtime_ns": 104981246
+      },
+      "trace_json_bytes": 10178,
+      "witness_scan_records": 0
+    },
+    {
+      "backend": "full_scan",
+      "bytes_moved": 3145728,
+      "bytes_read": 1572864,
+      "bytes_written": 1572864,
+      "capacity": 16384,
+      "completed_trials": 30,
+      "cost_same_for_every_trial": true,
+      "entrypoint": "putBelow(bytes32,uint256,uint256)",
+      "evidence_json_bytes": 8125,
+      "gas": 952343,
+      "max_commit_ops": 16384,
+      "max_load_ops": 16384,
+      "occupancy": [
+        "2_keys"
+      ],
+      "operation": "abort",
+      "outcome": "aborted",
+      "physical_reads": 16384,
+      "physical_writes": 16384,
+      "receipt_json_bytes": 2193,
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "ci95_latency_ns": [
+          95650672.0,
+          97824351.0
+        ],
+        "ci95_runtime_ns": [
+          87512566.0,
+          89726314.0
+        ],
+        "max_peak_rss_bytes": 76922880,
+        "p50_execution_ns": 49185859,
+        "p50_json_serialization_ns": 46505,
+        "p50_latency_ns": 97097458,
+        "p50_load_ns": 39896178,
+        "p50_peak_rss_bytes": 76922880,
+        "p50_persisted_bytes": 2086351,
+        "p50_persistence_ns": 7310354,
+        "p50_proof_objects_ns": 281934,
+        "p50_rss_before_bytes": 76922880,
+        "p50_runtime_ns": 89222862,
+        "p50_staging_ns": 620,
+        "p50_witness_ns": 4814,
+        "p95_latency_ns": 118905461,
+        "p95_runtime_ns": 109667496
+      },
+      "trace_json_bytes": 10318,
+      "witness_scan_records": 0
+    },
+    {
+      "backend": "path_oram_private_posmap_v1",
+      "bytes_moved": 439872,
+      "bytes_read": 219360,
+      "bytes_written": 220512,
+      "capacity": 16384,
+      "completed_trials": 30,
+      "cost_same_for_every_trial": true,
+      "entrypoint": "read(bytes32)",
+      "evidence_json_bytes": 2416429,
+      "gas": 35375,
+      "max_commit_ops": 836,
+      "max_load_ops": 314,
+      "occupancy": [
+        "2_keys"
+      ],
+      "operation": "read_hit",
+      "outcome": "committed",
+      "physical_reads": 314,
+      "physical_writes": 332,
+      "receipt_json_bytes": 384110,
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "ci95_latency_ns": [
+          56227789.0,
+          59062549.0
+        ],
+        "ci95_runtime_ns": [
+          8190921.0,
+          8498542.0
+        ],
+        "max_peak_rss_bytes": 114003968,
+        "p50_execution_ns": 8109850,
+        "p50_json_serialization_ns": 3629031,
+        "p50_latency_ns": 57712487,
+        "p50_load_ns": 234599,
+        "p50_peak_rss_bytes": 114003968,
+        "p50_persisted_bytes": 174313,
+        "p50_persistence_ns": 1480595,
+        "p50_proof_objects_ns": 47126313,
+        "p50_rss_before_bytes": 114003968,
+        "p50_runtime_ns": 8349457,
+        "p50_staging_ns": 981,
+        "p50_witness_ns": 398902,
+        "p95_latency_ns": 65634622,
+        "p95_runtime_ns": 12251160
+      },
+      "trace_json_bytes": 2800539,
+      "witness_scan_records": 0
+    },
+    {
+      "backend": "path_oram_private_posmap_v1",
+      "bytes_moved": 439872,
+      "bytes_read": 219360,
+      "bytes_written": 220512,
+      "capacity": 16384,
+      "completed_trials": 30,
+      "cost_same_for_every_trial": true,
+      "entrypoint": "read(bytes32)",
+      "evidence_json_bytes": 2416423,
+      "gas": 35375,
+      "max_commit_ops": 836,
+      "max_load_ops": 314,
+      "occupancy": [
+        "2_keys"
+      ],
+      "operation": "read_miss",
+      "outcome": "committed",
+      "physical_reads": 314,
+      "physical_writes": 332,
+      "receipt_json_bytes": 384112,
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "ci95_latency_ns": [
+          55866883.0,
+          58343902.0
+        ],
+        "ci95_runtime_ns": [
+          8138525.0,
+          8385817.0
+        ],
+        "max_peak_rss_bytes": 114003968,
+        "p50_execution_ns": 8020348,
+        "p50_json_serialization_ns": 3544703,
+        "p50_latency_ns": 57595368,
+        "p50_load_ns": 239542,
+        "p50_peak_rss_bytes": 114003968,
+        "p50_persisted_bytes": 174311,
+        "p50_persistence_ns": 1449568,
+        "p50_proof_objects_ns": 47533990,
+        "p50_rss_before_bytes": 114003968,
+        "p50_runtime_ns": 8248734,
+        "p50_staging_ns": 762,
+        "p50_witness_ns": 135293,
+        "p95_latency_ns": 75943396,
+        "p95_runtime_ns": 10767493
+      },
+      "trace_json_bytes": 2800535,
+      "witness_scan_records": 0
+    },
+    {
+      "backend": "path_oram_private_posmap_v1",
+      "bytes_moved": 1640640,
+      "bytes_read": 804000,
+      "bytes_written": 836640,
+      "capacity": 16384,
+      "completed_trials": 30,
+      "cost_same_for_every_trial": true,
+      "entrypoint": "put(bytes32,uint256)",
+      "evidence_json_bytes": 3685565,
+      "gas": 134620,
+      "max_commit_ops": 3388,
+      "max_load_ops": 1184,
+      "occupancy": [
+        "2_keys"
+      ],
+      "operation": "overwrite",
+      "outcome": "committed",
+      "physical_reads": 1184,
+      "physical_writes": 1288,
+      "receipt_json_bytes": 1537503,
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "ci95_latency_ns": [
+          200218335.0,
+          206207037.0
+        ],
+        "ci95_runtime_ns": [
+          29329202.0,
+          29854165.0
+        ],
+        "max_peak_rss_bytes": 114003968,
+        "p50_execution_ns": 29430243,
+        "p50_json_serialization_ns": 5784683,
+        "p50_latency_ns": 203243057,
+        "p50_load_ns": 243474,
+        "p50_peak_rss_bytes": 114003968,
+        "p50_persisted_bytes": 509546,
+        "p50_persistence_ns": 2430417,
+        "p50_proof_objects_ns": 170796168,
+        "p50_rss_before_bytes": 114003968,
+        "p50_runtime_ns": 29681709,
+        "p50_staging_ns": 911,
+        "p50_witness_ns": 122667,
+        "p95_latency_ns": 273370652,
+        "p95_runtime_ns": 44471820
+      },
+      "trace_json_bytes": 5223068,
+      "witness_scan_records": 0
+    },
+    {
+      "backend": "path_oram_private_posmap_v1",
+      "bytes_moved": 1640640,
+      "bytes_read": 804000,
+      "bytes_written": 836640,
+      "capacity": 16384,
+      "completed_trials": 30,
+      "cost_same_for_every_trial": true,
+      "entrypoint": "put(bytes32,uint256)",
+      "evidence_json_bytes": 3685544,
+      "gas": 134620,
+      "max_commit_ops": 3388,
+      "max_load_ops": 1184,
+      "occupancy": [
+        "2_keys"
+      ],
+      "operation": "noop_write",
+      "outcome": "committed",
+      "physical_reads": 1184,
+      "physical_writes": 1288,
+      "receipt_json_bytes": 1537494,
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "ci95_latency_ns": [
+          197576638.0,
+          208808361.0
+        ],
+        "ci95_runtime_ns": [
+          29370310.0,
+          30302298.0
+        ],
+        "max_peak_rss_bytes": 114003968,
+        "p50_execution_ns": 29375329,
+        "p50_json_serialization_ns": 5751358,
+        "p50_latency_ns": 202742556,
+        "p50_load_ns": 260836,
+        "p50_peak_rss_bytes": 114003968,
+        "p50_persisted_bytes": 510246,
+        "p50_persistence_ns": 2323419,
+        "p50_proof_objects_ns": 170652194,
+        "p50_rss_before_bytes": 114003968,
+        "p50_runtime_ns": 29629572,
+        "p50_staging_ns": 936,
+        "p50_witness_ns": 226302,
+        "p95_latency_ns": 267179599,
+        "p95_runtime_ns": 44015858
+      },
+      "trace_json_bytes": 5223038,
+      "witness_scan_records": 0
+    },
+    {
+      "backend": "path_oram_private_posmap_v1",
+      "bytes_moved": 1640640,
+      "bytes_read": 804000,
+      "bytes_written": 836640,
+      "capacity": 16384,
+      "completed_trials": 30,
+      "cost_same_for_every_trial": true,
+      "entrypoint": "clear(bytes32)",
+      "evidence_json_bytes": 3685517,
+      "gas": 134620,
+      "max_commit_ops": 3388,
+      "max_load_ops": 1184,
+      "occupancy": [
+        "2_keys"
+      ],
+      "operation": "delete",
+      "outcome": "committed",
+      "physical_reads": 1184,
+      "physical_writes": 1288,
+      "receipt_json_bytes": 1537473,
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "ci95_latency_ns": [
+          199932290.0,
+          206568992.0
+        ],
+        "ci95_runtime_ns": [
+          29467166.0,
+          30166074.0
+        ],
+        "max_peak_rss_bytes": 114003968,
+        "p50_execution_ns": 29361416,
+        "p50_json_serialization_ns": 5677824,
+        "p50_latency_ns": 201713949,
+        "p50_load_ns": 245682,
+        "p50_peak_rss_bytes": 114003968,
+        "p50_persisted_bytes": 512372,
+        "p50_persistence_ns": 2461740,
+        "p50_proof_objects_ns": 169428235,
+        "p50_rss_before_bytes": 114003968,
+        "p50_runtime_ns": 29607667,
+        "p50_staging_ns": 944,
+        "p50_witness_ns": 306638,
+        "p95_latency_ns": 269648106,
+        "p95_runtime_ns": 43722334
+      },
+      "trace_json_bytes": 5222990,
+      "witness_scan_records": 0
+    },
+    {
+      "backend": "path_oram_private_posmap_v1",
+      "bytes_moved": 1640640,
+      "bytes_read": 804000,
+      "bytes_written": 836640,
+      "capacity": 16384,
+      "completed_trials": 30,
+      "cost_same_for_every_trial": true,
+      "entrypoint": "put(bytes32,uint256)",
+      "evidence_json_bytes": 3685559,
+      "gas": 134620,
+      "max_commit_ops": 3388,
+      "max_load_ops": 1184,
+      "occupancy": [
+        "2_keys"
+      ],
+      "operation": "insert",
+      "outcome": "committed",
+      "physical_reads": 1184,
+      "physical_writes": 1288,
+      "receipt_json_bytes": 1537497,
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "ci95_latency_ns": [
+          196322876.0,
+          213478709.0
+        ],
+        "ci95_runtime_ns": [
+          28526140.0,
+          30328054.0
+        ],
+        "max_peak_rss_bytes": 114003968,
+        "p50_execution_ns": 29370294,
+        "p50_json_serialization_ns": 5719212,
+        "p50_latency_ns": 202005535,
+        "p50_load_ns": 240602,
+        "p50_peak_rss_bytes": 114003968,
+        "p50_persisted_bytes": 512382,
+        "p50_persistence_ns": 2407876,
+        "p50_proof_objects_ns": 169675270,
+        "p50_rss_before_bytes": 114003968,
+        "p50_runtime_ns": 29625351,
+        "p50_staging_ns": 1052,
+        "p50_witness_ns": 227903,
+        "p95_latency_ns": 271624273,
+        "p95_runtime_ns": 41805608
+      },
+      "trace_json_bytes": 5223056,
+      "witness_scan_records": 0
+    },
+    {
+      "backend": "path_oram_private_posmap_v1",
+      "bytes_moved": 1640640,
+      "bytes_read": 804000,
+      "bytes_written": 836640,
+      "capacity": 16384,
+      "completed_trials": 30,
+      "cost_same_for_every_trial": true,
+      "entrypoint": "putBelow(bytes32,uint256,uint256)",
+      "evidence_json_bytes": 3685645,
+      "gas": 134659,
+      "max_commit_ops": 3388,
+      "max_load_ops": 1184,
+      "occupancy": [
+        "2_keys"
+      ],
+      "operation": "abort",
+      "outcome": "aborted",
+      "physical_reads": 1184,
+      "physical_writes": 1288,
+      "receipt_json_bytes": 1537547,
+      "status": "ok",
+      "stored_keys": 2,
+      "timing": {
+        "ci95_latency_ns": [
+          196158224.0,
+          207096946.0
+        ],
+        "ci95_runtime_ns": [
+          28954394.0,
+          30146495.0
+        ],
+        "max_peak_rss_bytes": 137199616,
+        "p50_execution_ns": 29307457,
+        "p50_json_serialization_ns": 5694135,
+        "p50_latency_ns": 201742248,
+        "p50_load_ns": 239191,
+        "p50_peak_rss_bytes": 114003968,
+        "p50_persisted_bytes": 512373,
+        "p50_persistence_ns": 2455666,
+        "p50_proof_objects_ns": 169344004,
+        "p50_rss_before_bytes": 114003968,
+        "p50_runtime_ns": 29544568,
+        "p50_staging_ns": 960,
+        "p50_witness_ns": 220387,
+        "p95_latency_ns": 321048295,
+        "p95_runtime_ns": 57232448
+      },
+      "trace_json_bytes": 5223192,
+      "witness_scan_records": 0
+    }
+  ],
+  "schema": "uo-capacity-sweep-v4",
+  "workloads": []
+}

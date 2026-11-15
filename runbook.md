@@ -44,8 +44,8 @@ Reproducibility check:
 ```
 
 Instruction counts of a private-scheme tree node access before and after the
-eviction rewrite (needs valgrind, and lean and lake on PATH; not part of
-`run_validation.sh`):
+eviction networks of Issue 47 (needs valgrind, and lean and lake on PATH; not
+part of `run_validation.sh`):
 
 ```bash
 ./scripts/measure_tree_eviction_instructions.sh

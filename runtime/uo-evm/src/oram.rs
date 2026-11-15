@@ -2541,7 +2541,8 @@ mod tests {
         //! bucket store: contents, tree shape, pointers, free list, stash
         //! bound, and the fixed number of path reads and writes.
         use super::super::generated_oram_codecs::{
-            bucket_on_leaf_path, clone_tree_node, for_each_bucket_on_leaf_path_leaf_to_root,
+            bucket_on_leaf_path, clone_tree_node, compaction_network, expansion_network,
+            for_each_bucket_on_leaf_path_leaf_to_root, odd_even_merge_sort_network,
             tree_avl_height, tree_bootstrap_nodes, tree_get, tree_get_accesses, tree_key_lt,
             tree_place_nodes, tree_put, tree_put_accesses, TreeAccessRecord, TreeHeader, TreeLink,
             TreeNode, TreePathStore, TreeShape, TreeStash,
@@ -2550,7 +2551,7 @@ mod tests {
         use rand::{Rng, SeedableRng};
         use rand_chacha::ChaCha20Rng;
         use std::collections::BTreeMap;
-        use uo_core::{ScalarType, Type, Value};
+        use uo_core::{ScalarType, Type, Uint256, Value};
 
         struct MemoryTreeStore {
             buckets: Vec<Box<[TreeNode]>>,
@@ -3006,77 +3007,244 @@ mod tests {
             assert!(run_with(16, 3, 40, 2, true));
         }
 
-        /// Evicting a path places exactly the blocks the path walk does, in
-        /// the same slots and stash order: a block fits the bucket at a depth
-        /// when its leaf and the read leaf agree above that depth.
-        #[test]
-        fn eviction_depth_test_places_blocks_as_the_path_walk() {
-            let empty = TreeNode::empty(&key_type(), &value_type());
-            let mut rng = ChaCha20Rng::seed_from_u64(0xe71c7);
-            for leaf_count in [2usize, 4, 8, 16, 64, 256] {
-                let levels = leaf_count.trailing_zeros() as usize + 1;
-                let shape = TreeShape {
-                    capacity: leaf_count,
-                    leaf_count,
-                    blocks_per_bucket: 4,
-                    avl_height: tree_avl_height(leaf_count),
-                    stash_bound: 0,
-                    key_type: key_type(),
-                    value_type: value_type(),
-                    key_width: 20,
-                    value_width: 32,
+        /// A node with every field drawn at random; an unoccupied one is not
+        /// the canonical empty node, so a test sees whether such a block's
+        /// fields ever reach a bucket or a slot they should not.
+        fn random_block(
+            rng: &mut ChaCha20Rng,
+            id: usize,
+            leaf_count: usize,
+            density: f64,
+            empty: &TreeNode,
+        ) -> TreeNode {
+            let mut block = clone_tree_node(empty);
+            block.occupied = rng.gen_bool(density);
+            block.id = id;
+            block.leaf = rng.gen_range(0..leaf_count);
+            block.in_tree = rng.gen_bool(0.5);
+            block.key = Value::Address(rng.gen());
+            block.value = Value::Uint(Uint256::from_be_bytes(rng.gen()));
+            for link in [&mut block.left, &mut block.right] {
+                *link = TreeLink {
+                    present: rng.gen_bool(0.5),
+                    id: rng.gen_range(0..1_000),
+                    leaf: rng.gen_range(0..leaf_count),
+                    height: rng.gen_range(0..20),
                 };
-                for _ in 0..20 {
-                    let read_leaf = rng.gen_range(0..leaf_count);
-                    let fill = 30;
-                    let mut stash = TreeStash::with_capacity(0, fill, &empty).unwrap();
-                    // (occupied, id, leaf) of each stash block, for the walk.
-                    let mut reference = Vec::new();
-                    for id in 0..fill {
-                        let mut node = clone_tree_node(&empty);
-                        node.occupied = rng.gen_bool(0.7);
-                        node.id = id;
-                        node.leaf = rng.gen_range(0..leaf_count);
-                        reference.push((node.occupied, node.id, node.leaf));
-                        stash.append(&node).unwrap();
+            }
+            block
+        }
+
+        /// The eviction and compaction as they were written before the
+        /// networks, with plain branches: each bucket of the path, deepest
+        /// first, takes in stash order the first blocks still in the stash
+        /// whose paths pass through it, up to its size; then each of the
+        /// path's blocks left in the stash moves, in order, into the first
+        /// empty persistent slot. Returns the buckets, the persistent slots
+        /// and whether a block found no slot.
+        fn evict_path_by_walking(
+            blocks: &[TreeNode],
+            persistent: usize,
+            shape: &TreeShape,
+            read_leaf: usize,
+            empty: &TreeNode,
+        ) -> (Vec<Vec<TreeNode>>, Vec<TreeNode>, bool) {
+            let mut stash: Vec<TreeNode> = blocks.iter().map(clone_tree_node).collect();
+            let mut buckets = Vec::new();
+            for_each_bucket_on_leaf_path_leaf_to_root(shape.leaf_count, read_leaf, |index| {
+                let mut bucket = Vec::new();
+                for block in stash.iter_mut() {
+                    if block.occupied
+                        && bucket.len() < shape.blocks_per_bucket
+                        && bucket_on_leaf_path(shape.leaf_count, index, block.leaf)
+                    {
+                        bucket.push(std::mem::replace(block, clone_tree_node(empty)));
                     }
-                    let mut indices = Vec::new();
-                    for_each_bucket_on_leaf_path_leaf_to_root(leaf_count, read_leaf, |index| {
-                        indices.push(index)
-                    });
-                    assert_eq!(indices.len(), levels);
-                    for (offset, index) in indices.into_iter().enumerate() {
-                        let depth = levels - 1 - offset;
-                        let bucket = stash.evict_bucket(&shape, read_leaf, depth).unwrap();
-                        let mut expected = Vec::new();
-                        for block in reference.iter_mut() {
-                            if block.0
-                                && expected.len() < shape.blocks_per_bucket
-                                && bucket_on_leaf_path(leaf_count, index, block.2)
-                            {
-                                expected.push(block.1);
-                                block.0 = false;
+                }
+                while bucket.len() < shape.blocks_per_bucket {
+                    bucket.push(clone_tree_node(empty));
+                }
+                buckets.push(bucket);
+            });
+            let (slots, appended) = stash.split_at_mut(persistent);
+            let mut overflowed = false;
+            for moving in appended.iter_mut() {
+                if moving.occupied {
+                    match slots.iter_mut().find(|slot| !slot.occupied) {
+                        Some(slot) => *slot = std::mem::replace(moving, clone_tree_node(empty)),
+                        None => overflowed = true,
+                    }
+                }
+            }
+            stash.truncate(persistent);
+            (buckets, stash, overflowed)
+        }
+
+        /// The networks place every block as the bucket-by-bucket walk did:
+        /// the same blocks in the same bucket slots, the same persistent
+        /// slots, field for field, and the same overflow. Stashes of every
+        /// density, with and without room, on paths of one to thirteen
+        /// buckets.
+        #[test]
+        fn evict_path_places_blocks_as_the_bucket_by_bucket_walk() {
+            let empty = TreeNode::empty(&key_type(), &value_type());
+            let mut rng = ChaCha20Rng::seed_from_u64(0x47e7);
+            let mut cases = 0usize;
+            let mut overflows = 0usize;
+            for leaf_count in [1usize, 2, 4, 8, 16, 64, 256, 4096] {
+                let levels = leaf_count.trailing_zeros() as usize + 1;
+                for per_bucket in [1usize, 2, 4, 5] {
+                    for persistent in [0usize, 1, 3, 17, 60] {
+                        for density in [0.0, 0.3, 0.7, 1.0] {
+                            for _ in 0..4 {
+                                let shape = TreeShape {
+                                    capacity: leaf_count,
+                                    leaf_count,
+                                    blocks_per_bucket: per_bucket,
+                                    avl_height: tree_avl_height(leaf_count),
+                                    stash_bound: persistent,
+                                    key_type: key_type(),
+                                    value_type: value_type(),
+                                    key_width: 20,
+                                    value_width: 32,
+                                };
+                                let fill = persistent + levels * per_bucket;
+                                let blocks: Vec<TreeNode> = (0..fill)
+                                    .map(|id| {
+                                        random_block(&mut rng, id, leaf_count, density, &empty)
+                                    })
+                                    .collect();
+                                let mut stash =
+                                    TreeStash::with_capacity(persistent, fill, &empty).unwrap();
+                                for (slot, block) in blocks.iter().enumerate() {
+                                    if slot < persistent {
+                                        stash.blocks[slot] = clone_tree_node(block);
+                                    } else {
+                                        stash.append(block).unwrap();
+                                    }
+                                }
+                                let read_leaf = rng.gen_range(0..leaf_count);
+                                let (want_buckets, want_slots, want_overflow) =
+                                    evict_path_by_walking(
+                                        &blocks, persistent, &shape, read_leaf, &empty,
+                                    );
+                                let (buckets, overflowed) =
+                                    stash.evict_path(&shape, read_leaf).unwrap();
+                                assert_eq!(overflowed, want_overflow);
+                                assert_eq!(buckets.len(), want_buckets.len());
+                                for (bucket, want) in buckets.iter().zip(want_buckets.iter()) {
+                                    assert_eq!(&bucket[..], &want[..]);
+                                }
+                                assert_eq!(&stash.blocks[..persistent], &want_slots[..]);
+                                assert!(stash.blocks[persistent..]
+                                    .iter()
+                                    .all(|block| *block == empty));
+                                assert_eq!(stash.fill, persistent);
+                                cases += 1;
+                                overflows += usize::from(overflowed);
                             }
                         }
-                        let placed: Vec<usize> = bucket
-                            .iter()
-                            .filter(|node| node.occupied)
-                            .map(|node| node.id)
-                            .collect();
-                        assert_eq!(placed, expected);
                     }
-                    let left: Vec<usize> = stash
-                        .blocks
-                        .iter()
-                        .filter(|node| node.occupied)
-                        .map(|node| node.id)
+                }
+            }
+            assert!(overflows > 0 && overflows < cases, "{overflows} of {cases}");
+        }
+
+        /// The sort network sorts every input of 0s and 1s up to twelve
+        /// slots, so by the 0-1 principle every input; and random keys up to
+        /// two hundred slots. Each compare-exchange is within the slots.
+        #[test]
+        fn odd_even_merge_sort_network_sorts_any_length() {
+            for len in 0..=12usize {
+                for bits in 0u32..(1u32 << len) {
+                    let mut keys: Vec<u32> = (0..len).map(|slot| (bits >> slot) & 1).collect();
+                    odd_even_merge_sort_network(len, |low, high| {
+                        assert!(low < high && high < len);
+                        if keys[low] > keys[high] {
+                            keys.swap(low, high);
+                        }
+                        Ok(())
+                    })
+                    .unwrap();
+                    assert!(
+                        keys.windows(2).all(|pair| pair[0] <= pair[1]),
+                        "{len} {bits:b}"
+                    );
+                }
+            }
+            let mut rng = ChaCha20Rng::seed_from_u64(0x0dd5);
+            for len in 13..=200usize {
+                for _ in 0..5 {
+                    let mut keys: Vec<usize> = (0..len).map(|_| rng.gen_range(0..64)).collect();
+                    let mut want = keys.clone();
+                    want.sort_unstable();
+                    odd_even_merge_sort_network(len, |low, high| {
+                        assert!(low < high && high < len);
+                        if keys[low] > keys[high] {
+                            keys.swap(low, high);
+                        }
+                        Ok(())
+                    })
+                    .unwrap();
+                    assert_eq!(keys, want);
+                }
+            }
+        }
+
+        /// Compaction moves the kept items to the front in their order, and
+        /// expansion moves them back out to increasing targets; each leaves
+        /// `keep` marking exactly where the kept items are.
+        #[test]
+        fn compaction_and_expansion_networks_keep_the_order() {
+            let mut rng = ChaCha20Rng::seed_from_u64(0xc0de);
+            for len in 0..=80usize {
+                for _ in 0..20 {
+                    let density = rng.gen_range(0.0..=1.0);
+                    let keep: Vec<bool> = (0..len).map(|_| rng.gen_bool(density)).collect();
+                    let kept: Vec<usize> = (0..len).filter(|&slot| keep[slot]).collect();
+                    let mut items: Vec<usize> = (0..len).collect();
+                    let mut flags = keep.clone();
+                    compaction_network(&mut flags, |moves, from, to| {
+                        assert!(to < from && from < len);
+                        if moves {
+                            items[to] = items[from];
+                        }
+                        Ok(())
+                    })
+                    .unwrap();
+                    assert_eq!(&items[..kept.len()], &kept[..]);
+                    assert!(flags[..kept.len()].iter().all(|flag| *flag));
+                    assert!(flags[kept.len()..].iter().all(|flag| !*flag));
+
+                    // Spread the front back out to random increasing targets.
+                    let mut targets: Vec<usize> = (0..len).collect();
+                    targets.retain(|_| rng.gen_bool(0.5));
+                    targets.truncate(kept.len());
+                    let count = targets.len();
+                    let mut flags: Vec<bool> = (0..len).map(|slot| slot < count).collect();
+                    let mut distance: Vec<usize> = (0..len)
+                        .map(|slot| {
+                            if slot < count {
+                                targets[slot] - slot
+                            } else {
+                                0
+                            }
+                        })
                         .collect();
-                    let expected_left: Vec<usize> = reference
-                        .iter()
-                        .filter(|block| block.0)
-                        .map(|block| block.1)
-                        .collect();
-                    assert_eq!(left, expected_left);
+                    let mut items: Vec<usize> = (0..len).map(|slot| 1_000 + slot).collect();
+                    expansion_network(&mut flags, &mut distance, |moves, from, to| {
+                        assert!(from < to && to < len);
+                        if moves {
+                            items[to] = items[from];
+                        }
+                        Ok(())
+                    })
+                    .unwrap();
+                    for (rank, target) in targets.iter().enumerate() {
+                        assert_eq!(items[*target], 1_000 + rank);
+                    }
+                    let marked: Vec<usize> = (0..len).filter(|&slot| flags[slot]).collect();
+                    assert_eq!(marked, targets);
                 }
             }
         }

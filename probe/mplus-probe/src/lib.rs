@@ -10312,8 +10312,8 @@ fn run_tamper_validation() -> Result<JsonValue> {
     tampered_runtime_implementation_stash_overflow_in_band.generated_oram_codecs_source =
         replace_exactly_once(
             &tampered_runtime_implementation_stash_overflow_in_band.generated_oram_codecs_source,
-            "        if overflowed {\n            return Err(stash_overflow_error(persistent));\n        }\n        Ok(())",
-            "        Ok(())",
+            "    if overflowed {\n        return Err(stash_overflow_error(stash.persistent));\n    }\n    Ok(())",
+            "    Ok(())",
             "runtime implementation stash-overflow tamper",
         )?;
     scenarios.push(validate_tampered_json_case(
@@ -31447,12 +31447,12 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             "    if stash_overflowed {\n        return Err(stash_overflow_error(state.parameters.stash_bound));\n    }",
         )
         && generated_oram_codecs_source.contains(
-            "        if overflowed {\n            return Err(stash_overflow_error(persistent));\n        }\n        Ok(())",
+            "    if overflowed {\n        return Err(stash_overflow_error(stash.persistent));\n    }\n    Ok(())",
         )
         && generated_oram_codecs_source.contains(
             "    if overflowed {\n        return Err(stash_overflow_error(stash.persistent));\n    }\n    store.end_operation(header, stash)?;",
         )
-        && generated_oram_codecs_source.contains("    stash.compact()?;\n")
+        && generated_oram_codecs_source.contains("    evict_tree_path(shape, store, stash, read_leaf)?;\n")
         && !generated_oram_codecs_source.contains("failed | overflowed")
         && !generated_oram_codecs_source.contains("failed |= tree_finish(")
         && !generated_oram_codecs_source.contains("update_failed |= working_stash")

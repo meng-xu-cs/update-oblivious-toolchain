@@ -1540,8 +1540,9 @@ when the tape-family theorem needs no sampled runs.
 
 ## Backlog
 
-The maintainer scheduled Issues 51 to 59 as Wave 7 on 2026-11-14; the
-order is in [`README.md`](./README.md). Issues 47 to 50 are not scheduled.
+The maintainer scheduled Issues 51 to 59 as Wave 7 on 2026-11-14, and
+Issues 47 to 49 as Wave 8 on 2026-11-15; the order is in
+[`README.md`](./README.md). Issue 50 is deferred.
 
 Wave 7 is done. The full profile of the sweep was run again after Issue 57,
 which changed every Path ORAM count (`results/capacity_sweep_full.json`, 62
@@ -1572,6 +1573,64 @@ Eviction and compaction are 86% of a node access's instructions, in about
 33,000 masked node assignments. Compute the placement on small tags and move
 each payload once. Accept only with unchanged block placement and a measured
 gain.
+
+As built. A node access evicts the stash over the path it read and compacts
+it in one step, `TreeStash::evict_path`, in place of `evict_bucket`, which a
+node access called once per bucket, and `compact`. The placement is the one
+those made, computed on each block's occupancy and leaf alone: each bucket
+of the path, deepest first, takes in stash order the first blocks still in
+the stash whose paths pass through it, up to its size, and the path's blocks
+left behind then move, in order, into the first empty persistent slots. The
+blocks then move through three networks of masked moves, each a fixed
+sequence of pairs of slots that depends only on the stash's public sizes:
+`compaction_network`, an order-preserving compaction in which a kept block
+moves `2^k` slots toward the front at level `k` when bit `k` of its distance
+is set; `odd_even_merge_sort_network`, Batcher's odd-even merge sort, with
+the compare-exchanges against padded slots left out; and
+`expansion_network`, the compaction run backwards. The blocks the path takes
+are gathered in stash order, sorted by their slots on the path and spread
+over them; the blocks left behind are gathered and spread over the free
+persistent slots, which a compaction of their indices lists in order. A
+stash overflow is an error once the path is written, as it was
+(`evict_tree_path`). A Beneš network was not tried: its switches would
+have to be set without a secret branch, which these networks, whose moves
+follow from prefix counts over the tags, do not need.
+
+Measured. `evict_path_places_blocks_as_the_bucket_by_bucket_walk` compares
+the new eviction, field by field, with the old one written with plain
+branches, on 2,560 random stashes of paths of 1 to 13 buckets, with garbage
+in unoccupied slots, some with room and some without; the sort network sorts
+every input of 0s and 1s up to twelve slots and random keys up to two
+hundred, and the compaction and expansion keep their order on every length
+up to eighty. `results/stash_occupancy.json` and
+`results/path_oram_avl_map_replay.json` are unchanged but for the
+toolchain's digest. Under callgrind at 4,096 entries
+(`results/tree_eviction_instructions.json`, schema v2, from
+`scripts/measure_tree_eviction_instructions.sh`), a node access makes 8,329
+masked node moves where it made 36,974 and takes 2,823,437 instructions
+where it took 8,589,141: 3.04 times fewer, and 4.37 times fewer in the
+eviction (1,708,488 against 7,473,988). In the control, the full profile's
+rounds on the three largest maps at 2 keys on the code before the issue and
+after it, one run after the other
+([`capacity_sweep_control_before_eviction_networks.json`](./capacity_sweep_control_before_eviction_networks.json)
+and
+[`capacity_sweep_control_after_eviction_networks.json`](./capacity_sweep_control_after_eviction_networks.json)),
+a tree call's own work is 2.1 to 2.4 times faster, the whole measured call
+1.2 times, and the full scan moved by 4% at most:
+
+| Call | 4,096 entries | 8,192 | 16,384 |
+| --- | --- | --- | --- |
+| tree read | 12.6 ms to 6.0 ms | 15.8 ms to 7.4 ms | 18.2 ms to 8.3 ms |
+| tree overwrite | 48.4 ms to 21.7 ms | 60.1 ms to 26.6 ms | 70.5 ms to 29.7 ms |
+| full-scan read | 10.1 ms to 10.5 ms | 21.1 ms to 20.8 ms | 43.4 ms to 43.0 ms |
+| full-scan overwrite | 20.7 ms to 20.9 ms | 44.9 ms to 43.1 ms | 89.6 ms to 88.5 ms |
+
+The proof bundles of a trace did not change, so a whole tree read at 16,384
+entries takes 57.7 ms where it took 69.0 ms, still above the full scan's
+44.2 ms. On its own work the tree is now the faster backend for reads at all
+three capacities and for writes at 8,192 and 16,384 entries; at 4,096 the
+two overwrites have overlapping intervals. The counts did not move: the two
+runs have one digest of their counts.
 
 ### Issue 48 — Fuse scans and generalize the reuse analysis
 
