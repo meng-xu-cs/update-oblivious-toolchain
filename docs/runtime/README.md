@@ -76,5 +76,8 @@ receipt the runtime issued last. It answers an accepted call with the next
 the call's session, which the caller checks with
 `verify_production_receipt` and no call;
 `ProductionContractInstance::authenticated_last_receipt` tags the last
-receipt for any session. See the Deployment Theorem in
-[`../claim-boundary.md`](../claim-boundary.md).
+receipt for any session. A deployment with its records in files seals its
+master secret to its platform (`deploy_with_storage`) and restarts from the
+files and the sealed secret (`restart`), refused with a stale rollback
+counter, another platform's key or a changed store. See the Deployment
+Theorem in [`../claim-boundary.md`](../claim-boundary.md).

@@ -8,15 +8,23 @@
 //!
 //! Nothing public derives from the master secret. The freshness epoch that
 //! production call evidence carries is drawn independently of it.
+//!
+//! A production deployment seals its master secret to its platform, so that
+//! it can restart from its store: the master secret, encrypted under a key
+//! that derives from the platform's sealing key, opens only on the same
+//! platform and only for the deployment it was sealed for.
 
-use anyhow::{anyhow, Result};
+use crate::deployment::{SealedMasterSecret, SEALED_MASTER_SECRET_SCHEME};
+use anyhow::{anyhow, bail, Result};
+use chacha20poly1305::aead::AeadInPlace;
+use chacha20poly1305::{ChaCha20Poly1305, KeyInit, Nonce, Tag};
 use hkdf::Hkdf;
 use rand::rngs::OsRng;
 use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 use sha2::Sha256;
 use std::fmt;
-use zeroize::Zeroize;
+use zeroize::{Zeroize, Zeroizing};
 
 const SECRET_BYTES: usize = 32;
 
@@ -26,6 +34,9 @@ const PATH_ORAM_LEAF_SEED_LABEL: &[u8] = b"uo-runtime/path-oram-leaf-seed/v1";
 const PATH_ORAM_LEAF_LABEL: &[u8] = b"uo-runtime/path-oram-leaf/v1";
 const STORE_META_KEY_LABEL: &[u8] = b"uo-runtime/store-meta-key/v1";
 const STORE_META_TAG_LABEL: &[u8] = b"uo-runtime/store-meta-tag/v1";
+const PLATFORM_SEAL_KEY_LABEL: &[u8] = b"uo-runtime/platform-seal-key/v1";
+const SEAL_NONCE_BYTES: usize = 12;
+const SEAL_TAG_BYTES: usize = 16;
 #[cfg(any(test, feature = "diagnostics"))]
 const DIAGNOSTIC_MASTER_SECRET_LABEL: &[u8] = b"uo-runtime/diagnostic-master-secret/v1";
 
@@ -103,6 +114,105 @@ impl RuntimeMasterSecret {
     pub(crate) fn store_meta_key(&self) -> Result<StoreMetaKey> {
         Ok(StoreMetaKey(derive(&self.0, STORE_META_KEY_LABEL, &[])?))
     }
+
+    /// Seal the master secret to `platform` for the deployment whose request
+    /// hash is `deployment`, under a nonce drawn from the operating system:
+    /// a deployment seals its secret once.
+    pub(crate) fn seal_to_platform(
+        &self,
+        platform: &PlatformSealingKey,
+        deployment: &str,
+    ) -> Result<SealedMasterSecret> {
+        let mut nonce = [0u8; SEAL_NONCE_BYTES];
+        OsRng.fill_bytes(&mut nonce);
+        let mut sealed = Zeroizing::new(self.0);
+        let tag = platform_seal_cipher(platform)?
+            .encrypt_in_place_detached(
+                Nonce::from_slice(&nonce),
+                deployment.as_bytes(),
+                sealed.as_mut_slice(),
+            )
+            .map_err(|_| anyhow!("the master secret could not be sealed"))?;
+        Ok(SealedMasterSecret {
+            scheme: SEALED_MASTER_SECRET_SCHEME.into(),
+            nonce: hex::encode(nonce),
+            ciphertext: hex::encode(sealed.as_slice()),
+            tag: hex::encode(tag),
+        })
+    }
+
+    /// The master secret `sealed` holds, if it opens under `platform` for
+    /// the deployment whose request hash is `deployment`. It does not open
+    /// on another platform, for another deployment, or changed in any byte;
+    /// the error says which of these is not known and names no value.
+    pub(crate) fn unseal_from_platform(
+        sealed: &SealedMasterSecret,
+        platform: &PlatformSealingKey,
+        deployment: &str,
+    ) -> Result<Self> {
+        if sealed.scheme != SEALED_MASTER_SECRET_SCHEME {
+            bail!("the sealed master secret has an unknown scheme");
+        }
+        let decode = |hex_bytes: &str, len: usize| -> Result<Vec<u8>> {
+            let bytes = hex::decode(hex_bytes)
+                .map_err(|_| anyhow!("the sealed master secret is not hex"))?;
+            if bytes.len() != len {
+                bail!("the sealed master secret has the wrong length");
+            }
+            Ok(bytes)
+        };
+        let nonce = decode(&sealed.nonce, SEAL_NONCE_BYTES)?;
+        let tag = decode(&sealed.tag, SEAL_TAG_BYTES)?;
+        let mut secret = Zeroizing::new([0u8; SECRET_BYTES]);
+        secret.copy_from_slice(&decode(&sealed.ciphertext, SECRET_BYTES)?);
+        platform_seal_cipher(platform)?
+            .decrypt_in_place_detached(
+                Nonce::from_slice(&nonce),
+                deployment.as_bytes(),
+                secret.as_mut_slice(),
+                Tag::from_slice(&tag),
+            )
+            .map_err(|_| {
+                anyhow!(
+                    "the sealed master secret does not open on this platform for this deployment"
+                )
+            })?;
+        Ok(Self(*secret))
+    }
+}
+
+/// The key a platform gives an enclave to seal data to itself. On SGX it is
+/// the sealing key that `EGETKEY` derives for the enclave's measurement on
+/// the platform: only the same enclave on the same platform derives it
+/// again. The runtime takes it from the platform and relies on that (the
+/// TEE deployment assumption `platformSealing`). It has no `Clone` and no
+/// serialization, its `Debug` form shows nothing, and it is wiped on drop.
+pub struct PlatformSealingKey([u8; SECRET_BYTES]);
+
+impl PlatformSealingKey {
+    /// The key the platform handed the enclave.
+    pub fn from_platform(key: [u8; SECRET_BYTES]) -> Self {
+        Self(key)
+    }
+}
+
+impl Drop for PlatformSealingKey {
+    fn drop(&mut self) {
+        self.0.zeroize();
+    }
+}
+
+impl fmt::Debug for PlatformSealingKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("PlatformSealingKey(<redacted>)")
+    }
+}
+
+/// The cipher of a platform's sealing key.
+fn platform_seal_cipher(platform: &PlatformSealingKey) -> Result<ChaCha20Poly1305> {
+    let key = Zeroizing::new(derive(&platform.0, PLATFORM_SEAL_KEY_LABEL, &[])?);
+    ChaCha20Poly1305::new_from_slice(key.as_slice())
+        .map_err(|_| anyhow!("the platform seal key has the wrong length"))
 }
 
 /// The key under which a deployment authenticates the public metadata it
@@ -298,6 +408,64 @@ mod tests {
         assert_eq!(format!("{leaf_seed:?}"), "PathOramLeafSeed(<redacted>)");
         leaf_seed.wipe();
         assert_eq!(leaf_seed.0, [0u8; SECRET_BYTES]);
+    }
+
+    /// A master secret sealed to a platform opens there, for its own
+    /// deployment, to the same secret: the same store-metadata key derives
+    /// from it. It opens on no other platform, for no other deployment, and
+    /// with no byte of it changed; its sealed form shows no byte of the
+    /// secret, and two seals of it differ.
+    #[test]
+    fn a_master_secret_sealed_to_its_platform_opens_there_alone() {
+        let master = RuntimeMasterSecret::from_diagnostic_seed(5);
+        let platform = PlatformSealingKey::from_platform([0x5A; SECRET_BYTES]);
+        let deployment = "ab".repeat(32);
+        let sealed = master.seal_to_platform(&platform, &deployment).unwrap();
+        assert_eq!(sealed.scheme, SEALED_MASTER_SECRET_SCHEME);
+        assert!(!sealed.ciphertext.contains(&hex::encode(master.0)));
+        assert_ne!(
+            master.seal_to_platform(&platform, &deployment).unwrap(),
+            sealed
+        );
+        let opened =
+            RuntimeMasterSecret::unseal_from_platform(&sealed, &platform, &deployment).unwrap();
+        assert_eq!(opened.0, master.0);
+        let meta = b"commit metadata";
+        assert_eq!(
+            opened.store_meta_key().unwrap().tag(meta).unwrap(),
+            master.store_meta_key().unwrap().tag(meta).unwrap()
+        );
+
+        let other_platform = PlatformSealingKey::from_platform([0x5B; SECRET_BYTES]);
+        assert!(
+            RuntimeMasterSecret::unseal_from_platform(&sealed, &other_platform, &deployment)
+                .is_err()
+        );
+        assert!(
+            RuntimeMasterSecret::unseal_from_platform(&sealed, &platform, &"cd".repeat(32))
+                .is_err()
+        );
+        for field in 0..3 {
+            let mut changed = sealed.clone();
+            let part = match field {
+                0 => &mut changed.nonce,
+                1 => &mut changed.ciphertext,
+                _ => &mut changed.tag,
+            };
+            let first = u8::from_str_radix(&part[..2], 16).unwrap() ^ 1;
+            part.replace_range(..2, &format!("{first:02x}"));
+            assert!(
+                RuntimeMasterSecret::unseal_from_platform(&changed, &platform, &deployment)
+                    .is_err(),
+                "field {field}"
+            );
+        }
+        let mut renamed = sealed.clone();
+        renamed.scheme = "another".into();
+        assert!(
+            RuntimeMasterSecret::unseal_from_platform(&renamed, &platform, &deployment).is_err()
+        );
+        assert_eq!(format!("{platform:?}"), "PlatformSealingKey(<redacted>)");
     }
 
     /// RFC 5869, test case 1: the expansion this module relies on is the

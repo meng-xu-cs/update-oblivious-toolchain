@@ -228,9 +228,12 @@ and the ownership boundaries that keep them auditable.
     the attested counter, nor a record replaced by an older record of its
     location: a record carries its location and not its version. The first
     is the rollback resistance of the deployment assumptions; a digest tree
-    over the records is Issue 44 of the external review. A deployment from
-    OS randomness cannot restart, since its master secret is in memory
-    alone.
+    over the records is Issue 44 of the external review. A production
+    deployment restarts the same way, in a production build
+    (`ProductionContractInstance::restart`), from the master secret it
+    sealed to its platform when it deployed; it also takes the receipt it
+    issued last from the metadata, and goes on only if that receipt ends in
+    the state the store holds.
 
 19. A call that is dropped leaves each key's seal count at a value that
     the count before the call fixes, wherever it stopped. A staged call

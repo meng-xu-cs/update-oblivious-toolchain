@@ -45,7 +45,6 @@ impl RuntimeFreshnessState {
         }
     }
 
-    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn recover(
         snapshot: RuntimeFreshnessSnapshot,
         attested_rollback_counter: u64,

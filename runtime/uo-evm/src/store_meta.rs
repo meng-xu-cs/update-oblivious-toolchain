@@ -2,13 +2,15 @@
 //! and how a runtime that restarts from the store takes it back.
 //!
 //! The metadata is what a restart cannot read off the records: the
-//! freshness counters, whether the contract is initialized, and the digest
-//! of the public state. All of it is public. It carries a tag under a key
+//! freshness counters, whether the contract is initialized, the digest of
+//! the public state, and for a production deployment the receipt it issued
+//! last, which the next call must name. All of it is public. It carries a tag under a key
 //! that derives from the master secret, so a restart takes only metadata
 //! that a runtime with the same secret wrote. The tag does not say that the
 //! metadata is the latest: that is the rollback counter's part, which a
 //! restart compares with an attested one.
 
+use crate::deployment::ProductionReceipt;
 use crate::freshness::RuntimeFreshnessSnapshot;
 use crate::secret::StoreMetaKey;
 use anyhow::{bail, Result};
@@ -16,7 +18,6 @@ use serde::{Deserialize, Serialize};
 use uo_store::{SharedStorage, StoreCipher};
 
 const STORE_META_SCHEMA: &str = "uo-runtime-store-meta-v1";
-#[cfg_attr(not(any(test, feature = "diagnostics")), allow(dead_code))]
 const STORE_META_TAG_BYTES: usize = 32;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -28,6 +29,11 @@ pub(crate) struct StoreMeta {
     next_call_counter: u64,
     pub(crate) initialized: bool,
     pub(crate) public_state_sha256: String,
+    /// The receipt a production deployment issued last: a restart issues
+    /// the next one after it. A deployment that issues no receipts keeps
+    /// none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) last_receipt: Option<ProductionReceipt>,
 }
 
 impl StoreMeta {
@@ -43,10 +49,16 @@ impl StoreMeta {
             next_call_counter: freshness.next_call_counter,
             initialized,
             public_state_sha256,
+            last_receipt: None,
         }
     }
 
-    #[cfg_attr(not(any(test, feature = "diagnostics")), allow(dead_code))]
+    /// The metadata with the receipt a production deployment issued last.
+    pub(crate) fn with_last_receipt(mut self, receipt: Option<&ProductionReceipt>) -> Self {
+        self.last_receipt = receipt.cloned();
+        self
+    }
+
     pub(crate) fn freshness(&self) -> RuntimeFreshnessSnapshot {
         RuntimeFreshnessSnapshot {
             epoch: self.epoch,
@@ -65,7 +77,6 @@ impl StoreMeta {
 
     /// The metadata of the bytes a commit left, if they carry the tag of
     /// `key`. The error names no value.
-    #[cfg_attr(not(any(test, feature = "diagnostics")), allow(dead_code))]
     pub(crate) fn from_tagged_bytes(key: &StoreMetaKey, tagged: &[u8]) -> Result<Self> {
         if tagged.len() < STORE_META_TAG_BYTES {
             bail!("the store holds no commit metadata");

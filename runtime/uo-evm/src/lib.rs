@@ -22,8 +22,8 @@ pub use deployment::{
     production_deployment_request_sha256, production_public_environment_sha256,
     production_public_environment_transcript, production_public_receipt_sha256,
     production_translation_validation_certificate_sha256, verify_production_receipt,
-    ProductionCallEvidence, ProductionReceipt, ProductionRuntimePolicy,
-    PRODUCTION_NO_RECEIPT_SHA256,
+    ProductionCallEvidence, ProductionReceipt, ProductionRuntimePolicy, SealedMasterSecret,
+    PRODUCTION_NO_RECEIPT_SHA256, SEALED_MASTER_SECRET_SCHEME,
 };
 #[cfg(any(test, feature = "diagnostics"))]
 pub use engine::run_artifact_with_seed;
@@ -47,6 +47,7 @@ pub use oram::stash_occupancy::{simulate_stash_occupancy, StashOccupancyRun, Sta
 pub use return_channel::{open_encrypted_return, ReturnChannelSession, RETURN_CHANNEL_SCHEME};
 #[cfg(feature = "diagnostics")]
 pub use runtime::PathOramFreshCoinPlan;
+pub use secret::PlatformSealingKey;
 pub use uo_store::{
     FileStorage, MemoryStorage, SharedStorage, StorageAdapter, StorageIo, StorageStats, SyncPolicy,
 };

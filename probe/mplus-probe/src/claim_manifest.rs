@@ -375,7 +375,7 @@ const CLAIM_ENTRIES: &[ClaimEntry] = &[
     ClaimEntry {
         id: "assumption-tee-deployment",
         category: "assumption",
-        text: "TEE deployment assumptions: enclave memory confidentiality/integrity, attestation authenticity, rollback resistance, freshness, crash recovery, and patch-level trust; explicit Lean bundle SgxDeploymentAssumptions.",
+        text: "TEE deployment assumptions: enclave memory confidentiality/integrity, attestation authenticity, rollback resistance, freshness, crash recovery, patch-level trust, and platform sealing; explicit Lean bundle SgxDeploymentAssumptions.",
         status: STATUS_TRUSTED,
         doc_anchor: "TEE deployment assumptions",
         source_files: &["crates/uo-core/src/lib.rs"],
@@ -412,9 +412,9 @@ const CLAIM_ENTRIES: &[ClaimEntry] = &[
     ClaimEntry {
         id: "nonclaim-production-restart-and-store-rollback",
         category: "non_claim",
-        text: "Not claimed: a restart of a deployment from OS randomness, whose master secret is in memory alone, or the detection of a store that was rolled back or holds an older record of a location. A restart relies on the rollback resistance of the TEE deployment assumptions.",
+        text: "Not claimed: the detection of a store that was rolled back together with the attested rollback counter, or that holds an older record of a location, at a restart. A restart relies on the rollback resistance of the TEE deployment assumptions.",
         status: STATUS_NON_CLAIM,
-        doc_anchor: "a restart of a deployment from OS randomness",
+        doc_anchor: "the detection of a store that was rolled back together with the attested",
         source_files: &["docs/claim-boundary.md"],
         lean_modules: &[],
         runtime_compiler_files: &["runtime/uo-evm/src/engine.rs"],

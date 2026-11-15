@@ -3489,7 +3489,7 @@ fn static_drift_check_inventory() -> JsonValue {
         {
             "name": "sgx_deployment_assumption_bundle_pinned",
             "work_package": "W6.5",
-            "target": "the `SgxDeploymentAssumptions` Lean record's six `Prop` fields and the matching six `SgxDeploymentAssumptionProvenance` records carrying `IntelSGXAttestationReference`, `IntelSGXSDM3D`, `IntelSGXSDKDeveloperReference`, and `IntelSGXSecurityCenter` citations",
+            "target": "the `SgxDeploymentAssumptions` Lean record's seven `Prop` fields and the matching seven `SgxDeploymentAssumptionProvenance` records carrying `IntelSGXAttestationReference`, `IntelSGXSDM3D`, `IntelSGXSDKDeveloperReference`, and `IntelSGXSecurityCenter` citations",
             "report_field": "kernel_model_alignment_validation.sgx_deployment_assumption_bundle_pinned",
         },
         {
@@ -3765,7 +3765,7 @@ fn explicit_assumption_summary() -> JsonValue {
         {
             "assumption": "TEE deployment assumptions",
             "meaning": "enclave memory confidentiality/integrity, attestation authenticity, rollback resistance, freshness guarantee, crash recovery discipline, and patch-level trust",
-            "status": "explicit Lean assumption bundle `SgxDeploymentAssumptions` in `proof/lean/UOToolchain/SgxObserverFreeze.lean` carrying six `Prop` fields (`attestationAuthenticity`, `enclaveMemoryIsolation`, `rollbackResistance`, `freshnessGuarantee`, `crashRecoveryDiscipline`, `patchLevelTrust`); W6.5 pairs each field with an `SgxDeploymentAssumptionProvenance` record citing an Intel SGX specification; F17 adds `sgxDeploymentAssumptionMechanismMatrix` and `sgxDeploymentFirstMilestoneChecklist` in `RuntimeAuditSurfaces.lean`, so every assumption is mapped to implementation evidence, external/deployment-only evidence, or removal from the implemented claim; the encrypted return-channel milestone is mapped to runtime AEAD/session evidence plus a Lean no-plaintext-declassification policy theorem; static-drift checks `sgx_deployment_assumption_bundle_pinned`, `sgx_deployment_assumption_mechanism_matrix_pinned`, and `return_channel_crypto_evidence_pinned` pin the surface",
+            "status": "explicit Lean assumption bundle `SgxDeploymentAssumptions` in `proof/lean/UOToolchain/SgxObserverFreeze.lean` carrying seven `Prop` fields (`attestationAuthenticity`, `enclaveMemoryIsolation`, `rollbackResistance`, `freshnessGuarantee`, `crashRecoveryDiscipline`, `patchLevelTrust`, `platformSealing`); W6.5 pairs each field with an `SgxDeploymentAssumptionProvenance` record citing an Intel SGX specification; F17 adds `sgxDeploymentAssumptionMechanismMatrix` and `sgxDeploymentFirstMilestoneChecklist` in `RuntimeAuditSurfaces.lean`, so every assumption is mapped to implementation evidence, external/deployment-only evidence, or removal from the implemented claim; the encrypted return-channel milestone is mapped to runtime AEAD/session evidence plus a Lean no-plaintext-declassification policy theorem; static-drift checks `sgx_deployment_assumption_bundle_pinned`, `sgx_deployment_assumption_mechanism_matrix_pinned`, and `return_channel_crypto_evidence_pinned` pin the surface",
         }
     ])
 }
@@ -27936,7 +27936,15 @@ fn check_runtime_secrets_derive_from_the_master_secret(
         .matches("RuntimeMasterSecret::from_diagnostic_seed(")
         .count()
         == 2
-        && engine_impl_source.matches("RuntimeMasterSecret::").count() == 3
+        // A production deployment draws its secret from the OS too, and a
+        // production restart takes it from the seal it left.
+        && engine_impl_source.contains(
+            "        validate_production_policy(&policy)?;\n        let master = RuntimeMasterSecret::from_os_rng();\n        let sealed = master.seal_to_platform(",
+        )
+        && engine_impl_source.contains(
+            "        let master = RuntimeMasterSecret::unseal_from_platform(\n            sealed,",
+        )
+        && engine_impl_source.matches("RuntimeMasterSecret::").count() == 5
         && !engine_impl_source.contains("seed_from_u64")
         && state_source.contains("let secret = master.object_secret(spec.id, &spec.name)?;")
         && state_source.contains("let mut object = RuntimeObject::instantiate(spec, &secret)?;")
@@ -28560,11 +28568,15 @@ fn check_production_calls_issue_chained_receipts(
             "            self.inner.freshness.snapshot(),\n            &self.last_receipt_sha256,\n        )?;",
         )
         && engine_impl_source.contains(
-            "        let receipt = ProductionReceipt::for_call(\n            evidence,\n            &self.last_receipt,\n            &staged.trace.receipt,\n            staged.freshness.snapshot(),\n            staged.state.public_state_digest()?,\n            staged.state.ciphertext_store_digest()?,\n        )?;\n        let receipt_sha256 = receipt.sha256()?;\n        let receipt_tag = production_receipt_tag(session, &receipt_sha256)?;\n        let call = self.inner.commit_staged(staged)?.0;\n        self.last_receipt = receipt.clone();\n        self.last_receipt_sha256 = receipt_sha256;\n        Ok(ProductionCallResult {\n            call,\n            receipt,\n            receipt_tag,\n        })",
+            "        let receipt = ProductionReceipt::for_call(\n            evidence,\n            &self.last_receipt,\n            &staged.trace.receipt,\n            staged.freshness.snapshot(),\n            staged.state.public_state_digest()?,\n            staged.state.ciphertext_store_digest()?,\n        )?;\n        let receipt_sha256 = receipt.sha256()?;\n        let receipt_tag = production_receipt_tag(session, &receipt_sha256)?;\n        let call = self\n            .inner\n            .commit_staged_with_receipt(staged, Some(&receipt))?\n            .0;\n        self.last_receipt = receipt.clone();\n        self.last_receipt_sha256 = receipt_sha256;\n        Ok(ProductionCallResult {\n            call,\n            receipt,\n            receipt_tag,\n        })",
         )
         && engine_impl_source.matches("self.last_receipt = ").count() == 1
         && engine_impl_source.matches("self.last_receipt_sha256 = ").count() == 1
-        && engine_impl_source.matches("commit_staged(staged)").count() == 2
+        && engine_impl_source.matches("commit_staged(staged)").count() == 1
+        && engine_impl_source
+            .matches("commit_staged_with_receipt(staged, ")
+            .count()
+            == 2
 }
 
 /// Whether every production receipt the runtime hands out carries a tag
@@ -28591,7 +28603,7 @@ fn check_production_receipts_carry_session_tags(
     ) && deployment_source.contains(
         "        session\n            .production_receipt_mac(receipt_sha256)?\n            .finalize()\n            .into_bytes(),",
     ) && engine_impl_source.contains(
-        "        let receipt_sha256 = receipt.sha256()?;\n        let receipt_tag = production_receipt_tag(session, &receipt_sha256)?;\n        let call = self.inner.commit_staged(staged)?.0;",
+        "        let receipt_sha256 = receipt.sha256()?;\n        let receipt_tag = production_receipt_tag(session, &receipt_sha256)?;\n        let call = self\n            .inner\n            .commit_staged_with_receipt(staged, Some(&receipt))?\n            .0;",
     ) && engine_impl_source.contains(
         "            production_receipt_tag(session, &self.last_receipt_sha256)?,",
     ) && engine_impl_source.matches("production_receipt_tag(").count() == 2
@@ -28600,6 +28612,62 @@ fn check_production_receipts_carry_session_tags(
         && !deployment_source.contains("== tag")
         && !deployment_source.contains("tag ==")
         && return_channel_source.matches("PRODUCTION_RECEIPT_TAG_DOMAIN").count() == 3
+}
+
+/// Whether a production deployment restarts from its store with the
+/// master secret it sealed to its platform, in the build a production
+/// runtime uses. The secret is sealed with ChaCha20Poly1305 under a key that
+/// derives from the platform's sealing key, with the deployment's request as
+/// associated data, so it opens on that platform for that deployment alone.
+/// Every commit of a production deployment leaves its last receipt in the
+/// tagged commit metadata, and a restart issues the next receipt after that
+/// one, only if the receipt ends in the state the store holds: its public
+/// state and the digest of every sealed record. The restart is not behind
+/// the diagnostics feature, and it seals no record.
+fn check_production_deployments_restart_from_a_sealed_secret(
+    secret_source: &str,
+    engine_impl_source: &str,
+    store_meta_source: &str,
+    deployment_source: &str,
+) -> bool {
+    secret_source.contains("pub struct PlatformSealingKey([u8; SECRET_BYTES]);")
+        && secret_source.contains(
+            "    let key = Zeroizing::new(derive(&platform.0, PLATFORM_SEAL_KEY_LABEL, &[])?);",
+        )
+        && secret_source.contains(
+            "            .encrypt_in_place_detached(\n                Nonce::from_slice(&nonce),\n                deployment.as_bytes(),\n                sealed.as_mut_slice(),\n            )",
+        )
+        && secret_source.contains(
+            "            .decrypt_in_place_detached(\n                Nonce::from_slice(&nonce),\n                deployment.as_bytes(),\n                secret.as_mut_slice(),\n                Tag::from_slice(&tag),\n            )",
+        )
+        && secret_source.contains("        OsRng.fill_bytes(&mut nonce);\n")
+        // Sealed and opened for the deployment's own request.
+        && engine_impl_source.contains(
+            "        let sealed = master.seal_to_platform(\n            platform,\n            &production_deployment_request_sha256(&artifact, &policy)?,\n        )?;",
+        )
+        && engine_impl_source.contains(
+            "        let master = RuntimeMasterSecret::unseal_from_platform(\n            sealed,\n            platform,\n            &production_deployment_request_sha256(&artifact, &policy)?,\n        )?;",
+        )
+        // The restart is in the production build.
+        && engine_impl_source.contains(
+            "    /// and every sealed record of it. A restart seals no record.\n    pub fn restart(",
+        )
+        // It resumes from the store's own metadata and checks the receipt
+        // it found against the store.
+        && engine_impl_source.contains(
+            "        last_receipt.ends_in(\n            inner.freshness.snapshot(),\n            &inner.state.public_state_digest()?,\n            &inner.state.ciphertext_store_digest()?,\n        )?;",
+        )
+        && engine_impl_source.matches("Self::restart_internal(").count() == 1
+        && engine_impl_source.matches("ContractInstance::restart_internal(").count() == 1
+        // Every commit of the deployment leaves its last receipt.
+        && engine_impl_source.contains("            Some(&last_receipt),\n        )?;\n        make_deployment_durable(&inner.storage, &meta)?;")
+        && engine_impl_source.contains(".commit_staged_with_receipt(staged, Some(&receipt))?")
+        && store_meta_source.contains(
+            "    #[serde(default, skip_serializing_if = \"Option::is_none\")]\n    pub(crate) last_receipt: Option<ProductionReceipt>,",
+        )
+        && deployment_source.contains(
+            "            \"ciphertext_store_after_sha256\",\n            self.ciphertext_store_after_sha256 == ciphertext_store_sha256,",
+        )
 }
 
 /// Whether the production path's freshness errors carry no runtime value. An
@@ -34649,6 +34717,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && lean_sgx_observer_freeze_source.contains("freshnessGuarantee : Prop")
         && lean_sgx_observer_freeze_source.contains("crashRecoveryDiscipline : Prop")
         && lean_sgx_observer_freeze_source.contains("patchLevelTrust : Prop")
+        && lean_sgx_observer_freeze_source.contains("platformSealing : Prop")
         && lean_sgx_observer_freeze_source
             .contains("def sgxDeploymentProvenance_attestationAuthenticity")
         && lean_sgx_observer_freeze_source
@@ -34660,6 +34729,9 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && lean_sgx_observer_freeze_source
             .contains("def sgxDeploymentProvenance_crashRecoveryDiscipline")
         && lean_sgx_observer_freeze_source.contains("def sgxDeploymentProvenance_patchLevelTrust")
+        && lean_sgx_observer_freeze_source.contains("def sgxDeploymentProvenance_platformSealing")
+        && lean_sgx_observer_freeze_source
+            .contains("sgxDeploymentAssumptionProvenances.length = 7 := by rfl")
         && lean_sgx_observer_freeze_source.contains("\"IntelSGXAttestationReference\"")
         && lean_sgx_observer_freeze_source.contains("\"IntelSGXSDM3D\"")
         && lean_sgx_observer_freeze_source.contains("\"IntelSGXSDKDeveloperReference\"")
@@ -34672,6 +34744,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && lean_runtime_audit_surfaces_source.contains("\"attestation transcript\"")
         && lean_runtime_audit_surfaces_source.contains("\"rollback counter transcript\"")
         && lean_runtime_audit_surfaces_source.contains("\"sealed-state freshness evidence\"")
+        && lean_runtime_audit_surfaces_source.contains("\"platform sealing key derivation\"")
         && lean_runtime_audit_surfaces_source
             .contains("theorem sgxDeploymentAssumptionMechanismMatrix_coversBundleFields")
         && lean_runtime_audit_surfaces_source
@@ -46698,6 +46771,17 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             root.join("runtime/uo-evm/src/return_channel.rs"),
         )?),
     );
+    let production_deployments_restart_from_a_sealed_secret =
+        check_production_deployments_restart_from_a_sealed_secret(
+            &production_source_slice(&fs::read_to_string(
+                root.join("runtime/uo-evm/src/secret.rs"),
+            )?),
+            &engine_impl_source,
+            &production_source_slice(&fs::read_to_string(
+                root.join("runtime/uo-evm/src/store_meta.rs"),
+            )?),
+            &production_source_slice(&deployment_source),
+        );
     let production_calls_record_no_position_map_witness =
         check_production_calls_record_no_position_map_witness(
             &production_source_slice(&state_source),
@@ -48143,6 +48227,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "trace_runs_stand_for_recorded_events": trace_runs_stand_for_recorded_events,
         "production_calls_issue_chained_receipts": production_calls_issue_chained_receipts,
         "production_receipts_carry_session_tags": production_receipts_carry_session_tags,
+        "production_deployments_restart_from_a_sealed_secret": production_deployments_restart_from_a_sealed_secret,
         "theorem_certificate_constructor_checks":
             theorem_certificate_constructor_checks,
         "theorem_certificate_constructor_surface_restricted":
@@ -49097,6 +49182,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && trace_runs_stand_for_recorded_events
             && production_calls_issue_chained_receipts
             && production_receipts_carry_session_tags
+            && production_deployments_restart_from_a_sealed_secret
             && theorem_certificate_constructor_surface_restricted
             && runtime_public_call_trace_bundle_surface_restricted
             && runtime_public_call_trace_bundle_fields_private
@@ -57653,6 +57739,68 @@ mod tests {
     }
 
     #[test]
+    fn production_restart_check_rejects_the_drifts_it_guards() {
+        use super::{check_production_deployments_restart_from_a_sealed_secret, repo_root};
+        let root = repo_root();
+        let read =
+            |rel: &str| production_source_slice(&std::fs::read_to_string(root.join(rel)).unwrap());
+        let secret = read("runtime/uo-evm/src/secret.rs");
+        let engine = read("runtime/uo-evm/src/engine.rs");
+        let store_meta = read("runtime/uo-evm/src/store_meta.rs");
+        let deployment = read("runtime/uo-evm/src/deployment.rs");
+        let ok = |secret: &str, engine: &str, store_meta: &str, deployment: &str| {
+            check_production_deployments_restart_from_a_sealed_secret(
+                secret, engine, store_meta, deployment,
+            )
+        };
+        assert!(ok(&secret, &engine, &store_meta, &deployment));
+        let drift = |source: &str, from: &str, to: &str| {
+            assert_eq!(source.matches(from).count(), 1, "{from}");
+            source.replacen(from, to, 1)
+        };
+        // A secret sealed with no binding to its deployment.
+        let unbound = drift(
+            &secret,
+            "                deployment.as_bytes(),\n                sealed.as_mut_slice(),",
+            "                b\"\",\n                sealed.as_mut_slice(),",
+        );
+        assert!(!ok(&unbound, &engine, &store_meta, &deployment));
+        // A seal under a fixed nonce.
+        let fixed = drift(&secret, "        OsRng.fill_bytes(&mut nonce);\n", "");
+        assert!(!ok(&fixed, &engine, &store_meta, &deployment));
+        // A restart behind the diagnostics feature, where a production
+        // runtime cannot call it.
+        let gated = drift(
+            &engine,
+            "    /// and every sealed record of it. A restart seals no record.\n    pub fn restart(",
+            "    /// and every sealed record of it. A restart seals no record.\n    #[cfg(feature = \"diagnostics\")]\n    pub fn restart(",
+        );
+        assert!(!ok(&secret, &gated, &store_meta, &deployment));
+        // A restart that takes the receipt it finds without the store's
+        // records.
+        let unchecked = drift(
+            &engine,
+            "            &inner.state.ciphertext_store_digest()?,\n        )?;",
+            "            &last_receipt.ciphertext_store_after_sha256,\n        )?;",
+        );
+        assert!(!ok(&secret, &unchecked, &store_meta, &deployment));
+        // A call that commits with no receipt in the metadata.
+        let forgotten = drift(
+            &engine,
+            ".commit_staged_with_receipt(staged, Some(&receipt))?",
+            ".commit_staged_with_receipt(staged, None)?",
+        );
+        assert!(!ok(&secret, &forgotten, &store_meta, &deployment));
+        // Metadata that keeps no receipt.
+        let receiptless = drift(
+            &store_meta,
+            "    pub(crate) last_receipt: Option<ProductionReceipt>,",
+            "",
+        );
+        assert!(!ok(&secret, &engine, &receiptless, &deployment));
+    }
+
+    #[test]
     fn production_receipt_tag_check_rejects_the_drifts_it_guards() {
         use super::{check_production_receipts_carry_session_tags, repo_root};
         let root = repo_root();
@@ -57693,8 +57841,8 @@ mod tests {
         // A call that commits before its receipt has a tag.
         let late = drift(
             &engine,
-            "        let receipt_tag = production_receipt_tag(session, &receipt_sha256)?;\n        let call = self.inner.commit_staged(staged)?.0;",
-            "        let call = self.inner.commit_staged(staged)?.0;\n        let receipt_tag = production_receipt_tag(session, &receipt_sha256)?;",
+            "        let receipt_tag = production_receipt_tag(session, &receipt_sha256)?;\n        let call = self\n            .inner\n            .commit_staged_with_receipt(staged, Some(&receipt))?\n            .0;",
+            "        let call = self\n            .inner\n            .commit_staged_with_receipt(staged, Some(&receipt))?\n            .0;\n        let receipt_tag = production_receipt_tag(session, &receipt_sha256)?;",
         );
         assert!(!ok(&deployment, &late, &channel));
         // A last receipt handed out with no tag.
@@ -59087,8 +59235,8 @@ mod tests {
 
         // A call that commits before its receipt exists.
         let early = engine.replacen(
-            "        let receipt_sha256 = receipt.sha256()?;\n        let receipt_tag = production_receipt_tag(session, &receipt_sha256)?;\n        let call = self.inner.commit_staged(staged)?.0;\n",
-            "        let call = self.inner.commit_staged(staged)?.0;\n        let receipt_sha256 = receipt.sha256()?;\n        let receipt_tag = production_receipt_tag(session, &receipt_sha256)?;\n",
+            "        let receipt_sha256 = receipt.sha256()?;\n        let receipt_tag = production_receipt_tag(session, &receipt_sha256)?;\n        let call = self\n            .inner\n            .commit_staged_with_receipt(staged, Some(&receipt))?\n            .0;\n",
+            "        let call = self\n            .inner\n            .commit_staged_with_receipt(staged, Some(&receipt))?\n            .0;\n        let receipt_sha256 = receipt.sha256()?;\n        let receipt_tag = production_receipt_tag(session, &receipt_sha256)?;\n",
             1,
         );
         rejects("early commit", &early, &engine, ok(&deployment, &early));

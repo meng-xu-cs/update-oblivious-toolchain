@@ -51,6 +51,24 @@ pub struct ProductionCallEvidence {
 pub const PRODUCTION_NO_RECEIPT_SHA256: &str =
     "0000000000000000000000000000000000000000000000000000000000000000";
 
+/// The scheme of a master secret sealed to its platform.
+pub const SEALED_MASTER_SECRET_SCHEME: &str = "chacha20poly1305_platform_sealed_master_v1";
+
+/// A deployment's master secret sealed to its platform, which the host
+/// keeps beside the store and hands back to a restart: ChaCha20Poly1305
+/// under a key that HKDF-SHA256 derives from the platform's sealing key,
+/// with the deployment's request, what was deployed under which policy, as
+/// associated data. It opens only on the platform it was sealed on and only
+/// for that deployment. Its bytes are public.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SealedMasterSecret {
+    pub scheme: String,
+    pub nonce: String,
+    pub ciphertext: String,
+    pub tag: String,
+}
+
 /// What the runtime issues for a deployment and for every call it accepts.
 /// A receipt names its request, the receipt before it, the state before and
 /// after, what the call's observer saw, and the freshness counters after the
@@ -200,6 +218,35 @@ impl ProductionReceipt {
         )?;
         require_receipt_field("rollback_counter", self.rollback_counter == 0)?;
         require_receipt_field("next_call_counter", self.next_call_counter == 0)
+    }
+
+    /// Check that this receipt ends in the state a restart found: the same
+    /// public state, the same digest of every sealed record in the store,
+    /// and the same epoch and counters. A store that was changed after the
+    /// receipt was issued, in any record, has another digest.
+    pub(crate) fn ends_in(
+        &self,
+        counters: RuntimeFreshnessSnapshot,
+        public_state_sha256: &str,
+        ciphertext_store_sha256: &str,
+    ) -> Result<()> {
+        require_receipt_field(
+            "public_state_after_sha256",
+            self.public_state_after_sha256 == public_state_sha256,
+        )?;
+        require_receipt_field(
+            "ciphertext_store_after_sha256",
+            self.ciphertext_store_after_sha256 == ciphertext_store_sha256,
+        )?;
+        require_receipt_field("freshness_epoch", self.freshness_epoch == counters.epoch)?;
+        require_receipt_field(
+            "rollback_counter",
+            self.rollback_counter == counters.rollback_counter,
+        )?;
+        require_receipt_field(
+            "next_call_counter",
+            self.next_call_counter == counters.next_call_counter,
+        )
     }
 
     /// The receipt of a deployment: the first of its chain.

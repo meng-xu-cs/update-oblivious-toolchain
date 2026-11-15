@@ -166,19 +166,19 @@
         "report": "tamper_validation"
       },
       {
-        "bytes": 1807373,
+        "bytes": 1812396,
         "estimated": false,
         "metric": "runtime_implementation_kernel_meeting_boundary_validation.scenarios[15].boundary_json_bytes",
         "report": "runtime_implementation_kernel_meeting_boundary_validation"
       },
       {
-        "bytes": 1807373,
+        "bytes": 1812396,
         "estimated": false,
         "metric": "runtime_implementation_kernel_meeting_confinement_boundary_validation.scenarios[15].boundary_json_bytes",
         "report": "runtime_implementation_kernel_meeting_confinement_boundary_validation"
       },
       {
-        "bytes": 1801948,
+        "bytes": 1806971,
         "estimated": false,
         "metric": "runtime_implementation_confinement_boundary_validation.scenarios[15].boundary_json_bytes",
         "report": "runtime_implementation_confinement_boundary_validation"
@@ -246,7 +246,7 @@
     {
       "assumption": "TEE deployment assumptions",
       "meaning": "enclave memory confidentiality/integrity, attestation authenticity, rollback resistance, freshness guarantee, crash recovery discipline, and patch-level trust",
-      "status": "explicit Lean assumption bundle `SgxDeploymentAssumptions` in `proof/lean/UOToolchain/SgxObserverFreeze.lean` carrying six `Prop` fields (`attestationAuthenticity`, `enclaveMemoryIsolation`, `rollbackResistance`, `freshnessGuarantee`, `crashRecoveryDiscipline`, `patchLevelTrust`); W6.5 pairs each field with an `SgxDeploymentAssumptionProvenance` record citing an Intel SGX specification; F17 adds `sgxDeploymentAssumptionMechanismMatrix` and `sgxDeploymentFirstMilestoneChecklist` in `RuntimeAuditSurfaces.lean`, so every assumption is mapped to implementation evidence, external/deployment-only evidence, or removal from the implemented claim; the encrypted return-channel milestone is mapped to runtime AEAD/session evidence plus a Lean no-plaintext-declassification policy theorem; static-drift checks `sgx_deployment_assumption_bundle_pinned`, `sgx_deployment_assumption_mechanism_matrix_pinned`, and `return_channel_crypto_evidence_pinned` pin the surface"
+      "status": "explicit Lean assumption bundle `SgxDeploymentAssumptions` in `proof/lean/UOToolchain/SgxObserverFreeze.lean` carrying seven `Prop` fields (`attestationAuthenticity`, `enclaveMemoryIsolation`, `rollbackResistance`, `freshnessGuarantee`, `crashRecoveryDiscipline`, `patchLevelTrust`, `platformSealing`); W6.5 pairs each field with an `SgxDeploymentAssumptionProvenance` record citing an Intel SGX specification; F17 adds `sgxDeploymentAssumptionMechanismMatrix` and `sgxDeploymentFirstMilestoneChecklist` in `RuntimeAuditSurfaces.lean`, so every assumption is mapped to implementation evidence, external/deployment-only evidence, or removal from the implemented claim; the encrypted return-channel milestone is mapped to runtime AEAD/session evidence plus a Lean no-plaintext-declassification policy theorem; static-drift checks `sgx_deployment_assumption_bundle_pinned`, `sgx_deployment_assumption_mechanism_matrix_pinned`, and `return_channel_crypto_evidence_pinned` pin the surface"
     }
   ],
   "proof_artifact_size_budget": {
@@ -419,78 +419,78 @@
     "theorem_facing_large_artifacts_require_enumeration": false
   },
   "proof_checking_cost_ms": {
-    "canonical_pathoram_pair_validation": 218432,
-    "confidential_core_kernel_finish_slot_validation": 2738,
-    "confidential_core_kernel_interface_slot_finish_boundary_validation": 2790,
-    "confidential_core_kernel_interface_slot_validation": 2701,
-    "confidential_core_lowering_validation": 3111,
-    "confidential_core_shell_boundary_lowering_validation": 2587,
-    "confidential_core_shell_boundary_slot_validation": 2839,
-    "confidential_core_slot_validation": 3065,
-    "confidential_core_validation": 2732,
+    "canonical_pathoram_pair_validation": 210304,
+    "confidential_core_kernel_finish_slot_validation": 3009,
+    "confidential_core_kernel_interface_slot_finish_boundary_validation": 2878,
+    "confidential_core_kernel_interface_slot_validation": 2813,
+    "confidential_core_lowering_validation": 3673,
+    "confidential_core_shell_boundary_lowering_validation": 3065,
+    "confidential_core_shell_boundary_slot_validation": 2677,
+    "confidential_core_slot_validation": 2828,
+    "confidential_core_validation": 2765,
     "confidential_fragment_validation": 0,
-    "confidential_proof_family_assurance_validation": 3193,
-    "confidential_proof_family_boundary_validation": 3523,
-    "confidential_proof_family_finish_slot_boundary_validation": 3099,
-    "confidential_proof_family_kernel_interface_validation": 3646,
-    "confidential_proof_family_refinement_boundary_validation": 3272,
-    "confidential_proof_family_slot_assurance_validation": 3248,
-    "confidential_proof_family_slot_boundary_validation": 3198,
-    "confidential_proof_family_validation": 3362,
-    "controller_observer_validation": 3057,
-    "correctness": 3651,
-    "fresh_coin_validation": 78525,
-    "kernel_confinement_boundary_validation": 2635,
-    "kernel_dsl_validation": 3575,
-    "kernel_finish_boundary_validation": 2205,
-    "kernel_interface_confinement_boundary_validation": 2459,
-    "kernel_interface_singleton_boundary_validation": 2143,
-    "kernel_interface_validation": 2295,
-    "kernel_lowering_validation": 2805,
-    "kernel_model_alignment_validation": 17254,
-    "kernel_refinement_boundary_validation": 2462,
-    "kernel_refinement_validation": 2897,
-    "kernel_slot_boundary_validation": 2793,
-    "kernel_slot_dsl_validation": 3394,
-    "kernel_validation": 2824,
-    "leakage_auc": 78448,
-    "mutual_information": 74982,
-    "overheads": 172164,
+    "confidential_proof_family_assurance_validation": 3317,
+    "confidential_proof_family_boundary_validation": 4066,
+    "confidential_proof_family_finish_slot_boundary_validation": 3029,
+    "confidential_proof_family_kernel_interface_validation": 3491,
+    "confidential_proof_family_refinement_boundary_validation": 3414,
+    "confidential_proof_family_slot_assurance_validation": 3044,
+    "confidential_proof_family_slot_boundary_validation": 3293,
+    "confidential_proof_family_validation": 3174,
+    "controller_observer_validation": 2907,
+    "correctness": 2545,
+    "fresh_coin_validation": 77794,
+    "kernel_confinement_boundary_validation": 2364,
+    "kernel_dsl_validation": 2708,
+    "kernel_finish_boundary_validation": 2160,
+    "kernel_interface_confinement_boundary_validation": 2260,
+    "kernel_interface_singleton_boundary_validation": 2232,
+    "kernel_interface_validation": 2099,
+    "kernel_lowering_validation": 3516,
+    "kernel_model_alignment_validation": 16080,
+    "kernel_refinement_boundary_validation": 2304,
+    "kernel_refinement_validation": 2918,
+    "kernel_slot_boundary_validation": 2779,
+    "kernel_slot_dsl_validation": 3050,
+    "kernel_validation": 2892,
+    "leakage_auc": 79758,
+    "mutual_information": 73160,
+    "overheads": 165913,
     "paper_main_family_boundary_validation": 0,
     "paper_main_slot_boundary_validation": 0,
-    "pathoram_hidden_validation": 2274,
-    "pathoram_pair_validation": 10666,
-    "runtime_boundary_validation": 14065,
-    "runtime_confidential_statement_trace_bridge_boundary_validation": 1091,
-    "runtime_implementation_confidential_statement_trace_bridge_refinement_boundary_validation": 6213,
-    "runtime_implementation_confinement_boundary_validation": 74289,
-    "runtime_implementation_interface_validation": 7027,
-    "runtime_implementation_kernel_machine_confinement_boundary_validation": 75557,
-    "runtime_implementation_kernel_meeting_boundary_validation": 71666,
-    "runtime_implementation_kernel_meeting_confinement_boundary_validation": 146405,
-    "runtime_implementation_public_bridge_observer_refinement_boundary_validation": 43485,
-    "runtime_implementation_residual_helper_shell_machine_refinement_boundary_validation": 42208,
-    "runtime_implementation_shared_kernel_machine_refinement_boundary_validation": 73987,
-    "runtime_implementation_shared_kernel_refinement_boundary_validation": 74108,
-    "runtime_implementation_slot_adapter_machine_refinement_boundary_validation": 3956,
-    "runtime_implementation_small_confidential_kernel_machine_refinement_boundary_validation": 74312,
-    "runtime_kernel_machine_finish_boundary_validation": 3159,
-    "runtime_kernel_machine_finish_witness_validation": 2835,
-    "runtime_public_bridge_boundary_validation": 888,
-    "runtime_residual_helper_shell_boundary_validation": 3099,
-    "runtime_shared_confidential_kernel_boundary_validation": 5698,
-    "runtime_slot_adapter_boundary_validation": 618,
-    "runtime_small_confidential_kernel_boundary_validation": 4781,
-    "seeded_witness_validation": 8896,
-    "shell_boundary_lowering_validation": 3716,
-    "shell_boundary_slot_validation": 3256,
-    "shell_boundary_validation": 3085,
-    "static_checks": 2806,
-    "tamper_validation": 1615296,
-    "total_probe_ms": 3213842,
-    "trace_equivalence": 100670,
-    "trusted_kernel_validation": 2635,
-    "witness_validation": 2740
+    "pathoram_hidden_validation": 2296,
+    "pathoram_pair_validation": 10808,
+    "runtime_boundary_validation": 12291,
+    "runtime_confidential_statement_trace_bridge_boundary_validation": 790,
+    "runtime_implementation_confidential_statement_trace_bridge_refinement_boundary_validation": 6341,
+    "runtime_implementation_confinement_boundary_validation": 84467,
+    "runtime_implementation_interface_validation": 6472,
+    "runtime_implementation_kernel_machine_confinement_boundary_validation": 78505,
+    "runtime_implementation_kernel_meeting_boundary_validation": 72955,
+    "runtime_implementation_kernel_meeting_confinement_boundary_validation": 141310,
+    "runtime_implementation_public_bridge_observer_refinement_boundary_validation": 45847,
+    "runtime_implementation_residual_helper_shell_machine_refinement_boundary_validation": 46672,
+    "runtime_implementation_shared_kernel_machine_refinement_boundary_validation": 75206,
+    "runtime_implementation_shared_kernel_refinement_boundary_validation": 80020,
+    "runtime_implementation_slot_adapter_machine_refinement_boundary_validation": 4251,
+    "runtime_implementation_small_confidential_kernel_machine_refinement_boundary_validation": 69924,
+    "runtime_kernel_machine_finish_boundary_validation": 2971,
+    "runtime_kernel_machine_finish_witness_validation": 3126,
+    "runtime_public_bridge_boundary_validation": 918,
+    "runtime_residual_helper_shell_boundary_validation": 2641,
+    "runtime_shared_confidential_kernel_boundary_validation": 5751,
+    "runtime_slot_adapter_boundary_validation": 697,
+    "runtime_small_confidential_kernel_boundary_validation": 4640,
+    "seeded_witness_validation": 8244,
+    "shell_boundary_lowering_validation": 2866,
+    "shell_boundary_slot_validation": 2946,
+    "shell_boundary_validation": 2778,
+    "static_checks": 2918,
+    "tamper_validation": 1617459,
+    "total_probe_ms": 3207823,
+    "trace_equivalence": 96094,
+    "trusted_kernel_validation": 2945,
+    "witness_validation": 2169
   },
   "runtime_overheads": {
     "cases": [
@@ -2908,7 +2908,7 @@
     {
       "name": "sgx_deployment_assumption_bundle_pinned",
       "report_field": "kernel_model_alignment_validation.sgx_deployment_assumption_bundle_pinned",
-      "target": "the `SgxDeploymentAssumptions` Lean record's six `Prop` fields and the matching six `SgxDeploymentAssumptionProvenance` records carrying `IntelSGXAttestationReference`, `IntelSGXSDM3D`, `IntelSGXSDKDeveloperReference`, and `IntelSGXSecurityCenter` citations",
+      "target": "the `SgxDeploymentAssumptions` Lean record's seven `Prop` fields and the matching seven `SgxDeploymentAssumptionProvenance` records carrying `IntelSGXAttestationReference`, `IntelSGXSDM3D`, `IntelSGXSDKDeveloperReference`, and `IntelSGXSecurityCenter` citations",
       "work_package": "W6.5"
     },
     {
@@ -3536,7 +3536,7 @@
         },
         {
           "file": "proof/lean/UOToolchain/ProofGrade.lean",
-          "nonempty_loc": 1947
+          "nonempty_loc": 1953
         },
         {
           "file": "proof/lean/UOToolchain/ProofGradeRoot.lean",
@@ -3552,7 +3552,7 @@
         },
         {
           "file": "proof/lean/UOToolchain/RuntimeAuditSurfaces.lean",
-          "nonempty_loc": 612
+          "nonempty_loc": 622
         },
         {
           "file": "proof/lean/UOToolchain/RuntimeBoundarySchema.lean",
@@ -3780,7 +3780,7 @@
         },
         {
           "file": "proof/lean/UOToolchain/SgxObserverFreeze.lean",
-          "nonempty_loc": 1145
+          "nonempty_loc": 1169
         },
         {
           "file": "proof/lean/UOToolchain/SgxOramProjection.lean",
@@ -3824,7 +3824,7 @@
         }
       ],
       "root": "proof/lean",
-      "total_nonempty_loc": 127492
+      "total_nonempty_loc": 127532
     },
     "measurement": "non-empty source lines",
     "outer_runtime_risk_surface": {
@@ -3832,14 +3832,14 @@
       "files": [
         {
           "file": "runtime/uo-evm/src/engine.rs",
-          "nonempty_loc": 4339
+          "nonempty_loc": 4464
         },
         {
           "file": "runtime/uo-evm/src/shell.rs",
           "nonempty_loc": 579
         }
       ],
-      "total_nonempty_loc": 4918
+      "total_nonempty_loc": 5043
     },
     "trusted_runtime_surface": {
       "file_count": 4,

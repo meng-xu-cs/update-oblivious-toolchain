@@ -86,6 +86,8 @@ The TEE deployment assumptions are explicit Lean `Prop` fields:
 - freshness guarantee
 - crash recovery discipline
 - patch-level trust
+- platform sealing: the sealing key a production deployment seals its master
+  secret under derives only in the same enclave on the same platform
 
 Each field has provenance citing Intel SGX references. Runtime audit surfaces
 also map assumptions to implementation evidence, external/deployment-only
@@ -111,6 +113,12 @@ of the receipt the runtime issued last. An accepted call is answered with
 the next receipt of the deployment's chain, which carries nothing derived
 from the call's private evidence, and with the receipt's tag under the
 call's session, an HMAC that the session's holder checks.
+
+A deployment with its records in files seals its master secret to its
+platform (`ProductionContractInstance::deploy_with_storage`), and restarts
+from the files and the sealed secret with the attested rollback counter
+(`ProductionContractInstance::restart`); its next receipt follows the last
+one it issued before the restart.
 
 ## Non-Claim
 

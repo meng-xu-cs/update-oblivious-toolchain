@@ -904,10 +904,11 @@ bundle stays explicit at the Lean type level rather than being
 hidden in prose; each assumption is paired with the Intel SGX
 specification it relies on.
 
-The six canonical fields capture every load-bearing TEE deployment
+The seven canonical fields capture every load-bearing TEE deployment
 assumption called out by the WP6 charter (attestation, rollback,
-crash, freshness, patch-level) plus the underlying enclave memory
-isolation assumption that every TEE security claim depends on:
+crash, freshness, patch-level), the underlying enclave memory
+isolation assumption that every TEE security claim depends on, and the
+platform sealing that a production restart relies on:
 
 - `attestationAuthenticity` — Intel SGX attestation produces a
   quote signed by the platform's attestation key whose
@@ -924,7 +925,10 @@ isolation assumption that every TEE security claim depends on:
 - `crashRecoveryDiscipline` — crash recovery from sealed state does
   not leak partial confidential state;
 - `patchLevelTrust` — the deployed platform's security
-  patch / microcode level supports the SGX security claims.
+  patch / microcode level supports the SGX security claims;
+- `platformSealing` — the platform's sealing key, which seals a
+  production deployment's master secret, derives only in the same
+  enclave on the same platform (`EGETKEY`).
 
 Claim taxonomy (per
 [`docs/coding-agent-conventions.md`](../../docs/coding-agent-conventions.md#claim-discipline)):
@@ -934,7 +938,7 @@ specifications. They are not Lean-discharged; they are part of the
 deployment TCB and must be honored by the TEE platform under
 deployment. -/
 
-/-- Explicit hostile-host TEE deployment-assumption bundle. The six
+/-- Explicit hostile-host TEE deployment-assumption bundle. The seven
 fields are the irreducible deployment-side trust assumptions for
 the hostile-host SGX execution-oblivious theorem. Each field is
 paired with an explicit provenance record (defined below). -/
@@ -960,6 +964,10 @@ structure SgxDeploymentAssumptions where
   supports the SGX security claims (no known unmitigated TEE
   vulnerabilities below the deployment patch level). -/
   patchLevelTrust : Prop
+  /-- The platform's sealing key derives only in the same enclave on the
+  same platform, so a master secret sealed under it opens nowhere else
+  (`EGETKEY` sealing keys bound to the enclave's measurement). -/
+  platformSealing : Prop
 
 /-- Generic provenance-marker structure for one TEE deployment
 assumption. Pairs the assumption-bundle field name with the
@@ -1069,7 +1077,21 @@ def sgxDeploymentProvenance_patchLevelTrust :
   , staticDriftCheckName := "sgx_deployment_assumption_bundle_pinned"
   }
 
-/-- Six-element provenance list for the deployment-assumption
+/-- Provenance record for `platformSealing`. Cites the SGX sealing-key
+derivation (`EGETKEY`) and the SDK's sealing interfaces. -/
+def sgxDeploymentProvenance_platformSealing :
+    SgxDeploymentAssumptionProvenance :=
+  { fieldName := "platformSealing"
+  , role :=
+      "the platform's sealing key derives only in the same enclave on the same platform, so a production deployment's master secret sealed under it opens nowhere else"
+  , classification := "Cited / externally justified"
+  , primaryCitation :=
+      "Intel 64 and IA-32 Architectures Software Developer's Manual, Volume 3D: Intel SGX, EGETKEY (KEYNAME SEAL_KEY, KEYPOLICY MRENCLAVE), and Intel SGX SDK Developer Reference: sgx_seal_data / sgx_unseal_data."
+  , primaryBibKey := "IntelSGXSDM3D"
+  , staticDriftCheckName := "sgx_deployment_assumption_bundle_pinned"
+  }
+
+/-- Seven-element provenance list for the deployment-assumption
 bundle, in canonical declaration order. -/
 def sgxDeploymentAssumptionProvenances :
     List SgxDeploymentAssumptionProvenance :=
@@ -1079,12 +1101,13 @@ def sgxDeploymentAssumptionProvenances :
   , sgxDeploymentProvenance_freshnessGuarantee
   , sgxDeploymentProvenance_crashRecoveryDiscipline
   , sgxDeploymentProvenance_patchLevelTrust
+  , sgxDeploymentProvenance_platformSealing
   ]
 
-/-- The deployment-assumption provenance list has exactly six
+/-- The deployment-assumption provenance list has exactly seven
 entries — one per bundle field. -/
 theorem sgxDeploymentAssumptionProvenances_length :
-    sgxDeploymentAssumptionProvenances.length = 6 := by rfl
+    sgxDeploymentAssumptionProvenances.length = 7 := by rfl
 
 /-- Every entry in the deployment-assumption provenance list is
 classified as "Cited / externally justified". -/
@@ -1094,7 +1117,8 @@ theorem sgxDeploymentAssumptionProvenances_allCited :
   intro entry hMem
   unfold sgxDeploymentAssumptionProvenances at hMem
   simp at hMem
-  rcases hMem with h | h | h | h | h | h
+  rcases hMem with h | h | h | h | h | h | h
+  · subst h; rfl
   · subst h; rfl
   · subst h; rfl
   · subst h; rfl
@@ -1112,7 +1136,8 @@ theorem sgxDeploymentAssumptionProvenances_sharedDriftCheck :
   intro entry hMem
   unfold sgxDeploymentAssumptionProvenances at hMem
   simp at hMem
-  rcases hMem with h | h | h | h | h | h
+  rcases hMem with h | h | h | h | h | h | h
+  · subst h; rfl
   · subst h; rfl
   · subst h; rfl
   · subst h; rfl

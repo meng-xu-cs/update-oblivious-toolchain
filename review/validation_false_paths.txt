@@ -650,6 +650,7 @@ top_level_booleans:
   probe_reads_runtime_telemetry_from_diagnostic_channel: true
   production_calls_issue_chained_receipts: true
   production_calls_record_no_position_map_witness: true
+  production_deployments_restart_from_a_sealed_secret: true
   production_errors_carry_no_runtime_freshness_value: true
   production_receipts_carry_session_tags: true
   proof_grade_canonical_pair_instantiation_threads_runtime_boundary: true

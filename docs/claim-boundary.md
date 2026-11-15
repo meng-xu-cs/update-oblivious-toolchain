@@ -516,8 +516,23 @@ nonce repeats. A restart assumes the files are the ones the runtime wrote
 last: the rollback resistance of the TEE deployment assumptions. A sealed
 record is authenticated with its location, not its version, so a record
 replaced by an older record of its location is not detected (a digest tree
-over the records is Issue 44). Only a seeded deployment, which exists in test
-and diagnostics builds, can restart.
+over the records is Issue 44).
+
+A production deployment restarts from its files in the build a production
+runtime uses. It seals its master secret to its platform when it deploys
+(`ProductionContractInstance::deploy_with_storage`): ChaCha20Poly1305 under a
+key that derives from the platform's sealing key, with the deployment's
+request as associated data, so that the secret opens only on that platform
+and only for that deployment (the TEE deployment assumption
+`platformSealing`). Every commit leaves the receipt the deployment issued
+last in the tagged commit metadata. A restart
+(`ProductionContractInstance::restart`) takes the sealed secret and the
+attested rollback counter. It is refused unless the secret opens, the
+metadata carries the secret's tag, the counter is the attested one, and the
+receipt it finds ends in the state the store holds: the public state and the
+digest of every sealed record. Its next receipt follows that one
+(`production_deployments_restart_from_a_sealed_secret`). A seeded deployment,
+which exists in test and diagnostics builds, restarts from its seed.
 
 ### The Kernel's Operators
 
@@ -617,7 +632,7 @@ checked by recompiling the source.
 | Runtime key derivation | gives each object a storage key, an initial placement and Path ORAM leaf coins that are pseudo-random and independent of the other objects', which the two encryption assumptions and the leaf-coin model take as given | trusted, not modeled in Lean: a 256-bit master secret from the OS, HKDF-SHA256 (RFC 5869) with one label per use, and the ChaCha20 generator. `runtime_secrets_derive_from_the_master_secret` in `runtime_boundary_validation.json` pins the derivation's call sites, and `runtime/uo-evm/src/secret.rs` tests the RFC's first test vector |
 | Return-channel AEAD | hides a value returned under `encrypted_to_client` from the host. The theorems erase the payload's ciphertext and tag as a declared release, so what those bytes show of the value is in no Lean statement | trusted, not named in Lean: `ChaCha20Poly1305` under the session key, with the associated data and the nonce that `runtime/uo-evm/src/return_channel.rs` builds. The nonce is the first 96 bits of a hash of the runtime's freshness epoch, rollback counter and call counter, the session binding and the hash of the associated data, so two calls of a deployment seal under different nonces unless those 96 bits collide. That the session key is fresh and known to the client alone comes from the attested key exchange of the deployment, which the repository does not implement (the TEE deployment row) |
 | Production receipt MAC | lets the holder of a session conclude from a receipt's tag that the runtime issued the receipt as it is | trusted, stated in Lean as the two hypotheses of `deployment_receipt_tag_verifies_issued` in `UOToolchain/DeploymentAcceptance.lean` and not proved: HMAC-SHA256, under a key that HKDF-SHA256 derives from the session key and id, is unforgeable, and two receipts with one SHA-256 hash are one receipt. The session key comes from the attested key exchange, as in the row above |
-| TEE deployment assumptions | enclave memory confidentiality/integrity, attestation authenticity, rollback resistance, freshness, crash recovery discipline, patch-level trust | explicit Lean bundle `SgxDeploymentAssumptions`, paired with Intel SGX provenance and probe drift checks |
+| TEE deployment assumptions | enclave memory confidentiality/integrity, attestation authenticity, rollback resistance, freshness, crash recovery discipline, patch-level trust, platform sealing (the sealing key a production deployment seals its master secret under derives only in the same enclave on the same platform) | explicit Lean bundle `SgxDeploymentAssumptions`, paired with Intel SGX provenance and probe drift checks |
 | Parser/preprocessing equivalence | connects raw Solidity-like source text to the post-resolution AST consumed by Lean | still trusted front-end surface |
 | Real Keccak equivalence | connects runtime `tiny_keccak::Keccak::v256()` to the Lean mock-hash abstraction | not yet proved; Lean preservation uses the shared abstraction |
 
@@ -709,9 +724,9 @@ This repository does not claim:
   electromagnetic, or wall-clock obliviousness
 - value-level equality between the Lean mock hash and real runtime Keccak
   outputs
-- a restart of a deployment from OS randomness, whose master secret is in
-  memory alone, or the detection of a store that was rolled back or holds
-  an older record of a location (see The Storage Boundary)
+- the detection of a store that was rolled back together with the attested
+  rollback counter, or that holds an older record of a location, at a
+  restart (see The Storage Boundary)
 - Solidity 0.8 checked-arithmetic, division/modulo-by-zero, ABI, revert, or
   context-variable semantics beyond the admitted public environment fields
   (`msg.sender`, `tx.origin`, `block.number`, `block.timestamp`, and

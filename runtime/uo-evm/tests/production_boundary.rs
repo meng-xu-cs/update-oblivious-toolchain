@@ -641,3 +641,160 @@ fn a_changed_last_receipt_is_rejected_by_its_tag() {
     verify_production_receipt(&other, receipt, &other_tag).unwrap();
     assert!(verify_production_receipt(&session, receipt, &other_tag).is_err());
 }
+
+/// Every file of `from`, copied into a new directory `to`.
+fn copy_directory(from: &std::path::Path, to: &std::path::Path) {
+    std::fs::create_dir_all(to).unwrap();
+    for entry in std::fs::read_dir(from).unwrap() {
+        let entry = entry.unwrap();
+        let target = to.join(entry.file_name());
+        if entry.file_type().unwrap().is_dir() {
+            copy_directory(&entry.path(), &target);
+        } else {
+            std::fs::copy(entry.path(), target).unwrap();
+        }
+    }
+}
+
+/// A production deployment restarts from its files, in the build a
+/// production runtime uses, with the master secret it sealed to its
+/// platform: the restarted instance's last receipt is the one the
+/// deployment issued last, its next receipt follows it, and the map holds
+/// what was written before the restart. The restart is refused with a
+/// stale rollback counter, with the secret on another platform, and with a
+/// store whose records were changed after the last receipt.
+#[test]
+fn a_production_deployment_restarts_from_its_files_on_its_platform() {
+    use uo_evm::{PlatformSealingKey, SealedMasterSecret};
+    use uo_store::{FileStorage, SharedStorage, SyncPolicy};
+    let directory =
+        std::env::temp_dir().join(format!("uo-production-restart-{}", std::process::id()));
+    let changed = directory.with_extension("changed");
+    let _ = std::fs::remove_dir_all(&directory);
+    let _ = std::fs::remove_dir_all(&changed);
+    let artifact = single_access_map();
+    let policy = policy();
+    let session = session();
+    let environment = PublicEnvironment::default();
+    let platform = || PlatformSealingKey::from_platform([0x5A; 32]);
+    let (mut production, sealed) = ProductionContractInstance::deploy_with_storage(
+        artifact.clone(),
+        policy.clone(),
+        SharedStorage::new(FileStorage::create(&directory, SyncPolicy::Always).unwrap()),
+        &platform(),
+    )
+    .unwrap();
+    for (key, value) in [(1, 10), (2, 20)] {
+        let evidence = public_evidence(
+            &artifact,
+            &policy,
+            &session,
+            &environment,
+            production.last_receipt(),
+        );
+        production
+            .call_authorized("put(bytes32,uint256)", put(key, value), &session, &evidence)
+            .unwrap();
+    }
+    let last = production.last_receipt().clone();
+    drop(production);
+    let reopen = |directory: &std::path::Path| {
+        SharedStorage::new(FileStorage::open(directory, SyncPolicy::Always).unwrap())
+    };
+    let restart = |storage: SharedStorage,
+                   sealed: &SealedMasterSecret,
+                   platform: &PlatformSealingKey,
+                   rollback_counter: u64| {
+        ProductionContractInstance::restart(
+            artifact.clone(),
+            policy.clone(),
+            storage,
+            sealed,
+            platform,
+            rollback_counter,
+        )
+    };
+
+    // A stale rollback counter.
+    let error = restart(
+        reopen(&directory),
+        &sealed,
+        &platform(),
+        last.rollback_counter + 1,
+    )
+    .unwrap_err();
+    assert!(error.to_string().contains("rollback counter"), "{error}");
+    // The secret on another platform, or changed.
+    let other = PlatformSealingKey::from_platform([0x5B; 32]);
+    let error = restart(reopen(&directory), &sealed, &other, last.rollback_counter).unwrap_err();
+    assert!(
+        error.to_string().contains("does not open on this platform"),
+        "{error}"
+    );
+    let mut flipped = sealed.clone();
+    let first = u8::from_str_radix(&sealed.ciphertext[..2], 16).unwrap() ^ 1;
+    flipped.ciphertext = format!("{first:02x}{}", &sealed.ciphertext[2..]);
+    assert_ne!(flipped, sealed);
+    assert!(restart(
+        reopen(&directory),
+        &flipped,
+        &platform(),
+        last.rollback_counter
+    )
+    .is_err());
+    // A store changed in one record after the last receipt, with the
+    // metadata of the last commit kept: a copy of the files in which a byte
+    // of a bucket's ciphertext is flipped.
+    copy_directory(&directory, &changed);
+    let storage = reopen(&changed);
+    storage.with(|adapter| {
+        let location = "records@bucket0";
+        let mut record = adapter.record(location).unwrap().to_vec();
+        record[40] ^= 1;
+        adapter.write(location, &record).unwrap();
+        let meta = adapter.meta().to_vec();
+        adapter.commit(&meta).unwrap();
+    });
+    drop(storage);
+    let error = restart(
+        reopen(&changed),
+        &sealed,
+        &platform(),
+        last.rollback_counter,
+    )
+    .unwrap_err();
+    assert!(
+        error.to_string().contains("ciphertext_store_after_sha256"),
+        "{error}"
+    );
+
+    // The restart, and the chain goes on.
+    let mut restarted = restart(
+        reopen(&directory),
+        &sealed,
+        &platform(),
+        last.rollback_counter,
+    )
+    .unwrap();
+    assert_eq!(restarted.last_receipt(), &last);
+    let evidence = public_evidence(
+        &artifact,
+        &policy,
+        &session,
+        &environment,
+        restarted.last_receipt(),
+    );
+    let result = restarted
+        .call_authorized(
+            "read(bytes32)",
+            vec![Value::Bytes32([2; 32])],
+            &session,
+            &evidence,
+        )
+        .unwrap();
+    result.receipt.follows(&last).unwrap();
+    assert_eq!(result.call.return_value, Some(Value::uint(20)));
+    drop(restarted);
+    std::fs::remove_dir_all(&directory).unwrap();
+    std::fs::remove_dir_all(&changed).unwrap();
+}

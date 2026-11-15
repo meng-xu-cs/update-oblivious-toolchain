@@ -532,6 +532,14 @@ def sgxDeploymentAssumptionMechanismMatrix :
     , deploymentArtifact := "sealed storage recovery discipline"
     , driftCheckName := "sgx_deployment_assumption_mechanism_matrix_pinned"
     }
+  , { assumptionField := "platformSealing"
+    , mechanism :=
+        "a production deployment seals its master secret under the platform's sealing key for its own deployment request, and a restart opens it only on that platform"
+    , status := .externalDeploymentOnly
+    , evidenceAnchor := "SgxDeploymentAssumptions.platformSealing"
+    , deploymentArtifact := "platform sealing key derivation"
+    , driftCheckName := "sgx_deployment_assumption_mechanism_matrix_pinned"
+    }
   , { assumptionField := "patchLevelTrust"
     , mechanism :=
         "deployment records the SGX TCB/microcode level and rejects platforms below the required patch floor"
@@ -550,6 +558,7 @@ theorem sgxDeploymentAssumptionMechanismMatrix_coversBundleFields :
       , "rollbackResistance"
       , "freshnessGuarantee"
       , "crashRecoveryDiscipline"
+      , "platformSealing"
       , "patchLevelTrust"
       ] := by
   rfl
@@ -560,7 +569,8 @@ theorem sgxDeploymentAssumptionMechanismMatrix_allMapped :
   intro entry hMem
   unfold sgxDeploymentAssumptionMechanismMatrix at hMem
   simp at hMem
-  rcases hMem with h | h | h | h | h | h
+  rcases hMem with h | h | h | h | h | h | h
+  · subst h; rfl
   · subst h; rfl
   · subst h; rfl
   · subst h; rfl

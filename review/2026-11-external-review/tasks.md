@@ -2000,6 +2000,50 @@ production runtime uses, its first receipt after the restart follows the
 last before it, and the restart is refused with a stale counter, another
 platform's sealed secret or a changed store.
 
+As built. A production deployment with its records in files
+(`ProductionContractInstance::deploy_with_storage`) seals its master secret
+to its platform and returns the sealed secret, which the host keeps beside
+the store. The platform's key is `PlatformSealingKey`, which the platform
+hands the enclave (on SGX, the sealing key `EGETKEY` derives for the
+enclave's measurement). The seal (`RuntimeMasterSecret::seal_to_platform` in
+`runtime/uo-evm/src/secret.rs`) is ChaCha20Poly1305 under a key that
+HKDF-SHA256 derives from it, under a nonce from the operating system, with
+the deployment's request hash, what was deployed under which policy, as
+associated data: the secret opens on that platform and for that deployment
+alone. Every commit of a production deployment, the deployment's own
+included, leaves the receipt it issued last in the commit metadata
+(`StoreMeta::last_receipt`, absent for the others, so their metadata is as
+it was), which carries the tag of a key that derives from the master secret.
+`ProductionContractInstance::restart` takes the sealed secret and the
+attested rollback counter. It opens the secret, reads the metadata under its
+tag, compares the rollback counter, restores the objects without a seal
+(Issue 59), and goes on only if the receipt it found ends in the state the
+store holds (`ProductionReceipt::ends_in`): the public state, the digest of
+every sealed record, and the epoch and counters. Its next receipt follows
+that one. The restart and the seeded one share their code
+(`restart_internal`), and the production restart is in the production build;
+none of it changes a call.
+
+`a_production_deployment_restarts_from_its_files_on_its_platform` in
+`runtime/uo-evm/tests/production_boundary.rs`, which runs in the production
+build, makes two calls on a deployment in files, restarts it, reads a value
+written before the restart, and checks that the call's receipt follows the
+last one before it. The restart is refused with a rollback counter one
+ahead, with another platform's key, with a sealed secret changed in a byte,
+and from a copy of the files in which a byte of a bucket was changed after
+the last receipt. A unit test of the seal opens it on its platform alone and
+for its deployment alone. The deployment assumptions name the sealing:
+`platformSealing` is a seventh field of `SgxDeploymentAssumptions`, with a
+provenance record citing `EGETKEY` and the SDK's sealing interfaces, an entry
+of the mechanism matrix, and a facade of its citation key; the claim
+boundary's TEE row and the claim manifest name it. The non-claim of a
+restart from OS randomness is gone; what is left of it is a store rolled
+back together with the attested counter, or holding an older record.
+`production_deployments_restart_from_a_sealed_secret` in
+`runtime_boundary_validation.json` pins the seal and its binding, the
+restart in the production build, the receipt in the metadata and its check
+against the store, with a unit test of six drifts.
+
 ### Issue 59 — Keep sealed records in the store alone
 
 Source: Issue 41. Size: L. Depends on: Issue 41.

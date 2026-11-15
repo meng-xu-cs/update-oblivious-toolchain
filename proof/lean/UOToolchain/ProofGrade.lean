@@ -1899,24 +1899,24 @@ theorem proofGrade_sgx_storage_refinement_provenance_static_drift_check :
 /-! ### WP6.5 Hostile-Host TEE Deployment-Assumption Bundle Facades
 
 The facades below expose the W6.5 deployment-assumption bundle: the
-five irreducible TEE deployment assumptions
+seven irreducible TEE deployment assumptions
 (`attestationAuthenticity`, `enclaveMemoryIsolation`,
-`rollbackResistance`, `crashRecoveryDiscipline`,
-`patchLevelTrust`) packaged as `SgxDeploymentAssumptions` plus the
-matching provenance records pairing each assumption with an Intel
-SGX specification citation.
+`rollbackResistance`, `freshnessGuarantee`, `crashRecoveryDiscipline`,
+`patchLevelTrust`, `platformSealing`) packaged as
+`SgxDeploymentAssumptions` plus the matching provenance records pairing
+each assumption with an Intel SGX specification citation.
 
 Claim taxonomy: these facades are **Cited / externally justified**
 for every assumption field. The bundle does not Lean-discharge any
-of the five assumptions; they are part of the deployment TCB and
+of the seven assumptions; they are part of the deployment TCB and
 are honored by the TEE platform under deployment. The facades give
 each assumption an explicit Lean-side provenance pairing accessible
 at the Lean type level. -/
 
 /-- Paper-facing W6.5 facade: the deployment-assumption provenance
-list contains exactly six entries — one per bundle field. -/
+list contains exactly seven entries — one per bundle field. -/
 theorem proofGrade_sgx_deployment_assumption_provenances_length :
-    sgxDeploymentAssumptionProvenances.length = 6 :=
+    sgxDeploymentAssumptionProvenances.length = 7 :=
   sgxDeploymentAssumptionProvenances_length
 
 /-- Paper-facing W6.5 facade: every entry in the deployment-
@@ -1977,6 +1977,13 @@ record's pinned BibTeX key is `IntelSGXSecurityCenter`. -/
 theorem proofGrade_sgx_deployment_patch_level_trust_bibKey :
     sgxDeploymentProvenance_patchLevelTrust.primaryBibKey =
       "IntelSGXSecurityCenter" := by rfl
+
+/-- Paper-facing W6.5 facade: the `platformSealing` provenance record's
+pinned BibTeX key is `IntelSGXSDM3D`, whose SGX volume defines the
+sealing key `EGETKEY` derives. -/
+theorem proofGrade_sgx_deployment_platform_sealing_bibKey :
+    sgxDeploymentProvenance_platformSealing.primaryBibKey =
+      "IntelSGXSDM3D" := by rfl
 
 /-! ### WP6.6 Hostile-Host Closure Audit Facades
 

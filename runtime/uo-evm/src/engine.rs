@@ -1,7 +1,8 @@
 use crate::deployment::{
-    production_receipt_tag, validate_production_artifact, validate_production_call_preflight,
-    validate_production_policy, validate_production_public_environment_trace,
-    ProductionCallEvidence, ProductionReceipt, ProductionRuntimePolicy,
+    production_deployment_request_sha256, production_receipt_tag, validate_production_artifact,
+    validate_production_call_preflight, validate_production_policy,
+    validate_production_public_environment_trace, ProductionCallEvidence, ProductionReceipt,
+    ProductionRuntimePolicy, SealedMasterSecret,
 };
 use crate::freshness::RuntimeFreshnessState;
 use crate::return_channel::ReturnChannelSession;
@@ -14,7 +15,7 @@ use crate::runtime::{
     contract_seal_ciphers, deploy_contract_runtime, run_contract_call, stage_contract_runtime,
     ContractRuntime, PathOramFreshCoinPlan,
 };
-use crate::secret::{RuntimeMasterSecret, StoreMetaKey};
+use crate::secret::{PlatformSealingKey, RuntimeMasterSecret, StoreMetaKey};
 use crate::store_meta::{make_deployment_durable, DroppedCallSeals, StagedStore, StoreMeta};
 use anyhow::{anyhow, bail, Result};
 use uo_core::{
@@ -180,7 +181,82 @@ impl ProductionContractInstance {
         Self::from_deployed(ContractInstance::deploy(artifact)?, policy)
     }
 
-    /// Issue the deployment's receipt, the first of the instance's chain.
+    /// `deploy`, with the contract's records kept in `storage`, which must
+    /// hold nothing yet, and the deployment's master secret sealed to
+    /// `platform` for this deployment. The host keeps the sealed secret
+    /// beside the store: a restart takes both.
+    pub fn deploy_with_storage(
+        artifact: CompiledArtifact,
+        policy: ProductionRuntimePolicy,
+        storage: SharedStorage,
+        platform: &PlatformSealingKey,
+    ) -> Result<(Self, SealedMasterSecret)> {
+        validate_production_artifact(&artifact)?;
+        validate_production_policy(&policy)?;
+        let master = RuntimeMasterSecret::from_os_rng();
+        let sealed = master.seal_to_platform(
+            platform,
+            &production_deployment_request_sha256(&artifact, &policy)?,
+        )?;
+        let inner = ContractInstance::deploy_internal(
+            artifact,
+            &master,
+            RuntimeFreshnessState::from_os_rng(),
+            None,
+            storage,
+        )?;
+        Ok((Self::from_deployed(inner, policy)?, sealed))
+    }
+
+    /// Start again from the store a production deployment of `artifact`
+    /// under `policy` left, with the master secret it sealed to its
+    /// platform: the instance of its last commit, whose next receipt follows
+    /// the last one it issued. The restart is refused unless the secret
+    /// opens on `platform` for this deployment, the commit metadata carries
+    /// the tag of that secret, its rollback counter is the attested one, and
+    /// the store is the one the last receipt was issued for: its public state
+    /// and every sealed record of it. A restart seals no record.
+    pub fn restart(
+        artifact: CompiledArtifact,
+        policy: ProductionRuntimePolicy,
+        storage: SharedStorage,
+        sealed: &SealedMasterSecret,
+        platform: &PlatformSealingKey,
+        attested_rollback_counter: u64,
+    ) -> Result<Self> {
+        validate_production_artifact(&artifact)?;
+        validate_production_policy(&policy)?;
+        let master = RuntimeMasterSecret::unseal_from_platform(
+            sealed,
+            platform,
+            &production_deployment_request_sha256(&artifact, &policy)?,
+        )?;
+        let (inner, meta) = ContractInstance::restart_internal(
+            artifact,
+            &master,
+            None,
+            storage,
+            attested_rollback_counter,
+        )?;
+        let last_receipt = meta
+            .last_receipt
+            .ok_or_else(|| anyhow!("the store's commit metadata names no production receipt"))?;
+        last_receipt.ends_in(
+            inner.freshness.snapshot(),
+            &inner.state.public_state_digest()?,
+            &inner.state.ciphertext_store_digest()?,
+        )?;
+        let last_receipt_sha256 = last_receipt.sha256()?;
+        Ok(Self {
+            inner,
+            policy,
+            last_receipt,
+            last_receipt_sha256,
+        })
+    }
+
+    /// Issue the deployment's receipt, the first of the instance's chain,
+    /// and leave it in the store's commit metadata.
     fn from_deployed(inner: ContractInstance, policy: ProductionRuntimePolicy) -> Result<Self> {
         let last_receipt = ProductionReceipt::for_deployment(
             &inner.artifact,
@@ -189,6 +265,13 @@ impl ProductionContractInstance {
             inner.state.public_state_digest()?,
             inner.state.ciphertext_store_digest()?,
         )?;
+        let meta = inner.store_meta(
+            &inner.freshness,
+            inner.initialized,
+            inner.state.public_state_digest()?,
+            Some(&last_receipt),
+        )?;
+        make_deployment_durable(&inner.storage, &meta)?;
         let last_receipt_sha256 = last_receipt.sha256()?;
         Ok(Self {
             inner,
@@ -298,7 +381,10 @@ impl ProductionContractInstance {
         )?;
         let receipt_sha256 = receipt.sha256()?;
         let receipt_tag = production_receipt_tag(session, &receipt_sha256)?;
-        let call = self.inner.commit_staged(staged)?.0;
+        let call = self
+            .inner
+            .commit_staged_with_receipt(staged, Some(&receipt))?
+            .0;
         self.last_receipt = receipt.clone();
         self.last_receipt_sha256 = receipt_sha256;
         Ok(ProductionCallResult {
@@ -362,25 +448,49 @@ impl ContractInstance {
         attested_rollback_counter: u64,
     ) -> Result<Self> {
         let master = RuntimeMasterSecret::from_diagnostic_seed(deploy_seed);
+        Ok(Self::restart_internal(
+            artifact,
+            &master,
+            Some(deploy_seed),
+            storage,
+            attested_rollback_counter,
+        )?
+        .0)
+    }
+
+    /// Start again from the store a deployment with `master` left, with the
+    /// commit metadata it kept there. The metadata must carry the tag of the
+    /// secret, its rollback counter must be the attested one, and the public
+    /// state the store keeps must have the digest the metadata names. Each
+    /// storage key resumes at the seal count the store has reserved for it,
+    /// and no object seals a record.
+    fn restart_internal(
+        artifact: CompiledArtifact,
+        master: &RuntimeMasterSecret,
+        replay_seed: Option<u64>,
+        storage: SharedStorage,
+        attested_rollback_counter: u64,
+    ) -> Result<(Self, StoreMeta)> {
         let store_meta_key = master.store_meta_key()?;
         let meta = storage
             .with(|adapter| StoreMeta::from_tagged_bytes(&store_meta_key, adapter.meta()))?;
         let freshness =
             RuntimeFreshnessState::recover(meta.freshness(), attested_rollback_counter)?;
-        let state = deploy_contract_runtime(&artifact.contract.state, &master, &storage, true)?;
+        let state = deploy_contract_runtime(&artifact.contract.state, master, &storage, true)?;
         if state.public_state_digest()? != meta.public_state_sha256 {
             bail!("the public state the store keeps is not the public state of its last commit");
         }
-        Ok(Self {
+        let instance = Self {
             artifact,
             state,
-            replay_seed: Some(deploy_seed),
+            replay_seed,
             freshness,
             environment: PublicEnvironment::default(),
             initialized: meta.initialized,
             storage,
             store_meta_key,
-        })
+        };
+        Ok((instance, meta))
     }
 
     fn deploy_internal(
@@ -412,6 +522,7 @@ impl ContractInstance {
             &instance.freshness,
             instance.initialized,
             instance.state.public_state_digest()?,
+            None,
         )?;
         make_deployment_durable(&instance.storage, &meta)?;
         Ok(instance)
@@ -424,8 +535,10 @@ impl ContractInstance {
         freshness: &RuntimeFreshnessState,
         initialized: bool,
         public_state_sha256: String,
+        last_receipt: Option<&ProductionReceipt>,
     ) -> Result<Vec<u8>> {
         StoreMeta::new(freshness.snapshot(), initialized, public_state_sha256)
+            .with_last_receipt(last_receipt)
             .tagged_bytes(&self.store_meta_key)
     }
 
@@ -536,6 +649,7 @@ impl ContractInstance {
             &self.freshness,
             self.initialized,
             self.state.public_state_digest()?,
+            None,
         )?;
         store.make_durable(&meta)
     }
@@ -594,11 +708,26 @@ impl ContractInstance {
     /// state the call leaves; if it cannot, the call is dropped like one that
     /// failed, and `self` is as it was.
     fn commit_staged(&mut self, staged: StagedCall) -> Result<(CallResult, usize)> {
+        self.commit_staged_with_receipt(staged, None)
+    }
+
+    /// `commit_staged`, with the receipt a production call issued left in
+    /// the commit metadata.
+    fn commit_staged_with_receipt(
+        &mut self,
+        staged: StagedCall,
+        receipt: Option<&ProductionReceipt>,
+    ) -> Result<(CallResult, usize)> {
         let public_state_sha256 = match staged.trace.receipt.public_state_transition.as_ref() {
             Some(transition) => transition.committed_public_state_hash.clone(),
             None => staged.state.public_state_digest()?,
         };
-        let meta = self.store_meta(&staged.freshness, staged.initialized, public_state_sha256)?;
+        let meta = self.store_meta(
+            &staged.freshness,
+            staged.initialized,
+            public_state_sha256,
+            receipt,
+        )?;
         crate::instrumentation::time_store_persistence(|| staged.store.make_durable(&meta))?;
         staged.seals.keep();
         self.state = staged.state;
