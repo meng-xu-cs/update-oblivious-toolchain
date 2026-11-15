@@ -484,8 +484,8 @@
     },
     {
       "path": "tree_eviction_instructions.json",
-      "bytes": 4218,
-      "sha256": "b92893abe9236eec98d973b7ce0ac4060769bf3677b138fa7b283aecfb1509b8"
+      "bytes": 6851,
+      "sha256": "b1098904302e42607b50d30d8c028a2d2d2c29b6c66d7f250bd0596186f7dfd4"
     },
     {
       "path": "trusted_kernel_validation.json",

@@ -11,16 +11,22 @@
 # moves over the whole stash; AFTER_REV defaults to HEAD. Each revision is exported with `git archive` into a scratch
 # directory, its mplus-probe is built in release, and the capacity sweep runs
 # under callgrind on one map capacity (UO_SWEEP_CAPACITIES, default 4096) with
-# one trial, UO_MEASURE_REPEATS times (default 2). A revision whose sweep has
+# one trial, UO_MEASURE_REPEATS times (default 2), with address-space
+# randomization off (setarch -R), so that no address varies between runs. A
+# revision whose sweep has
 # occupancy levels, workloads and Lean checks runs none of them: two stored
 # keys and one call of each kind. The report gives, per
 # revision and run, the calls and inclusive instruction counts (Ir) of the
 # tree's node access (`tree_access`) and of the eviction, stash and copy
 # functions under it, the counts per node access, the eviction's instructions
 # and its masked node moves per node access, and the before/after ratios per
-# node access; it states whether the repeated runs counted the same.
+# node access; it states whether the repeated runs agree: the same calls,
+# and inclusive counts within one part in a million of each other. The
+# eviction's counts repeat exactly; tree_access's includes the allocator,
+# whose paths depend on the heap that the sweep's timing code leaves before
+# each call, and varies by a few hundred instructions in billions.
 #
-# Needs git, cargo, valgrind and python3, and lean and lake on PATH (the probe
+# Needs git, cargo, valgrind, setarch and python3, and lean and lake on PATH (the probe
 # records their versions in its reproducibility manifest). Set UO_KEEP_WORK=1
 # to keep the scratch directory (sources, builds and callgrind outputs).
 set -euo pipefail
@@ -34,7 +40,7 @@ CAPACITY="${UO_SWEEP_CAPACITIES:-4096}"
 REPEATS="${UO_MEASURE_REPEATS:-2}"
 OUT="${UO_RESULTS_DIR:-results}/tree_eviction_instructions.json"
 
-for tool in git cargo valgrind python3 lean lake; do
+for tool in git cargo valgrind setarch python3 lean lake; do
   if ! command -v "$tool" >/dev/null 2>&1; then
     printf '%s not found on PATH\n' "$tool" >&2
     exit 1
@@ -77,6 +83,7 @@ measure() {
       UO_SWEEP_CAPACITIES="$CAPACITY" UO_SWEEP_TRIALS=1 UO_SWEEP_WARMUPS=0 \
         UO_SWEEP_OCCUPANCY_MAX_CAPACITY=0 UO_SWEEP_WORKLOAD_CALLS=0 \
         UO_SWEEP_LEAN_CAPACITIES=0 \
+        setarch "$(uname -m)" -R \
         valgrind --tool=callgrind --callgrind-out-file="$WORK/$label/run$run.callgrind" \
         "$target/release/mplus-probe" --only capacity-sweep --out-dir "$WORK/$label/run$run-out" \
         >"$WORK/$label/run$run.log" 2>&1
@@ -172,6 +179,17 @@ def per_access(value, accesses):
     return round(value / accesses, 1) if accesses else None
 
 
+# The largest share by which a function's inclusive count may differ between
+# the runs of one revision for the runs to agree (see the header).
+AGREEMENT_TOLERANCE = 1e-6
+
+
+def relative_spread(values):
+    """The largest of the values less the smallest, over the largest."""
+    top = max(values)
+    return (top - min(values)) / top if top else 0.0
+
+
 revisions = []
 for label, commit in (("before", before_commit), ("after", after_commit)):
     runs = []
@@ -196,12 +214,26 @@ for label, commit in (("before", before_commit), ("after", after_commit)):
                 "masked_node_moves_per_node_access": per_access(moves, accesses),
             }
         )
+    calls_agree = all(
+        run["node_accesses"] == runs[0]["node_accesses"]
+        and all(
+            run["functions"][key]["calls"] == runs[0]["functions"][key]["calls"]
+            for key, _ in FUNCTIONS
+        )
+        for run in runs
+    )
+    spread = max(
+        relative_spread([run["functions"][key]["inclusive_ir"] for run in runs])
+        for key, _ in FUNCTIONS
+    )
     revisions.append(
         {
             "label": label,
             "commit": commit,
             "runs": runs,
-            "runs_agree": all(run == runs[0] for run in runs),
+            "calls_agree": calls_agree,
+            "largest_relative_spread_of_inclusive_ir": float(f"{spread:.3g}"),
+            "runs_agree": calls_agree and spread <= AGREEMENT_TOLERANCE,
         }
     )
 

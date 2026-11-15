@@ -24,8 +24,8 @@
           "functions": {
             "tree_access": {
               "calls": 455,
-              "inclusive_ir": 3908058823,
-              "inclusive_ir_per_node_access": 8589140.3
+              "inclusive_ir": 3908058762,
+              "inclusive_ir_per_node_access": 8589140.1
             },
             "evict_bucket": {
               "calls": 5915,
@@ -66,8 +66,8 @@
           "functions": {
             "tree_access": {
               "calls": 455,
-              "inclusive_ir": 3908059025,
-              "inclusive_ir_per_node_access": 8589140.7
+              "inclusive_ir": 3908059208,
+              "inclusive_ir_per_node_access": 8589141.1
             },
             "evict_bucket": {
               "calls": 5915,
@@ -104,7 +104,9 @@
           "masked_node_moves_per_node_access": 36974.3
         }
       ],
-      "runs_agree": false
+      "calls_agree": true,
+      "largest_relative_spread_of_inclusive_ir": 1.14e-07,
+      "runs_agree": true
     },
     {
       "label": "after",
@@ -115,8 +117,8 @@
           "functions": {
             "tree_access": {
               "calls": 455,
-              "inclusive_ir": 1284663835,
-              "inclusive_ir_per_node_access": 2823437.0
+              "inclusive_ir": 1284663616,
+              "inclusive_ir_per_node_access": 2823436.5
             },
             "evict_bucket": {
               "calls": 0,
@@ -157,8 +159,8 @@
           "functions": {
             "tree_access": {
               "calls": 455,
-              "inclusive_ir": 1284663834,
-              "inclusive_ir_per_node_access": 2823437.0
+              "inclusive_ir": 1284663674,
+              "inclusive_ir_per_node_access": 2823436.6
             },
             "evict_bucket": {
               "calls": 0,
@@ -195,7 +197,9 @@
           "masked_node_moves_per_node_access": 8329.3
         }
       ],
-      "runs_agree": false
+      "calls_agree": true,
+      "largest_relative_spread_of_inclusive_ir": 4.51e-08,
+      "runs_agree": true
     }
   ],
   "before_over_after_per_node_access": {
