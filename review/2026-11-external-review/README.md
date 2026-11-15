@@ -101,6 +101,10 @@ Issue 22 has the options and the reasoning.
    before Issue 58, so that a restart seals nothing. Issue 57 comes last:
    it changes every Path ORAM count, so the full profile of the capacity
    sweep runs once after it, and measures Issue 59's memory too.
+   Done; the full profile was run after Issue 57, with the quick profile's
+   counts: at 16,384 entries the probe's resident memory in the tree's
+   calls is 115 MB to 118 MB, where it was 153 MB to 172 MB. No control was
+   run, so the wave's latencies are not set against the profile before it.
 
 The research issues (43 to 46) start once the issues they depend on are
 done. The rest of the backlog (47 to 50) is not scheduled, and the folding
@@ -150,7 +154,7 @@ its engineering part is Wave 4, its certified part is research.
 | 54 | Compare a runtime trace with the exact encoding in Lean | 7 | M | 38 | done | `08834f2` |
 | 55 | Take the public-state snapshot once for each object a call changes | 7 | M | 37 | done | `c787993` |
 | 56 | Slice production sources with a lexer | 7 | S to M | | done | `325184f` |
-| 57 | Trace the reads of a Path ORAM map that cross the storage boundary | 7 | L | 41 | done | |
+| 57 | Trace the reads of a Path ORAM map that cross the storage boundary | 7 | L | 41 | done | `266d9ce` |
 | 58 | Seal the master secret so that a production deployment can restart | 7 | M | 41, 53 | done | `8838bc8` |
 | 59 | Keep sealed records in the store alone | 7 | L | 41 | done | `26fe8af` |
 

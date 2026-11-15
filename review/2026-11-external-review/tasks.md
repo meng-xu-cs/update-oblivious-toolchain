@@ -1543,6 +1543,27 @@ when the tape-family theorem needs no sampled runs.
 The maintainer scheduled Issues 51 to 59 as Wave 7 on 2026-11-14; the
 order is in [`README.md`](./README.md). Issues 47 to 50 are not scheduled.
 
+Wave 7 is done. The full profile of the sweep was run again after Issue 57,
+which changed every Path ORAM count (`results/capacity_sweep_full.json`, 62
+minutes; its counts are those of the quick profile, and `docs/path-oram.md`
+has its figures). The machine had restarted since the profile before it, and
+no control was run for this wave, so its latencies are not set against that
+profile's; Issues 55 and 59 counted what they changed in a call's
+instructions with callgrind. What does not depend on the machine's speed:
+
+| At 16,384 entries | Profile before (Issues 30 to 41) | This profile |
+| --- | --- | --- |
+| Tree read: physical reads, storage events | 332, 664 | 314, 646 |
+| Tree insert: storage events | 2,576 | 2,472 |
+| Tree read: modeled gas | 51,354 (v2) | 35,375 (v3) |
+| Resident memory in the full scan's calls | 122 MB | 111 MB |
+| Resident memory in the tree's calls, from 2 keys to a full map | 153 MB to 172 MB | 115 MB to 118 MB |
+
+By the median of a kind of call the two backends have the order of the
+profile before in 524 of the 525 cells; in the other, a read that misses on
+a map of 4,096 entries half full, the tree's median is 0.1 ms below the full
+scan's, and their intervals overlap.
+
 ### Issue 47 — Try an oblivious routing network for tree eviction
 
 Source: F7 (§8). Size: M. Depends on: Issue 27.
