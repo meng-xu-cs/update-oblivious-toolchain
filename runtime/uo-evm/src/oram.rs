@@ -687,6 +687,11 @@ impl OramState {
         }
     }
 
+    /// The map's cipher, sharing its key's count of seals.
+    pub(crate) fn seal_cipher(&self) -> StoreCipher {
+        self.cipher.clone_for_runtime_state()
+    }
+
     pub(crate) fn instantiate(spec: &StateObject, rng: &mut ChaCha20Rng) -> Result<Self> {
         let parameters = OramParameters::for_spec(spec)?;
         let cipher = StoreCipher::from_rng(rng);

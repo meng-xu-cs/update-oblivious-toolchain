@@ -595,6 +595,22 @@ impl RuntimeObject {
         Self::instantiate(spec, &ObjectSecret::from_diagnostic_seed(seed))
     }
 
+    /// The object's cipher, sharing its key's count of seals, if the object
+    /// has a key.
+    pub(in crate::runtime) fn seal_cipher(&self) -> Option<StoreCipher> {
+        match self {
+            Self::RawCell(object) | Self::UoCell(object) => {
+                Some(object.cipher.clone_for_runtime_state())
+            }
+            Self::RawArray(object) | Self::UoArray(object) => {
+                Some(object.cipher.clone_for_runtime_state())
+            }
+            Self::UoSmallMap(object) => Some(object.cipher.clone_for_runtime_state()),
+            Self::UoOramMap(object) => Some(object.oram.seal_cipher()),
+            Self::RawMap(_) => None,
+        }
+    }
+
     /// Put a newly instantiated object behind its contract's store. A
     /// sealed object's cipher keeps its part of the store, so every record
     /// the object opens or seals from now on crosses to the store, and the

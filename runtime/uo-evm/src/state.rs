@@ -22,7 +22,7 @@ use uo_kernel_runtime::{
     RuntimeKernelConfidentialStore, RuntimeKernelMachine as PublicRuntimeKernel,
     RuntimeKernelObjectStore, RuntimeKernelStatementTrace,
 };
-use uo_store::SharedStorage;
+use uo_store::{SharedStorage, StoreCipher};
 
 const CIPHERTEXT_STORE_DIGEST_DOMAIN: &[u8] = b"uo-runtime/ciphertext-store/v1";
 
@@ -543,6 +543,16 @@ impl ContractRuntime {
     /// A digest of the ciphertext the committed state holds in storage.
     pub(crate) fn ciphertext_store_digest(&self) -> Result<String> {
         self.committed.objects.ciphertext_store_digest()
+    }
+
+    /// The cipher of every committed object that has a key, each sharing its
+    /// key's count of seals with the object.
+    pub(crate) fn seal_ciphers(&self) -> Vec<StoreCipher> {
+        self.committed
+            .objects
+            .iter()
+            .filter_map(|(_, object)| object.seal_cipher())
+            .collect()
     }
 
     pub(in crate::runtime) fn public_state_snapshot(&self) -> Result<PublicStateSnapshot> {

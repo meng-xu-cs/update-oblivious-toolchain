@@ -46,6 +46,12 @@ pub(crate) fn ensure_contract_runtime_cold(
     runtime.ensure_cold(expected_object_ids, context)
 }
 
+/// The ciphers of a deployed runtime's keys, each sharing its key's count of
+/// seals, for the counts a dropped call leaves.
+pub(crate) fn contract_seal_ciphers(runtime: &ContractRuntime) -> Vec<uo_store::StoreCipher> {
+    runtime.seal_ciphers()
+}
+
 /// The committed runtime for staged (transactional) execution: a runtime
 /// that holds the committed objects themselves, shared and not copied.
 /// `run_contract_call` replaces in it the objects the call loaded, and it is

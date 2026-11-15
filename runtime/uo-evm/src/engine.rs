@@ -11,11 +11,11 @@ use crate::runtime::{
     keep_decoded_contract_witness,
 };
 use crate::runtime::{
-    deploy_contract_runtime, run_contract_call, stage_contract_runtime, ContractRuntime,
-    PathOramFreshCoinPlan,
+    contract_seal_ciphers, deploy_contract_runtime, run_contract_call, stage_contract_runtime,
+    ContractRuntime, PathOramFreshCoinPlan,
 };
 use crate::secret::{RuntimeMasterSecret, StoreMetaKey};
-use crate::store_meta::{make_deployment_durable, StagedStore, StoreMeta};
+use crate::store_meta::{make_deployment_durable, DroppedCallSeals, StagedStore, StoreMeta};
 use anyhow::{anyhow, bail, Result};
 use uo_core::{
     CompiledArtifact, EncryptedReturnPayload, ExecutionTrace, PublicEnvironment, PublicReceipt,
@@ -121,6 +121,7 @@ struct StagedCall {
     freshness: RuntimeFreshnessState,
     initialized: bool,
     store: StagedStore,
+    seals: DroppedCallSeals,
 }
 
 /// Preflight the return-channel/session policy for an entrypoint before any
@@ -577,6 +578,7 @@ impl ContractInstance {
         };
         let meta = self.store_meta(&staged.freshness, staged.initialized, public_state_sha256)?;
         crate::instrumentation::time_store_persistence(|| staged.store.make_durable(&meta))?;
+        staged.seals.keep();
         self.state = staged.state;
         self.freshness = staged.freshness;
         self.initialized = staged.initialized;
@@ -659,7 +661,9 @@ impl ContractInstance {
         let call_freshness = staged_freshness.begin_call()?;
         // From here the call's records are pending in the store. If the call
         // fails, or is dropped after it was staged, `store` is dropped and
-        // the store puts back what the call replaced.
+        // the store puts back what the call replaced, and `seals` moves each
+        // key's count to a value its count before the call fixes.
+        let seals = DroppedCallSeals::begin(contract_seal_ciphers(&self.state));
         let store = StagedStore::begin(&self.storage)?;
         let mut staged_state = stage_contract_runtime(&self.state)?;
         let (return_value, encrypted_return, aborted, trace, zero_writes) = run_contract_call(
@@ -684,6 +688,7 @@ impl ContractInstance {
             freshness: staged_freshness,
             initialized,
             store,
+            seals,
         })
     }
 }
@@ -3634,6 +3639,153 @@ bounds:
         instance.call("read(bytes32)", vec![b32(7)]).unwrap();
         assert_eq!(instance.storage_stats().commits, commits + 1);
         assert_ne!(stored(&instance), before);
+    }
+
+    /// A store in memory that fails the write it is told to, counted from
+    /// when it is told.
+    #[derive(Debug)]
+    struct FailingStorage {
+        inner: uo_store::MemoryStorage,
+        fail_at: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    }
+
+    impl uo_store::StorageAdapter for FailingStorage {
+        fn create(&mut self, object: &str, location: &str, record: &[u8]) -> anyhow::Result<()> {
+            self.inner.create(object, location, record)
+        }
+        fn read(&mut self, location: &str, held: &[u8]) -> anyhow::Result<()> {
+            self.inner.read(location, held)
+        }
+        fn write(&mut self, location: &str, record: &[u8]) -> anyhow::Result<uo_core::WriteClass> {
+            use std::sync::atomic::Ordering;
+            if self.fail_at.load(Ordering::SeqCst) == 1 {
+                anyhow::bail!("the store fails this write");
+            }
+            let _ = self
+                .fail_at
+                .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |left| {
+                    (left > 1).then(|| left - 1)
+                });
+            self.inner.write(location, record)
+        }
+        fn put_public(&mut self, object: &str, location: &str, value: &[u8]) -> anyhow::Result<()> {
+            self.inner.put_public(object, location, value)
+        }
+        fn reserve_seals(&mut self, object: &str, below: u64) -> anyhow::Result<()> {
+            self.inner.reserve_seals(object, below)
+        }
+        fn reserved_seals(&self, object: &str) -> u64 {
+            self.inner.reserved_seals(object)
+        }
+        fn begin(&mut self) -> anyhow::Result<()> {
+            self.inner.begin()
+        }
+        fn commit(&mut self, meta: &[u8]) -> anyhow::Result<()> {
+            self.inner.commit(meta)
+        }
+        fn abandon(&mut self) {
+            self.inner.abandon()
+        }
+        fn log(&self) -> Vec<uo_store::StorageIo> {
+            self.inner.log()
+        }
+        fn set_logging(&mut self, logging: bool) {
+            self.inner.set_logging(logging)
+        }
+        fn record(&self, location: &str) -> Option<&[u8]> {
+            self.inner.record(location)
+        }
+        fn public_records(&self, object: &str) -> Vec<(String, Vec<u8>)> {
+            self.inner.public_records(object)
+        }
+        fn sealed_records_sha256(&self) -> String {
+            self.inner.sealed_records_sha256()
+        }
+        fn seal_counts(&self, object: &str) -> Vec<u64> {
+            self.inner.seal_counts(object)
+        }
+        fn meta(&self) -> &[u8] {
+            self.inner.meta()
+        }
+        fn stats(&self) -> uo_store::StorageStats {
+            self.inner.stats()
+        }
+    }
+
+    /// A call that is dropped leaves each key's seal count at a value its
+    /// count before the call fixes, wherever the call stopped: two calls
+    /// dropped at different writes leave the same nonces in the records of
+    /// the call after them, and a dropped call that sealed nothing leaves
+    /// them too.
+    #[test]
+    fn a_dropped_call_leaves_the_same_nonces_wherever_it_stopped() {
+        use crate::store_meta::seal_count_after_dropped_call;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::Arc;
+        let artifact = compile_bench(
+            bench_raw!("ConfidentialMixer.sol"),
+            include_str!(bench_raw!("ConfidentialMixer.uo.yaml")),
+            ProgramMode::Uo,
+        );
+        // The nonces of the records a second deposit writes, after a first
+        // deposit that the store fails at its `fail_at`-th write.
+        let nonces_after_drop = |fail_at: usize| {
+            let failing = Arc::new(AtomicUsize::new(0));
+            let storage = uo_store::SharedStorage::new(FailingStorage {
+                inner: uo_store::MemoryStorage::new(),
+                fail_at: Arc::clone(&failing),
+            });
+            let mut instance =
+                ContractInstance::deploy_with_seed_and_storage(artifact.clone(), 23, storage)
+                    .unwrap();
+            let before: Vec<u64> = instance
+                .state
+                .seal_ciphers()
+                .iter()
+                .map(|cipher| cipher.seal_count())
+                .collect();
+            failing.store(fail_at, Ordering::SeqCst);
+            instance
+                .call("deposit(bytes32,uint256)", vec![b32(1), Value::uint(5)])
+                .unwrap_err();
+            failing.store(0, Ordering::SeqCst);
+            let after: Vec<u64> = instance
+                .state
+                .seal_ciphers()
+                .iter()
+                .map(|cipher| cipher.seal_count())
+                .collect();
+            let expected: Vec<u64> = before
+                .iter()
+                .map(|start| seal_count_after_dropped_call(*start))
+                .collect();
+            assert_eq!(after, expected, "fail at write {fail_at}");
+            let writes_before = instance.storage_stats().writes;
+            instance
+                .call("deposit(bytes32,uint256)", vec![b32(2), Value::uint(7)])
+                .unwrap();
+            assert!(instance.storage_stats().writes > writes_before);
+            let mut nonces: Vec<(String, u64)> = Vec::new();
+            instance.storage.with(|adapter| {
+                for io in adapter.log() {
+                    if let uo_store::StorageIo::Write { location, .. } = io {
+                        let record = adapter.record(&location).unwrap();
+                        let count = uo_store::sealed_record_seal_count(record).unwrap();
+                        nonces.push((location, count));
+                    }
+                }
+            });
+            assert!(!nonces.is_empty());
+            nonces
+        };
+        let early = nonces_after_drop(1);
+        let later = nonces_after_drop(4);
+        assert_eq!(early, later);
+        // The nonces of the second deposit start where a dropped call leaves
+        // its keys, and not where the dropped call's last seal left them.
+        assert!(early
+            .iter()
+            .all(|(_, count)| *count >= seal_count_after_dropped_call(0)));
     }
 
     fn scratch_store_directory(name: &str) -> PathBuf {

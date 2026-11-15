@@ -1641,6 +1641,33 @@ depends on a secret.
 Acceptance: a test drops a call at two different points and reads the same
 nonces out of the next call's records.
 
+As built. The first way, with a count that depends on less than the
+entrypoint: the count before the call. A staged call takes the count of
+every key of the deployment before it runs (`DroppedCallSeals` in
+`runtime/uo-evm/src/store_meta.rs`, made in `stage_call` before the store
+begins the call), and only `commit_staged`, once the store has made the
+call durable, disarms it. Any other end of the call drops it, which moves
+each key's count to the second multiple of 2^32 above its count before the
+call (`seal_count_after_dropped_call`) and has the store reserve that
+count, so that a restart does not resume at a reservation that the dropped
+call's seals made. The count before a call is a function of the calls
+before it, committed ones by their entrypoints and dropped ones by this
+rule, so the count after a drop shows that a call was dropped, which the
+caller sees, and nothing of where it stopped. This is simpler than the
+static schedule: it needs no model of the seals a call makes, only that no
+call makes 2^32 of them under one key, and it costs at most 2^33 counts of
+a 64-bit count per dropped call.
+
+`a_dropped_call_leaves_the_same_nonces_wherever_it_stopped` in
+`engine.rs` deploys the same ConfidentialMixer twice behind a store that
+fails a write it is told to, drops a deposit at its first write in one and
+at its fourth in the other, and reads the nonces of the records the next
+deposit writes: they are the same, and with the guard disarmed the test
+fails. The boundary bit `dropped_calls_leave_fixed_seal_counts` pins the
+guard, the rule and where the engine makes and disarms it, and its unit
+test rejects eight drifts; invariant 19 of `docs/runtime/secret-state.md`
+states the rule.
+
 ### Issue 53 — Authenticate production receipts under an attested key
 
 Source: Issue 26. Size: M. Depends on: Issue 26.

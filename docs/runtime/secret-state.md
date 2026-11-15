@@ -205,20 +205,34 @@ and the ownership boundaries that keep them auditable.
     OS randomness cannot restart, since its master secret is in memory
     alone.
 
+19. A call that is dropped leaves each key's seal count at a value that
+    the count before the call fixes, wherever it stopped. A staged call
+    takes the count of every key before it runs (`DroppedCallSeals` in
+    `runtime/uo-evm/src/store_meta.rs`). A commit that made the store
+    durable keeps the counts the call's seals reached. Any other end of
+    the call, an evaluation error, a failed production check or a store
+    that could not commit, moves each count to the second multiple of
+    2^32 above its count before the call (`seal_count_after_dropped_call`)
+    and has the store reserve that count. No call seals 2^32 records under
+    one key, so the count after the drop is above every count the call
+    used, and is the same whether the call stopped at its first seal or
+    after its last. A key has room for 2^32 dropped calls.
+
 ### What a nonce shows
 
 A record's nonce shows how many records were sealed under its object's key
 before it. An object seals a fixed number of records when it is deployed, and
 after that each seal is one recorded storage write
 (`reseal_payload_and_record_write`), so on an error-free run the count
-follows from the storage trace and shows nothing more. A call that stops on
-an evaluation error is dropped with its trace, but its seals stay counted:
-the next record's nonce then shows how many records the dropped call had
-sealed under that key. Evaluation errors are outside the trace claims (see
-[`proof-architecture.md`](../proof-architecture.md)). After a restart a
-key's count resumes at the count its store had reserved, so the next
-record's nonce also shows that the runtime restarted and how many counts
-it skipped.
+follows from the storage trace and shows nothing more. A call that is
+dropped, on an evaluation error or after it ran, leaves each key's count at
+the second multiple of 2^32 above its count before the call (invariant 19):
+the next record's nonce shows that a call was dropped, which the caller
+sees, and nothing of how far it got. Evaluation errors are outside the trace
+claims (see [`proof-architecture.md`](../proof-architecture.md)). After a
+restart a key's count resumes at the count its store had reserved, so the
+next record's nonce also shows that the runtime restarted and how many
+counts it skipped.
 
 ### What a marker shows
 
@@ -246,7 +260,7 @@ write/read evidence, direct store cipher calls outside the codec layer, and
 reintroduction of host-visible hidden-state errors that should be modeled
 confidential aborts.
 
-Invariants 9 to 18 have thirteen bits in `runtime_boundary_validation.json`:
+Invariants 9 to 19 have fourteen bits in `runtime_boundary_validation.json`:
 `deployment_seed_stays_out_of_call_traces`,
 `production_errors_carry_no_runtime_freshness_value`,
 `contract_instance_debug_is_opaque`,
@@ -258,8 +272,9 @@ Invariants 9 to 18 have thirteen bits in `runtime_boundary_validation.json`:
 `production_calls_record_no_position_map_witness`,
 `evidence_builds_audit_the_kept_position_map_witness`,
 `a_call_copies_no_committed_object`,
-`trace_runs_stand_for_recorded_events` and
-`sealed_records_cross_the_storage_boundary`. Each is a check of source text,
+`trace_runs_stand_for_recorded_events`,
+`sealed_records_cross_the_storage_boundary` and
+`dropped_calls_leave_fixed_seal_counts`. Each is a check of source text,
 and a probe unit test shows that it rejects the drifts it guards against.
 
 A source check reads the production part of a file: the file without the

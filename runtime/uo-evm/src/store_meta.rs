@@ -13,7 +13,7 @@ use crate::freshness::RuntimeFreshnessSnapshot;
 use crate::secret::StoreMetaKey;
 use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
-use uo_store::SharedStorage;
+use uo_store::{SharedStorage, StoreCipher};
 
 const STORE_META_SCHEMA: &str = "uo-runtime-store-meta-v1";
 #[cfg_attr(not(any(test, feature = "diagnostics")), allow(dead_code))]
@@ -121,6 +121,73 @@ impl Drop for StagedStore {
     fn drop(&mut self) {
         if self.pending {
             self.storage.with(|adapter| adapter.abandon());
+        }
+    }
+}
+
+/// A dropped call's keys resume past the second multiple of this quantum
+/// above their count before the call. A call seals far fewer records than
+/// this under one key, so that count is a function of the count before the
+/// call alone.
+pub(crate) const DROPPED_CALL_SEAL_QUANTUM: u64 = 1 << 32;
+
+/// The seal count a key resumes at after a call that started at `start` was
+/// dropped: the second multiple of the quantum above `start`, or the end of
+/// the count, which no seal can use.
+pub(crate) fn seal_count_after_dropped_call(start: u64) -> u64 {
+    (start / DROPPED_CALL_SEAL_QUANTUM)
+        .checked_add(2)
+        .and_then(|quanta| quanta.checked_mul(DROPPED_CALL_SEAL_QUANTUM))
+        .unwrap_or(u64::MAX)
+}
+
+/// The seal count of every key of a deployment when a call is staged. A
+/// call that is dropped, whatever the reason and wherever it stopped, leaves
+/// each key's count at `seal_count_after_dropped_call` of its count before
+/// the call, and the store reserves that count, so that neither the next
+/// record's nonce nor a restart shows how far the call got. A call that is
+/// committed keeps the counts its seals reached, which its entrypoint fixes.
+#[derive(Debug)]
+pub(crate) struct DroppedCallSeals {
+    starts: Vec<(StoreCipher, u64)>,
+    dropped: bool,
+}
+
+impl DroppedCallSeals {
+    /// The counts of `ciphers`, each sharing its key's count, before a call.
+    pub(crate) fn begin(ciphers: Vec<StoreCipher>) -> Self {
+        let starts = ciphers
+            .into_iter()
+            .map(|cipher| {
+                let start = cipher.seal_count();
+                (cipher, start)
+            })
+            .collect();
+        Self {
+            starts,
+            dropped: true,
+        }
+    }
+
+    /// The call is committed: its keys keep the counts its seals reached.
+    pub(crate) fn keep(mut self) {
+        self.dropped = false;
+    }
+}
+
+impl Drop for DroppedCallSeals {
+    fn drop(&mut self) {
+        if !self.dropped {
+            return;
+        }
+        for (cipher, start) in &self.starts {
+            let resume = seal_count_after_dropped_call(*start);
+            cipher.resume_seal_count(resume);
+            // A restart resumes at the count the store reserved, so the
+            // store reserves the count the key resumes at.
+            if let Some(storage) = cipher.storage() {
+                let _ = storage.reserve_seals(resume);
+            }
         }
     }
 }

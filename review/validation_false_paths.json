@@ -440,6 +440,7 @@
       "diagnostic_call_result_nonclone": true,
       "direct_store_open_surface_restricted": true,
       "direct_store_seal_surface_restricted": true,
+      "dropped_calls_leave_fixed_seal_counts": true,
       "engine_assembles_execution_trace_directly": false,
       "engine_clones_call_args_directly": false,
       "engine_confidential_manifest_surface_absent": true,

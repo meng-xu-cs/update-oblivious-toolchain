@@ -476,21 +476,24 @@ crosses are source-frozen (`sealed_records_cross_the_storage_boundary` in
 `runtime_boundary_validation.json`, and three scenarios of
 `tamper_validation.json`). No Lean statement is about the adapter.
 
-A call's records are pending in the adapter until the call is committed
-there, with the commit metadata: the freshness counters, whether the
-contract is initialized and the digest of the public state, under a tag
-whose key derives from the master secret. A call that is dropped leaves the
-adapter as it was. The adapter takes a sealed record only under a nonce it
-has reserved for the record's key, and a reservation is durable before it
-takes effect, so a runtime that restarts from the adapter's files, at the
-counts they reserve, repeats no nonce. The report restarts each benchmark
-from files and checks that its reads answer as before and that no nonce
-repeats. A restart assumes the files are the ones the runtime wrote last:
-the rollback resistance of the TEE deployment assumptions. A sealed record
-is authenticated with its location, not its version, so a record replaced
-by an older record of its location is not detected (a digest tree over the
-records is Issue 44). Only a seeded deployment, which exists in test and
-diagnostics builds, can restart.
+A call's records are pending in the adapter until the call is committed there,
+with the commit metadata: the freshness counters, whether the contract is
+initialized and the digest of the public state, under a tag whose key derives
+from the master secret. A call that is dropped leaves the adapter as it was,
+and each key's seal count at a value that its count before the call fixes, so
+that the next nonce shows nothing of how far the dropped call got (invariant
+19 of [`runtime/secret-state.md`](./runtime/secret-state.md),
+`dropped_calls_leave_fixed_seal_counts`). The adapter takes a sealed record
+only under a nonce it has reserved for the record's key, and a reservation is
+durable before it takes effect, so a runtime that restarts from the adapter's
+files, at the counts they reserve, repeats no nonce. The report restarts each
+benchmark from files and checks that its reads answer as before and that no
+nonce repeats. A restart assumes the files are the ones the runtime wrote
+last: the rollback resistance of the TEE deployment assumptions. A sealed
+record is authenticated with its location, not its version, so a record
+replaced by an older record of its location is not detected (a digest tree
+over the records is Issue 44). Only a seeded deployment, which exists in test
+and diagnostics builds, can restart.
 
 ### The Kernel's Operators
 
