@@ -1,3 +1,4 @@
+use crate::controller::CallRecorder;
 use crate::freshness::PathOramLeafSeed;
 use anyhow::{anyhow, bail, Result};
 use rand_chacha::ChaCha20Rng;
@@ -208,19 +209,25 @@ impl OramStorage {
     }
 
     /// Read the counter and every metadata page from the store, where they
-    /// cross the storage boundary, and hold them.
+    /// cross the storage boundary, and hold them. `trace` names each read,
+    /// here and once: no access reads them again.
     fn read_counter_and_pages(
         &mut self,
         spec: &StateObject,
         parameters: &OramParameters,
         cipher: &StoreCipher,
+        trace: &mut CallRecorder,
     ) -> Result<()> {
-        self.access_counter_slot = cipher.read_stored_record(
-            &format!("{}@counter", spec.name),
-            parameters.counter_record_len(),
-        )?;
+        let counter = format!("{}@counter", spec.name);
+        self.access_counter_slot =
+            cipher.read_stored_record(&counter, parameters.counter_record_len())?;
+        trace.physical_read(&spec.name, counter, self.access_counter_slot.len());
         self.directory_pages =
             read_metadata_pages(spec, parameters, cipher, parameters.metadata_pages)?;
+        for (page, sealed) in self.directory_pages.iter().enumerate() {
+            let location = format!("{}@meta{page}", spec.name);
+            trace.physical_read(&spec.name, location, sealed.len());
+        }
         Ok(())
     }
 }
@@ -818,10 +825,11 @@ impl OramState {
     pub(crate) fn clone_for_tx(
         &self,
         spec: &StateObject,
+        trace: &mut CallRecorder,
         allocator: &mut AllocatorSession,
     ) -> Result<Self> {
         let mut cloned = cold_clone_oram_state(spec, self)?;
-        cloned.refresh_from_storage(spec, allocator)?;
+        cloned.refresh_from_storage(spec, trace, allocator)?;
         Ok(cloned)
     }
 
@@ -1012,14 +1020,15 @@ impl OramState {
 
     /// Load the map for a call: read its counter and its metadata pages
     /// from the store, which the call holds until it commits, and open
-    /// them.
+    /// them. `trace` names those reads, the call's only reads of them.
     pub(crate) fn refresh_from_storage(
         &mut self,
         spec: &StateObject,
+        trace: &mut CallRecorder,
         allocator: &mut AllocatorSession,
     ) -> Result<()> {
         self.storage
-            .read_counter_and_pages(spec, &self.parameters, &self.cipher)?;
+            .read_counter_and_pages(spec, &self.parameters, &self.cipher, trace)?;
         self.access_counter = read_oram_counter_from_storage(
             spec,
             &self.cipher,
@@ -1368,7 +1377,9 @@ mod tests {
         state: &OramState,
     ) -> (Vec<MapEntry>, Vec<Option<usize>>) {
         let mut allocator = allocator_for_path_oram(&state.parameters);
-        let rebuilt = state.clone_for_tx(spec, &mut allocator).unwrap();
+        let rebuilt = state
+            .clone_for_tx(spec, &mut load_recorder(), &mut allocator)
+            .unwrap();
         (
             map_entries_snapshot(&rebuilt.entries),
             options_from_masked_position_map(&rebuilt.position_map),
@@ -1384,6 +1395,11 @@ mod tests {
             })
             .unwrap();
         shapes
+    }
+
+    /// A recorder for a load outside a call: nothing reads its trace.
+    fn load_recorder() -> crate::controller::CallRecorder {
+        crate::controller::CallRecorder::begin("load_test", &[])
     }
 
     /// A fresh map deployed into a store of its own, which keeps its
@@ -1402,7 +1418,9 @@ mod tests {
     fn loaded(spec: &StateObject, seed: u64) -> OramState {
         let mut state = deployed(spec, seed);
         let mut allocator = allocator_for_path_oram(&state.parameters);
-        state.refresh_from_storage(spec, &mut allocator).unwrap();
+        state
+            .refresh_from_storage(spec, &mut load_recorder(), &mut allocator)
+            .unwrap();
         allocator.finish().unwrap();
         state
     }
@@ -1414,7 +1432,7 @@ mod tests {
         let cipher = state.cipher.clone_for_runtime_state();
         state
             .storage
-            .read_counter_and_pages(spec, &parameters, &cipher)
+            .read_counter_and_pages(spec, &parameters, &cipher, &mut load_recorder())
             .unwrap();
     }
 
@@ -1583,7 +1601,9 @@ mod tests {
         state.stash.clear();
 
         let mut allocator = allocator_for_path_oram(&state.parameters);
-        let cloned = state.clone_for_tx(&spec, &mut allocator).unwrap();
+        let cloned = state
+            .clone_for_tx(&spec, &mut load_recorder(), &mut allocator)
+            .unwrap();
 
         assert_eq!(map_entries_snapshot(&cloned.entries), expected_entries);
         assert_eq!(cloned.position_map, expected_position_map);
@@ -1743,8 +1763,18 @@ mod tests {
         let stored = |location: &str| storage.record(location).unwrap();
 
         let mut allocator = allocator_for_path_oram(&committed.parameters);
-        let mut state = committed.clone_for_tx(&spec, &mut allocator).unwrap();
+        let mut recorder = load_recorder();
+        let mut state = committed
+            .clone_for_tx(&spec, &mut recorder, &mut allocator)
+            .unwrap();
         assert!(committed.holds_no_sealed_record());
+        // The load reads the counter and every metadata page, and the trace
+        // names each of those reads there, once.
+        let mut loaded = vec![format!("{}@counter", spec.name)];
+        loaded.extend(
+            (0..state.parameters.metadata_pages).map(|page| format!("{}@meta{page}", spec.name)),
+        );
+        assert_eq!(recorder.physical_read_locations(), loaded);
         // The load holds the counter and the metadata pages, as the store
         // keeps them, and no bucket.
         assert_eq!(
@@ -1806,12 +1836,17 @@ mod tests {
                 .collect()
         };
         let mut old_allocator = allocator_for_path_oram(&old.parameters);
-        old.refresh_from_storage(&spec, &mut old_allocator).unwrap();
+        old.refresh_from_storage(&spec, &mut load_recorder(), &mut old_allocator)
+            .unwrap();
         old_allocator.finish().unwrap();
         old.cold_commit();
         let expected_entries = {
             let mut allocator = allocator_for_path_oram(&old.parameters);
-            map_entries_snapshot(&old.clone_for_tx(&spec, &mut allocator).unwrap().entries)
+            map_entries_snapshot(
+                &old.clone_for_tx(&spec, &mut load_recorder(), &mut allocator)
+                    .unwrap()
+                    .entries,
+            )
         };
         // What the committed map holds of its contents in the clear is not
         // what a call reads: a call reads the store.
@@ -1826,7 +1861,9 @@ mod tests {
         let old_counter = storage.record(&format!("{}@counter", spec.name)).unwrap();
 
         let mut shadow_allocator = allocator_for_path_oram(&old.parameters);
-        let mut new = old.clone_for_tx(&spec, &mut shadow_allocator).unwrap();
+        let mut new = old
+            .clone_for_tx(&spec, &mut load_recorder(), &mut shadow_allocator)
+            .unwrap();
         shadow_allocator.finish().unwrap();
         assert!(old.holds_no_sealed_record());
         let entries_ptr = new.entries.as_ptr();
@@ -1870,7 +1907,9 @@ mod tests {
         next.cold_commit();
         assert!(next.holds_no_sealed_record());
         let mut refresh_allocator = allocator_for_path_oram(&next.parameters);
-        let rebuilt = next.clone_for_tx(&spec, &mut refresh_allocator).unwrap();
+        let rebuilt = next
+            .clone_for_tx(&spec, &mut load_recorder(), &mut refresh_allocator)
+            .unwrap();
         refresh_allocator.finish().unwrap();
         assert_eq!(map_entries_snapshot(&rebuilt.entries), expected_entries);
     }
@@ -2304,7 +2343,9 @@ mod tests {
         let storage = state.cipher.storage().unwrap().clone();
         let mut allocator = allocator_for_path_oram(&state.parameters);
         let reads_before = storage.stats().reads;
-        let cloned = state.clone_for_tx(&spec, &mut allocator).unwrap();
+        let cloned = state
+            .clone_for_tx(&spec, &mut load_recorder(), &mut allocator)
+            .unwrap();
         let reads = storage.stats().reads - reads_before;
         assert_eq!(reads as usize, 1 + state.parameters.metadata_pages);
         assert!(cloned.storage.buckets.holds_none());
@@ -2341,7 +2382,9 @@ mod tests {
         put_stored_bucket(&state, &spec, leaf_bucket, &bucket);
 
         let mut allocator = allocator_for_path_oram(&state.parameters);
-        state.refresh_from_storage(&spec, &mut allocator).unwrap();
+        state
+            .refresh_from_storage(&spec, &mut load_recorder(), &mut allocator)
+            .unwrap();
         let mut leaf_coins = PathOramLeafCoinSource::random();
         let (value, transcript, failed) = state
             .get(
@@ -2384,7 +2427,9 @@ mod tests {
         put_stored_bucket(&state, &spec, 0, &bucket);
 
         let mut allocator = allocator_for_path_oram(&state.parameters);
-        state.refresh_from_storage(&spec, &mut allocator).unwrap();
+        state
+            .refresh_from_storage(&spec, &mut load_recorder(), &mut allocator)
+            .unwrap();
         let mut leaf_coins = PathOramLeafCoinSource::random();
         let (_value, _transcript, failed) = state
             .get(
@@ -2422,7 +2467,9 @@ mod tests {
         );
 
         let mut allocator = allocator_for_path_oram(&state.parameters);
-        state.refresh_from_storage(&spec, &mut allocator).unwrap();
+        state
+            .refresh_from_storage(&spec, &mut load_recorder(), &mut allocator)
+            .unwrap();
         let mut leaf_coins = PathOramLeafCoinSource::random();
         let (_value, _transcript, failed) = state
             .get(
@@ -2469,7 +2516,9 @@ mod tests {
         put_stored_bucket(&state, &spec, off_path_bucket, &bucket);
 
         let mut allocator = allocator_for_path_oram(&state.parameters);
-        state.refresh_from_storage(&spec, &mut allocator).unwrap();
+        state
+            .refresh_from_storage(&spec, &mut load_recorder(), &mut allocator)
+            .unwrap();
         // A read of an absent key whose path, to leaf 0, runs through the
         // tampered bucket.
         let mut leaf_coins = PathOramLeafCoinSource::require_injected();

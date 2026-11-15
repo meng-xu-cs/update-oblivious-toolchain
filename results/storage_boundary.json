@@ -8,8 +8,6 @@
         {
           "aborted": false,
           "entrypoint": "classify(uint256)",
-          "held_unit_bytes_named_again": 0,
-          "held_unit_reads_named_again": 0,
           "role": "target",
           "store": {
             "read_bytes": 64,
@@ -18,7 +16,7 @@
             "written_bytes": 64
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
@@ -32,8 +30,6 @@
         {
           "aborted": false,
           "entrypoint": "peek()",
-          "held_unit_bytes_named_again": 0,
-          "held_unit_reads_named_again": 0,
           "role": "getter",
           "store": {
             "read_bytes": 64,
@@ -42,7 +38,7 @@
             "written_bytes": 0
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
@@ -66,8 +62,6 @@
         {
           "aborted": false,
           "entrypoint": "seed(uint256,bytes32)",
-          "held_unit_bytes_named_again": 0,
-          "held_unit_reads_named_again": 0,
           "role": "setup",
           "store": {
             "read_bytes": 256,
@@ -76,7 +70,7 @@
             "written_bytes": 256
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
@@ -90,8 +84,6 @@
         {
           "aborted": false,
           "entrypoint": "seed(uint256,bytes32)",
-          "held_unit_bytes_named_again": 0,
-          "held_unit_reads_named_again": 0,
           "role": "setup",
           "store": {
             "read_bytes": 256,
@@ -100,7 +92,7 @@
             "written_bytes": 256
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
@@ -114,8 +106,6 @@
         {
           "aborted": false,
           "entrypoint": "auth(bytes32)",
-          "held_unit_bytes_named_again": 0,
-          "held_unit_reads_named_again": 0,
           "role": "target",
           "store": {
             "read_bytes": 320,
@@ -124,7 +114,7 @@
             "written_bytes": 64
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
@@ -138,8 +128,6 @@
         {
           "aborted": false,
           "entrypoint": "readLast()",
-          "held_unit_bytes_named_again": 0,
-          "held_unit_reads_named_again": 0,
           "role": "getter",
           "store": {
             "read_bytes": 64,
@@ -148,7 +136,7 @@
             "written_bytes": 0
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
@@ -173,8 +161,6 @@
         {
           "aborted": false,
           "entrypoint": "deposit(bytes32,uint256)",
-          "held_unit_bytes_named_again": 0,
-          "held_unit_reads_named_again": 0,
           "role": "target",
           "store": {
             "read_bytes": 832,
@@ -183,7 +169,7 @@
             "written_bytes": 832
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
@@ -208,8 +194,6 @@
         {
           "aborted": false,
           "entrypoint": "deposit(bytes32,uint256)",
-          "held_unit_bytes_named_again": 0,
-          "held_unit_reads_named_again": 0,
           "role": "target",
           "store": {
             "read_bytes": 6208,
@@ -218,7 +202,7 @@
             "written_bytes": 6208
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
@@ -243,8 +227,6 @@
         {
           "aborted": false,
           "entrypoint": "deposit(bytes32,uint256)",
-          "held_unit_bytes_named_again": 11328,
-          "held_unit_reads_named_again": 17,
           "role": "target",
           "store": {
             "read_bytes": 18112,
@@ -253,13 +235,13 @@
             "written_bytes": 29440
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
             "public_writes": 0,
-            "sealed_read_bytes": 29440,
-            "sealed_reads": 49,
+            "sealed_read_bytes": 18112,
+            "sealed_reads": 32,
             "sealed_writes": 49,
             "sealed_written_bytes": 29440
           }
@@ -278,8 +260,6 @@
         {
           "aborted": false,
           "entrypoint": "deposit(bytes32,uint256)",
-          "held_unit_bytes_named_again": 27616,
-          "held_unit_reads_named_again": 69,
           "role": "target",
           "store": {
             "read_bytes": 297088,
@@ -288,13 +268,13 @@
             "written_bytes": 324704
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
             "public_writes": 0,
-            "sealed_read_bytes": 324704,
-            "sealed_reads": 501,
+            "sealed_read_bytes": 297088,
+            "sealed_reads": 432,
             "sealed_writes": 501,
             "sealed_written_bytes": 324704
           }
@@ -313,8 +293,6 @@
         {
           "aborted": false,
           "entrypoint": "deposit(bytes32,uint256)",
-          "held_unit_bytes_named_again": 0,
-          "held_unit_reads_named_again": 0,
           "role": "setup",
           "store": {
             "read_bytes": 832,
@@ -323,7 +301,7 @@
             "written_bytes": 832
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
@@ -337,8 +315,6 @@
         {
           "aborted": false,
           "entrypoint": "withdraw(bytes32,uint256)",
-          "held_unit_bytes_named_again": 0,
-          "held_unit_reads_named_again": 0,
           "role": "target",
           "store": {
             "read_bytes": 832,
@@ -347,7 +323,7 @@
             "written_bytes": 832
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
@@ -361,8 +337,6 @@
         {
           "aborted": false,
           "entrypoint": "balanceOf(bytes32)",
-          "held_unit_bytes_named_again": 0,
-          "held_unit_reads_named_again": 0,
           "role": "getter",
           "store": {
             "read_bytes": 768,
@@ -371,7 +345,7 @@
             "written_bytes": 0
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
@@ -385,8 +359,6 @@
         {
           "aborted": false,
           "entrypoint": "totalValue()",
-          "held_unit_bytes_named_again": 0,
-          "held_unit_reads_named_again": 0,
           "role": "getter",
           "store": {
             "read_bytes": 64,
@@ -395,7 +367,7 @@
             "written_bytes": 0
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
@@ -420,8 +392,6 @@
         {
           "aborted": false,
           "entrypoint": "deposit(bytes32,uint256)",
-          "held_unit_bytes_named_again": 0,
-          "held_unit_reads_named_again": 0,
           "role": "setup",
           "store": {
             "read_bytes": 6208,
@@ -430,7 +400,7 @@
             "written_bytes": 6208
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
@@ -444,8 +414,6 @@
         {
           "aborted": false,
           "entrypoint": "withdraw(bytes32,uint256)",
-          "held_unit_bytes_named_again": 0,
-          "held_unit_reads_named_again": 0,
           "role": "target",
           "store": {
             "read_bytes": 6208,
@@ -454,7 +422,7 @@
             "written_bytes": 6208
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
@@ -468,8 +436,6 @@
         {
           "aborted": false,
           "entrypoint": "balanceOf(bytes32)",
-          "held_unit_bytes_named_again": 0,
-          "held_unit_reads_named_again": 0,
           "role": "getter",
           "store": {
             "read_bytes": 6144,
@@ -478,7 +444,7 @@
             "written_bytes": 0
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
@@ -492,8 +458,6 @@
         {
           "aborted": false,
           "entrypoint": "totalValue()",
-          "held_unit_bytes_named_again": 0,
-          "held_unit_reads_named_again": 0,
           "role": "getter",
           "store": {
             "read_bytes": 64,
@@ -502,7 +466,7 @@
             "written_bytes": 0
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
@@ -527,8 +491,6 @@
         {
           "aborted": false,
           "entrypoint": "deposit(bytes32,uint256)",
-          "held_unit_bytes_named_again": 11328,
-          "held_unit_reads_named_again": 17,
           "role": "setup",
           "store": {
             "read_bytes": 18112,
@@ -537,13 +499,13 @@
             "written_bytes": 29440
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
             "public_writes": 0,
-            "sealed_read_bytes": 29440,
-            "sealed_reads": 49,
+            "sealed_read_bytes": 18112,
+            "sealed_reads": 32,
             "sealed_writes": 49,
             "sealed_written_bytes": 29440
           }
@@ -551,8 +513,6 @@
         {
           "aborted": false,
           "entrypoint": "withdraw(bytes32,uint256)",
-          "held_unit_bytes_named_again": 11328,
-          "held_unit_reads_named_again": 17,
           "role": "target",
           "store": {
             "read_bytes": 18112,
@@ -561,13 +521,13 @@
             "written_bytes": 29440
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
             "public_writes": 0,
-            "sealed_read_bytes": 29440,
-            "sealed_reads": 49,
+            "sealed_read_bytes": 18112,
+            "sealed_reads": 32,
             "sealed_writes": 49,
             "sealed_written_bytes": 29440
           }
@@ -575,8 +535,6 @@
         {
           "aborted": false,
           "entrypoint": "balanceOf(bytes32)",
-          "held_unit_bytes_named_again": 0,
-          "held_unit_reads_named_again": 0,
           "role": "getter",
           "store": {
             "read_bytes": 14688,
@@ -585,7 +543,7 @@
             "written_bytes": 14688
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
@@ -599,8 +557,6 @@
         {
           "aborted": false,
           "entrypoint": "totalValue()",
-          "held_unit_bytes_named_again": 0,
-          "held_unit_reads_named_again": 0,
           "role": "getter",
           "store": {
             "read_bytes": 64,
@@ -609,7 +565,7 @@
             "written_bytes": 0
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
@@ -634,8 +590,6 @@
         {
           "aborted": false,
           "entrypoint": "deposit(bytes32,uint256)",
-          "held_unit_bytes_named_again": 27616,
-          "held_unit_reads_named_again": 69,
           "role": "setup",
           "store": {
             "read_bytes": 297088,
@@ -644,13 +598,13 @@
             "written_bytes": 324704
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
             "public_writes": 0,
-            "sealed_read_bytes": 324704,
-            "sealed_reads": 501,
+            "sealed_read_bytes": 297088,
+            "sealed_reads": 432,
             "sealed_writes": 501,
             "sealed_written_bytes": 324704
           }
@@ -658,8 +612,6 @@
         {
           "aborted": false,
           "entrypoint": "withdraw(bytes32,uint256)",
-          "held_unit_bytes_named_again": 27616,
-          "held_unit_reads_named_again": 69,
           "role": "target",
           "store": {
             "read_bytes": 297088,
@@ -668,13 +620,13 @@
             "written_bytes": 324704
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
             "public_writes": 0,
-            "sealed_read_bytes": 324704,
-            "sealed_reads": 501,
+            "sealed_read_bytes": 297088,
+            "sealed_reads": 432,
             "sealed_writes": 501,
             "sealed_written_bytes": 324704
           }
@@ -682,8 +634,6 @@
         {
           "aborted": false,
           "entrypoint": "balanceOf(bytes32)",
-          "held_unit_bytes_named_again": 640,
-          "held_unit_reads_named_again": 10,
           "role": "getter",
           "store": {
             "read_bytes": 91392,
@@ -692,13 +642,13 @@
             "written_bytes": 92032
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
             "public_writes": 0,
-            "sealed_read_bytes": 92032,
-            "sealed_reads": 135,
+            "sealed_read_bytes": 91392,
+            "sealed_reads": 125,
             "sealed_writes": 135,
             "sealed_written_bytes": 92032
           }
@@ -706,8 +656,6 @@
         {
           "aborted": false,
           "entrypoint": "totalValue()",
-          "held_unit_bytes_named_again": 0,
-          "held_unit_reads_named_again": 0,
           "role": "getter",
           "store": {
             "read_bytes": 64,
@@ -716,7 +664,7 @@
             "written_bytes": 0
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
@@ -741,8 +689,6 @@
         {
           "aborted": false,
           "entrypoint": "mint(address,uint256)",
-          "held_unit_bytes_named_again": 0,
-          "held_unit_reads_named_again": 0,
           "role": "setup",
           "store": {
             "read_bytes": 768,
@@ -751,7 +697,7 @@
             "written_bytes": 768
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
@@ -765,8 +711,6 @@
         {
           "aborted": false,
           "entrypoint": "approve(address,address,uint256)",
-          "held_unit_bytes_named_again": 0,
-          "held_unit_reads_named_again": 0,
           "role": "setup",
           "store": {
             "read_bytes": 1536,
@@ -775,7 +719,7 @@
             "written_bytes": 1536
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
@@ -789,8 +733,6 @@
         {
           "aborted": false,
           "entrypoint": "transferFrom(address,address,address,uint256)",
-          "held_unit_bytes_named_again": 0,
-          "held_unit_reads_named_again": 0,
           "role": "target",
           "store": {
             "read_bytes": 2304,
@@ -799,7 +741,7 @@
             "written_bytes": 2304
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
@@ -813,8 +755,6 @@
         {
           "aborted": false,
           "entrypoint": "balanceOf(address)",
-          "held_unit_bytes_named_again": 0,
-          "held_unit_reads_named_again": 0,
           "role": "getter",
           "store": {
             "read_bytes": 768,
@@ -823,7 +763,7 @@
             "written_bytes": 0
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
@@ -837,8 +777,6 @@
         {
           "aborted": false,
           "entrypoint": "balanceOf(address)",
-          "held_unit_bytes_named_again": 0,
-          "held_unit_reads_named_again": 0,
           "role": "getter",
           "store": {
             "read_bytes": 768,
@@ -847,7 +785,7 @@
             "written_bytes": 0
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
@@ -861,8 +799,6 @@
         {
           "aborted": false,
           "entrypoint": "allowanceOf(address,address)",
-          "held_unit_bytes_named_again": 0,
-          "held_unit_reads_named_again": 0,
           "role": "getter",
           "store": {
             "read_bytes": 1536,
@@ -871,7 +807,7 @@
             "written_bytes": 0
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
@@ -896,8 +832,6 @@
         {
           "aborted": false,
           "entrypoint": "mint(address,uint256)",
-          "held_unit_bytes_named_again": 9792,
-          "held_unit_reads_named_again": 17,
           "role": "setup",
           "store": {
             "read_bytes": 15616,
@@ -906,13 +840,13 @@
             "written_bytes": 25408
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
             "public_writes": 0,
-            "sealed_read_bytes": 25408,
-            "sealed_reads": 48,
+            "sealed_read_bytes": 15616,
+            "sealed_reads": 31,
             "sealed_writes": 48,
             "sealed_written_bytes": 25408
           }
@@ -920,8 +854,6 @@
         {
           "aborted": false,
           "entrypoint": "approve(address,address,uint256)",
-          "held_unit_bytes_named_again": 0,
-          "held_unit_reads_named_again": 0,
           "role": "setup",
           "store": {
             "read_bytes": 26432,
@@ -930,7 +862,7 @@
             "written_bytes": 26432
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
@@ -944,8 +876,6 @@
         {
           "aborted": false,
           "entrypoint": "transferFrom(address,address,address,uint256)",
-          "held_unit_bytes_named_again": 51968,
-          "held_unit_reads_named_again": 84,
           "role": "target",
           "store": {
             "read_bytes": 51712,
@@ -954,13 +884,13 @@
             "written_bytes": 103680
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
             "public_writes": 0,
-            "sealed_read_bytes": 103680,
-            "sealed_reads": 178,
+            "sealed_read_bytes": 51712,
+            "sealed_reads": 94,
             "sealed_writes": 178,
             "sealed_written_bytes": 103680
           }
@@ -968,8 +898,6 @@
         {
           "aborted": false,
           "entrypoint": "balanceOf(address)",
-          "held_unit_bytes_named_again": 0,
-          "held_unit_reads_named_again": 0,
           "role": "getter",
           "store": {
             "read_bytes": 12704,
@@ -978,7 +906,7 @@
             "written_bytes": 12704
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
@@ -992,8 +920,6 @@
         {
           "aborted": false,
           "entrypoint": "balanceOf(address)",
-          "held_unit_bytes_named_again": 0,
-          "held_unit_reads_named_again": 0,
           "role": "getter",
           "store": {
             "read_bytes": 12704,
@@ -1002,7 +928,7 @@
             "written_bytes": 12704
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
@@ -1016,8 +942,6 @@
         {
           "aborted": false,
           "entrypoint": "allowanceOf(address,address)",
-          "held_unit_bytes_named_again": 0,
-          "held_unit_reads_named_again": 0,
           "role": "getter",
           "store": {
             "read_bytes": 26432,
@@ -1026,7 +950,7 @@
             "written_bytes": 26432
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
@@ -1051,8 +975,6 @@
         {
           "aborted": false,
           "entrypoint": "mint(address,uint256)",
-          "held_unit_bytes_named_again": 25216,
-          "held_unit_reads_named_again": 69,
           "role": "setup",
           "store": {
             "read_bytes": 268704,
@@ -1061,13 +983,13 @@
             "written_bytes": 293920
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
             "public_writes": 0,
-            "sealed_read_bytes": 293920,
-            "sealed_reads": 500,
+            "sealed_read_bytes": 268704,
+            "sealed_reads": 431,
             "sealed_writes": 500,
             "sealed_written_bytes": 293920
           }
@@ -1075,8 +997,6 @@
         {
           "aborted": false,
           "entrypoint": "approve(address,address,uint256)",
-          "held_unit_bytes_named_again": 0,
-          "held_unit_reads_named_again": 0,
           "role": "setup",
           "store": {
             "read_bytes": 26432,
@@ -1085,7 +1005,7 @@
             "written_bytes": 26432
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
@@ -1099,8 +1019,6 @@
         {
           "aborted": false,
           "entrypoint": "transferFrom(address,address,address,uint256)",
-          "held_unit_bytes_named_again": 95488,
-          "held_unit_reads_named_again": 197,
           "role": "target",
           "store": {
             "read_bytes": 545216,
@@ -1109,13 +1027,13 @@
             "written_bytes": 640704
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
             "public_writes": 0,
-            "sealed_read_bytes": 640704,
-            "sealed_reads": 1082,
+            "sealed_read_bytes": 545216,
+            "sealed_reads": 885,
             "sealed_writes": 1082,
             "sealed_written_bytes": 640704
           }
@@ -1123,8 +1041,6 @@
         {
           "aborted": false,
           "entrypoint": "balanceOf(address)",
-          "held_unit_bytes_named_again": 640,
-          "held_unit_reads_named_again": 10,
           "role": "getter",
           "store": {
             "read_bytes": 82656,
@@ -1133,13 +1049,13 @@
             "written_bytes": 83296
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
             "public_writes": 0,
-            "sealed_read_bytes": 83296,
-            "sealed_reads": 135,
+            "sealed_read_bytes": 82656,
+            "sealed_reads": 125,
             "sealed_writes": 135,
             "sealed_written_bytes": 83296
           }
@@ -1147,8 +1063,6 @@
         {
           "aborted": false,
           "entrypoint": "balanceOf(address)",
-          "held_unit_bytes_named_again": 640,
-          "held_unit_reads_named_again": 10,
           "role": "getter",
           "store": {
             "read_bytes": 82656,
@@ -1157,13 +1071,13 @@
             "written_bytes": 83296
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
             "public_writes": 0,
-            "sealed_read_bytes": 83296,
-            "sealed_reads": 135,
+            "sealed_read_bytes": 82656,
+            "sealed_reads": 125,
             "sealed_writes": 135,
             "sealed_written_bytes": 83296
           }
@@ -1171,8 +1085,6 @@
         {
           "aborted": false,
           "entrypoint": "allowanceOf(address,address)",
-          "held_unit_bytes_named_again": 0,
-          "held_unit_reads_named_again": 0,
           "role": "getter",
           "store": {
             "read_bytes": 26432,
@@ -1181,7 +1093,7 @@
             "written_bytes": 26432
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
@@ -1206,8 +1118,6 @@
         {
           "aborted": false,
           "entrypoint": "upsert(bytes32,uint256)",
-          "held_unit_bytes_named_again": 0,
-          "held_unit_reads_named_again": 0,
           "role": "setup",
           "store": {
             "read_bytes": 768,
@@ -1216,7 +1126,7 @@
             "written_bytes": 768
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
@@ -1230,8 +1140,6 @@
         {
           "aborted": false,
           "entrypoint": "clearIfMatch(bytes32,uint256)",
-          "held_unit_bytes_named_again": 0,
-          "held_unit_reads_named_again": 0,
           "role": "target",
           "store": {
             "read_bytes": 768,
@@ -1240,7 +1148,7 @@
             "written_bytes": 768
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
@@ -1254,8 +1162,6 @@
         {
           "aborted": false,
           "entrypoint": "read(bytes32)",
-          "held_unit_bytes_named_again": 0,
-          "held_unit_reads_named_again": 0,
           "role": "getter",
           "store": {
             "read_bytes": 768,
@@ -1264,7 +1170,7 @@
             "written_bytes": 0
           },
           "store_classifies_every_write_as_update": true,
-          "store_reads_equal_traced_reads_but_for_held_units": true,
+          "store_reads_equal_traced_reads": true,
           "store_writes_equal_traced_writes": true,
           "trace": {
             "public_reads": 0,
@@ -1287,7 +1193,7 @@
     "a_record_reaches_the_store_only_under_a_reserved_nonce": true,
     "every_restart_continues_its_deployment": true,
     "store_log_agrees_with_trace_in_every_call": true,
-    "store_reads_and_reads_named_again_are_the_traced_reads": true,
+    "store_reads_are_the_traced_reads": true,
     "store_writes_are_the_traced_writes": true
   },
   "coverage": {
@@ -1323,7 +1229,6 @@
       "store_holds_what_it_held": true
     }
   ],
-  "held_units": "a call opens the counter and the metadata pages of a Path ORAM map once, when it loads the map; the trace names the counter at every access, and the metadata pages at every access of the local scheme and every operation of the tree; the store sees each once",
   "nonce_reservation": {
     "a_deployment_reserves_before_it_hands_over_a_record": true,
     "holds": true,
@@ -1333,9 +1238,10 @@
     "record_refused_with_nothing_reserved": true,
     "record_taken_once_its_count_is_reserved": true
   },
+  "oram_reads": "a call reads the counter and the metadata pages of an ORAM map once, where it loads the map, and holds them through the call; each access reads its buckets; the trace names each of those reads where the call makes it",
   "provenance": {
     "restart": "a seeded deployment restarts from a store in files; the sync policy is off, so the report times no device",
-    "toolchain_manifest_sha256": "742b7e75ca925b1fc168e5e1f119a9657dee326bcfb91d6a807273ccca2bcea3"
+    "toolchain_manifest_sha256": "dbca0034cf15045bcf51b1eede921ec9618bba1b1456256ee363b01486a28290"
   },
   "restarts": [
     {
@@ -1643,12 +1549,11 @@
       "stale_attested_counter_refused": true
     }
   ],
-  "schema": "uo-storage-boundary-v1",
+  "schema": "uo-storage-boundary-v2",
   "totals": {
-    "held_unit_reads_named_again": 655,
     "store_reads": 3862,
     "store_writes": 4395,
-    "traced_sealed_reads": 4517,
+    "traced_sealed_reads": 3862,
     "traced_sealed_writes": 4395
   },
   "what_is_compared": "the log a storage adapter keeps of the sealed records the runtime opens and seals, against the physical reads and writes of sealed objects in the call's trace"

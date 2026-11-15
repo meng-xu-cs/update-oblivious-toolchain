@@ -3326,7 +3326,7 @@
       "controller_phase_count": 8,
       "entrypoint": "put(bytes32,uint256)",
       "exit_events": 10,
-      "gas_used": 2757,
+      "gas_used": 2612,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 4,
         "expected_kernel_step_public_object_schedule": [
@@ -3644,7 +3644,7 @@
       "controller_phase_count": 8,
       "entrypoint": "put(bytes32,uint256)",
       "exit_events": 10,
-      "gas_used": 2757,
+      "gas_used": 2612,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 4,
         "expected_kernel_step_public_object_schedule": [
@@ -3948,7 +3948,7 @@
         "secret_arg_count": 2,
         "statement_count": 2
       },
-      "confidential_proof_bundle_family_json_bytes": 182873,
+      "confidential_proof_bundle_family_json_bytes": 180254,
       "confidential_slot_program": {
         "entrypoint_id": "add(bytes32,uint256)",
         "expected_runtime_step_count": 5,
@@ -3962,7 +3962,7 @@
       "controller_phase_count": 13,
       "entrypoint": "add(bytes32,uint256)",
       "exit_events": 16,
-      "gas_used": 3376,
+      "gas_used": 3086,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 5,
         "expected_kernel_step_public_object_schedule": [
@@ -4339,7 +4339,7 @@
         "secret_arg_count": 2,
         "statement_count": 2
       },
-      "confidential_proof_bundle_family_json_bytes": 182873,
+      "confidential_proof_bundle_family_json_bytes": 180254,
       "confidential_slot_program": {
         "entrypoint_id": "add(bytes32,uint256)",
         "expected_runtime_step_count": 5,
@@ -4353,7 +4353,7 @@
       "controller_phase_count": 13,
       "entrypoint": "add(bytes32,uint256)",
       "exit_events": 16,
-      "gas_used": 3376,
+      "gas_used": 3086,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 5,
         "expected_kernel_step_public_object_schedule": [
@@ -4730,7 +4730,7 @@
         "secret_arg_count": 2,
         "statement_count": 3
       },
-      "confidential_proof_bundle_family_json_bytes": 354094,
+      "confidential_proof_bundle_family_json_bytes": 344851,
       "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
@@ -4744,7 +4744,7 @@
       "controller_phase_count": 13,
       "entrypoint": "deposit(bytes32,uint256)",
       "exit_events": 16,
-      "gas_used": 5445,
+      "gas_used": 4459,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 7,
         "expected_kernel_step_public_object_schedule": [
@@ -5190,7 +5190,7 @@
         "secret_arg_count": 4,
         "statement_count": 9
       },
-      "confidential_proof_bundle_family_json_bytes": 1074016,
+      "confidential_proof_bundle_family_json_bytes": 1027072,
       "confidential_slot_program": {
         "entrypoint_id": "transferFrom(address,address,address,uint256)",
         "expected_runtime_step_count": 9,
@@ -5204,7 +5204,7 @@
       "controller_phase_count": 33,
       "entrypoint": "transferFrom(address,address,address,uint256)",
       "exit_events": 40,
-      "gas_used": 14097,
+      "gas_used": 10211,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 9,
         "expected_kernel_step_public_object_schedule": [

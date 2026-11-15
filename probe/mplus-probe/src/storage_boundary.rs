@@ -12,16 +12,12 @@
 //!
 //! - The store's writes are the trace's writes of sealed objects, one for
 //!   one and in order, and the store classifies each as an `Update`.
-//! - The store's reads of an exact object (a cell, an array, a full-scan
-//!   map) are the trace's reads of it.
-//! - The store's reads of a Path ORAM map are the trace's reads of it with
-//!   one difference. The runtime opens the map's counter and metadata pages
-//!   once, when the call loads the map, and holds them through the call. The
-//!   trace names the counter at every access, and the metadata pages at
-//!   every access of the local scheme and every operation of the tree. The
-//!   store sees each of those records once, and every bucket read.
-//! - So every read the store sees is one the trace names. The report counts
-//!   the reads the trace names again and the store does not see.
+//! - The store's reads of each sealed object are the trace's reads of it,
+//!   one for one and in order: every slot of an exact object (a cell, an
+//!   array, a full-scan map), where the call loads it; and the counter and
+//!   the metadata pages of an ORAM map, where the call loads the map and
+//!   which it holds through the call, then the buckets of each access.
+//! - So the store sees every read the trace names, and no other.
 //!
 //! The report then runs each benchmark on a store that keeps its records in
 //! files, drops the runtime after the workload's calls, and starts another
@@ -45,26 +41,17 @@ use uo_evm::{
     SyncPolicy,
 };
 
-pub(crate) const STORAGE_BOUNDARY_SCHEMA: &str = "uo-storage-boundary-v1";
+pub(crate) const STORAGE_BOUNDARY_SCHEMA: &str = "uo-storage-boundary-v2";
 
-/// A sealed object of an artifact and whether it is a Path ORAM map, whose
-/// counter and metadata pages a call holds open.
-fn sealed_objects(artifact: &CompiledArtifact) -> BTreeMap<String, bool> {
+/// The sealed objects of an artifact.
+fn sealed_objects(artifact: &CompiledArtifact) -> BTreeSet<String> {
     artifact
         .contract
         .state
         .iter()
         .filter(|object| object.backend != BackendKind::Raw)
-        .map(|object| (object.name.clone(), object.backend == BackendKind::Oram))
+        .map(|object| object.name.clone())
         .collect()
-}
-
-/// Whether `location` is a unit of an ORAM map that a call holds open once
-/// it has loaded the map: the counter or a metadata page.
-fn is_held_unit(object: &str, location: &str) -> bool {
-    location
-        .strip_prefix(object)
-        .is_some_and(|unit| unit == "@counter" || unit.starts_with("@meta"))
 }
 
 /// What one call's store log and trace say, and whether they agree.
@@ -80,13 +67,9 @@ struct CallComparison {
     traced_written_bytes: usize,
     traced_public_reads: usize,
     traced_public_writes: usize,
-    /// Reads of a held unit that the trace names after the call's first
-    /// read of the unit, which the store does not see.
-    reads_named_again: usize,
-    bytes_named_again: usize,
     store_writes_equal_traced_writes: bool,
     store_classifies_every_write_as_update: bool,
-    store_reads_equal_traced_reads_but_for_held_units: bool,
+    store_reads_equal_traced_reads: bool,
     /// The first difference, for a report that fails.
     difference: Option<String>,
 }
@@ -103,7 +86,7 @@ fn compare_call(
         .physical_writes
         .events()
         .filter_map(|event| {
-            if sealed.contains_key(&event.object) {
+            if sealed.contains(&event.object) {
                 Some((event.object, event.location, event.len, event.class))
             } else {
                 comparison.traced_public_writes += 1;
@@ -144,25 +127,16 @@ fn compare_call(
         ));
     }
 
-    // Per object: the trace's reads with each held unit at its first read
-    // only, against the store's reads.
-    let mut seen_held: BTreeSet<String> = BTreeSet::new();
+    // Per object: the trace's reads against the store's, one for one and in
+    // order.
     let mut traced_reads: BTreeMap<String, Vec<(String, usize)>> = BTreeMap::new();
     for event in receipt.physical_reads.events() {
-        let Some(is_oram) = sealed.get(&event.object) else {
+        if !sealed.contains(&event.object) {
             comparison.traced_public_reads += 1;
             continue;
-        };
+        }
         comparison.traced_reads += 1;
         comparison.traced_read_bytes += event.len;
-        if *is_oram
-            && is_held_unit(&event.object, &event.location)
-            && !seen_held.insert(event.location.clone())
-        {
-            comparison.reads_named_again += 1;
-            comparison.bytes_named_again += event.len;
-            continue;
-        }
         traced_reads
             .entry(event.object)
             .or_default()
@@ -184,10 +158,8 @@ fn compare_call(
                 .push((location.clone(), *len));
         }
     }
-    comparison.store_reads_equal_traced_reads_but_for_held_units = store_reads == traced_reads;
-    if !comparison.store_reads_equal_traced_reads_but_for_held_units
-        && comparison.difference.is_none()
-    {
+    comparison.store_reads_equal_traced_reads = store_reads == traced_reads;
+    if !comparison.store_reads_equal_traced_reads && comparison.difference.is_none() {
         let objects: BTreeSet<&String> = store_reads.keys().chain(traced_reads.keys()).collect();
         for object in objects {
             let store = store_reads.get(object).map(Vec::as_slice).unwrap_or(&[]);
@@ -214,7 +186,7 @@ impl CallComparison {
     fn agrees(&self) -> bool {
         self.store_writes_equal_traced_writes
             && self.store_classifies_every_write_as_update
-            && self.store_reads_equal_traced_reads_but_for_held_units
+            && self.store_reads_equal_traced_reads
     }
 
     fn row(&self, role: &str, call: &CallSpec, aborted: bool) -> JsonValue {
@@ -236,12 +208,9 @@ impl CallComparison {
                 "public_reads": self.traced_public_reads,
                 "public_writes": self.traced_public_writes,
             },
-            "held_unit_reads_named_again": self.reads_named_again,
-            "held_unit_bytes_named_again": self.bytes_named_again,
             "store_writes_equal_traced_writes": self.store_writes_equal_traced_writes,
             "store_classifies_every_write_as_update": self.store_classifies_every_write_as_update,
-            "store_reads_equal_traced_reads_but_for_held_units":
-                self.store_reads_equal_traced_reads_but_for_held_units,
+            "store_reads_equal_traced_reads": self.store_reads_equal_traced_reads,
         });
         if let Some(difference) = &self.difference {
             row["first_difference"] = json!(difference);
@@ -295,7 +264,6 @@ struct BoundaryTotals {
     store_writes: usize,
     traced_reads: usize,
     traced_writes: usize,
-    reads_named_again: usize,
 }
 
 /// Run a workload on a store in memory and compare each call's log with its
@@ -325,7 +293,6 @@ fn run_boundary(
         totals.store_writes += comparison.store_writes;
         totals.traced_reads += comparison.traced_reads;
         totals.traced_writes += comparison.traced_writes;
-        totals.reads_named_again += comparison.reads_named_again;
         calls.push(comparison.row(role, call, result.aborted));
         if role == "getter" {
             getters.push((result.return_value, result.trace.receipt));
@@ -335,7 +302,7 @@ fn run_boundary(
         row: json!({
             "benchmark": workload.label,
             "backend": backend,
-            "sealed_objects": sealed_objects(artifact).keys().collect::<Vec<_>>(),
+            "sealed_objects": sealed_objects(artifact).into_iter().collect::<Vec<_>>(),
             "calls": calls,
             "store_log_agrees_with_trace": agrees,
         }),
@@ -360,7 +327,7 @@ fn nonce_state(
     artifact: &CompiledArtifact,
 ) -> BTreeMap<String, (Vec<u64>, u64)> {
     sealed_objects(artifact)
-        .into_keys()
+        .into_iter()
         .map(|object| {
             let state = storage.with(|adapter| {
                 (
@@ -559,7 +526,7 @@ fn nonce_reservation(artifact: &CompiledArtifact) -> Result<JsonValue> {
         storage.clone(),
     )?;
     let object = sealed_objects(artifact)
-        .into_keys()
+        .into_iter()
         .next()
         .ok_or_else(|| anyhow!("the artifact has no sealed object"))?;
     // A full-scan map's first slot, or a cell.
@@ -640,7 +607,6 @@ pub(crate) fn run_storage_boundary(
             totals.store_writes += run.totals.store_writes;
             totals.traced_reads += run.totals.traced_reads;
             totals.traced_writes += run.totals.traced_writes;
-            totals.reads_named_again += run.totals.reads_named_again;
             benchmarks.push(run.row);
             let (restart, holds) = run_restart(&workload, &backend, artifact, &run.getters)
                 .with_context(|| format!("restart of {}/{backend}", workload.label))?;
@@ -675,12 +641,9 @@ pub(crate) fn run_storage_boundary(
     let nonce_reservation = nonce_reservation(&erc20.uo).context("nonce reservation")?;
     let nonce_reservation_holds = nonce_reservation["holds"] == json!(true);
 
-    // The store sees a read for every read the trace names but the ones it
-    // names again, and no other.
-    let reads_account = totals.store_reads + totals.reads_named_again == totals.traced_reads;
     let checks = json!({
         "store_log_agrees_with_trace_in_every_call": every_log_agrees,
-        "store_reads_and_reads_named_again_are_the_traced_reads": reads_account,
+        "store_reads_are_the_traced_reads": totals.store_reads == totals.traced_reads,
         "store_writes_are_the_traced_writes": totals.store_writes == totals.traced_writes,
         "every_restart_continues_its_deployment": every_restart_holds,
         "a_dropped_call_leaves_the_store_as_it_was": every_dropped_call_holds,
@@ -692,7 +655,7 @@ pub(crate) fn run_storage_boundary(
     Ok(json!({
         "schema": STORAGE_BOUNDARY_SCHEMA,
         "what_is_compared": "the log a storage adapter keeps of the sealed records the runtime opens and seals, against the physical reads and writes of sealed objects in the call's trace",
-        "held_units": "a call opens the counter and the metadata pages of a Path ORAM map once, when it loads the map; the trace names the counter at every access, and the metadata pages at every access of the local scheme and every operation of the tree; the store sees each once",
+        "oram_reads": "a call reads the counter and the metadata pages of an ORAM map once, where it loads the map, and holds them through the call; each access reads its buckets; the trace names each of those reads where the call makes it",
         "coverage": {
             "benchmark_backend_pairs": benchmarks.len(),
             "calls": totals.calls,
@@ -702,7 +665,6 @@ pub(crate) fn run_storage_boundary(
             "store_writes": totals.store_writes,
             "traced_sealed_reads": totals.traced_reads,
             "traced_sealed_writes": totals.traced_writes,
-            "held_unit_reads_named_again": totals.reads_named_again,
         },
         "benchmarks": benchmarks,
         "restarts": restarts,
@@ -768,14 +730,14 @@ mod tests {
     #[test]
     fn the_comparison_rejects_the_differences_it_guards_against() {
         let artifact = artifact();
-        // Two accesses of the tree: the trace names the counter twice, and
-        // the store sees it once.
+        // A call that loads the tree and makes two accesses: the counter and
+        // the metadata page where it loads the map, then a bucket at each
+        // access.
         let traced = receipt(
             &[
                 ("balances", "balances@counter", 64),
                 ("balances", "balances@meta0", 960),
                 ("balances", "balances@bucket0", 800),
-                ("balances", "balances@counter", 64),
                 ("balances", "balances@bucket0", 800),
             ],
             &[
@@ -793,11 +755,24 @@ mod tests {
         ];
         let agreed = compare_call(&artifact, &log, &traced);
         assert!(agreed.agrees(), "{:?}", agreed.difference);
-        assert_eq!(agreed.reads_named_again, 1);
-        assert_eq!(
-            agreed.store_reads + agreed.reads_named_again,
-            agreed.traced_reads
+        assert_eq!(agreed.store_reads, agreed.traced_reads);
+
+        // A trace that names the counter again at the second access, as
+        // traces did before Issue 57, names a read the store did not see.
+        let named_again = receipt(
+            &[
+                ("balances", "balances@counter", 64),
+                ("balances", "balances@meta0", 960),
+                ("balances", "balances@bucket0", 800),
+                ("balances", "balances@counter", 64),
+                ("balances", "balances@bucket0", 800),
+            ],
+            &[
+                ("balances", "balances@bucket0", 800),
+                ("balances", "balances@counter", 64),
+            ],
         );
+        assert!(!compare_call(&artifact, &log, &named_again).agrees());
 
         // A bucket read the trace names and the store did not see.
         let mut missing = log.clone();
@@ -807,7 +782,7 @@ mod tests {
         let mut extra = log.clone();
         extra.push(read("balances", "balances@bucket7", 800));
         assert!(!compare_call(&artifact, &extra, &traced).agrees());
-        // A bucket is not a held unit: read twice, it is seen twice.
+        // A bucket read twice is seen twice.
         let mut once = log.clone();
         once.remove(2);
         assert!(!compare_call(&artifact, &once, &traced).agrees());

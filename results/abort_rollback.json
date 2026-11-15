@@ -52,7 +52,7 @@
         "5"
       ],
       "runtime_status": "executed",
-      "target_gas_used": 5502,
+      "target_gas_used": 4516,
       "target_return": null
     },
     {
@@ -70,7 +70,7 @@
         "3"
       ],
       "runtime_status": "executed",
-      "target_gas_used": 5502,
+      "target_gas_used": 4516,
       "target_return": "2"
     },
     {
@@ -88,7 +88,7 @@
         "5"
       ],
       "runtime_status": "executed",
-      "target_gas_used": 94329,
+      "target_gas_used": 60399,
       "target_return": null
     },
     {
@@ -106,7 +106,7 @@
         "3"
       ],
       "runtime_status": "executed",
-      "target_gas_used": 94329,
+      "target_gas_used": 60399,
       "target_return": "2"
     },
     {
@@ -166,7 +166,7 @@
         "4"
       ],
       "runtime_status": "executed",
-      "target_gas_used": 14097,
+      "target_gas_used": 10211,
       "target_return": null
     },
     {
@@ -186,7 +186,7 @@
         "1"
       ],
       "runtime_status": "executed",
-      "target_gas_used": 14097,
+      "target_gas_used": 10211,
       "target_return": "1"
     },
     {
@@ -206,7 +206,7 @@
         "4"
       ],
       "runtime_status": "executed",
-      "target_gas_used": 191490,
+      "target_gas_used": 121716,
       "target_return": null
     },
     {
@@ -226,7 +226,7 @@
         "1"
       ],
       "runtime_status": "executed",
-      "target_gas_used": 191490,
+      "target_gas_used": 121716,
       "target_return": "1"
     }
   ],

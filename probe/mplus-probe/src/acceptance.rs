@@ -595,7 +595,7 @@ mod tests {
                     "calls": [{
                         "aborted": false,
                         "store_writes_equal_traced_writes": true,
-                        "store_reads_equal_traced_reads_but_for_held_units": agrees,
+                        "store_reads_equal_traced_reads": agrees,
                     }],
                 }],
                 "restarts": [{"no_nonce_repeats_after_restart": no_nonce_repeats}],

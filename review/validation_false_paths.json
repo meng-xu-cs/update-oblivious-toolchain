@@ -581,6 +581,7 @@
       "oram_buffer_reuse_restricted": true,
       "oram_commit_api_is_explicit": true,
       "oram_commit_fields_private": true,
+      "oram_reads_are_traced_where_the_call_reads_them": true,
       "oram_runtime_uses_shared_boxed_filler_helper": true,
       "oram_runtime_uses_shared_boxed_seal_helper": true,
       "oram_runtime_uses_shared_commit_reseal_helper": true,

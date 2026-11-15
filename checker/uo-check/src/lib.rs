@@ -1080,9 +1080,9 @@ fn expected_commit_ops(
 }
 
 /// The sealed records an entrypoint may read: each slot of each exact object
-/// it loads, once; for each access of an ORAM map the path's buckets and the
-/// metadata pages; and, on a Path ORAM scheme, the counter and the metadata
-/// pages the call reads when it starts.
+/// it loads, once; and for each ORAM map it loads, the counter and the
+/// metadata pages, once, and the buckets of each access (on the surrogate
+/// scheme, of its one access).
 fn expected_load_ops(
     statements: &[Statement],
     oram_accesses: &BTreeMap<u32, usize>,
@@ -1098,14 +1098,12 @@ fn expected_load_ops(
                     if object.backend == BackendKind::Oram =>
                 {
                     let oram = OramManifest::for_object(object)?;
-                    let per_access = oram.metadata_pages_per_access + oram.buckets_per_access;
-                    if is_path_oram_scheme(&object.oram_scheme) {
-                        per_access * oram_accesses.get(&object_id).copied().unwrap_or(0)
-                            + oram.metadata_pages
-                            + 1
+                    let accesses = if is_path_oram_scheme(&object.oram_scheme) {
+                        oram_accesses.get(&object_id).copied().unwrap_or(0)
                     } else {
-                        per_access
-                    }
+                        1
+                    };
+                    oram.metadata_pages + 1 + oram.buckets_per_access * accesses
                 }
                 uo_core::ContainerKind::Array | uo_core::ContainerKind::Map => {
                     object.capacity.unwrap_or(1)

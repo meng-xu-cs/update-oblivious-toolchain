@@ -245,7 +245,7 @@ const CLAIM_ENTRIES: &[ClaimEntry] = &[
     ClaimEntry {
         id: "storage-boundary-log",
         category: "claim",
-        text: "Every sealed record the runtime opens or seals crosses to a storage adapter, which logs the read with the record it keeps and the write with the class it computes from its own records. On every benchmark and sealed backend the adapter's writes are the trace's writes of sealed objects, each an Update, and its reads are the trace's reads, except that a Path ORAM map's counter and metadata pages cross once per call where the trace names them at every access or operation. A runtime restarted from the adapter's files answers as before and repeats no nonce. Empirically tested over the benchmarks; the places where a record crosses are source-frozen.",
+        text: "Every sealed record the runtime opens or seals crosses to a storage adapter, which logs the read with the record it keeps and the write with the class it computes from its own records. On every benchmark and sealed backend the adapter's writes are the trace's writes of sealed objects, each an Update, and its reads are the trace's reads, one for one: a Path ORAM map's counter and metadata pages once, where the call loads the map, and the buckets of each access. A runtime restarted from the adapter's files answers as before and repeats no nonce. Empirically tested over the benchmarks; the places where a record crosses are source-frozen.",
         status: STATUS_EMPIRICAL,
         doc_anchor: "storage adapter",
         source_files: &["runtime/uo-store/src/storage.rs"],

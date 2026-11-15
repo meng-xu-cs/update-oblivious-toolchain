@@ -113,7 +113,7 @@
         "read_hit": 32,
         "read_miss": 32
       },
-      "samples_json_bytes": 18024007,
+      "samples_json_bytes": 17777779,
       "scheme": "path_oram_private_posmap_v1",
       "setup_calls": {
         "aborts": 1,
@@ -141,7 +141,7 @@
         "read_hit": 32,
         "read_miss": 32
       },
-      "samples_json_bytes": 52929730,
+      "samples_json_bytes": 52491810,
       "scheme": "path_oram_private_posmap_v1",
       "setup_calls": {
         "aborts": 2,
@@ -169,7 +169,7 @@
         "read_hit": 32,
         "read_miss": 32
       },
-      "samples_json_bytes": 152778214,
+      "samples_json_bytes": 152047724,
       "scheme": "path_oram_private_posmap_v1",
       "setup_calls": {
         "aborts": 1,

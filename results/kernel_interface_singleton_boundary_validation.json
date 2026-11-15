@@ -3008,7 +3008,7 @@
       "controller_phase_count": 8,
       "entrypoint": "put(bytes32,uint256)",
       "exit_events": 10,
-      "gas_used": 2757,
+      "gas_used": 2612,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 4,
         "expected_kernel_step_public_object_schedule": [
@@ -3296,7 +3296,7 @@
       "controller_phase_count": 8,
       "entrypoint": "put(bytes32,uint256)",
       "exit_events": 10,
-      "gas_used": 2757,
+      "gas_used": 2612,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 4,
         "expected_kernel_step_public_object_schedule": [
@@ -3584,7 +3584,7 @@
       "controller_phase_count": 13,
       "entrypoint": "add(bytes32,uint256)",
       "exit_events": 16,
-      "gas_used": 3376,
+      "gas_used": 3086,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 5,
         "expected_kernel_step_public_object_schedule": [
@@ -3936,7 +3936,7 @@
       "scenario": "SingleAccessMap/pathoram/add-class0",
       "setup_calls": 0,
       "shared_resource_events": 65,
-      "witness_json_bytes": 15707
+      "witness_json_bytes": 15416
     },
     {
       "accepted": true,
@@ -3945,7 +3945,7 @@
       "controller_phase_count": 13,
       "entrypoint": "add(bytes32,uint256)",
       "exit_events": 16,
-      "gas_used": 3376,
+      "gas_used": 3086,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 5,
         "expected_kernel_step_public_object_schedule": [
@@ -4297,7 +4297,7 @@
       "scenario": "SingleAccessMap/pathoram/add-class1",
       "setup_calls": 0,
       "shared_resource_events": 65,
-      "witness_json_bytes": 15707
+      "witness_json_bytes": 15416
     },
     {
       "accepted": true,
@@ -4306,7 +4306,7 @@
       "controller_phase_count": 13,
       "entrypoint": "deposit(bytes32,uint256)",
       "exit_events": 16,
-      "gas_used": 5445,
+      "gas_used": 4459,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 7,
         "expected_kernel_step_public_object_schedule": [
@@ -4727,7 +4727,7 @@
       "scenario": "ConfidentialMixer/pathoram/deposit",
       "setup_calls": 0,
       "shared_resource_events": 189,
-      "witness_json_bytes": 33486
+      "witness_json_bytes": 32459
     },
     {
       "accepted": true,
@@ -4736,7 +4736,7 @@
       "controller_phase_count": 33,
       "entrypoint": "transferFrom(address,address,address,uint256)",
       "exit_events": 40,
-      "gas_used": 14097,
+      "gas_used": 10211,
       "kernel_interface_bundle": {
         "expected_kernel_step_count": 9,
         "expected_kernel_step_public_object_schedule": [
@@ -5429,7 +5429,7 @@
       "scenario": "ERC20Lite/pathoram/transferFrom",
       "setup_calls": 2,
       "shared_resource_events": 723,
-      "witness_json_bytes": 108871
+      "witness_json_bytes": 103655
     }
   ]
 }

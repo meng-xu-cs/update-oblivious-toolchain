@@ -2325,7 +2325,7 @@
       "cold_store_object_count": 1,
       "commit_object_count": 1,
       "entrypoint": "put(bytes32,uint256)",
-      "gas_used": 2757,
+      "gas_used": 2612,
       "kernel_json_bytes": 1962,
       "kernel_refinement_json_bytes": 537,
       "kernel_witness": {
@@ -2555,7 +2555,7 @@
       "cold_store_object_count": 1,
       "commit_object_count": 1,
       "entrypoint": "put(bytes32,uint256)",
-      "gas_used": 2757,
+      "gas_used": 2612,
       "kernel_json_bytes": 1962,
       "kernel_refinement_json_bytes": 537,
       "kernel_witness": {
@@ -2785,7 +2785,7 @@
       "cold_store_object_count": 1,
       "commit_object_count": 1,
       "entrypoint": "add(bytes32,uint256)",
-      "gas_used": 3376,
+      "gas_used": 3086,
       "kernel_json_bytes": 2726,
       "kernel_refinement_json_bytes": 592,
       "kernel_witness": {
@@ -3084,7 +3084,7 @@
       "cold_store_object_count": 1,
       "commit_object_count": 1,
       "entrypoint": "add(bytes32,uint256)",
-      "gas_used": 3376,
+      "gas_used": 3086,
       "kernel_json_bytes": 2726,
       "kernel_refinement_json_bytes": 592,
       "kernel_witness": {
@@ -3383,7 +3383,7 @@
       "cold_store_object_count": 2,
       "commit_object_count": 2,
       "entrypoint": "deposit(bytes32,uint256)",
-      "gas_used": 5445,
+      "gas_used": 4459,
       "kernel_json_bytes": 3191,
       "kernel_refinement_json_bytes": 1003,
       "kernel_witness": {
@@ -3735,7 +3735,7 @@
       "cold_store_object_count": 2,
       "commit_object_count": 2,
       "entrypoint": "transferFrom(address,address,address,uint256)",
-      "gas_used": 14097,
+      "gas_used": 10211,
       "kernel_json_bytes": 6061,
       "kernel_refinement_json_bytes": 1111,
       "kernel_witness": {

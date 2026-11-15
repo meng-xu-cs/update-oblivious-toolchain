@@ -1043,7 +1043,7 @@
       },
       "private_posmap_artifact": {
         "accepted": true,
-        "artifact_json_bytes": 18904,
+        "artifact_json_bytes": 18902,
         "contract": "ConfidentialMixer",
         "function_count": 5,
         "lean_stderr": "",
@@ -1052,7 +1052,7 @@
         "manifest_object_count": 2,
         "metadata_contract": "ConfidentialMixer",
         "mode": "uo",
-        "source_artifact_json_bytes": 18904,
+        "source_artifact_json_bytes": 18902,
         "state_object_count": 2
       },
       "private_posmap_kernel_admission": {
@@ -1264,7 +1264,7 @@
       "fullscan64_kernel_admission": null,
       "oram_artifact": {
         "accepted": true,
-        "artifact_json_bytes": 30806,
+        "artifact_json_bytes": 30804,
         "contract": "ERC20Lite",
         "function_count": 6,
         "lean_stderr": "",
@@ -1273,7 +1273,7 @@
         "manifest_object_count": 2,
         "metadata_contract": "ERC20Lite",
         "mode": "uo",
-        "source_artifact_json_bytes": 30806,
+        "source_artifact_json_bytes": 30804,
         "state_object_count": 2
       },
       "oram_kernel_admission": {
@@ -1375,7 +1375,7 @@
       },
       "private_posmap_artifact": {
         "accepted": true,
-        "artifact_json_bytes": 30834,
+        "artifact_json_bytes": 30831,
         "contract": "ERC20Lite",
         "function_count": 6,
         "lean_stderr": "",
@@ -1384,7 +1384,7 @@
         "manifest_object_count": 2,
         "metadata_contract": "ERC20Lite",
         "mode": "uo",
-        "source_artifact_json_bytes": 30834,
+        "source_artifact_json_bytes": 30831,
         "state_object_count": 2
       },
       "private_posmap_kernel_admission": {

@@ -397,16 +397,13 @@ proved.
   `allowances` map uses the local one (2^734 coin seeds). See
   [`path-oram.md`](./path-oram.md).
 - On both Path ORAM schemes, a call reads only the paths it accesses. It
-  starts from the map's counter and metadata pages, which its first access
-  also names, and rebuilds each slot's leaf and key and the stash in the
-  enclave; a read takes the key's value from the key's block once its path is
-  read. The call-start reads follow a public pattern and are not in the
-  trace as such, so the leakage claim is unaffected; `results/overheads.json`
-  lists them beside the traced counts (`call_start_reads`). The call holds
-  those records, so its later accesses open none of them again, though the
-  trace names them at each (see The Storage Boundary below). Every access
-  rewrites every metadata page, and its trace reads them all, so its cost is
-  linear in the map's capacity.
+  reads the map's counter and metadata pages once, when it loads the map,
+  and rebuilds each slot's leaf and key and the stash in the enclave; a read
+  takes the key's value from the key's block once its path is read. The
+  trace names each of those reads where the call makes it, and no access
+  names them again: the call holds the records (see The Storage Boundary
+  below). Every access rewrites every metadata page, so its cost is linear
+  in the map's capacity.
 - Legacy/surrogate ORAM paths remain available for benchmarking and historical
   comparison, not for the strengthened proof-grade claim.
 - Executable insecure raw baselines (the `insecure-eval-raw` evaluation feature,
@@ -438,7 +435,7 @@ The components are interpreted as follows:
   environment, termination status, declared status policy, return shape,
   return policy, any public or declassified return payload, encrypted-return
   ciphertext evidence, declassification labels, and modeled public gas (cost
-  model `uo-modeled-resource-cost-v2`: a modeled resource cost, not stock EVM
+  model `uo-modeled-resource-cost-v3`: a modeled resource cost, not stock EVM
   gas; there is no EVM gas schedule or bytecode backend; see The Modeled
   Cost below).
 - `boundary_schedule` is the exact enclave boundary sequence.
@@ -475,30 +472,30 @@ with the call's trace:
 
 - The adapter's writes are the trace's writes of sealed objects, one for
   one and in order (4,395), and the adapter classifies each as an `Update`.
-- The adapter's reads of an exact object (a cell, an array, a full-scan
-  map) are the trace's reads of it.
-- The adapter's reads of a Path ORAM map are the trace's reads of it but
-  for the map's counter and metadata pages. The runtime opens those once,
-  when the call loads the map, and holds them through the call. The trace
-  names the counter at every access, and the metadata pages at every access
-  of the local scheme and every operation of the tree. The adapter sees
-  each once. Over the 47 calls the trace names 4,517 reads of sealed
-  objects and the adapter sees 3,862; the other 655 name a counter or a
-  page again.
+- The adapter's reads of each sealed object are the trace's reads of it,
+  one for one and in order (3,862 over the 47 calls): every slot of an
+  exact object (a cell, an array, a full-scan map), where the call loads
+  it; and the counter and the metadata pages of a Path ORAM map, where the
+  call loads the map, then the buckets of each access. The runtime holds
+  the counter and the pages through the call, and no access reads them
+  again.
 
-So every read the adapter sees is one the trace names, and the trace names
-more reads of a Path ORAM map than cross the boundary. The reads it names
-again are at positions the public parameters fix, so what the adapter sees
-is a function of the trace, and the leakage claim, which is about the
-trace, covers it. The modeled cost charges the reads the trace names: for a
-call that makes several accesses to a map of the local scheme it charges up
-to twice the bytes that cross (103,680 against 51,712 for ERC20Lite
-`transferFrom`). Tracing a map's counter and metadata pages once per call,
-as the runtime reads them, is Issue 57 of the external review. This
+So the adapter sees every read the trace names and no other: what crosses
+the boundary is the trace's physical reads and writes, and the leakage
+claim, which is about the trace, covers it. The modeled cost charges the
+reads that cross. Until Issue 57 of the external review the trace named a
+map's counter and metadata pages again at every access of the local scheme
+(and on the tree the counter at every node access and the pages at every
+operation), 4,517 reads over the 47 calls, and the cost charged a call that
+makes several accesses to a map of the local scheme up to twice the bytes
+it reads (103,680 against 51,712 for ERC20Lite `transferFrom`). This
 comparison is empirical, over the benchmarks; the places where a record
 crosses are source-frozen (`sealed_records_cross_the_storage_boundary` in
 `runtime_boundary_validation.json`, and three scenarios of
-`tamper_validation.json`). No Lean statement is about the adapter.
+`tamper_validation.json`), and so are the places where the trace names a
+Path ORAM map's reads and the read bound that counts them
+(`oram_reads_are_traced_where_the_call_reads_them`). No Lean statement is
+about the adapter.
 
 A call's records are pending in the adapter until the call is committed there,
 with the commit metadata: the freshness counters, whether the contract is
@@ -581,29 +578,33 @@ an index out of range (`eval_confidential_kernel_array_index_generated`).
 ### The Modeled Cost
 
 The public gas of a confidential entrypoint is a function of its schedule,
-fixed when it is compiled (cost model `uo-modeled-resource-cost-v2`):
+fixed when it is compiled (cost model `uo-modeled-resource-cost-v3`):
 
 ```text
 2000 + 11·statements + 7·expressions + 29·max_load_ops + 29·max_commit_ops
 ```
 
 `max_commit_ops` bounds the sealed records a call writes: each slot of each
-exact object the entrypoint may write (`may_write_objects`), and the path
-and metadata pages of each access of an ORAM map. `max_load_ops` bounds
-those it reads: each slot of each exact object it loads, once; for each
-access of an ORAM map the buckets of the path and the metadata pages; and,
-for a Path ORAM map, the counter and the metadata pages the call reads when
-it starts, which no trace records. On the exact backends the count is what
-a call does: it opens each slot of an object it accesses once, when it
-loads the object, the trace records that read there, and neither an access
-nor the commit opens a slot again. A call that aborts keeps what it loaded
-and reseals that. A confidential call loads the objects its kernel program
-schedules, and a public one the objects its body accesses. On the private
-scheme both count the
-metadata pages once per node access, where a call reads and writes them
-fewer times, so there they are bounds and not counts. Model v1 charged the
-writes alone, so a call that only read would have cost about 2,000 units
-whatever it read.
+exact object the entrypoint may write (`may_write_objects`), and the
+counter, the metadata pages and the path of each access of an ORAM map.
+`max_load_ops` bounds those it reads: each slot of each exact object it
+loads, once; and for each ORAM map it loads, the counter and the metadata
+pages, once, and the path of each access. The count is what a call does:
+it opens each slot of an exact object it accesses once, when it loads the
+object, and a map's counter and metadata pages once, when it loads the
+map; the trace records each read there, and neither an access nor the
+commit opens one again. An access opens its path. A call that aborts keeps
+what it loaded and reseals that. A confidential call loads the objects its
+kernel program schedules, and a public one the objects its body accesses.
+On the private scheme the commit bound counts the metadata pages once per
+node access, where a call writes them once per operation, so there it is a
+bound and not a count. Model v1 charged the writes alone, so a call that
+only read would have cost about 2,000 units whatever it read. Model v2
+counted a Path ORAM map's counter and metadata pages again at each access,
+where the trace named them and no access read them, so it charged a call
+that makes several accesses to a map of the local scheme up to twice the
+bytes the call reads; model v3 counts each read once (Issue 57 of the
+external review).
 
 A read is charged what a write is. Each moves one sealed record across the
 enclave boundary and costs the runtime one authenticated decryption or

@@ -3747,13 +3747,10 @@ bounds:
     /// its own records.
     ///
     /// The store's reads of each sealed object are the trace's reads of it,
-    /// in order, with one difference: the counter and the metadata pages of
-    /// a Path ORAM map are in the store's log once, where the call loaded
-    /// the map. The runtime holds them open through the call, and the trace
-    /// names them again at every access (the counter) and at every
-    /// operation (the metadata). Returns how many reads the trace names
-    /// again.
-    fn compare_store_log_with_trace(instance: &ContractInstance, result: &CallResult) -> usize {
+    /// one for one and in order: the counter and the metadata pages of a
+    /// Path ORAM map where the call loaded the map, which the call holds
+    /// open through the call, and the buckets of each access.
+    fn compare_store_log_with_trace(instance: &ContractInstance, result: &CallResult) {
         use uo_core::WriteClass;
         use uo_store::StorageIo;
         let sealed = sealed_object_names(instance);
@@ -3783,16 +3780,9 @@ bounds:
             .iter()
             .all(|write| write.3 == WriteClass::Update));
 
-        let held = |location: &str| location.ends_with("@counter") || location.contains("@meta");
-        let mut named_again = 0usize;
-        let mut seen: BTreeSet<String> = BTreeSet::new();
         let mut traced_reads: BTreeMap<String, Vec<(String, usize)>> = BTreeMap::new();
         for event in result.trace.receipt.physical_reads.events() {
             if !sealed.contains(&event.object) {
-                continue;
-            }
-            if held(&event.location) && !seen.insert(event.location.clone()) {
-                named_again += 1;
                 continue;
             }
             traced_reads
@@ -3812,7 +3802,6 @@ bounds:
             }
         }
         assert_eq!(store_reads, traced_reads);
-        named_again
     }
 
     fn erc20_calls() -> Vec<(&'static str, Vec<Value>, bool)> {
@@ -3878,20 +3867,16 @@ bounds:
             let result = exact.call(entrypoint, args).unwrap();
             assert_eq!(result.aborted, aborts, "call {index}, {entrypoint}");
             assert!(result.trace.receipt.physical_reads.event_count() > 0);
-            assert_eq!(
-                compare_store_log_with_trace(&exact, &result),
-                0,
-                "call {index}, {entrypoint}"
-            );
+            compare_store_log_with_trace(&exact, &result);
         }
 
-        // Path ORAM maps of both schemes. A call that makes one access to a
-        // map of the local scheme reads what its trace names. A call that
-        // makes more accesses, and every call on the tree, holds the map's
-        // counter and metadata pages open after it loaded the map, so the
-        // store sees them once where the trace names them again. The calls
-        // record no witness: a test build's audit of the witness decodes
-        // the whole store, and the store would log that too.
+        // Path ORAM maps of both schemes: a call reads a map's counter and
+        // metadata pages once, where it loads the map, and holds them; each
+        // access reads its buckets. The trace names each read where the
+        // call makes it, also on the tree, whose get makes 11 node accesses
+        // on a map of 256 entries. The calls record no witness: a test
+        // build's audit of the witness decodes the whole store, and the
+        // store would log that too.
         let mut oram = ContractInstance::deploy_with_seed(
             compile_bench(
                 bench_raw!("ERC20Lite.sol"),
@@ -3902,19 +3887,21 @@ bounds:
         )
         .unwrap();
         oram.state.run_unwitnessed_for_test();
-        let mut named_again = Vec::new();
         for (index, (entrypoint, args, aborts)) in erc20_calls().into_iter().enumerate() {
             let result = oram.call(entrypoint, args).unwrap();
             assert_eq!(result.aborted, aborts, "call {index}, {entrypoint}");
-            named_again.push((entrypoint, compare_store_log_with_trace(&oram, &result)));
+            compare_store_log_with_trace(&oram, &result);
+            // Each map the call loads, its counter once.
+            for map in ["balances", "allowances"] {
+                let counters = result
+                    .receipt()
+                    .physical_reads
+                    .events()
+                    .filter(|event| event.location == format!("{map}@counter"))
+                    .count();
+                assert!(counters <= 1, "call {index}, {entrypoint}, {map}");
+            }
         }
-        // One access to `allowances`, on the local scheme: nothing is named
-        // again. A get on the tree of 256 entries makes 11 node accesses and
-        // names the counter again at 10 of them.
-        assert_eq!(named_again[1], ("approve(address,address,uint256)", 0));
-        assert_eq!(named_again[6], ("allowanceOf(address,address)", 0));
-        assert_eq!(named_again[5], ("balanceOf(address)", 10));
-        assert!(named_again[0].1 > 10 && named_again[2].1 > named_again[0].1);
     }
 
     #[test]

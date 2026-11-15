@@ -190,9 +190,16 @@ call; only the surrogate scheme is single-access. -/
 def WellFormedAnyPathOramObject (object : OramObjectManifest) : Prop :=
   WellFormedPathOramObject object ∨ WellFormedPrivatePathOramObject object
 
+/-- The sealed records an access reads: its buckets. The call reads the
+map's counter and metadata pages once, when it loads the map
+(`callStartPhysicalReads`), and holds them. -/
 def totalPhysicalReadsPerAccess (object : OramObjectManifest) (accessCounter : Nat) : Nat :=
-  1 + (accessSchedule object accessCounter).metadataPages.length +
-    (accessSchedule object accessCounter).bucketIndices.length
+  (accessSchedule object accessCounter).bucketIndices.length
+
+/-- The sealed records a call reads from a map when it loads it: the counter
+and every metadata page. -/
+def callStartPhysicalReads (object : OramObjectManifest) : Nat :=
+  1 + object.metadataPages
 
 def totalPhysicalWritesPerAccess (object : OramObjectManifest) (accessCounter : Nat) : Nat :=
   1 + (accessSchedule object accessCounter).metadataPages.length +
@@ -252,21 +259,25 @@ theorem mem_bucketWindow_lt_bucketCount
 
 theorem totalPhysicalReadsPerAccess_eq_manifest
   {object : OramObjectManifest}
-  {accessCounter : Nat}
+  {accessCounter : Nat} :
+  totalPhysicalReadsPerAccess object accessCounter = object.bucketsPerAccess := by
+  simp [totalPhysicalReadsPerAccess, accessSchedule, bucketWindow]
+
+theorem callStartPhysicalReads_eq_manifest
+  {object : OramObjectManifest}
   (hWellFormed : WellFormedOramObject object) :
-  totalPhysicalReadsPerAccess object accessCounter =
-    object.metadataPagesPerAccess + object.bucketsPerAccess := by
+  callStartPhysicalReads object = object.metadataPagesPerAccess := by
   rcases hWellFormed with hSurrogate | hPathOrPrivate
   · rcases hSurrogate with
       ⟨_hScheme, _hBlocks, _hBucketSize, _hBucketCount, hMetadata, _hBuckets, _hStash, _hRecursion, _hAccesses⟩
-    simp [totalPhysicalReadsPerAccess, hMetadata, Nat.add_left_comm, Nat.add_comm]
+    unfold callStartPhysicalReads; omega
   · rcases hPathOrPrivate with hPath | hPrivate
     · rcases hPath with
         ⟨_hScheme, _hBlocks, _hBucketSize, _hBucketCount, _hStash, _hRecursion, hMetadata, _hBuckets, _hAccesses⟩
-      simp [totalPhysicalReadsPerAccess, hMetadata, Nat.add_left_comm, Nat.add_comm]
+      unfold callStartPhysicalReads; omega
     · rcases hPrivate with
       ⟨_hScheme, _hBlocks, _hBucketSize, _hBucketCount, _hStash, _hRecursion, hMetadata, _hBuckets, _hAccesses⟩
-      simp [totalPhysicalReadsPerAccess, hMetadata, Nat.add_left_comm, Nat.add_comm]
+      unfold callStartPhysicalReads; omega
 
 theorem totalPhysicalWritesPerAccess_eq_manifest
   {object : OramObjectManifest}
@@ -286,12 +297,16 @@ theorem totalPhysicalWritesPerAccess_eq_manifest
       ⟨_hScheme, _hBlocks, _hBucketSize, _hBucketCount, _hStash, _hRecursion, hMetadata, _hBuckets, _hAccesses⟩
       simp [totalPhysicalWritesPerAccess, hMetadata, Nat.add_left_comm, Nat.add_comm]
 
+/-- A call that makes one access to a map reads what it writes: the counter
+and the metadata pages when it loads the map, and the access's buckets. -/
 theorem totalPhysicalBudgets_match
   {object : OramObjectManifest}
   {accessCounter : Nat}
   (hWellFormed : WellFormedOramObject object) :
-  totalPhysicalReadsPerAccess object accessCounter = totalPhysicalWritesPerAccess object accessCounter := by
-  rw [totalPhysicalReadsPerAccess_eq_manifest hWellFormed, totalPhysicalWritesPerAccess_eq_manifest hWellFormed]
+  callStartPhysicalReads object + totalPhysicalReadsPerAccess object accessCounter =
+    totalPhysicalWritesPerAccess object accessCounter := by
+  rw [callStartPhysicalReads_eq_manifest hWellFormed, totalPhysicalReadsPerAccess_eq_manifest,
+    totalPhysicalWritesPerAccess_eq_manifest hWellFormed]
 
 theorem accessLeakage_eq_of_samePublicProjection
   {cfg₁ cfg₂ : OramConfig}

@@ -30,9 +30,9 @@
 //! that runs it into a file of its own. `UO_SWEEP_*` overrides either.
 
 use super::{
-    call_start_decode, compile_artifact_from_metadata, display_report_path, env_f64_list,
-    env_usize, env_usize_list, lean_proofgrade_witness_checker_path, load_metadata,
-    percentile_sorted, read_max_rss_kb, write_temp_json, PROBE_DEPLOY_SEED,
+    compile_artifact_from_metadata, display_report_path, env_f64_list, env_usize, env_usize_list,
+    lean_proofgrade_witness_checker_path, load_metadata, percentile_sorted, read_max_rss_kb,
+    write_temp_json, PROBE_DEPLOY_SEED,
 };
 use anyhow::{anyhow, bail, Context, Result};
 use serde_json::{json, Value as JsonValue};
@@ -630,8 +630,6 @@ struct SweepLeanCheck {
 struct SweepSample {
     operation: SweepOperation,
     cost: SweepCost,
-    /// What the call read at its start, outside the trace: reads and bytes.
-    call_start: (usize, usize),
     /// Sealed records the call's two witness snapshots opened.
     witness_records: u64,
     trace_json_bytes: usize,
@@ -715,7 +713,6 @@ fn lean_check_call(checker: &Path, name: &str, trace: &ExecutionTrace) -> Result
 /// Make one planned call, check what it did, and apply it to `keys`.
 fn run_sweep_call(
     instance: &mut ContractInstance,
-    artifact: &CompiledArtifact,
     plan: SweepCallPlan,
     keys: &mut SweepKeys,
     lean_checker: Option<(&Path, &str)>,
@@ -780,7 +777,6 @@ fn run_sweep_call(
             bytes_written: trace.physical_writes.events().map(|event| event.len).sum(),
             gas: trace.gas_used,
         },
-        call_start: call_start_decode(artifact, entrypoint, &trace.physical_reads)?,
         witness_records: totals.witness_records_opened,
         trace_json_bytes,
         receipt_json_bytes,
@@ -937,8 +933,7 @@ fn operation_row(
         .first()
         .ok_or_else(|| anyhow!("no {} was measured", operation.label()))?;
     // The manifest's bounds on the sealed records the call reads and writes,
-    // which the modeled cost charges. The reads include those at the call's
-    // start, which no trace records.
+    // which the modeled cost charges.
     let entry = artifact
         .contract
         .manifest
@@ -946,14 +941,12 @@ fn operation_row(
         .get(operation.entrypoint())
         .ok_or_else(|| anyhow!("manifest entry missing for {}", operation.entrypoint()))?;
     let within_manifest_bounds = samples.iter().all(|sample| {
-        sample.cost.physical_reads + sample.call_start.0 <= entry.max_load_ops
+        sample.cost.physical_reads <= entry.max_load_ops
             && sample.cost.physical_writes <= entry.max_commit_ops
     });
-    let same_for_every_trial = samples.iter().all(|sample| {
-        sample.cost == first.cost
-            && sample.call_start == first.call_start
-            && sample.witness_records == first.witness_records
-    });
+    let same_for_every_trial = samples
+        .iter()
+        .all(|sample| sample.cost == first.cost && sample.witness_records == first.witness_records);
     let median = |pick: &dyn Fn(&SweepSample) -> u128| median_of(samples.iter().map(pick));
     let series = |pick: &dyn Fn(&SweepSample) -> u128| -> Vec<u128> {
         sorted(samples.iter().map(pick).collect())
@@ -1056,8 +1049,6 @@ fn operation_row(
     row.insert("gas".into(), json!(first.cost.gas));
     row.insert("max_load_ops".into(), json!(entry.max_load_ops));
     row.insert("max_commit_ops".into(), json!(entry.max_commit_ops));
-    row.insert("call_start_reads".into(), json!(first.call_start.0));
-    row.insert("call_start_bytes".into(), json!(first.call_start.1));
     row.insert("witness_scan_records".into(), json!(first.witness_records));
     row.insert("trace_json_bytes".into(), json!(trace_json_bytes));
     row.insert("receipt_json_bytes".into(), json!(receipt_json_bytes));
@@ -1329,7 +1320,7 @@ fn sweep_backend_capacity(
                     let lean = lean_here
                         .filter(|_| cell_index == 0 && round == parameters.warmups)
                         .map(|checker| (checker, lean_name.as_str()));
-                    let sample = run_sweep_call(&mut instance, &artifact, plan, &mut keys, lean)
+                    let sample = run_sweep_call(&mut instance, plan, &mut keys, lean)
                         .with_context(|| format!("round {round}, {}", operation.label()))?;
                     if round >= parameters.warmups {
                         samples.entry(operation).or_default().push(sample);
@@ -1375,13 +1366,14 @@ fn sweep_backend_capacity(
                     let plan = plan_sweep_call(wanted, &mut keys, level);
                     let operation = plan.operation;
                     workload_samples.push(
-                        run_sweep_call(&mut instance, &artifact, plan, &mut keys, None)
-                            .with_context(|| {
+                        run_sweep_call(&mut instance, plan, &mut keys, None).with_context(
+                            || {
                                 format!(
                                     "workload with {read_percent}% reads, call {index}, {}",
                                     operation.label()
                                 )
-                            })?,
+                            },
+                        )?,
                     );
                 }
                 fill_to_level(&mut instance, &mut keys, level)?;
@@ -1870,12 +1862,13 @@ mod tests {
             };
             assert_eq!(row["outcome"], json!(outcome));
         }
-        // The untraced work is what the map's public shape says: a call on
-        // a Path ORAM map reads the counter and the metadata pages at its
-        // start. Its witness snapshots are copies of the one the runtime
+        // A call reads nothing its trace does not name: it traces the
+        // counter and the metadata pages of a Path ORAM map where it loads
+        // the map. Its witness snapshots are copies of the one the runtime
         // keeps and open no record. The decode of the kept witness after a
         // load opens every bucket and metadata page of a tree, or every
-        // position-map page of the local scheme. The full scan has neither.
+        // position-map page of the local scheme, and the full scan has none:
+        // that is the untraced work, and the map's public shape fixes it.
         for (label, backend, scheme) in super::CAPACITY_SWEEP_BACKENDS {
             for capacity in [4usize, 16] {
                 let artifact = super::sweep_map_artifact(capacity, backend, scheme).unwrap();
@@ -1885,16 +1878,12 @@ mod tests {
                     .objects
                     .iter()
                     .find_map(|object| object.oram.as_ref());
-                let (call_start, witness) = match oram {
-                    None => (0, 0),
-                    Some(oram) => {
-                        let opened = if scheme == Some("path_oram_private_posmap_v1") {
-                            oram.bucket_count + oram.metadata_pages
-                        } else {
-                            capacity.div_ceil(8)
-                        };
-                        (1 + oram.metadata_pages, opened)
+                let witness = match oram {
+                    None => 0,
+                    Some(oram) if scheme == Some("path_oram_private_posmap_v1") => {
+                        oram.bucket_count + oram.metadata_pages
                     }
+                    Some(_) => capacity.div_ceil(8),
                 };
                 let mut seen = 0;
                 for row in rows
@@ -1902,27 +1891,24 @@ mod tests {
                     .filter(|row| row["backend"] == label && row["capacity"] == json!(capacity))
                 {
                     seen += 1;
-                    assert_eq!(
-                        row["call_start_reads"],
-                        json!(call_start),
-                        "{label} {capacity}"
-                    );
                     assert_eq!(row["witness_scan_records"], json!(0), "{label} {capacity}");
                     // The manifest's load bound, which the modeled cost
-                    // charges, is what the call reads, traced and at its
-                    // start, on the full scan and the local scheme; on the
-                    // tree it is a bound, which counts the metadata pages
-                    // once per node access.
+                    // charges, is what the call reads, on every backend. Its
+                    // commit bound is what the call writes on the full scan
+                    // and the local scheme; on the tree it is a bound, which
+                    // counts the metadata pages once per node access.
                     let count = |field: &str| row[field].as_u64().unwrap();
-                    let reads = count("physical_reads") + count("call_start_reads");
+                    assert_eq!(
+                        count("physical_reads"),
+                        count("max_load_ops"),
+                        "{label} {capacity}"
+                    );
                     if scheme == Some("path_oram_private_posmap_v1") {
-                        assert!(reads <= count("max_load_ops"), "{label} {capacity}");
                         assert!(
                             count("physical_writes") <= count("max_commit_ops"),
                             "{label} {capacity}"
                         );
                     } else {
-                        assert_eq!(reads, count("max_load_ops"), "{label} {capacity}");
                         assert_eq!(
                             count("physical_writes"),
                             count("max_commit_ops"),

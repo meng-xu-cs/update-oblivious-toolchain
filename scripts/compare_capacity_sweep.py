@@ -22,8 +22,6 @@ COUNTS = [
     "bytes_read",
     "bytes_written",
     "gas",
-    "call_start_reads",
-    "call_start_bytes",
     "witness_scan_records",
     "trace_json_bytes",
     "receipt_json_bytes",

@@ -55,7 +55,7 @@
         "read_hit": 3,
         "read_miss": 3
       },
-      "samples_json_bytes": 2121428,
+      "samples_json_bytes": 2092460,
       "scheme": "path_oram_private_posmap_v1",
       "setup_calls": {
         "aborts": 1,

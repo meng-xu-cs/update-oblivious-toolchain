@@ -29042,7 +29042,7 @@ fn check_sealed_records_are_kept_in_the_store_alone(
             "        let record = cipher.read_stored_record(\n            &format!(\"{}@bucket{index}\", spec.name),\n            parameters.bucket_record_len(),\n        )?;\n        self.held.insert(index, SealedPage(record));",
         )
         && oram_source.contains(
-            "        self.storage\n            .read_counter_and_pages(spec, &self.parameters, &self.cipher)?;",
+            "        self.storage\n            .read_counter_and_pages(spec, &self.parameters, &self.cipher, trace)?;",
         )
         && !oram_source.contains("Arc<[u8]>")
         && !oram_source.contains("make_mut")
@@ -29058,6 +29058,58 @@ fn check_sealed_records_are_kept_in_the_store_alone(
         && generated_oram_codecs_source
             .contains("            buckets.read(cipher, spec, parameters, index)?;\n")
         && generated_oram_codecs_source.matches(".read(cipher, spec, parameters").count() == 2
+}
+
+/// Whether a call's trace names the reads of an ORAM map where the call
+/// makes them (Issue 57 of the external review). A call reads the map's
+/// counter and metadata pages from the store once, when it loads the map,
+/// and the trace names each read there; it holds them through the call, and
+/// an access names as physical reads only the buckets it reads. The
+/// manifest's read bound counts the same: the counter and the pages once,
+/// and the buckets of each access.
+fn check_oram_reads_are_traced_where_the_call_reads_them(
+    oram_source: &str,
+    objects_source: &str,
+    generated_oram_codecs_source: &str,
+    manifest_source: &str,
+) -> bool {
+    // The map's load reads the counter and the pages and traces each read.
+    oram_source.contains(
+        "        let counter = format!(\"{}@counter\", spec.name);\n        self.access_counter_slot =\n            cipher.read_stored_record(&counter, parameters.counter_record_len())?;\n        trace.physical_read(&spec.name, counter, self.access_counter_slot.len());",
+    ) && oram_source.contains(
+        "        for (page, sealed) in self.directory_pages.iter().enumerate() {\n            let location = format!(\"{}@meta{page}\", spec.name);\n            trace.physical_read(&spec.name, location, sealed.len());\n        }",
+    ) && oram_source.matches("trace.physical_read(").count() == 2
+        && oram_source.contains(
+            "        self.storage\n            .read_counter_and_pages(spec, &self.parameters, &self.cipher, trace)?;",
+        )
+        && oram_source.contains("        cloned.refresh_from_storage(spec, trace, allocator)?;")
+        && objects_source
+            .contains("oram: object.oram.clone_for_tx(&object.spec, trace, allocator)?,")
+        // An access reads its buckets alone.
+        && generated_oram_codecs_source
+            .matches("    let public_read_count = state.parameters.buckets_per_access;\n")
+            .count()
+            == 2
+        && generated_oram_codecs_source
+            .matches("let mut physical_reads = FixedBoxBuilder::new(public_read_count);")
+            .count()
+            == 2
+        && generated_oram_codecs_source.contains(
+            "            physical_reads: FixedBoxBuilder::new(self.parameters.buckets_per_access),",
+        )
+        && generated_oram_codecs_source
+            .matches("physical_reads.push(PhysicalReadEvent {")
+            .count()
+            == 3
+        && !generated_oram_codecs_source.contains("location: format!(\"{}@counter\"")
+        && !generated_oram_codecs_source.contains("location: format!(\"{}@meta")
+        // The read bound counts the same.
+        && manifest_source.contains(
+            "    pub fn total_load_ops(&self) -> usize {\n        self.buckets_per_access\n    }",
+        )
+        && manifest_source.contains(
+            "    pub fn call_start_load_ops(&self) -> usize {\n        self.metadata_pages_per_access\n    }",
+        )
 }
 
 /// Whether the public-state snapshot is built from a digest of each public
@@ -34551,8 +34603,6 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
                 "\"path ORAM transcript directory page count {} mismatched public bound {} for {}\"",
             )
             && generated_oram_codecs_source
-                .contains("state.storage.directory_pages.get(page).ok_or_else")
-            && generated_oram_codecs_source
                 .contains("state.storage.buckets.get(index).ok_or_else")
             && generated_oram_codecs_source.contains("buckets.get(bucket_index).ok_or_else")
             && generated_oram_codecs_source.contains("buckets.get_mut(bucket_index).ok_or_else")
@@ -36504,8 +36554,6 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             && generated_oram_codecs_source.contains(
                 "\"path ORAM transcript directory page count {} mismatched public bound {} for {}\"",
             )
-            && generated_oram_codecs_source
-                .contains("state.storage.directory_pages.get(page).ok_or_else")
             && generated_oram_codecs_source
                 .contains("state.storage.buckets.get(index).ok_or_else")
             && generated_oram_codecs_source.contains("buckets.get(bucket_index).ok_or_else")
@@ -41550,7 +41598,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         )
         && objects_source
             .contains("Self::RawMap(object) => Ok(Self::RawMap(object.clone_committed_public())),")
-        && objects_source.contains("oram: object.oram.clone_for_tx(&object.spec, allocator)?,")
+        && objects_source
+            .contains("oram: object.oram.clone_for_tx(&object.spec, trace, allocator)?,")
         && objects_source.contains("cipher: self.cipher.clone_for_runtime_state(),")
         && !objects_source.contains("oram: self.oram.clone(),")
         && !objects_source.contains("cipher: self.cipher.clone(),")
@@ -46803,6 +46852,13 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             &production_source_slice(&generated_oram_codecs_source),
             &production_source_slice(&state_source),
         );
+    let oram_reads_are_traced_where_the_call_reads_them =
+        check_oram_reads_are_traced_where_the_call_reads_them(
+            &production_source_slice(&oram_source),
+            &objects_production_source,
+            &generated_oram_codecs_source,
+            &manifest_source,
+        );
     let public_state_digests_are_kept_per_object =
         check_public_state_digests_are_kept_per_object(&production_source_slice(&state_source));
     let mut trace_run_type_files = Vec::new();
@@ -46936,7 +46992,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && generated_oram_codecs_source
             .contains("let mut logical_accesses = FixedBoxBuilder::new(public_access_count);")
         && generated_oram_codecs_source
-            .contains("let mut physical_reads = FixedBoxBuilder::new(public_access_count);")
+            .contains("let mut physical_reads = FixedBoxBuilder::new(public_read_count);")
         && generated_oram_codecs_source
             .contains("logical_accesses: logical_accesses.finish()?,")
         && generated_oram_codecs_source.contains("physical_reads: physical_reads.finish()?,")
@@ -46952,7 +47008,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && !oram_source.contains("self.overflowed = true;")
         && !oram_source.contains("ORAM write-log length {} did not match public capacity {}")
         && !oram_source.contains("let mut logical_accesses = FixedBoxBuilder::new(public_access_count);")
-        && !oram_source.contains("let mut physical_reads = FixedBoxBuilder::new(public_access_count);")
+        && !oram_source.contains("let mut physical_reads = FixedBoxBuilder::new(public_read_count);")
         && !oram_source.contains("Vec::with_capacity(public_access_count)")
         && !oram_source.contains("physical_writes: Vec<OramWrite>,")
         && !oram_source.contains("writes: Vec<OramWrite>,")
@@ -47250,13 +47306,13 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && generated_oram_codecs_source
             .contains("let mut logical_accesses = FixedBoxBuilder::new(public_access_count);")
         && generated_oram_codecs_source
-            .contains("let mut physical_reads = FixedBoxBuilder::new(public_access_count);")
+            .contains("let mut physical_reads = FixedBoxBuilder::new(public_read_count);")
         && generated_oram_codecs_source.contains("logical_accesses: logical_accesses.finish()?,")
         && generated_oram_codecs_source.contains("physical_reads: physical_reads.finish()?,")
         && !oram_source
             .contains("let mut logical_accesses = FixedBoxBuilder::new(public_access_count);")
         && !oram_source
-            .contains("let mut physical_reads = FixedBoxBuilder::new(public_access_count);")
+            .contains("let mut physical_reads = FixedBoxBuilder::new(public_read_count);")
         && !oram_source.contains("logical_accesses: logical_accesses.finish()?,")
         && !oram_source.contains("physical_reads: physical_reads.finish()?,")
         && !oram_source.contains("logical_accesses: Vec<LogicalEvent>,")
@@ -48223,6 +48279,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "evidence_builds_audit_the_kept_position_map_witness": evidence_builds_audit_the_kept_position_map_witness,
         "a_call_copies_no_committed_object": a_call_copies_no_committed_object,
         "sealed_records_are_kept_in_the_store_alone": sealed_records_are_kept_in_the_store_alone,
+        "oram_reads_are_traced_where_the_call_reads_them": oram_reads_are_traced_where_the_call_reads_them,
         "public_state_digests_are_kept_per_object": public_state_digests_are_kept_per_object,
         "trace_runs_stand_for_recorded_events": trace_runs_stand_for_recorded_events,
         "production_calls_issue_chained_receipts": production_calls_issue_chained_receipts,
@@ -49178,6 +49235,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && evidence_builds_audit_the_kept_position_map_witness
             && a_call_copies_no_committed_object
             && sealed_records_are_kept_in_the_store_alone
+            && oram_reads_are_traced_where_the_call_reads_them
             && public_state_digests_are_kept_per_object
             && trace_runs_stand_for_recorded_events
             && production_calls_issue_chained_receipts
@@ -54036,7 +54094,6 @@ fn append_overhead_workload(
             &oram,
         )?;
         case["oram"] = scenario_overhead(&oram);
-        append_call_start_decode(&mut case["oram"], oram_artifact, target.entrypoint, &oram)?;
         case["variants"]
             .as_array_mut()
             .expect("variants is an array")
@@ -54044,12 +54101,6 @@ fn append_overhead_workload(
         matrix.push(oram_row.clone());
         if artifact_capacity_label(oram_artifact) == Some("64".to_string()) {
             case["oram_64"] = scenario_overhead(&oram);
-            append_call_start_decode(
-                &mut case["oram_64"],
-                oram_artifact,
-                target.entrypoint,
-                &oram,
-            )?;
         }
         case["oram_improves_physical_writes_baseline"] = json!(oram_write_comparison_baseline.0);
         case["oram_improves_physical_writes"] = json!(
@@ -54073,12 +54124,6 @@ fn append_overhead_workload(
             &private_posmap,
         )?;
         case["oram_private_posmap"] = scenario_overhead(&private_posmap);
-        append_call_start_decode(
-            &mut case["oram_private_posmap"],
-            private_artifact,
-            target.entrypoint,
-            &private_posmap,
-        )?;
         case["variants"]
             .as_array_mut()
             .expect("variants is an array")
@@ -54096,12 +54141,6 @@ fn append_overhead_workload(
         let large_row =
             overhead_matrix_row(benchmark, &label, large_artifact, target.entrypoint, &large)?;
         case[label.as_str()] = scenario_overhead(&large);
-        append_call_start_decode(
-            &mut case[label.as_str()],
-            large_artifact,
-            target.entrypoint,
-            &large,
-        )?;
         case["variants"]
             .as_array_mut()
             .expect("variants is an array")
@@ -55953,7 +55992,7 @@ fn optional_scenario_overhead(result: &OptionalScenarioResult) -> JsonValue {
 /// Versioned identifier for the modeled resource-cost accounting reported as
 /// `gas_used`. This is a MODELED resource cost, not stock EVM gas: there is no
 /// EVM gas schedule or bytecode backend in this toolchain.
-const RESOURCE_COST_MODEL: &str = "uo-modeled-resource-cost-v2";
+const RESOURCE_COST_MODEL: &str = "uo-modeled-resource-cost-v3";
 
 /// Self-describing cost-model record embedded in `overheads.json` so the report
 /// is not ambiguous about its `gas_used` wording. The two documented formulas
@@ -56067,7 +56106,6 @@ fn overhead_matrix_row(
 ) -> Result<JsonValue> {
     let mut row = scenario_overhead(result);
     append_artifact_overhead_metadata(&mut row, benchmark, backend_label, artifact, entrypoint)?;
-    append_call_start_decode(&mut row, artifact, entrypoint, result)?;
     Ok(row)
 }
 
@@ -56175,91 +56213,6 @@ fn artifact_capacity_label(artifact: &CompiledArtifact) -> Option<String> {
                 .join("+"),
         )
     }
-}
-
-/// What a call reads at its start, outside the trace: for each Path ORAM map
-/// the entrypoint touches, the runtime opens the counter and every metadata
-/// page, the units the map's first traced access reads, to rebuild each
-/// slot's leaf and key (the directory) and the stash in the enclave
-/// (`refresh_path_state_from_storage`). It reads no bucket: an access reads
-/// its path, and takes the key's value from the key's block. The pattern is
-/// fixed by the public parameters, so it reveals nothing. Lengths are the
-/// stored ciphertext lengths the trace records for the same units.
-fn call_start_decode(
-    artifact: &CompiledArtifact,
-    entrypoint: &str,
-    physical_reads: &uo_core::PhysicalReads,
-) -> Result<(usize, usize)> {
-    let manifest = &artifact.contract.manifest;
-    let entry = manifest
-        .entrypoints
-        .get(entrypoint)
-        .ok_or_else(|| anyhow!("manifest entry missing for {entrypoint}"))?;
-    let mut reads = 0usize;
-    let mut bytes = 0usize;
-    for object_id in entry.oram_accesses.keys() {
-        let object = manifest
-            .objects
-            .iter()
-            .find(|object| object.id == *object_id)
-            .ok_or_else(|| anyhow!("manifest object {object_id} missing for {entrypoint}"))?;
-        let Some(oram) = object.oram.as_ref() else {
-            continue;
-        };
-        if !uo_core::manifest::is_path_oram_scheme(&oram.scheme) {
-            continue;
-        }
-        let traced_len = |unit: &str| -> Result<usize> {
-            let prefix = format!("{}@{unit}", object.name);
-            physical_reads
-                .events()
-                .find(|event| event.object == object.name && event.location.starts_with(&prefix))
-                .map(|event| event.len)
-                .ok_or_else(|| anyhow!("no traced {unit} read for {}", object.name))
-        };
-        let counter = traced_len("counter")?;
-        let page = traced_len("meta")?;
-        reads += 1 + oram.metadata_pages;
-        bytes += counter + oram.metadata_pages * page;
-    }
-    Ok((reads, bytes))
-}
-
-/// Adds the call-start reads to an overhead row of an entrypoint that touches
-/// a Path ORAM map, next to the traced counts.
-fn append_call_start_decode(
-    row: &mut JsonValue,
-    artifact: &CompiledArtifact,
-    entrypoint: &str,
-    result: &ScenarioResult,
-) -> Result<()> {
-    let (reads, bytes) =
-        call_start_decode(artifact, entrypoint, &result.target.trace.physical_reads)?;
-    if reads == 0 {
-        return Ok(());
-    }
-    let traced_reads = result.target.trace.physical_reads.event_count();
-    let traced_bytes = result
-        .target
-        .trace
-        .physical_reads
-        .events()
-        .map(|event| event.len)
-        .sum::<usize>();
-    let object = row
-        .as_object_mut()
-        .ok_or_else(|| anyhow!("overhead row for {entrypoint} is not a JSON object"))?;
-    object.insert("call_start_reads".into(), json!(reads));
-    object.insert("call_start_bytes".into(), json!(bytes as f64));
-    object.insert(
-        "physical_reads_with_call_start".into(),
-        json!(traced_reads + reads),
-    );
-    object.insert(
-        "bytes_read_with_call_start".into(),
-        json!((traced_bytes + bytes) as f64),
-    );
-    Ok(())
 }
 
 fn format_value(value: Option<&Value>) -> JsonValue {
@@ -58978,6 +58931,67 @@ mod tests {
             "",
         );
         assert!(!ok(&objects, &oram, &unread, &state));
+    }
+
+    #[test]
+    fn oram_read_check_rejects_the_drifts_it_guards() {
+        use super::{check_oram_reads_are_traced_where_the_call_reads_them, repo_root};
+        let root = repo_root();
+        let read = |rel: &str| std::fs::read_to_string(root.join(rel)).unwrap();
+        let oram = production_source_slice(&read("runtime/uo-evm/src/oram.rs"));
+        let objects = production_source_slice(&read("runtime/uo-evm/src/objects.rs"));
+        let codecs = read("runtime/uo-evm/src/generated_oram_codecs.rs");
+        let manifest = read("crates/uo-core/src/manifest.rs");
+        let ok = |oram: &str, objects: &str, codecs: &str, manifest: &str| {
+            check_oram_reads_are_traced_where_the_call_reads_them(oram, objects, codecs, manifest)
+        };
+        assert!(ok(&oram, &objects, &codecs, &manifest));
+        let drift = |source: &str, from: &str, to: &str| {
+            assert_eq!(source.matches(from).count(), 1, "{from}");
+            source.replacen(from, to, 1)
+        };
+        // A load that reads the counter and does not trace the read.
+        let untraced = drift(
+            &oram,
+            "        trace.physical_read(&spec.name, counter, self.access_counter_slot.len());\n",
+            "",
+        );
+        assert!(!ok(&untraced, &objects, &codecs, &manifest));
+        // A load that reads the pages and does not trace them.
+        let untraced = drift(
+            &oram,
+            "            trace.physical_read(&spec.name, location, sealed.len());\n",
+            "",
+        );
+        assert!(!ok(&untraced, &objects, &codecs, &manifest));
+        // A map loaded for a call with a recorder no trace reads.
+        let elsewhere = drift(
+            &objects,
+            "oram: object.oram.clone_for_tx(&object.spec, trace, allocator)?,",
+            "oram: object.oram.clone_for_tx(&object.spec, &mut CallRecorder::begin(\"x\", &[]), allocator)?,",
+        );
+        assert!(!ok(&oram, &elsewhere, &codecs, &manifest));
+        // An access of the local scheme that names the counter again.
+        let again = drift(
+            &codecs,
+            "    let mut physical_reads = FixedBoxBuilder::new(public_read_count);\n\n    logical_accesses.push(LogicalEvent {\n        kind: \"uooram_counter\".into(),\n        object: spec.name.clone(),\n        detail: \"counter\".into(),\n    })?;\n\n    for page in 0..state.storage.directory_pages.len() {\n        logical_accesses.push(LogicalEvent {\n            kind: \"uooram_metadata_load\".into(),",
+            "    let mut physical_reads = FixedBoxBuilder::new(public_read_count + 1);\n\n    logical_accesses.push(LogicalEvent {\n        kind: \"uooram_counter\".into(),\n        object: spec.name.clone(),\n        detail: \"counter\".into(),\n    })?;\n    physical_reads.push(PhysicalReadEvent {\n        object: spec.name.clone(),\n        location: format!(\"{}@counter\", spec.name),\n        len: state.storage.access_counter_slot.len(),\n    })?;\n\n    for page in 0..state.storage.directory_pages.len() {\n        logical_accesses.push(LogicalEvent {\n            kind: \"uooram_metadata_load\".into(),",
+        );
+        assert!(!ok(&oram, &objects, &again, &manifest));
+        // A node access of the tree with room for reads beyond its path.
+        let wider = drift(
+            &codecs,
+            "            physical_reads: FixedBoxBuilder::new(self.parameters.buckets_per_access),",
+            "            physical_reads: FixedBoxBuilder::new(logical_reads),",
+        );
+        assert!(!ok(&oram, &objects, &wider, &manifest));
+        // A read bound that counts the counter and the pages at every access.
+        let bound = drift(
+            &manifest,
+            "    pub fn total_load_ops(&self) -> usize {\n        self.buckets_per_access\n    }",
+            "    pub fn total_load_ops(&self) -> usize {\n        self.total_commit_ops()\n    }",
+        );
+        assert!(!ok(&oram, &objects, &codecs, &bound));
     }
 
     #[test]

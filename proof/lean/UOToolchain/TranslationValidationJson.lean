@@ -2253,9 +2253,9 @@ def expectedCommitOpsForFunction
     pure (acc + addition)
 
 /-- The sealed records a call of `fn` may read: each slot of each exact
-object it loads, once; for each access of an ORAM map the path's buckets and
-the metadata pages; and, on a Path ORAM scheme, the counter and the metadata
-pages the call reads when it starts. -/
+object it loads, once; and for each ORAM map it loads, the counter and the
+metadata pages, once, and the buckets of each access (on the surrogate
+scheme, of its one access). -/
 def expectedLoadOpsForFunction
   (view : ImportedProofRelevantContractView)
   (fn : ImportedProofRelevantFunctionView) :
@@ -2276,13 +2276,12 @@ def expectedLoadOpsForFunction
           | some manifestObject =>
               match manifestObject.oram with
               | some oram =>
-                  let perAccess := totalCommitOps oram
-                  if translationIsPathOramScheme stateObject.oram_scheme then
-                    pure <|
-                      perAccess * lookupPairCount objectId oramAccesses +
-                        oram.metadata_pages + 1
-                  else
-                    pure perAccess
+                  let accesses :=
+                    if translationIsPathOramScheme stateObject.oram_scheme then
+                      lookupPairCount objectId oramAccesses
+                    else
+                      1
+                  pure <| oram.metadata_pages + 1 + oram.buckets_per_access * accesses
               | none => throw s!"ORAM object {objectId} is missing ORAM manifest data"
           | none => throw s!"manifest is missing object id {objectId}"
         else

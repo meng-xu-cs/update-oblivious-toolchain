@@ -29,7 +29,7 @@
     },
     {
       "accepted": true,
-      "certificate_json_bytes": 6534,
+      "certificate_json_bytes": 6243,
       "entrypoint": "add(bytes32,uint256)",
       "kept_witness_audits": 1,
       "leaf_steps": 2,
@@ -41,7 +41,7 @@
     },
     {
       "accepted": true,
-      "certificate_json_bytes": 6534,
+      "certificate_json_bytes": 6243,
       "entrypoint": "add(bytes32,uint256)",
       "kept_witness_audits": 1,
       "leaf_steps": 2,
@@ -53,7 +53,7 @@
     },
     {
       "accepted": true,
-      "certificate_json_bytes": 15602,
+      "certificate_json_bytes": 14575,
       "entrypoint": "deposit(bytes32,uint256)",
       "kept_witness_audits": 1,
       "leaf_steps": 2,
@@ -65,7 +65,7 @@
     },
     {
       "accepted": true,
-      "certificate_json_bytes": 53336,
+      "certificate_json_bytes": 48120,
       "entrypoint": "transferFrom(address,address,address,uint256)",
       "kept_witness_audits": 5,
       "leaf_steps": 6,

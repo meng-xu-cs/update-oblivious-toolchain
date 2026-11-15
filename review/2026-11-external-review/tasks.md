@@ -1981,6 +1981,68 @@ no held unit; `call_start_reads` and the `*_with_call_start` sums leave the
 overhead report; the Path ORAM theorems and checkers hold on the new
 schedule; `docs/path-oram.md` has the new counts and break-evens.
 
+As built. A call reads a Path ORAM map's counter and metadata pages from
+the store once, when it loads the map, and the trace names each read there:
+`OramStorage::read_counter_and_pages` records them with the call's recorder,
+which `OramState::refresh_from_storage` and `OramState::clone_for_tx` now
+take. The call holds those records through the call, as it did, and an
+access names as physical reads only the buckets it reads: the path on the
+local scheme, the window of buckets on the surrogate scheme
+(`public_read_count` in both transcripts), and the path of each node access
+on the tree. The logical trace keeps its shape: each access still names the
+counter and the metadata pages it uses in the enclave. So the controller's
+per-access page budgets, the logical-trace checks and the Path ORAM theorems
+over logical events are unchanged, and the checkers that match a leaf
+schedule against storage events match bucket events alone, as they did.
+Moving the logical markers as well, to the map's load, would have taken the
+runtime refinement's induction proofs over the access shape with it; nothing
+in the issue asks for that, and it is not done.
+
+The manifest's read bound counts what a call reads: for each map it loads,
+the counter and the metadata pages once (`call_start_load_ops`, now
+`metadata_pages_per_access` on every scheme) and the buckets of each access
+(`total_load_ops` is `buckets_per_access`); the surrogate scheme makes its
+one pass. The compiler, `uo-check` and the Lean translation checker
+(`expectedLoadOpsForFunction`) compute the same bound. The cost model is
+`uo-modeled-resource-cost-v3`: v2's formula over the new bound. ERC20Lite
+`transferFrom` on the local scheme has a bound of 94 reads where it had 228,
+and costs 10,211 units where it cost 14,097; on the tree at 16,384 entries
+it costs 270,457 where it cost 401,885. `UOToolchain/OramModel.lean`'s read
+model follows: an access reads its buckets (`totalPhysicalReadsPerAccess`),
+a call reads the counter and the pages when it loads the map
+(`callStartPhysicalReads`), and a call that makes one access reads what it
+writes (`totalPhysicalBudgets_match`).
+
+Measured. The storage-boundary report (schema v2) compares each object's
+reads one for one, with no held unit: over the 47 calls the trace names
+3,862 reads of sealed objects and the store sees those 3,862, where the
+trace named 4,517. `call_start_reads`, `call_start_bytes` and the two
+`*_with_call_start` sums left the overhead report and the capacity sweep. In
+the overhead report, ERC20Lite `transferFrom` reads 94 records of 51,712
+bytes on the local scheme (178 of 103,680 traced before), and 885, 1,767 and
+2,388 on the tree at 256, 4,096 and 16,384 entries (1,082, 2,010 and 2,658).
+In the capacity sweep's quick profile a call's read bound is the count of
+its reads on every backend, where on the tree it counted the counter and the
+metadata pages again at every node access; a tree read at 16,384 entries
+traces 314 reads (332 before) and 646 physical operations (664), and a write
+2,472 (2,576). The tree costs less modeled gas than the full scan from 1,024
+entries for reads alone (2,048 under v2) and from 2,048 for an even mix and
+for writes alone (2,048 and 4,096); the local scheme from 32, 16 and 8
+entries for reads alone, an even mix and writes alone (128, 32 and 16),
+which are its break-evens in physical operations. The break-evens in bytes
+and in physical operations did not move.
+
+`oram_reads_are_traced_where_the_call_reads_them` in
+`runtime_boundary_validation.json` pins the load's reads and their trace,
+the accesses' bucket reads and the read bound, with a unit test of six
+drifts. The Lean implementation interface pins the transcripts' read
+buffers, the traced load and the counter's read. The engine's test of the
+store's log compares reads one for one on both Path ORAM schemes and checks
+that a call names each map's counter once; the ORAM test of a load checks
+the reads it traces; the tree test counts `1 + 25 + 45 · 9` reads for a
+write of 45 node accesses at 256 entries; and the compiler's test of the
+load bound finds that one access reads what it writes.
+
 ### Issue 58 — Seal the master secret so that a production deployment can restart
 
 Source: Issue 41. Size: M. Depends on: Issues 41 and 53.

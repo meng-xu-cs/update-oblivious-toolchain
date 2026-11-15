@@ -846,7 +846,9 @@ impl RuntimeObject {
     /// and this is the only time the call reads it: the scan is traced
     /// once, whatever the number of the call's accesses, and the accesses
     /// work on the opened copy. A raw object is copied and traces each
-    /// access; a Path ORAM map reads its paths as it is accessed.
+    /// access. An ORAM map reads its counter and its metadata pages here,
+    /// traced once, and its paths (on the surrogate scheme, its window of
+    /// buckets) as it is accessed.
     pub(in crate::runtime) fn clone_for_tx(
         &self,
         trace: &mut CallRecorder,
@@ -863,7 +865,7 @@ impl RuntimeObject {
             }
             Self::UoOramMap(object) => Ok(Self::UoOramMap(OramMapObject {
                 spec: object.spec.clone(),
-                oram: object.oram.clone_for_tx(&object.spec, allocator)?,
+                oram: object.oram.clone_for_tx(&object.spec, trace, allocator)?,
                 accessed: false,
                 dirty: false,
                 leaf_coin_seed: object.leaf_coin_seed.duplicate(),
@@ -3352,7 +3354,7 @@ mod tests {
         match &mut old {
             RuntimeObject::UoOramMap(map) => {
                 map.oram
-                    .refresh_from_storage(&spec, &mut old_allocator)
+                    .refresh_from_storage(&spec, &mut load_recorder(), &mut old_allocator)
                     .unwrap();
             }
             _ => unreachable!(),
@@ -3422,7 +3424,7 @@ mod tests {
         match &mut old {
             RuntimeObject::UoOramMap(map) => {
                 map.oram
-                    .refresh_from_storage(&spec, &mut old_allocator)
+                    .refresh_from_storage(&spec, &mut load_recorder(), &mut old_allocator)
                     .unwrap();
             }
             _ => unreachable!(),

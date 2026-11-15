@@ -3199,7 +3199,7 @@
       "controller_phase_count": 8,
       "entrypoint": "put(bytes32,uint256)",
       "exit_events": 10,
-      "gas_used": 2757,
+      "gas_used": 2612,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -3505,7 +3505,7 @@
       "controller_phase_count": 8,
       "entrypoint": "put(bytes32,uint256)",
       "exit_events": 10,
-      "gas_used": 2757,
+      "gas_used": 2612,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -3776,7 +3776,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "confidential_core_shell_boundary_lowering_bundle_json_bytes": 21574,
+      "confidential_core_shell_boundary_lowering_bundle_json_bytes": 21283,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "SingleAccessMap",
@@ -3811,7 +3811,7 @@
       "controller_phase_count": 13,
       "entrypoint": "add(bytes32,uint256)",
       "exit_events": 16,
-      "gas_used": 3376,
+      "gas_used": 3086,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -4154,7 +4154,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "confidential_core_shell_boundary_lowering_bundle_json_bytes": 21574,
+      "confidential_core_shell_boundary_lowering_bundle_json_bytes": 21283,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "SingleAccessMap",
@@ -4189,7 +4189,7 @@
       "controller_phase_count": 13,
       "entrypoint": "add(bytes32,uint256)",
       "exit_events": 16,
-      "gas_used": 3376,
+      "gas_used": 3086,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -4532,7 +4532,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "confidential_core_shell_boundary_lowering_bundle_json_bytes": 41267,
+      "confidential_core_shell_boundary_lowering_bundle_json_bytes": 40240,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "ConfidentialMixer",
@@ -4567,7 +4567,7 @@
       "controller_phase_count": 13,
       "entrypoint": "deposit(bytes32,uint256)",
       "exit_events": 16,
-      "gas_used": 5445,
+      "gas_used": 4459,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -4976,7 +4976,7 @@
     {
       "accepted": true,
       "boundary_events": 14,
-      "confidential_core_shell_boundary_lowering_bundle_json_bytes": 121930,
+      "confidential_core_shell_boundary_lowering_bundle_json_bytes": 116714,
       "confidential_fragment_witness": {
         "accepted": true,
         "contract": "ERC20Lite",
@@ -5011,7 +5011,7 @@
       "controller_phase_count": 33,
       "entrypoint": "transferFrom(address,address,address,uint256)",
       "exit_events": 40,
-      "gas_used": 14097,
+      "gas_used": 10211,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,

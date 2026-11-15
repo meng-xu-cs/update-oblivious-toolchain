@@ -2520,7 +2520,7 @@
         "statement_trace_count": 1
       },
       "entrypoint": "put(bytes32,uint256)",
-      "gas_used": 2757,
+      "gas_used": 2612,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -2768,7 +2768,7 @@
         "statement_trace_count": 1
       },
       "entrypoint": "put(bytes32,uint256)",
-      "gas_used": 2757,
+      "gas_used": 2612,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -3016,7 +3016,7 @@
         "statement_trace_count": 2
       },
       "entrypoint": "add(bytes32,uint256)",
-      "gas_used": 3376,
+      "gas_used": 3086,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -3333,7 +3333,7 @@
         "statement_trace_count": 2
       },
       "entrypoint": "add(bytes32,uint256)",
-      "gas_used": 3376,
+      "gas_used": 3086,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1
@@ -3650,7 +3650,7 @@
         "statement_trace_count": 3
       },
       "entrypoint": "deposit(bytes32,uint256)",
-      "gas_used": 5445,
+      "gas_used": 4459,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,
@@ -4021,7 +4021,7 @@
         "statement_trace_count": 9
       },
       "entrypoint": "transferFrom(address,address,address,uint256)",
-      "gas_used": 14097,
+      "gas_used": 10211,
       "kernel_witness": {
         "canonical_loaded_object_schedule": [
           1,

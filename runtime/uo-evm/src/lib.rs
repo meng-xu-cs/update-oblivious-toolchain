@@ -1269,14 +1269,14 @@ bounds:
             first_trace.trace.theorem_trace.boundary_schedule.len(),
             2 * accesses + 2
         );
-        // Each node access reads the counter and the 9 buckets of one path;
-        // each of the two operations' first also reads the 25 metadata
-        // pages: the header and 24 stash pages, for a stash bound of
-        // 152 + 34 = 186.
+        // The call reads the counter and the 25 metadata pages once, where
+        // it loads the map: the header and 24 stash pages, for a stash bound
+        // of 152 + 34 = 186. Each node access reads the 9 buckets of one
+        // path.
         assert_eq!(uo_core::manifest::path_oram_tree_stash_bound(256), 152 + 34);
         assert_eq!(
             first_trace.trace.physical_reads.event_count(),
-            accesses * (1 + 9) + 2 * 25
+            1 + 25 + accesses * 9
         );
         assert_eq!(
             first_trace

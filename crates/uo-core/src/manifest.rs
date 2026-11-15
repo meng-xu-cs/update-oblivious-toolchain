@@ -164,14 +164,15 @@ pub struct EntrypointManifest {
     pub uomap_reads: usize,
     pub uomap_writes: usize,
     /// The sealed records the call may write: each slot of each exact object
-    /// in `may_write_objects`, and for each access of an ORAM map the units
-    /// `max_load_ops` counts for it.
+    /// in `may_write_objects`, and for each access of an ORAM map its
+    /// counter, its metadata pages and its buckets.
     pub max_commit_ops: usize,
     /// The sealed records the call may read from storage: each slot of each
-    /// exact object it loads, once; for each access of an ORAM map the
-    /// buckets of the path and the metadata pages; and, for a Path ORAM
-    /// map, the counter and the metadata pages the call reads when it
-    /// starts. The modeled cost charges them (`uo-modeled-resource-cost-v2`).
+    /// exact object it loads, once; and for each ORAM map it loads, the
+    /// counter and the metadata pages, once, where the call loads the map,
+    /// and the buckets of each access (on the surrogate scheme, the window
+    /// of its one access). The modeled cost charges them
+    /// (`uo-modeled-resource-cost-v3`).
     pub max_load_ops: usize,
     /// The objects the entrypoint may write, in increasing id order: every
     /// object with a write statement in its body, whether or not the
@@ -453,32 +454,31 @@ impl OramManifest {
         self.metadata_pages_per_access + self.buckets_per_access
     }
 
-    /// The sealed records one access may read: the units it may write.
+    /// The sealed records one access reads: its buckets. It reads no counter
+    /// and no metadata page: the call read those when it loaded the map,
+    /// and holds them.
     pub fn total_load_ops(&self) -> usize {
-        self.total_commit_ops()
+        self.buckets_per_access
     }
 
-    /// The sealed records a call reads from the map when it starts, outside
-    /// any access: on a Path ORAM scheme the counter and every metadata
-    /// page, which is `metadata_pages_per_access`.
+    /// The sealed records a call reads from the map when it starts and loads
+    /// the map, outside any access: the counter and every metadata page,
+    /// which is `metadata_pages_per_access`. The trace names each there.
     pub fn call_start_load_ops(&self) -> usize {
-        if is_path_oram_scheme(&self.scheme) {
-            self.metadata_pages_per_access
-        } else {
-            0
-        }
+        self.metadata_pages_per_access
     }
 
-    /// The sealed records a call that makes `accesses` accesses may read.
+    /// The sealed records a call that makes `accesses` accesses may read:
+    /// those it reads when it loads the map, and the buckets of each access.
     /// The surrogate scheme makes one pass whatever the count.
     pub fn load_ops_for_accesses(&self, accesses: usize) -> usize {
-        if is_path_oram_scheme(&self.scheme) {
-            self.total_load_ops()
-                .saturating_mul(accesses)
-                .saturating_add(self.call_start_load_ops())
+        let accesses = if is_path_oram_scheme(&self.scheme) {
+            accesses
         } else {
-            self.total_load_ops()
-        }
+            1
+        };
+        self.call_start_load_ops()
+            .saturating_add(self.total_load_ops().saturating_mul(accesses))
     }
 
     pub fn resource_bounds_for_capacity(

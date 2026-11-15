@@ -127,7 +127,7 @@
       "oram": {
         "aborted": false,
         "executable": true,
-        "gas_used": 5502,
+        "gas_used": 4516,
         "getters": [
           "3",
           "3"
@@ -170,7 +170,7 @@
       "oram": {
         "aborted": false,
         "executable": true,
-        "gas_used": 14097,
+        "gas_used": 10211,
         "getters": [
           "7",
           "3",

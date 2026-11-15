@@ -62,8 +62,8 @@ The Lean development states more than it currently proves for Path ORAM:
 - A call reads only the paths it accesses. Each position-map page holds,
   after its slots' leaves, each slot's key: the directory in which an access
   finds its key's slot (`encode_path_position_map_page_into`). A call starts
-  from the map's counter and metadata pages, the units its first access
-  reads, and rebuilds the directory and the stash in the enclave
+  by reading the map's counter and metadata pages from the store, and
+  rebuilds the directory and the stash in the enclave
   (`refresh_path_state_from_storage`); it reads no bucket. It holds those
   records through the call, and no access opens them again. An access reads its
   path into the stash and takes the key's value from the key's block there
@@ -71,31 +71,28 @@ The Lean development states more than it currently proves for Path ORAM:
   values, and a write held until commit is read back from the call's pending
   writes. Each block a path read loads is checked (slot and leaf in range,
   its bucket on the path to its leaf), and the accessed slot must have exactly
-  one block, on its prior leaf and with its key. The trace does not have the
-  call-start reads as such. It names the counter and the metadata pages at
-  every access of the local scheme, and on the tree the counter at every node
-  access and the metadata pages at every operation. Those reads follow a
-  fixed pattern set by the public parameters, so they reveal nothing, and the
-  trace names more of them than cross the storage boundary: the store that
-  keeps a map's records sees its counter and each of its pages once in a
-  call, and every bucket read (`results/storage_boundary.json`; see The
-  Storage Boundary in [`claim-boundary.md`](./claim-boundary.md)). ERC20Lite
-  `transferFrom` on the local route traces 178 reads of 103,680 bytes. Its
-  store sees 94 reads of 51,712 bytes: the 50 call-start reads (a capacity-64
-  map: the counter and 16 pages; a capacity-128 map: the counter and 32
-  pages) and 44 buckets. The other 84 traced reads name a counter or a page
-  again. Reading every bucket at call start, as calls did before, added the
-  382 buckets of the two maps.
-  `results/overheads.json` reports the call-start reads next to the traced
-  counts of every ORAM row (`call_start_reads`, `call_start_bytes`,
-  `physical_reads_with_call_start`, `bytes_read_with_call_start`). The two
-  sums count a call-start read and the traced read that names the same
-  record, so they are more than the store sees. On the
-  local scheme every access still rewrites every metadata page (the flat
+  one block, on its prior leaf and with its key. The trace names each read
+  where the call makes it: the counter and the metadata pages once, where
+  the call loads the map (`OramStorage::read_counter_and_pages`, which
+  `OramState::refresh_from_storage` calls with the call's recorder), and the
+  buckets of each access. Those reads
+  follow a fixed pattern set by the public parameters, so they reveal
+  nothing, and the store that keeps a map's records sees them one for one
+  (`results/storage_boundary.json`; see The Storage Boundary in
+  [`claim-boundary.md`](./claim-boundary.md)). ERC20Lite `transferFrom` on
+  the local route reads 94 records of 51,712 bytes: 50 when it starts (a
+  capacity-64 map: the counter and 16 pages; a capacity-128 map: the counter
+  and 32 pages) and 44 buckets. Until Issue 57 of the external review its
+  trace named the counter and the pages again at every access, 178 reads of
+  103,680 bytes, and the modeled cost charged those. Reading every bucket at
+  call start, as calls once did, added the 382 buckets of the two maps. Each
+  access still names the counter and the pages it uses in the logical trace,
+  which is the controller's: the enclave consults them at every access. On
+  the local scheme every access still rewrites every metadata page (the flat
   position map with its keys, linear in the capacity, and the stash, at most
-  16 pages), and its trace reads them all, so an access's cost grows linearly
-  with the capacity; the scheme is capped at 128. The private scheme's
-  accesses are those of its AVL map (below).
+  16 pages), so an access's cost grows linearly with the capacity; the
+  scheme is capped at 128. The private scheme's accesses are those of its
+  AVL map (below).
 - The stash bound is the capacity capped at 152 (`pathOramStashBound`). By
   the Path ORAM stash theorem (Stefanov et al., JACM 2018, Theorem 5.1, at 5
   blocks per bucket) the stash holds more than `R` blocks after an access
@@ -206,15 +203,18 @@ The Lean development states more than it currently proves for Path ORAM:
   scheme every node the operation reads.
 - What the tree costs: ERC20Lite `transferFrom` with its `balances` map on
   the private scheme makes 90 node accesses at capacity 256 (two gets of 11
-  and two puts of 34, each write reusing the presence its read found), 1,060
-  traced reads (1.16 MB) in all where the flat position map it replaces made
-  308 (347 KB); at capacity 4096, 1,988 reads (2.18 MB) against the flat
-  map's 2,244 (2.6 MB); at capacity 16384 (`oram_private_posmap_16384`), 2,636
-  reads (2.90 MB), where a flat position map is 2,048 pages read and
-  rewritten on every access. Without the reuse each write would add a get:
-  112, 162 and 192 node accesses. The tree's cost grows with the square of
-  the logarithm of the capacity and the flat map's linearly; the tree costs
-  more than the flat map at 256 entries and less from 4,096.
+  and two puts of 34, each write reusing the presence its read found), and
+  the call reads 885 sealed records (545 KB): each map's counter and
+  metadata pages once, and the path of each access. At capacity 4096 it
+  reads 1,767 (1.08 MB), and at capacity 16384
+  (`oram_private_posmap_16384`) 2,388 (1.46 MB), where a flat position map
+  is 2,048 pages rewritten on every access. When the private scheme kept a
+  flat position map, its trace named 308 reads (347 KB) at capacity 256 and
+  2,244 (2.6 MB) at 4096, in records of the size they had then, and the
+  counter and the pages at every access. Without the reuse each write would
+  add a get: 112, 162 and 192 node accesses. The tree's cost grows with the
+  square of the logarithm of the capacity and the flat map's linearly; the
+  tree costs more than the flat map at 256 entries and less from 4,096.
   The per-call allocator event log grows with the call's ORAM commit
   operations (`max_commit_ops`), so these large maps fit it.
 - `UOToolchain/PathOramFreshLeaves.lean` proves, without enumerating seeds,
@@ -395,36 +395,39 @@ tag (the nibble encoding these records had before took 190 and 124 bytes).
 On the full scan a write moves 192 bytes per entry, the scan and the rewrite
 of every slot, and a read moves 96: it scans the map and rewrites nothing,
 since its program has no write statement for the map. On the tree a write, a
-get and then a put of `3h + 1` node accesses, costs about four times a read:
-270 against 1,000 physical operations at 256 entries, 664 against 2,576 at
-16,384. The tree moves fewer bytes than the full scan from 4,096 entries for
-reads alone and from 8,192 for an even mix and for writes alone; it makes
-fewer physical operations from 512 entries for reads alone and for an even
-mix and from 1,024 for writes alone; and it costs less modeled gas from
-2,048 for reads alone and for an even mix and from 4,096 for writes alone.
-The stash cap of 152 costs a tree access 10 of these operations, the five
-stash pages it added, read and written once per operation: 2.3% of a read's
-bytes at 16,384 entries and 5.7% at 256, and the gas break-even for reads
-alone, which was at 1,024 entries with a cap of 114. The gas is that of cost
-model v2, which charges the
-sealed records a call reads, those at its start included, as it charges
-those it writes (see The Modeled Cost in
-[`claim-boundary.md`](./claim-boundary.md)). The local scheme makes fewer
+get and then a put of `3h + 1` node accesses, costs three and a half to four
+times a read: 260 against 931 physical operations at 256 entries, 646
+against 2,472 at 16,384. The tree moves fewer bytes than the full scan from
+4,096 entries for reads alone and from 8,192 for an even mix and for writes
+alone; it makes fewer physical operations from 512 entries for reads alone
+and for an even mix and from 1,024 for writes alone; and it costs less
+modeled gas from 1,024 for reads alone and from 2,048 for an even mix and
+for writes alone. The stash cap of 152 costs a tree access 10 of these
+operations, the five stash pages it added, read once per call and written
+once per operation: 2.3% of a read's bytes at 16,384 entries and 5.7% at
+256; under cost model v2 it moved the gas break-even for reads alone from
+1,024 entries to 2,048. The gas is that of cost model v3, which charges the
+sealed records a call reads as it charges those it writes, and counts a
+map's counter and metadata pages once, where the call reads them (see The
+Modeled Cost in [`claim-boundary.md`](./claim-boundary.md)); v2 counted
+them again at every access, and on the tree at 16,384 entries charged a
+read 51,354 units where v3 charges 35,375. The local scheme makes fewer
 operations than the full scan from 32 entries for reads alone, 16 for an
-even mix and 8 for writes alone, and costs less gas from 128, 32 and 16, but
-moves more bytes at every capacity it admits, and up to its 128 entries it
-costs less than the tree on every metric.
+even mix and 8 for writes alone, and costs less gas from the same
+capacities (from 128, 32 and 16 under v2), but moves more bytes at every
+capacity it admits, and up to its 128 entries it costs less than the tree on
+every metric.
 
-Beside the traced counts the report gives the work that no trace records as
-such. A call on a Path ORAM map reads the map's counter and metadata pages
-when it starts, 29 reads of 27,840 bytes on the tree at 16,384 entries, and
-holds them through the call. The trace names them at the call's accesses
-instead, so the store sees fewer reads than the trace names: 314 for a read
-on that tree, whose trace names 332. An
+A call on a Path ORAM map reads the map's counter and metadata pages when it
+starts, 29 reads of 27,840 bytes on the tree at 16,384 entries, holds them
+through the call, and its trace names them there: a read on that tree
+traces 314 reads, the ones its store sees, where its trace named 332 before
+Issue 57, the counter again at every node access. Beside the traced counts
+the report gives the work that no trace records. An
 instrumented call exports the position maps before and after it as a
 witness. It once decoded them from storage, every bucket and metadata page
 of the tree twice: 65,590 sealed records at 16,384 entries, where a read
-traces 664 operations. The runtime now keeps the witness from call to call
+traces 646 operations. The runtime now keeps the witness from call to call
 and a call moves it by its own leaf transitions, so a measured call opens no
 record for it (`witness_scan_records` is 0 in every row). The decode
 happens once after each bulk load (`witness_decode_records` of a fill:
@@ -635,7 +638,8 @@ tree, and the break-evens are where this profile has them: between 4,096
 and 8,192 entries for reads, and between 8,192 and 16,384 for writes. The
 tree's advantage in bytes and physical operations is as it was; in gas, the
 stash cap of 152 moved its break-even for reads alone from 1,024 entries to
-2,048.
+2,048 under cost model v2, and cost model v3, which counts each read once
+(Issue 57), puts it at 1,024 again.
 
 The sweep also found a defect, which is fixed. An aborting call opened every
 slot of an exact map again to restore it, and the allocator's budget of

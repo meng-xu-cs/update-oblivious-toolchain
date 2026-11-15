@@ -696,39 +696,27 @@ pub(super) fn surrogate_access_transcript(
             spec.name
         );
     }
+    // The access uses the counter and every metadata page, and reads its
+    // window of buckets alone: the call read the counter and the pages from
+    // the store when it loaded the map, and holds them
+    // (`OramState::refresh_from_storage`, which traces those reads).
     let public_access_count =
         1 + state.storage.directory_pages.len() + state.parameters.buckets_per_access;
+    let public_read_count = state.parameters.buckets_per_access;
     let mut logical_accesses = FixedBoxBuilder::new(public_access_count);
-    let mut physical_reads = FixedBoxBuilder::new(public_access_count);
+    let mut physical_reads = FixedBoxBuilder::new(public_read_count);
 
     logical_accesses.push(LogicalEvent {
         kind: "uooram_counter".into(),
         object: spec.name.clone(),
         detail: "counter".into(),
     })?;
-    physical_reads.push(PhysicalReadEvent {
-        object: spec.name.clone(),
-        location: format!("{}@counter", spec.name),
-        len: state.storage.access_counter_slot.len(),
-    })?;
 
     for page in 0..state.storage.directory_pages.len() {
-        let directory_page = state.storage.directory_pages.get(page).ok_or_else(|| {
-            anyhow!(
-                "surrogate ORAM transcript directory page index {} missing despite public count guard for {}",
-                page,
-                spec.name
-            )
-        })?;
         logical_accesses.push(LogicalEvent {
             kind: "uooram_meta_scan".into(),
             object: spec.name.clone(),
             detail: format!("page:{page}"),
-        })?;
-        physical_reads.push(PhysicalReadEvent {
-            object: spec.name.clone(),
-            location: format!("{}@meta{page}", spec.name),
-            len: directory_page.len(),
         })?;
     }
 
@@ -779,39 +767,27 @@ pub(super) fn path_access_transcript(
             spec.name
         );
     }
+    // The access uses the counter and every metadata page, and reads the
+    // buckets of its path alone: the call read the counter and the pages
+    // from the store when it loaded the map, and holds them
+    // (`OramState::refresh_from_storage`, which traces those reads).
     let public_access_count =
         1 + state.storage.directory_pages.len() + state.parameters.buckets_per_access;
+    let public_read_count = state.parameters.buckets_per_access;
     let mut logical_accesses = FixedBoxBuilder::new(public_access_count);
-    let mut physical_reads = FixedBoxBuilder::new(public_access_count);
+    let mut physical_reads = FixedBoxBuilder::new(public_read_count);
 
     logical_accesses.push(LogicalEvent {
         kind: "uooram_counter".into(),
         object: spec.name.clone(),
         detail: "counter".into(),
     })?;
-    physical_reads.push(PhysicalReadEvent {
-        object: spec.name.clone(),
-        location: format!("{}@counter", spec.name),
-        len: state.storage.access_counter_slot.len(),
-    })?;
 
     for page in 0..state.storage.directory_pages.len() {
-        let directory_page = state.storage.directory_pages.get(page).ok_or_else(|| {
-            anyhow!(
-                "path ORAM transcript directory page index {} missing despite public count guard for {}",
-                page,
-                spec.name
-            )
-        })?;
         logical_accesses.push(LogicalEvent {
             kind: "uooram_metadata_load".into(),
             object: spec.name.clone(),
             detail: format!("page:{page}"),
-        })?;
-        physical_reads.push(PhysicalReadEvent {
-            object: spec.name.clone(),
-            location: format!("{}@meta{page}", spec.name),
-            len: directory_page.len(),
         })?;
     }
 
@@ -5424,10 +5400,15 @@ impl TreePathStore for SealedTreeStore<'_> {
         } else {
             0
         };
-        let reads = 1 + metadata_reads + self.parameters.buckets_per_access;
+        // The access uses the counter, and at an operation's first access
+        // the metadata pages; it reads the buckets of its path alone. The
+        // call read the counter and the pages from the store when it loaded
+        // the map, and holds them (`OramState::refresh_from_storage`, which
+        // traces those reads).
+        let logical_reads = 1 + metadata_reads + self.parameters.buckets_per_access;
         let mut trace = TreeAccessTrace {
-            logical_accesses: FixedBoxBuilder::new(reads),
-            physical_reads: FixedBoxBuilder::new(reads),
+            logical_accesses: FixedBoxBuilder::new(logical_reads),
+            physical_reads: FixedBoxBuilder::new(self.parameters.buckets_per_access),
             writes: oram_write_log_with_capacity(
                 self.parameters.buckets_per_access + metadata_writes + 1,
             )?,
@@ -5438,27 +5419,11 @@ impl TreePathStore for SealedTreeStore<'_> {
             object: self.spec.name.clone(),
             detail: "counter".into(),
         })?;
-        trace.physical_reads.push(PhysicalReadEvent {
-            object: self.spec.name.clone(),
-            location: format!("{}@counter", self.spec.name),
-            len: self.storage.access_counter_slot.len(),
-        })?;
         for page in 0..metadata_reads {
-            let sealed_len = self
-                .storage
-                .directory_pages
-                .get(page)
-                .ok_or_else(|| anyhow!("tree metadata page {} missing", page))?
-                .len();
             trace.logical_accesses.push(LogicalEvent {
                 kind: "uooram_metadata_load".into(),
                 object: self.spec.name.clone(),
                 detail: format!("page:{page}"),
-            })?;
-            trace.physical_reads.push(PhysicalReadEvent {
-                object: self.spec.name.clone(),
-                location: format!("{}@meta{page}", self.spec.name),
-                len: sealed_len,
             })?;
         }
         self.begun += 1;

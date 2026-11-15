@@ -150,8 +150,8 @@ its engineering part is Wave 4, its certified part is research.
 | 54 | Compare a runtime trace with the exact encoding in Lean | 7 | M | 38 | done | `08834f2` |
 | 55 | Take the public-state snapshot once for each object a call changes | 7 | M | 37 | done | `c787993` |
 | 56 | Slice production sources with a lexer | 7 | S to M | | done | `325184f` |
-| 57 | Trace the reads of a Path ORAM map that cross the storage boundary | 7 | L | 41 | todo | |
-| 58 | Seal the master secret so that a production deployment can restart | 7 | M | 41, 53 | done | |
+| 57 | Trace the reads of a Path ORAM map that cross the storage boundary | 7 | L | 41 | done | |
+| 58 | Seal the master secret so that a production deployment can restart | 7 | M | 41, 53 | done | `8838bc8` |
 | 59 | Keep sealed records in the store alone | 7 | L | 41 | done | `26fe8af` |
 
 Sizes are relative, not a schedule: S a day or less, M several days, L one
