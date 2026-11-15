@@ -51006,9 +51006,12 @@ fn check_registry_correctness(artifacts: &BenchArtifacts) -> Result<JsonValue> {
     }))
 }
 
-fn run_trace_equivalence(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<JsonValue> {
-    let classifier_uo = run_fixed_classifier_experiment(&suite["FixedSlotClassifier"].uo)
-        .context("trace_equivalence/FixedSlotClassifier/uo")?;
+/// The trace report's positive control: the raw classifier, whose runs are
+/// executable only in an insecure evaluation build, and its same-same
+/// comparison. It asks no Lean checker.
+fn trace_equivalence_positive_control(
+    suite: &BTreeMap<&'static str, BenchArtifacts>,
+) -> Result<JsonValue> {
     let classifier_raw = optional_raw_experiment(
         run_fixed_classifier_experiment(&suite["FixedSlotClassifier"].raw)
             .context("trace_equivalence/FixedSlotClassifier/raw"),
@@ -51017,6 +51020,17 @@ fn run_trace_equivalence(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Resu
         run_classifier_same_same(&suite["FixedSlotClassifier"].raw)
             .context("trace_equivalence/FixedSlotClassifier/raw-sameSame"),
     )?;
+    Ok(json!({
+        "benchmark": "FixedSlotClassifier",
+        "raw": optional_trace_control_summary(&classifier_raw),
+        "same_same": optional_trace_control_summary(&classifier_same_same),
+    }))
+}
+
+fn run_trace_equivalence(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Result<JsonValue> {
+    let classifier_uo = run_fixed_classifier_experiment(&suite["FixedSlotClassifier"].uo)
+        .context("trace_equivalence/FixedSlotClassifier/uo")?;
+    let positive_control = trace_equivalence_positive_control(suite)?;
     let auth_uo =
         run_authscan_experiment(&suite["AuthScan"].uo).context("trace_equivalence/AuthScan/uo")?;
     let mixer_uo = run_mixer_key_experiment(&suite["ConfidentialMixer"].uo)
@@ -51063,11 +51077,7 @@ fn run_trace_equivalence(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Resu
     )
     .context("trace_equivalence/ConfidentialMixer/oram_private_posmap_encrypted_return")?;
     Ok(json!({
-        "positive_control": {
-            "benchmark": "FixedSlotClassifier",
-            "raw": optional_trace_control_summary(&classifier_raw),
-            "same_same": optional_trace_control_summary(&classifier_same_same),
-        },
+        "positive_control": positive_control,
         "exact_uo": [
             trace_summary("FixedSlotClassifier", "uo", &classifier_uo)?,
             trace_summary("AuthScan", "uo", &auth_uo)?,
@@ -56976,7 +56986,7 @@ mod tests {
     #[cfg(not(feature = "insecure-eval-raw"))]
     use super::{
         check_authscan_correctness, compile_suite, run_auc_reports, run_mutual_information_reports,
-        run_overheads, run_trace_equivalence, BenchArtifacts,
+        run_overheads, trace_equivalence_positive_control, BenchArtifacts,
     };
     use uo_core::{
         canonical_path_oram_leaf_values_of_seed, ProgramMode, RuntimePathOramTransitionKind, Value,
@@ -57371,13 +57381,13 @@ mod tests {
     fn report_paths_mark_raw_confidential_artifacts_as_rejected() {
         let suite = compile_suite().unwrap();
 
-        let trace_report = run_trace_equivalence(&suite).unwrap();
+        // The trace report's positive control. The rest of the report asks
+        // the Lean exact-trace checker (`checkExactTrace`), which the
+        // validation script builds; a workspace test run needs no Lean.
+        let positive_control = trace_equivalence_positive_control(&suite).unwrap();
+        assert_eq!(positive_control["raw"]["executable"].as_bool(), Some(false));
         assert_eq!(
-            trace_report["positive_control"]["raw"]["executable"].as_bool(),
-            Some(false)
-        );
-        assert_eq!(
-            trace_report["positive_control"]["same_same"]["rejected"].as_bool(),
+            positive_control["same_same"]["rejected"].as_bool(),
             Some(true)
         );
 
