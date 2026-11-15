@@ -247,10 +247,15 @@ proved.
   the paper-main theorem's storage-trace premise. That the runtime store
   emits exactly this encoding is checked against runtime traces
   (`exact_encoding_matches` in `results/trace_equivalence.json`), not proved.
-  The check is the probe's: a Rust mirror of the Lean encoding gives the
-  reads and writes of a call, and the trace must hold exactly those, with
-  every record of the sealed length of its object's type and every write
-  an `Update`. No Lean checker reads the storage events of an exact object.
+  The check is Lean's (`exactTraceMatches` in
+  `UOToolchain/KernelExactTraceCheck.lean`, run by `checkExactTrace`): from
+  the call's artifact it decodes the entrypoint's kernel program and the
+  layout of each object the program touches (its slot count, the naming of
+  its slots, and the length of a sealed record of its type), and the
+  trace's reads and writes must be those of `exactEncodeRun` of the program
+  over that layout, one for one and in order. So every record has the
+  sealed length of its object's type and every write is an `Update`
+  (`exactTraceMatches_sound`, `exactTraceMatches_writes_update`).
   A runtime trace holds the scan and the rewrite of an exact object as one
   item each: a run, with the object, the naming of its slots, their count
   and their one length. The trace is the events of its items in order.
@@ -263,10 +268,11 @@ proved.
   handed, each classified from its bytes as below, and takes a write into
   the rewrite only if it is the `Update` of the rewrite's next slot. A
   source check binds this (`trace_runs_stand_for_recorded_events` in
-  `runtime_boundary_validation.json`), and seven tamper scenarios are
-  rejected: three change the sources, and four change the slot count, the
-  record length or the slot naming of a run in a trace (`exact_trace/*`),
-  which the probe's comparison rejects.
+  `runtime_boundary_validation.json`), and ten tamper scenarios are
+  rejected: three change the sources, and seven change the trace of a
+  call (`exact_trace/*`: the slot count of a scan and of a rewrite, the
+  record length, the naming of the slots, the class of a write, a read
+  left out, an object scanned twice), which the Lean checker rejects.
   The class `Update` of a sealed write is not a label the runtime asserts,
   and it does not rest on the ciphertext. A sealed record is a whole number
   of 32-byte units, the unit the storage observer classifies. Each unit is

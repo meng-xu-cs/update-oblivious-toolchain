@@ -1,6 +1,7 @@
 import Lean.Data.Json
 import UOToolchain.RuntimeKernelDslJson
 import UOToolchain.PathOramTreeShape
+import UOToolchain.RuntimeValueOpsSemantics
 
 open Lean
 
@@ -442,19 +443,32 @@ private partial def typeCanonicalLenFromJson (json : Json) : Except String Nat :
       (fun acc fieldJson => do
         let name : String ← lookupFieldAs fieldJson "name"
         let tyJson ← lookupFieldJson fieldJson "ty"
-        pure (acc + 4 + name.length + 4 + (← typeCanonicalLenFromJson tyJson)))
+        pure (acc + RuntimeValueOpsSemantics.canonicalLengthPrefixBytes + name.utf8ByteSize +
+          RuntimeValueOpsSemantics.canonicalLengthPrefixBytes + (← typeCanonicalLenFromJson tyJson)))
   else if let some payload := taggedPayload? json "Array" then
     let items ← expectJsonArray payload
     match items with
     | [elementJson, sizeJson] =>
         let size : Nat ← fromJson? sizeJson
-        pure (size * (4 + (← typeCanonicalLenFromJson elementJson)))
+        pure (size *
+          (RuntimeValueOpsSemantics.canonicalLengthPrefixBytes +
+            (← typeCanonicalLenFromJson elementJson)))
     | _ => throw "unsupported array type encoding"
   else
     throw "unsupported type encoding"
 
 private def typeCanonicalLenFromRawString (input : String) : Except String Nat := do
   typeCanonicalLenFromJson (← parseJsonString input)
+
+/- Each part of a struct or a fixed-size array sits behind an eight-byte
+length prefix, as in `Type::canonical_len`: a `uint256[4]` is
+4 × (8 + 32) = 160 bytes, and a struct `{a: uint256, ok: bool}` is
+(8 + 1 + 8 + 32) + (8 + 2 + 8 + 1) = 68 bytes. -/
+#guard (typeCanonicalLenFromRawString
+  "{\"Array\":[{\"Scalar\":{\"Uint\":256}},4]}").toOption == some 160
+#guard (typeCanonicalLenFromRawString
+  ("{\"Struct\":[{\"name\":\"a\",\"ty\":{\"Scalar\":{\"Uint\":256}}}," ++
+    "{\"name\":\"ok\",\"ty\":{\"Scalar\":\"Bool\"}}]}")).toOption == some 68
 
 def expectedEntrypointInputLen
   (fn : ImportedProofRelevantFunctionView) : Except String Nat := do
@@ -3323,13 +3337,16 @@ private partial def valueCanonicalLenFromJson (json : Json) : Except String Nat 
       let items ← expectJsonArray fieldJson
       match items with
       | [Json.str name, valueJson] =>
-          pure (acc + 4 + name.length + 4 + (← valueCanonicalLenFromJson valueJson))
+          pure (acc + RuntimeValueOpsSemantics.canonicalLengthPrefixBytes + name.utf8ByteSize +
+            RuntimeValueOpsSemantics.canonicalLengthPrefixBytes +
+            (← valueCanonicalLenFromJson valueJson))
       | _ =>
           throw "unsupported struct value encoding"
   else if let some payload := taggedPayload? json "Array" then
     let items ← expectJsonArray payload
     items.foldlM (init := 0) fun acc item => do
-      pure (acc + 4 + (← valueCanonicalLenFromJson item))
+      pure (acc + RuntimeValueOpsSemantics.canonicalLengthPrefixBytes +
+        (← valueCanonicalLenFromJson item))
   else
     throw "unsupported value encoding"
 

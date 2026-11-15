@@ -19,8 +19,8 @@
     },
     {
       "path": "acceptance.json",
-      "bytes": 166744,
-      "sha256": "9f0d5a4c6fd5e3eacb0b24aafefdbde595c57bb96e9231b5e62b6c75d1f86a0a"
+      "bytes": 167168,
+      "sha256": "cbb2b40b734c8a1753f2a7a50a31834dd97148a61d2812cab44f30d9029e410e"
     },
     {
       "path": "admission_matrix.json",
@@ -39,8 +39,8 @@
     },
     {
       "path": "bridge_validation.json",
-      "bytes": 8564673,
-      "sha256": "6bcd848ed1c2bcae9fa4f98cf4e30376f2b860c3aeb76b72dc9f1b5460c295ea"
+      "bytes": 8567123,
+      "sha256": "ae603020acc76d3cdccef5ff68edcd857795716fa35846d3185ce889372bae0d"
     },
     {
       "path": "canonical_pathoram_pair_validation.json",
@@ -49,8 +49,8 @@
     },
     {
       "path": "capacity_sweep.json",
-      "bytes": 2084719,
-      "sha256": "45c55f6e7b7fb6cdf8bc2be7e9d0bacf9d354aa64434307f27b5cf6095b64b49"
+      "bytes": 2084316,
+      "sha256": "3289fb62f2b94533b0a006bfa872ce729abe5a2ffad82a171b258c76197ffd87"
     },
     {
       "path": "capacity_sweep_full.json",
@@ -299,13 +299,13 @@
     },
     {
       "path": "reviewer_summary.json",
-      "bytes": 140554,
-      "sha256": "61fff456a540c40404bf7031b37b699c8d5acf0e0b682e33f8f38ed186d0b75b"
+      "bytes": 140780,
+      "sha256": "0b2990541fce0082976887b0850ba29e9e51d0a56781494aea359c7c999ae2a4"
     },
     {
       "path": "reviewer_summary.md",
-      "bytes": 29416,
-      "sha256": "02f88d18c76f65adf11d5190bc53b1caac9c045cb3628a92c8a6f488135a87f1"
+      "bytes": 29417,
+      "sha256": "9d51049d85322115c7061f02b5797072018d103cf6a0f5ee142069948dab4d4f"
     },
     {
       "path": "runtime_boundary_validation.json",
@@ -435,7 +435,7 @@
     {
       "path": "stash_occupancy.json",
       "bytes": 12693,
-      "sha256": "7770e35f4c67d3c989d3a37d52fc181e1ed560b1fbacf3ddf161a9774429120f"
+      "sha256": "7318540f59cab37aca82dc148f2d92625bd4b7f9756333028dd8c90d4550ca1c"
     },
     {
       "path": "stash_occupancy_full.json",
@@ -444,18 +444,18 @@
     },
     {
       "path": "static_checks.json",
-      "bytes": 72524,
-      "sha256": "dfabaf769ce71a029b0e15cfa0cb8cb002959d30d391468ea0058ba6184dddd8"
+      "bytes": 72688,
+      "sha256": "adeeb69d5b30e6de2333e194ff9b10fb2fc25e2e3e6525190820e80a710a4319"
     },
     {
       "path": "storage_boundary.json",
       "bytes": 51979,
-      "sha256": "f6258644007fe01575ede42cb02c56cbe767428b58bd689fdf43c611f86d718e"
+      "sha256": "34cea3967dd4f2319ce29bb8640a386265b1a8c5827e33cf64929b63ffa405f9"
     },
     {
       "path": "tamper_validation.json",
-      "bytes": 804584,
-      "sha256": "850c5d91260cf5c1a90193ec45bd49d43f0fa76fcf5c23ce2322068b927591f5"
+      "bytes": 806784,
+      "sha256": "9f22d06d3719fe67a27a368a03012c3862eff021322b623a87b194d62f86a0ae"
     },
     {
       "path": "tape_substitution.json",

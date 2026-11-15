@@ -145,9 +145,9 @@ its engineering part is Wave 4, its certified part is research.
 | 49 | Write the related-work boundary and add matched baselines | backlog | M | 27 | todo | |
 | 50 | Bridge a scoped subset to Solidity 0.8 semantics | backlog | L | | deferred | |
 | 51 | Remove the generator that a seal no longer reads | 7 | S to M | 24 | done | `48915bb` |
-| 52 | Make the seal count of a dropped call a function of its entrypoint | 7 | M | 24 | done | |
+| 52 | Make the seal count of a dropped call a function of its entrypoint | 7 | M | 24 | done | `b68dfbc` |
 | 53 | Authenticate production receipts under an attested key | 7 | M | 26 | todo | |
-| 54 | Compare a runtime trace with the exact encoding in Lean | 7 | M | 38 | todo | |
+| 54 | Compare a runtime trace with the exact encoding in Lean | 7 | M | 38 | done | |
 | 55 | Take the public-state snapshot once for each object a call changes | 7 | M | 37 | todo | |
 | 56 | Slice production sources with a lexer | 7 | S to M | | done | `325184f` |
 | 57 | Trace the reads of a Path ORAM map that cross the storage boundary | 7 | L | 41 | todo | |

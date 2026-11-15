@@ -390,12 +390,12 @@ write of any class
 a recorder that counts a write into its open rewrite without that check
 (`runtime_implementation_interface/recorder_rewrite_run_skips_fold_drift`),
 and a trace hash over the items of a trace instead of its events
-(`runtime_implementation_interface/trace_hash_over_run_items_drift`). Four
-more scenarios change a run in the trace of a call (`exact_trace/*`: the
-slot count of a scan and of a rewrite, the record length of a scan, the
-naming of its slots), and the probe's comparison of the trace with the
-exact store's encoding rejects them. That comparison is Rust code; no Lean
-checker reads the storage events of an exact object. Its tests are in
+(`runtime_implementation_interface/trace_hash_over_run_items_drift`). Seven
+more scenarios change the trace of a call (`exact_trace/*`: the slot count
+of a scan and of a rewrite, the record length of a scan, the naming of its
+slots, the class of a write, a read left out, an object scanned twice), and
+the Lean checker of a trace against the exact store's encoding
+(`checkExactTrace`) rejects them. The invariant's tests are in
 `crates/uo-core/src/trace.rs`, which shows that a trace with runs has the
 hashes, the transcript and the Path ORAM checks of the trace of their
 events, that a rewrite takes the `Update` of its next slot and no other

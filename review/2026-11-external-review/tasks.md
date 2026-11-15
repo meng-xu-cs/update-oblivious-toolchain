@@ -1709,6 +1709,44 @@ one item for each object.
 Acceptance: the Lean checker rejects the four `exact_trace/*` tamper
 scenarios, and the probe's mirror of the encoding is deleted.
 
+As built. `exactTraceMatches` in
+`proof/lean/UOToolchain/KernelExactTraceCheck.lean` holds of a contract's
+state objects, a kernel program and a trace when every object the program
+touches is on an exact backend and the trace's physical reads and writes
+are those of `exactEncodeRun` of the program over the objects' layouts, one
+for one and in order. `exactTraceMatches_sound` states that, and
+`exactTraceMatches_writes_update` that every write of such a trace is an
+`Update`. An object's layout comes from its declaration in the artifact: its
+kind, its slot count (one for a cell, its capacity for an array or a map),
+and the length of a sealed record of its value, or for a map of a present
+flag, a key and a value (`Ty.canonicalLen`, as `Type::canonical_len`
+computes it). The `checkExactTrace` executable reads an artifact and the
+calls to check, each an entrypoint with its refinement trace, the form the
+witness checkers read, whose importer expands a run with
+`ExactObjectLayout.scanReads` and `updateWrites`. It decodes each
+entrypoint's kernel program from the manifest and prints a verdict for
+each call. The probe asks it about every run of an exact-route experiment
+(`exact_encoding_matches` in `trace_equivalence.json`, which regenerates
+unchanged) and about the tamper scenarios. The Rust mirror
+(`exact_encoding_prediction`, `trace_matches_exact_encoding` and their unit
+test) is gone. The four `exact_trace/*` scenarios now change the refinement
+trace, and the Lean checker rejects them, with three more: a write of
+another class, a read left out, and the map scanned a second time (425
+scenarios in all).
+
+Writing the record lengths showed that the translation validator's own
+canonical lengths (`typeCanonicalLenFromJson` and
+`valueCanonicalLenFromJson` in `UOToolchain/TranslationValidationJson.lean`)
+put a 4-byte prefix before each part of a struct or an array, where the
+runtime puts 8 (`CANONICAL_LENGTH_PREFIX_BYTES`). Proof-grade translation
+validation compares the input length of every entrypoint with the
+manifest's, so it rejected every artifact with a struct or a fixed-size
+array parameter: for the admission matrix's `f(uint256[4])` it computed
+4 × (4 + 32) = 144 bytes against the manifest's 160. It failed closed, and
+no benchmark has such a parameter, so no report changes. Both now use
+`canonicalLengthPrefixBytes`; the public `f(uint256[4])` validates, and two
+`#guard`s pin a `uint256[4]` at 160 bytes and a two-field struct at 68.
+
 ### Issue 55 — Take the public-state snapshot once for each object a call changes
 
 Source: Issue 37. Size: M. Depends on: Issue 37.

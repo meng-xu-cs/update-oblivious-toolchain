@@ -25,7 +25,7 @@ use uo_core::{
     canonical_path_oram_leaf_values_of_seed, runtime_boundary_obligation_ids,
     runtime_boundary_schema_is_mechanized_for_claim, validate_runtime_boundary_schema, BackendKind,
     BoundaryEvent, CanonicalFreshCoinRuntimePathOramTheoremInput,
-    CanonicalFreshCoinRuntimePathOramWitnessFamily, CompiledArtifact, ConfidentialKernelExpr,
+    CanonicalFreshCoinRuntimePathOramWitnessFamily, CompiledArtifact,
     ConfidentialKernelSlotProgram, ConfidentialKernelStatement, ContainerKind, ContractMetadata,
     LogicalEvent, NormalizedMicroTrace, ProgramMode, PublicOutcomeTrace,
     RuntimeBoundaryEvidenceKind, RuntimeConfidentialCoreKernelFinishSlotBundle,
@@ -50715,27 +50715,27 @@ fn run_trace_equivalence(suite: &BTreeMap<&'static str, BenchArtifacts>) -> Resu
             "same_same": optional_trace_control_summary(&classifier_same_same),
         },
         "exact_uo": [
-            trace_summary("FixedSlotClassifier", "uo", &classifier_uo),
-            trace_summary("AuthScan", "uo", &auth_uo),
-            trace_summary("ConfidentialMixer", "uo", &mixer_uo),
-            trace_summary("ERC20Lite", "uo", &erc20_uo),
-            trace_summary("RegistryCRUD", "uo", &registry_uo),
-            trace_summary("ConfidentialMixer", "uo_encrypted_return", &mixer_sealed_uo),
+            trace_summary("FixedSlotClassifier", "uo", &classifier_uo)?,
+            trace_summary("AuthScan", "uo", &auth_uo)?,
+            trace_summary("ConfidentialMixer", "uo", &mixer_uo)?,
+            trace_summary("ERC20Lite", "uo", &erc20_uo)?,
+            trace_summary("RegistryCRUD", "uo", &registry_uo)?,
+            trace_summary("ConfidentialMixer", "uo_encrypted_return", &mixer_sealed_uo)?,
         ],
         "computational_uo": [
-            trace_summary("ConfidentialMixer", "oram", &mixer_oram),
-            trace_summary("ERC20Lite", "oram", &erc20_oram),
-            trace_summary("ERC20Lite", "oram_private_posmap", &erc20_private_posmap),
+            trace_summary("ConfidentialMixer", "oram", &mixer_oram)?,
+            trace_summary("ERC20Lite", "oram", &erc20_oram)?,
+            trace_summary("ERC20Lite", "oram_private_posmap", &erc20_private_posmap)?,
             trace_summary(
                 "ConfidentialMixer",
                 "oram_encrypted_return",
                 &mixer_sealed_oram,
-            ),
+            )?,
             trace_summary(
                 "ConfidentialMixer",
                 "oram_private_posmap_encrypted_return",
                 &mixer_sealed_private_posmap,
-            ),
+            )?,
         ],
     }))
 }
@@ -53926,7 +53926,6 @@ fn scenario_matches(
     result.target.return_value.as_ref() == expected_return && result.getters == expected_getters
 }
 
-#[derive(Clone)]
 struct ExperimentOutcome {
     class0_metrics: Vec<BTreeMap<String, f64>>,
     class1_metrics: Vec<BTreeMap<String, f64>>,
@@ -53935,10 +53934,11 @@ struct ExperimentOutcome {
     logical_write_equal: bool,
     physical_read_equal: bool,
     physical_equal: bool,
-    /// Whether every run's physical trace is the one the Lean exact-store
-    /// encoding predicts (`None` when an accessed object is not on an exact
-    /// backend, e.g. the ORAM route).
-    exact_encoding_matches: Option<bool>,
+    /// The receipts of the runs of an entrypoint on the exact route, which
+    /// the Lean checker `checkExactTrace` compares with the exact store's
+    /// encoding of its program (`None` off the exact route, e.g. on the
+    /// ORAM route).
+    exact_route: Option<ExactRouteRuns>,
     /// Whether every run's public outcome and enclave-boundary schedule are the
     /// ones the Lean models predict (`None` off the exact and Path ORAM routes).
     outcome_model_matches: Option<bool>,
@@ -54201,328 +54201,258 @@ fn run_erc20_allowance_key_experiment(artifact: &CompiledArtifact) -> Result<Exp
     )
 }
 
-/// Physical `(object, location)` trace the exact store's encoding predicts for
-/// one run of a confidential kernel program. Rust mirror of `IR.exactEncodeRun`
-/// in `proof/lean/UOToolchain/KernelExactTrace.lean`: the call reads every
-/// slot of each object a statement accesses once, in object-id order, when it
-/// loads the object, however many statements access it; and at commit every
-/// object a statement writes is rewritten slot by slot, in object-id order,
-/// with `Update`-class writes. An object the program only reads is not
-/// written.
-struct ExactEncodingPrediction {
-    reads: Vec<(String, String)>,
-    writes: Vec<(String, String)>,
-    /// The length of a sealed slot of each object the program accesses: of a
-    /// sealed value for a cell or an array, of a sealed map record for a
-    /// map.
-    record_lengths: BTreeMap<String, usize>,
+/// The runs of an entrypoint on the exact route, for the Lean checker: the
+/// artifact, the entrypoint, and each run's trace as the runtime's
+/// refinement witness holds it, whose physical reads and writes
+/// `checkExactTrace` compares with `exactEncodeRun` of the entrypoint's
+/// program.
+struct ExactRouteRuns {
+    artifact: JsonValue,
+    entrypoint: String,
+    traces: Vec<JsonValue>,
 }
 
-/// Objects an expression reads, in evaluation order (`IR.KernelExpr.storageReads`).
-/// `select` arms are pure, so only the condition can read storage.
-fn exact_expr_storage_reads(expr: &ConfidentialKernelExpr, reads: &mut Vec<u32>) {
-    match expr {
-        ConfidentialKernelExpr::Literal { .. } | ConfidentialKernelExpr::Var { .. } => {}
-        ConfidentialKernelExpr::Unary { expr, .. } => exact_expr_storage_reads(expr, reads),
-        ConfidentialKernelExpr::Binary { lhs, rhs, .. } => {
-            exact_expr_storage_reads(lhs, reads);
-            exact_expr_storage_reads(rhs, reads);
-        }
-        ConfidentialKernelExpr::Select { cond, .. } => exact_expr_storage_reads(cond, reads),
-        ConfidentialKernelExpr::CellGet { object_id } => reads.push(*object_id),
-        ConfidentialKernelExpr::ArrayGet { object_id, index } => {
-            exact_expr_storage_reads(index, reads);
-            reads.push(*object_id);
-        }
-        ConfidentialKernelExpr::MapGet { object_id, key } => {
-            exact_expr_storage_reads(key, reads);
-            reads.push(*object_id);
-        }
-        ConfidentialKernelExpr::StructField { base, .. } => exact_expr_storage_reads(base, reads),
-        ConfidentialKernelExpr::ArrayIndex { base, index } => {
-            exact_expr_storage_reads(base, reads);
-            exact_expr_storage_reads(index, reads);
-        }
-        ConfidentialKernelExpr::Keccak256 { parts } => {
-            for part in parts.iter() {
-                exact_expr_storage_reads(part, reads);
-            }
-        }
-    }
+/// A call's trace as its refinement witness holds it, which is the form the
+/// Lean trace importer reads.
+fn refinement_trace_json(trace: &uo_core::ExecutionTrace) -> Result<JsonValue> {
+    let witness = serde_json::to_value(trace.runtime_refinement_witness()?)?;
+    witness
+        .get("trace")
+        .cloned()
+        .ok_or_else(|| anyhow!("the refinement witness holds no trace"))
 }
 
-/// Objects a statement accesses (`IR.KernelStatement.accesses`): the reads of
-/// its expressions, then its write target, which also goes to `written`
-/// (`IR.writtenObjects`), whatever the write's predicate.
-fn exact_statement_accesses(
-    statement: &ConfidentialKernelStatement,
-    accesses: &mut Vec<u32>,
-    written: &mut Vec<u32>,
-) {
-    match statement {
-        ConfidentialKernelStatement::Declare { value, .. }
-        | ConfidentialKernelStatement::Assign { value, .. } => {
-            exact_expr_storage_reads(value, accesses)
-        }
-        ConfidentialKernelStatement::Require { cond }
-        | ConfidentialKernelStatement::AbortIf { cond } => exact_expr_storage_reads(cond, accesses),
-        ConfidentialKernelStatement::CellSet {
-            object_id,
-            value,
-            predicate,
-        } => {
-            exact_expr_storage_reads(value, accesses);
-            if let Some(predicate) = predicate {
-                exact_expr_storage_reads(predicate, accesses);
-            }
-            accesses.push(*object_id);
-            written.push(*object_id);
-        }
-        ConfidentialKernelStatement::ArraySet {
-            object_id,
-            index,
-            value,
-            predicate,
-        } => {
-            exact_expr_storage_reads(index, accesses);
-            exact_expr_storage_reads(value, accesses);
-            if let Some(predicate) = predicate {
-                exact_expr_storage_reads(predicate, accesses);
-            }
-            accesses.push(*object_id);
-            written.push(*object_id);
-        }
-        ConfidentialKernelStatement::MapPut {
-            object_id,
-            key,
-            value,
-            predicate,
-        } => {
-            exact_expr_storage_reads(key, accesses);
-            exact_expr_storage_reads(value, accesses);
-            if let Some(predicate) = predicate {
-                exact_expr_storage_reads(predicate, accesses);
-            }
-            accesses.push(*object_id);
-            written.push(*object_id);
-        }
-        ConfidentialKernelStatement::Return { value } => {
-            if let Some(value) = value {
-                exact_expr_storage_reads(value, accesses);
-            }
-        }
-    }
-}
+/// The schema of the input of `checkExactTrace`.
+const EXACT_TRACE_CHECK_SCHEMA: &str = "uo-exact-trace-check-v1";
 
-/// The exact-store encoding's prediction for one run of `entrypoint`, or `None`
-/// when the entrypoint is not a confidential UO kernel program or an accessed
-/// object is not on an exact (full-scan) backend.
-fn exact_encoding_prediction(
-    artifact: &CompiledArtifact,
-    entrypoint: &str,
-) -> Option<ExactEncodingPrediction> {
-    if artifact.contract.mode != ProgramMode::Uo {
-        return None;
-    }
-    let function = artifact
-        .contract
-        .functions
-        .iter()
-        .find(|function| function.signature == entrypoint)?;
-    let program = function.confidential_program.as_ref()?;
-    let mut accesses = Vec::new();
-    let mut written = Vec::new();
-    for statement in program.body.iter() {
-        exact_statement_accesses(statement, &mut accesses, &mut written);
-    }
-    let mut record_lengths = BTreeMap::new();
-    let mut slot_locations = |object_id: u32| -> Option<(String, Vec<String>)> {
-        let object = artifact
-            .contract
-            .state
+/// Run `checkExactTrace` on `(name, entrypoint, trace)` cases of one
+/// artifact. For each case, whether Lean found its physical reads and
+/// writes to be the exact store's encoding of the entrypoint's program, and
+/// the error it gave if not.
+fn lean_exact_trace_verdicts(
+    artifact: &JsonValue,
+    cases: &[(String, String, JsonValue)],
+) -> Result<Vec<(String, Option<String>)>> {
+    let checker = ensure_lean_checker("checkExactTrace", "exact trace")?;
+    let input = json!({
+        "schema": EXACT_TRACE_CHECK_SCHEMA,
+        "artifact": artifact,
+        "cases": cases
             .iter()
-            .find(|object| object.id == object_id)?;
-        if object.backend != BackendKind::FullScan {
-            return None;
-        }
-        let value_len = object.value_type.canonical_len();
-        let (locations, payload_len) = match object.kind {
-            ContainerKind::Cell => (vec![object.name.clone()], value_len),
-            ContainerKind::Array => (
-                (0..object.capacity?)
-                    .map(|slot| format!("{}[{}]", object.name, slot))
-                    .collect(),
-                value_len,
-            ),
-            ContainerKind::Map => (
-                (0..object.capacity?)
-                    .map(|slot| format!("{}#{}", object.name, slot))
-                    .collect(),
-                1 + object.key_type.as_ref()?.canonical_len() + value_len,
-            ),
-        };
-        record_lengths.insert(object.name.clone(), sealed_encoded_len(payload_len));
-        Some((object.name.clone(), locations))
-    };
-    // `IR.touchedObjects`: each accessed object once, in increasing id order.
-    let mut touched = accesses;
-    touched.sort_unstable();
-    touched.dedup();
-    let mut reads = Vec::new();
-    for object_id in touched {
-        let (name, locations) = slot_locations(object_id)?;
-        reads.extend(
-            locations
-                .into_iter()
-                .map(|location| (name.clone(), location)),
-        );
+            .map(|(name, entrypoint, trace)| json!({
+                "name": name,
+                "entrypoint": entrypoint,
+                "trace": trace,
+            }))
+            .collect::<Vec<_>>(),
+    });
+    let (path, _) = write_temp_json("exact-trace-check", &input)?;
+    let output = Command::new(&checker).arg(&path).output()?;
+    let _ = fs::remove_file(&path);
+    // 0: every trace is the encoding; 1: some is not; anything else: the
+    // input did not decode.
+    if !matches!(output.status.code(), Some(0 | 1)) {
+        return Err(anyhow!(
+            "Lean exact trace check failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
     }
-    written.sort_unstable();
-    written.dedup();
-    let mut writes = Vec::new();
-    for object_id in written {
-        let (name, locations) = slot_locations(object_id)?;
-        writes.extend(
-            locations
-                .into_iter()
-                .map(|location| (name.clone(), location)),
-        );
+    let verdicts: JsonValue = serde_json::from_slice(&output.stdout)?;
+    let verdicts = verdicts["cases"]
+        .as_array()
+        .ok_or_else(|| anyhow!("the Lean exact trace check printed no cases"))?;
+    if verdicts.len() != cases.len() {
+        return Err(anyhow!(
+            "the Lean exact trace check judged {} of {} cases",
+            verdicts.len(),
+            cases.len()
+        ));
     }
-    Some(ExactEncodingPrediction {
-        reads,
-        writes,
-        record_lengths,
-    })
+    Ok(verdicts
+        .iter()
+        .map(|verdict| {
+            (
+                verdict["name"].as_str().unwrap_or_default().to_string(),
+                verdict["error"].as_str().map(str::to_string),
+            )
+        })
+        .collect())
 }
 
-/// Whether a runtime trace is the predicted one: the same `(object, location)`
-/// reads and writes in order, only `Update`-class writes, and every record
-/// of the length of its object's sealed slot. The trace holds the scan and
-/// the rewrite of an object as one item each; this compares their events,
-/// so a scan of another number of slots or of another length is not the
-/// predicted one.
-fn trace_matches_exact_encoding(
-    trace: &uo_core::ExecutionTrace,
-    prediction: &ExactEncodingPrediction,
-) -> bool {
-    let reads = trace
-        .physical_reads
-        .events()
-        .map(|event| (event.object.clone(), event.location.clone()))
-        .collect::<Vec<_>>();
-    let writes = trace
-        .physical_writes
-        .events()
-        .map(|event| (event.object.clone(), event.location.clone()))
-        .collect::<Vec<_>>();
-    let lengths_predicted = trace
-        .physical_reads
-        .events()
-        .map(|event| (event.object, event.len))
-        .chain(
-            trace
-                .physical_writes
-                .events()
-                .map(|event| (event.object, event.len)),
-        )
-        .all(|(object, len)| prediction.record_lengths.get(&object) == Some(&len));
-    reads == prediction.reads
-        && writes == prediction.writes
-        && trace
-            .physical_writes
-            .events()
-            .all(|event| event.class == WriteClass::Update)
-        && lengths_predicted
+/// Whether Lean finds every run of an exact-route experiment to be the exact
+/// store's encoding of its entrypoint's program.
+fn exact_route_runs_match_encoding(runs: &ExactRouteRuns) -> Result<bool> {
+    let cases: Vec<(String, String, JsonValue)> = runs
+        .traces
+        .iter()
+        .enumerate()
+        .map(|(index, trace)| {
+            (
+                format!("{}/run{index}", runs.entrypoint),
+                runs.entrypoint.clone(),
+                trace.clone(),
+            )
+        })
+        .collect();
+    Ok(lean_exact_trace_verdicts(&runs.artifact, &cases)?
+        .iter()
+        .all(|(_, error)| error.is_none()))
 }
 
-/// Tamper scenarios on the trace of an exact-backend call. The trace holds
-/// the scan of a full-scan map and its rewrite as one item each, with the
-/// map's slot count and the length of a sealed record. A trace whose item
-/// names another count or another length is not the trace the exact store's
-/// encoding predicts from the artifact, and the check that compares the two
-/// rejects it.
+/// Tamper scenarios on the trace of an exact-backend call, which the Lean
+/// checker `checkExactTrace` must reject. The trace is the call's refinement
+/// trace, the form the checker reads. It holds the scan of a full-scan map
+/// and its rewrite as one item each, with the map's slot count and the
+/// length of a sealed record: a trace whose item names another count,
+/// another length or other locations, whose write has another class, that
+/// leaves a read out, or that scans the map again, is not the exact store's
+/// encoding of the entrypoint's program.
 fn exact_trace_run_tamper_scenarios() -> Result<Vec<JsonValue>> {
-    use uo_core::{PhysicalReadItem, PhysicalWriteItem};
     let artifact = compile_artifact(
         "benches/raw/ConfidentialMixer.sol",
         "benches/raw/ConfidentialMixer.uo.yaml",
         ProgramMode::Uo,
     )?;
     let entrypoint = "deposit(bytes32,uint256)";
-    let prediction = exact_encoding_prediction(&artifact, entrypoint)
-        .ok_or_else(|| anyhow!("{entrypoint} is not on the exact route"))?;
-    let run = || run_target_call(&artifact, &[], entrypoint, vec![b32(7), Value::uint(5)]);
-    let honest = run()?;
-    if !trace_matches_exact_encoding(&honest, &prediction) {
-        bail!("the trace of {entrypoint} is not the exact store's encoding");
+    if kernel_trace_route(&artifact, entrypoint) != Some(KernelTraceRoute::Exact) {
+        bail!("{entrypoint} is not on the exact route");
     }
-    let scan_of = |trace: &uo_core::ExecutionTrace| {
-        trace
-            .physical_reads
-            .items()
-            .iter()
-            .position(|item| matches!(item, PhysicalReadItem::Scan(_)))
-            .ok_or_else(|| anyhow!("the trace of {entrypoint} holds no scan"))
+    let artifact_json = serde_json::to_value(&artifact)?;
+    let judge = |trace: &JsonValue| -> Result<Option<String>> {
+        let case = (
+            "ConfidentialMixer/uo/deposit".to_string(),
+            entrypoint.to_string(),
+            trace.clone(),
+        );
+        let mut verdicts = lean_exact_trace_verdicts(&artifact_json, &[case])?;
+        Ok(verdicts.pop().and_then(|(_, error)| error))
     };
-    let rewrite_of = |trace: &uo_core::ExecutionTrace| {
-        trace
-            .physical_writes
-            .items()
-            .iter()
-            .position(|item| matches!(item, PhysicalWriteItem::Rewrite(_)))
-            .ok_or_else(|| anyhow!("the trace of {entrypoint} holds no rewrite"))
-    };
-    type Mutation = fn(&mut uo_core::ExactObjectSlots);
-    let cases: [(&str, &str, bool, bool, Mutation); 4] = [
+    let honest = refinement_trace_json(&run_target_call(
+        &artifact,
+        &[],
+        entrypoint,
+        vec![b32(7), Value::uint(5)],
+    )?)?;
+    if let Some(error) = judge(&honest)? {
+        bail!("the Lean checker rejects the honest trace of {entrypoint}: {error}");
+    }
+    // The run item of the full-scan map in a list of the trace.
+    fn map_item<'a>(trace: &'a mut JsonValue, list: &str, run: &str) -> Option<&'a mut JsonValue> {
+        trace[list]
+            .as_array_mut()?
+            .iter_mut()
+            .find(|item| item[run]["object"] == json!("balances"))
+            .map(|item| &mut item[run])
+    }
+    // A list of the trace with its run items written out as events.
+    fn events(trace: &JsonValue, list: &str, run: &str) -> Vec<JsonValue> {
+        let mut out = Vec::new();
+        for item in trace[list].as_array().into_iter().flatten() {
+            match item.get(run) {
+                Some(slots) => {
+                    let object = slots["object"].as_str().unwrap_or_default();
+                    let count = slots["slots"].as_u64().unwrap_or(0);
+                    for slot in 0..count {
+                        let location = match slots["kind"].as_str() {
+                            Some("cell") => object.to_string(),
+                            Some("array") => format!("{object}[{slot}]"),
+                            _ => format!("{object}#{slot}"),
+                        };
+                        let mut event =
+                            json!({"object": object, "location": location, "len": slots["len"]});
+                        if list == "physical_writes" {
+                            event["write_class"] = json!("Update");
+                        }
+                        out.push(event);
+                    }
+                }
+                None => out.push(item.clone()),
+            }
+        }
+        out
+    }
+    type Mutation = fn(&mut JsonValue) -> Option<()>;
+    let cases: [(&str, &str, Mutation); 7] = [
         (
             "exact_trace/scan_slot_count_drift",
             "name one slot fewer in the scan of the full-scan map than the map has, so the check of the trace against the exact store's encoding must reject a scan that leaves a slot out",
-            true,
-            false,
-            |run| run.slots -= 1,
+            |trace| {
+                let scan = map_item(trace, "physical_reads", "scan")?;
+                scan["slots"] = json!(scan["slots"].as_u64()? - 1);
+                Some(())
+            },
         ),
         (
             "exact_trace/rewrite_slot_count_drift",
             "name one slot more in the rewrite of the full-scan map than the map has, so the check of the trace against the exact store's encoding must reject a rewrite of another number of slots",
-            false,
-            true,
-            |run| run.slots += 1,
+            |trace| {
+                let rewrite = map_item(trace, "physical_writes", "rewrite")?;
+                rewrite["slots"] = json!(rewrite["slots"].as_u64()? + 1);
+                Some(())
+            },
         ),
         (
             "exact_trace/scan_record_length_drift",
             "name another record length in the scan of the full-scan map and in its rewrite, the same in both, so the check of the trace against the exact store's encoding must reject records that are not of the length of the map's sealed slot",
-            true,
-            true,
-            |run| run.len -= 32,
+            |trace| {
+                let scan = map_item(trace, "physical_reads", "scan")?;
+                scan["len"] = json!(scan["len"].as_u64()? - 32);
+                let rewrite = map_item(trace, "physical_writes", "rewrite")?;
+                rewrite["len"] = json!(rewrite["len"].as_u64()? - 32);
+                Some(())
+            },
         ),
         (
             "exact_trace/scan_slot_naming_drift",
             "name the slots of the full-scan map as those of an array in its scan, so the check of the trace against the exact store's encoding must reject a scan of other locations",
-            true,
-            false,
-            |run| run.kind = uo_core::ExactObjectKind::Array,
+            |trace| {
+                map_item(trace, "physical_reads", "scan")?["kind"] = json!("array");
+                Some(())
+            },
+        ),
+        (
+            "exact_trace/write_class_drift",
+            "give the first write of the call another class than Update, so the check of the trace against the exact store's encoding must reject a write class the encoding does not have",
+            |trace| {
+                let mut writes = events(trace, "physical_writes", "rewrite");
+                writes.first_mut()?["write_class"] = json!("Set");
+                trace["physical_writes"] = json!(writes);
+                Some(())
+            },
+        ),
+        (
+            "exact_trace/dropped_read_drift",
+            "leave the last read of the call out, so the check of the trace against the exact store's encoding must reject a scan that misses a slot",
+            |trace| {
+                let mut reads = events(trace, "physical_reads", "scan");
+                reads.pop()?;
+                trace["physical_reads"] = json!(reads);
+                Some(())
+            },
+        ),
+        (
+            "exact_trace/rescanned_object_drift",
+            "read the slots of the full-scan map a second time, as a call that read an object once for each access did, so the check of the trace against the exact store's encoding must reject a second scan",
+            |trace| {
+                let scan = trace["physical_reads"]
+                    .as_array()?
+                    .iter()
+                    .find(|item| item["scan"]["object"] == json!("balances"))?
+                    .clone();
+                trace["physical_reads"].as_array_mut()?.push(scan);
+                Some(())
+            },
         ),
     ];
     let mut scenarios = Vec::with_capacity(cases.len());
-    for (scenario, mutation, in_scan, in_rewrite, mutate) in cases {
-        let mut trace = run()?;
-        if in_scan {
-            let index = scan_of(&trace)?;
-            if let PhysicalReadItem::Scan(item) = &mut trace.physical_reads.items_mut()[index] {
-                mutate(&mut item.scan);
-            }
-        }
-        if in_rewrite {
-            let index = rewrite_of(&trace)?;
-            if let PhysicalWriteItem::Rewrite(item) = &mut trace.physical_writes.items_mut()[index]
-            {
-                mutate(&mut item.rewrite);
-            }
-        }
-        if trace.receipt == honest.receipt {
+    for (scenario, mutation, mutate) in cases {
+        let mut trace = honest.clone();
+        mutate(&mut trace).ok_or_else(|| anyhow!("{scenario} found nothing to change"))?;
+        if trace == honest {
             bail!("{scenario} changed nothing");
         }
-        let accepted = trace_matches_exact_encoding(&trace, &prediction);
+        let lean_error = judge(&trace)?;
+        let accepted = lean_error.is_none();
         scenarios.push(json!({
             "scenario": scenario,
             "artifact_kind": "runtime_exact_trace",
@@ -54531,11 +54461,10 @@ fn exact_trace_run_tamper_scenarios() -> Result<Vec<JsonValue>> {
             "mutation": mutation,
             "accepted": accepted,
             "rejected": !accepted,
-            "error": if accepted {
-                "unexpectedly accepted a trace that is not the exact store's encoding"
-            } else {
-                "the trace is not the exact store's encoding of the entrypoint"
-            },
+            "checker": "proof/lean/.lake/build/bin/checkExactTrace",
+            "error": lean_error.unwrap_or_else(|| {
+                "unexpectedly accepted a trace that is not the exact store's encoding".to_string()
+            }),
         }));
     }
     Ok(scenarios)
@@ -54555,7 +54484,8 @@ enum KernelTraceRoute {
 }
 
 /// `None` when the entrypoint is not a confidential kernel program of a UO
-/// build or accesses a raw object.
+/// build or accesses a raw object. The objects the program accesses are those
+/// its kernel steps name, which the runtime loads.
 fn kernel_trace_route(artifact: &CompiledArtifact, entrypoint: &str) -> Option<KernelTraceRoute> {
     if artifact.contract.mode != ProgramMode::Uo {
         return None;
@@ -54565,11 +54495,16 @@ fn kernel_trace_route(artifact: &CompiledArtifact, entrypoint: &str) -> Option<K
         .functions
         .iter()
         .find(|function| function.signature == entrypoint)?;
-    let program = function.confidential_program.as_ref()?;
-    let mut accesses = Vec::new();
-    for statement in program.body.iter() {
-        exact_statement_accesses(statement, &mut accesses, &mut Vec::new());
-    }
+    function.confidential_program.as_ref()?;
+    let accesses: BTreeSet<u32> = artifact
+        .contract
+        .manifest
+        .entrypoints
+        .get(entrypoint)?
+        .kernel_steps
+        .iter()
+        .filter_map(|step| step.object_id)
+        .collect();
     let mut route = KernelTraceRoute::Exact;
     for object_id in accesses {
         let object = artifact
@@ -54888,9 +54823,8 @@ fn run_binary_experiment_on_channel(
     class1: Vec<Vec<Value>>,
     return_channel: Option<&ReturnChannelSession>,
 ) -> Result<ExperimentOutcome> {
-    let prediction = exact_encoding_prediction(artifact, entrypoint);
-    let mut exact_encoding_matches = prediction.as_ref().map(|_| true);
     let route = kernel_trace_route(artifact, entrypoint);
+    let mut exact_route_traces = (route == Some(KernelTraceRoute::Exact)).then(Vec::new);
     let outcome_model = route.and_then(|route| kernel_outcome_model(artifact, entrypoint, route));
     let mut outcome_model_matches = route.map(|_| outcome_model.is_some());
     let mut final_public_state_model_matches = route.map(|_| true);
@@ -54907,10 +54841,8 @@ fn run_binary_experiment_on_channel(
                 return_channel,
             )?;
             let result = bracketed.result;
-            if let (Some(prediction), Some(matches)) =
-                (prediction.as_ref(), exact_encoding_matches.as_mut())
-            {
-                *matches &= trace_matches_exact_encoding(&result.call.trace, prediction);
+            if let Some(traces) = exact_route_traces.as_mut() {
+                traces.push(refinement_trace_json(&result.call.trace)?);
             }
             if let (Some(model), Some(matches)) =
                 (outcome_model.as_ref(), outcome_model_matches.as_mut())
@@ -54934,8 +54866,17 @@ fn run_binary_experiment_on_channel(
         .transpose()?;
     let [class0_hashes, class1_hashes] = hashes;
     let [class0_metrics, class1_metrics] = metrics;
+    let exact_route = exact_route_traces
+        .map(|traces| -> Result<ExactRouteRuns> {
+            Ok(ExactRouteRuns {
+                artifact: serde_json::to_value(artifact)?,
+                entrypoint: entrypoint.to_string(),
+                traces,
+            })
+        })
+        .transpose()?;
     Ok(ExperimentOutcome {
-        exact_encoding_matches,
+        exact_route,
         outcome_model_matches,
         final_public_state_model_matches,
         encrypted_return,
@@ -55443,7 +55384,12 @@ where
         .all(|lhs| class1.iter().all(|rhs| project(lhs) == project(rhs)))
 }
 
-fn trace_summary(benchmark: &str, mode: &str, outcome: &ExperimentOutcome) -> JsonValue {
+fn trace_summary(benchmark: &str, mode: &str, outcome: &ExperimentOutcome) -> Result<JsonValue> {
+    let exact_encoding_matches = outcome
+        .exact_route
+        .as_ref()
+        .map(exact_route_runs_match_encoding)
+        .transpose()?;
     // Exact backends (uo) owe exact physical-trace equality; the ORAM route is
     // related only computationally, so a physical-trace inequality there is an
     // expected computational difference, not a failed obligation.
@@ -55458,7 +55404,7 @@ fn trace_summary(benchmark: &str, mode: &str, outcome: &ExperimentOutcome) -> Js
         "logical_write_equal": outcome.logical_write_equal,
         "physical_read_equal": outcome.physical_read_equal,
         "physical_trace_equal": outcome.physical_equal,
-        "exact_encoding_matches": outcome.exact_encoding_matches,
+        "exact_encoding_matches": exact_encoding_matches,
         "outcome_model_matches": outcome.outcome_model_matches,
         "final_public_state_model_matches": outcome.final_public_state_model_matches,
     });
@@ -55468,7 +55414,7 @@ fn trace_summary(benchmark: &str, mode: &str, outcome: &ExperimentOutcome) -> Js
         fields.insert("encrypted_return_checks_hold".into(), json!(checks.hold()));
         fields.insert("encrypted_return".into(), json!(checks));
     }
-    summary
+    Ok(summary)
 }
 
 fn extract_metrics(result: &DiagnosticCallResult) -> BTreeMap<String, f64> {
@@ -56775,9 +56721,8 @@ mod tests {
     // Only used by the strict-default-build tests below, which the
     // insecure-eval-raw feature compiles out.
     use super::{
-        b32, exact_encoding_prediction, kernel_outcome_model, kernel_trace_route,
-        run_matches_final_public_state_model, run_matches_outcome_model,
-        trace_matches_exact_encoding, KernelOutcomeModel, KernelTraceRoute, PROBE_DEPLOY_SEED,
+        b32, kernel_outcome_model, kernel_trace_route, run_matches_final_public_state_model,
+        run_matches_outcome_model, KernelOutcomeModel, KernelTraceRoute, PROBE_DEPLOY_SEED,
     };
     #[cfg(not(feature = "insecure-eval-raw"))]
     use super::{
@@ -56786,62 +56731,8 @@ mod tests {
     };
     use uo_core::{
         canonical_path_oram_leaf_values_of_seed, ProgramMode, RuntimePathOramTransitionKind, Value,
-        WriteClass,
     };
     use uo_evm::ContractInstance;
-
-    #[test]
-    fn exact_encoding_prediction_matches_runtime_and_rejects_drift() {
-        let artifact = compile_artifact(
-            "benches/raw/ConfidentialMixer.sol",
-            "benches/raw/ConfidentialMixer.uo.yaml",
-            ProgramMode::Uo,
-        )
-        .unwrap();
-        let entrypoint = "deposit(bytes32,uint256)";
-        let prediction = exact_encoding_prediction(&artifact, entrypoint).unwrap();
-        // Capacity-8 balances map and the total cell. The body accesses each
-        // twice, a read and a write; the call reads each once, when it loads
-        // it, in object-id order, and rewrites each once at commit.
-        assert_eq!(prediction.reads.len(), 9);
-        assert_eq!(prediction.writes.len(), 9);
-        assert_eq!(prediction.reads, prediction.writes);
-        let run = || {
-            let mut instance =
-                ContractInstance::deploy_with_seed(artifact.clone(), PROBE_DEPLOY_SEED).unwrap();
-            instance
-                .call(entrypoint, vec![b32(7), Value::uint(5)])
-                .unwrap()
-                .trace
-        };
-        assert!(trace_matches_exact_encoding(&run(), &prediction));
-
-        let mut reclassed = run();
-        let mut writes: Vec<_> = reclassed.physical_writes.events().collect();
-        writes[0].class = WriteClass::Set;
-        reclassed.physical_writes = writes.into();
-        assert!(!trace_matches_exact_encoding(&reclassed, &prediction));
-
-        let mut shortened = run();
-        let mut reads: Vec<_> = shortened.physical_reads.events().collect();
-        reads.pop();
-        shortened.physical_reads = reads.into();
-        assert!(!trace_matches_exact_encoding(&shortened, &prediction));
-
-        // A trace that reads an object once per access, as the runtime's did
-        // before a call read each object once, is not the predicted one.
-        let mut rescanned = run();
-        let mut reads: Vec<_> = rescanned.physical_reads.events().collect();
-        let balances: Vec<_> = reads
-            .iter()
-            .filter(|read| read.object == "balances")
-            .cloned()
-            .collect();
-        assert_eq!(balances.len(), 8);
-        reads.extend(balances);
-        rescanned.physical_reads = reads.into();
-        assert!(!trace_matches_exact_encoding(&rescanned, &prediction));
-    }
 
     #[test]
     fn outcome_model_matches_runtime_for_completed_and_aborted_calls() {
@@ -57029,7 +56920,15 @@ mod tests {
         assert!(checks.hold(), "{checks:?}");
         assert_eq!((checks.runs, checks.distinct_returned_values), (8, 3));
         assert_eq!(experiment.outcome_model_matches, Some(true));
-        assert_eq!(experiment.exact_encoding_matches, Some(true));
+        // The experiment keeps the receipt of each run on the exact route,
+        // which the Lean checker compares with the exact store's encoding.
+        assert_eq!(
+            experiment
+                .exact_route
+                .as_ref()
+                .map(|runs| runs.traces.len()),
+            Some(8)
+        );
         assert!(experiment.physical_equal && experiment.logical_equal);
     }
 

@@ -201,6 +201,12 @@
       "uses_proofgrade_umbrella": true
     },
     {
+      "file": "proof/lean/CheckExactTrace.lean",
+      "restricted": true,
+      "uses_legacy_umbrella": false,
+      "uses_proofgrade_umbrella": true
+    },
+    {
       "file": "proof/lean/CheckKernelAdmission.lean",
       "restricted": true,
       "uses_legacy_umbrella": false,

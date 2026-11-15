@@ -71,7 +71,7 @@
     "page_model": "page_v1",
     "shared_resource_model": "shared_v1"
   },
-  "scenario_count": 422,
+  "scenario_count": 425,
   "scenarios": [
     {
       "accepted": false,
@@ -170,8 +170,9 @@
       "accepted": false,
       "artifact_kind": "runtime_exact_trace",
       "benchmark": "ConfidentialMixer/uo/deposit",
+      "checker": "proof/lean/.lake/build/bin/checkExactTrace",
       "entrypoint": "deposit(bytes32,uint256)",
-      "error": "the trace is not the exact store's encoding of the entrypoint",
+      "error": "the trace of deposit(bytes32,uint256) is not the exact store's encoding of its program",
       "mutation": "name one slot fewer in the scan of the full-scan map than the map has, so the check of the trace against the exact store's encoding must reject a scan that leaves a slot out",
       "rejected": true,
       "scenario": "exact_trace/scan_slot_count_drift"
@@ -180,8 +181,9 @@
       "accepted": false,
       "artifact_kind": "runtime_exact_trace",
       "benchmark": "ConfidentialMixer/uo/deposit",
+      "checker": "proof/lean/.lake/build/bin/checkExactTrace",
       "entrypoint": "deposit(bytes32,uint256)",
-      "error": "the trace is not the exact store's encoding of the entrypoint",
+      "error": "the trace of deposit(bytes32,uint256) is not the exact store's encoding of its program",
       "mutation": "name one slot more in the rewrite of the full-scan map than the map has, so the check of the trace against the exact store's encoding must reject a rewrite of another number of slots",
       "rejected": true,
       "scenario": "exact_trace/rewrite_slot_count_drift"
@@ -190,8 +192,9 @@
       "accepted": false,
       "artifact_kind": "runtime_exact_trace",
       "benchmark": "ConfidentialMixer/uo/deposit",
+      "checker": "proof/lean/.lake/build/bin/checkExactTrace",
       "entrypoint": "deposit(bytes32,uint256)",
-      "error": "the trace is not the exact store's encoding of the entrypoint",
+      "error": "the trace of deposit(bytes32,uint256) is not the exact store's encoding of its program",
       "mutation": "name another record length in the scan of the full-scan map and in its rewrite, the same in both, so the check of the trace against the exact store's encoding must reject records that are not of the length of the map's sealed slot",
       "rejected": true,
       "scenario": "exact_trace/scan_record_length_drift"
@@ -200,11 +203,45 @@
       "accepted": false,
       "artifact_kind": "runtime_exact_trace",
       "benchmark": "ConfidentialMixer/uo/deposit",
+      "checker": "proof/lean/.lake/build/bin/checkExactTrace",
       "entrypoint": "deposit(bytes32,uint256)",
-      "error": "the trace is not the exact store's encoding of the entrypoint",
+      "error": "the trace of deposit(bytes32,uint256) is not the exact store's encoding of its program",
       "mutation": "name the slots of the full-scan map as those of an array in its scan, so the check of the trace against the exact store's encoding must reject a scan of other locations",
       "rejected": true,
       "scenario": "exact_trace/scan_slot_naming_drift"
+    },
+    {
+      "accepted": false,
+      "artifact_kind": "runtime_exact_trace",
+      "benchmark": "ConfidentialMixer/uo/deposit",
+      "checker": "proof/lean/.lake/build/bin/checkExactTrace",
+      "entrypoint": "deposit(bytes32,uint256)",
+      "error": "the trace of deposit(bytes32,uint256) is not the exact store's encoding of its program",
+      "mutation": "give the first write of the call another class than Update, so the check of the trace against the exact store's encoding must reject a write class the encoding does not have",
+      "rejected": true,
+      "scenario": "exact_trace/write_class_drift"
+    },
+    {
+      "accepted": false,
+      "artifact_kind": "runtime_exact_trace",
+      "benchmark": "ConfidentialMixer/uo/deposit",
+      "checker": "proof/lean/.lake/build/bin/checkExactTrace",
+      "entrypoint": "deposit(bytes32,uint256)",
+      "error": "the trace of deposit(bytes32,uint256) is not the exact store's encoding of its program",
+      "mutation": "leave the last read of the call out, so the check of the trace against the exact store's encoding must reject a scan that misses a slot",
+      "rejected": true,
+      "scenario": "exact_trace/dropped_read_drift"
+    },
+    {
+      "accepted": false,
+      "artifact_kind": "runtime_exact_trace",
+      "benchmark": "ConfidentialMixer/uo/deposit",
+      "checker": "proof/lean/.lake/build/bin/checkExactTrace",
+      "entrypoint": "deposit(bytes32,uint256)",
+      "error": "the trace of deposit(bytes32,uint256) is not the exact store's encoding of its program",
+      "mutation": "read the slots of the full-scan map a second time, as a call that read an object once for each access did, so the check of the trace against the exact store's encoding must reject a second scan",
+      "rejected": true,
+      "scenario": "exact_trace/rescanned_object_drift"
     },
     {
       "accepted": false,
