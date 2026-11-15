@@ -1768,6 +1768,68 @@ Acceptance: a call's time does not grow with the size of public objects it
 does not load, measured on a contract with a large public array; the
 public-state checks and their tamper scenarios pass.
 
+As built. A table entry keeps the digest of its object's public state
+(`PublicObjectDigest` in `runtime/uo-evm/src/state.rs`) beside the digest of
+its sealed records: the SHA-256, under its own domain and with the object's
+id, of the JSON the snapshot decodes from storage, and nothing for a
+confidential object. It is computed the first time a snapshot asks for it
+and forgotten when the object is handed out for change. A snapshot's digest
+is the SHA-256, under `uo-runtime/public-state/v1`, of the ids and digests
+of the public objects in object-id order, and the public delta compares the
+objects' digests. So the snapshots a call takes before it runs, at its
+commit and after decode the public objects the call loaded and no other.
+That needed one more change: a public call took its committed snapshot from
+its shadow, before the shadow's objects were made cold, and making an object
+cold builds a new table entry, so the next call decoded the objects again.
+It now takes the snapshot from the committed state, as a confidential call
+does. The public-state digest of every trace changes. The benchmarks have no
+public object, so theirs is the digest of the empty state, which no
+committed report names. The Lean statements about the public-state record
+read its digests as opaque strings, and none of them changes.
+
+Measured on a new report (`results/public_state.json`, `--only
+public-state`). PublicLedger holds a public sealed array of 16 to 16,384
+slots, a public cell and a confidential cell; `bump` adds to the cell,
+`hide` to the confidential cell, and `record` writes the array. Before
+(the report run on the parent commit) and after (the committed report), on
+one machine, the median of nine calls of each kind after two:
+
+| Slots | `bump` | `hide` | `record` |
+| --- | --- | --- | --- |
+| 16 | 0.20 → 0.05 ms | 0.31 → 0.19 ms | 0.25 → 0.19 ms |
+| 16,384 | 141 → 0.08 ms | 156 → 0.29 ms | 201 → 169 ms |
+
+Before, every call decoded every public object three times: 6 objects and
+639,267 bytes of JSON at 16,384 slots. Now `bump` decodes its cell twice
+(106 bytes at every size), `hide` nothing, and `record` the array twice.
+The report checks that the calls that do not load the array decode the same
+objects and bytes at every size, and that the confidential call decodes no
+public object.
+
+Found on the way, and changed: to see that an exact array is cold, the
+checks of a call's boundaries read the written flag of every slot, at every
+call, of the arrays the call did not load too (about 0.1 ms at 16,384
+slots). A table entry now also keeps that its object was found cold, and
+forgets it when the object is handed out for change. Callgrind counts the
+same work at 16 and at 16,384 slots, over 32 calls after the deployment:
+17.7 and 17.8 million instructions for `bump`, 63.9 and 64.0 million for
+`hide`. The report's times for the two at 16,384 slots, 0.03 and 0.1 ms
+above those at 16, are those of the same instructions on the memory a
+larger state leaves. A `bump` timed right after a `record` takes about
+0.1 ms more again at 16,384 slots, the time of the caches and the allocator
+after a call that moved the array, so the report runs the rounds of each
+call together.
+
+`public_state_digests_are_kept_per_object` in
+`runtime_boundary_validation.json` pins the digests, with a unit test of six
+drifts, and `a_call_copies_no_committed_object` pins the kept coldness. One
+tamper scenario is new (426 in all): an object handed out for change with the
+digest of its public state kept. The engine test
+`a_call_decodes_the_public_state_of_the_objects_it_loaded` runs the three
+calls at 16 and 4,096 slots and checks which objects the snapshots of each
+call decode, that a digest after the call decodes nothing, that every
+digest is the one that decodes every object again, and each call's delta.
+
 ### Issue 56 — Slice production sources with a lexer
 
 Source: Issues 36 and 38. Size: S to M. Depends on: nothing.

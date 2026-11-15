@@ -54,6 +54,7 @@ fn report_mode(report: &str) -> &'static str {
         // script.
         | "stash_occupancy_full"
         | "storage_boundary"
+        | "public_state"
         // Written by scripts/measure_tree_eviction_instructions.sh, not the probe.
         | "tree_eviction_instructions"
         // Written by scripts/measure_kernel_operator_instructions.sh, not the

@@ -3,7 +3,6 @@ use crate::runtime::fresh_coins::{PathOramFreshCoinEntry, PathOramFreshCoinPlan}
 use crate::runtime::objects::RuntimeObject;
 use crate::secret::RuntimeMasterSecret;
 use anyhow::{anyhow, bail, Result};
-use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
@@ -25,6 +24,12 @@ use uo_kernel_runtime::{
 use uo_store::{SharedStorage, StoreCipher};
 
 const CIPHERTEXT_STORE_DIGEST_DOMAIN: &[u8] = b"uo-runtime/ciphertext-store/v1";
+/// The public-state digest hashes, after this, the id and the digest of
+/// each public object in object-id order.
+const PUBLIC_STATE_DIGEST_DOMAIN: &[u8] = b"uo-runtime/public-state/v1";
+/// A public object's digest hashes, after this, the object's id and the
+/// JSON of its state as the snapshot decodes it.
+const PUBLIC_OBJECT_DIGEST_DOMAIN: &[u8] = b"uo-runtime/public-object/v1";
 
 #[derive(Debug)]
 pub(in crate::runtime) struct CommittedRuntimeState {
@@ -66,13 +71,16 @@ struct RuntimeObjectEntry {
     object: Arc<TableObject>,
 }
 
-/// An object with the digest of its sealed records, once that was asked
-/// for. The digest stands for as long as the object is not changed, so the
-/// digest of an object a call left alone is not computed again.
+/// An object with the digest of its sealed records and the digest of its
+/// public state, each once it was asked for, and whether it was found cold.
+/// Each stands for as long as the object is not changed, so none is computed
+/// again for an object a call left alone.
 #[derive(Debug)]
 struct TableObject {
     object: RuntimeObject,
     sealed_records: OnceLock<SealedRecordsDigest>,
+    public_state: OnceLock<PublicObjectDigest>,
+    cold: OnceLock<()>,
 }
 
 /// How many sealed records an object holds in storage, and their digest.
@@ -82,38 +90,46 @@ struct SealedRecordsDigest {
     digest: [u8; 32],
 }
 
-#[derive(Serialize)]
-struct RuntimePublicObjectStateSnapshot {
-    object_id: u32,
-    payload: serde_json::Value,
-}
+/// The digest of a public object's state, decoded from storage, or `None`
+/// for a confidential object, which is no part of the public state.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct PublicObjectDigest(Option<[u8; 32]>);
 
-/// The public objects of a state, each with its snapshot payload, in object-id
-/// order, and their digest.
+/// The public objects of a state, each with the digest of its state, in
+/// object-id order, and the digest of them all.
 pub(in crate::runtime) struct PublicStateSnapshot {
-    objects: Vec<RuntimePublicObjectStateSnapshot>,
+    objects: Vec<(u32, [u8; 32])>,
     digest: String,
 }
 
 impl PublicStateSnapshot {
-    fn from_objects(objects: Vec<RuntimePublicObjectStateSnapshot>) -> Result<Self> {
-        let digest = hash_json(&objects)?;
-        Ok(Self { objects, digest })
+    /// The snapshot of the public objects of a state, given in object-id
+    /// order with their digests.
+    fn from_objects(objects: Vec<(u32, [u8; 32])>) -> Self {
+        let mut state = Sha256::new();
+        state.update(PUBLIC_STATE_DIGEST_DOMAIN);
+        for (object_id, digest) in &objects {
+            state.update(object_id.to_be_bytes());
+            state.update(digest);
+        }
+        let digest = hex::encode(state.finalize());
+        Self { objects, digest }
     }
 
-    /// The ids of the public objects whose payload differs between this
+    /// The ids of the public objects whose state differs between this
     /// snapshot and `committed`, ascending: a transition's public delta
-    /// (`publicStateDelta` in `UOToolchain/IRSemantics.lean`).
+    /// (`publicStateDelta` in `UOToolchain/IRSemantics.lean`). Two states of
+    /// an object differ where their digests do.
     fn delta(&self, committed: &Self) -> Vec<u32> {
-        let initial: BTreeMap<u32, &serde_json::Value> = self
+        let initial: BTreeMap<u32, &[u8; 32]> = self
             .objects
             .iter()
-            .map(|object| (object.object_id, &object.payload))
+            .map(|(object_id, digest)| (*object_id, digest))
             .collect();
-        let committed: BTreeMap<u32, &serde_json::Value> = committed
+        let committed: BTreeMap<u32, &[u8; 32]> = committed
             .objects
             .iter()
-            .map(|object| (object.object_id, &object.payload))
+            .map(|(object_id, digest)| (*object_id, digest))
             .collect();
         let object_ids: BTreeSet<u32> = initial.keys().chain(committed.keys()).copied().collect();
         object_ids
@@ -183,6 +199,28 @@ impl SealedRecordsDigest {
     }
 }
 
+impl PublicObjectDigest {
+    /// Decode the state of `object` from storage, as the public-state
+    /// snapshot has it, and hash it with the object's id. A confidential
+    /// object is not decoded.
+    fn of(object_id: u32, object: &RuntimeObject) -> Result<Self> {
+        if object.is_confidential() {
+            return Ok(Self(None));
+        }
+        let mut allocator = public_state_snapshot_allocator()?;
+        let Some(payload) = object.public_state_snapshot_value(&mut allocator)? else {
+            return Ok(Self(None));
+        };
+        let payload = serde_json::to_vec(&payload)?;
+        crate::instrumentation::count_public_state_decode(object_id, payload.len());
+        let mut digest = Sha256::new();
+        digest.update(PUBLIC_OBJECT_DIGEST_DOMAIN);
+        digest.update(object_id.to_be_bytes());
+        digest.update(&payload);
+        Ok(Self(Some(digest.finalize().into())))
+    }
+}
+
 impl TableObject {
     /// The digest of the object's sealed records. It reads every record the
     /// first time and none after.
@@ -195,6 +233,34 @@ impl TableObject {
         let _ = self.sealed_records.set(digest);
         Ok(digest)
     }
+
+    /// Whether the object holds nothing of a call. An object found cold
+    /// stays cold until it is handed out for change, so this looks at it
+    /// the first time and not after: a committed array the call did not
+    /// load is not scanned at every call boundary.
+    fn is_cold(&self) -> bool {
+        if self.cold.get().is_some() {
+            return true;
+        }
+        let cold = self.object.committed_cache_is_cold();
+        if cold {
+            // Whoever stores it first stores what this found.
+            let _ = self.cold.set(());
+        }
+        cold
+    }
+
+    /// The digest of the object's public state. It decodes the object from
+    /// storage the first time and not after.
+    fn public_state_digest(&self, object_id: u32) -> Result<PublicObjectDigest> {
+        if let Some(digest) = self.public_state.get() {
+            return Ok(*digest);
+        }
+        let digest = PublicObjectDigest::of(object_id, &self.object)?;
+        // Whoever stores it first stores what this computed.
+        let _ = self.public_state.set(digest);
+        Ok(digest)
+    }
 }
 
 impl RuntimeObjectEntry {
@@ -204,6 +270,8 @@ impl RuntimeObjectEntry {
             object: Arc::new(TableObject {
                 object,
                 sealed_records: OnceLock::new(),
+                public_state: OnceLock::new(),
+                cold: OnceLock::new(),
             }),
         }
     }
@@ -220,11 +288,13 @@ impl RuntimeObjectEntry {
         &self.object.object
     }
 
-    /// The object, to change it, if no other table holds it. Its digest is
-    /// forgotten.
+    /// The object, to change it, if no other table holds it. Its digests,
+    /// and that it was found cold, are forgotten.
     fn object_mut(&mut self) -> Option<&mut RuntimeObject> {
         let held = Arc::get_mut(&mut self.object)?;
         held.sealed_records = OnceLock::new();
+        held.public_state = OnceLock::new();
+        held.cold = OnceLock::new();
         Some(&mut held.object)
     }
 
@@ -240,7 +310,7 @@ impl RuntimeObjectEntry {
     fn into_cold_committed(self) -> Result<Self> {
         let object_id = self.object_id;
         if Arc::strong_count(&self.object) > 1 {
-            if !self.object.object.committed_cache_is_cold() {
+            if !self.object.is_cold() {
                 bail!("object {object_id} was shared with committed state and not cold");
             }
             return Ok(self);
@@ -287,18 +357,17 @@ impl RuntimeObjectTable {
         object_ids.finish()
     }
 
+    /// The public-state snapshot of the table's objects. An object keeps
+    /// the digest of its public state, so a snapshot decodes only the public
+    /// objects that no snapshot has read since they were loaded or changed.
     fn public_state_snapshot(&self) -> Result<PublicStateSnapshot> {
-        let mut allocator = public_state_snapshot_allocator()?;
-        let mut snapshots = Vec::new();
-        for entry in &self.entries {
-            if let Some(payload) = entry.object().public_state_snapshot_value(&mut allocator)? {
-                snapshots.push(RuntimePublicObjectStateSnapshot {
-                    object_id: entry.object_id,
-                    payload,
-                });
+        let mut objects = Vec::new();
+        for entry in self.entries.iter() {
+            if let Some(digest) = entry.object.public_state_digest(entry.object_id)?.0 {
+                objects.push((entry.object_id, digest));
             }
         }
-        PublicStateSnapshot::from_objects(snapshots)
+        Ok(PublicStateSnapshot::from_objects(objects))
     }
 
     /// A digest of every sealed record in storage, by object and by slot. It
@@ -331,17 +400,42 @@ impl RuntimeObjectTable {
     }
 
     /// The public-state digest of this staged table over `committed`: each
-    /// object as staged here, or as committed when the call did not load it.
+    /// object as staged here, or as committed when the call did not load it,
+    /// with the digest the committed object keeps.
     fn staged_public_state_digest(&self, committed: &Self) -> Result<String> {
-        let mut allocator = public_state_snapshot_allocator()?;
-        let mut snapshots = Vec::new();
-        for (object_id, committed_object) in committed.iter() {
-            let object = self.get(object_id).unwrap_or(committed_object);
-            if let Some(payload) = object.public_state_snapshot_value(&mut allocator)? {
-                snapshots.push(RuntimePublicObjectStateSnapshot { object_id, payload });
+        let mut objects = Vec::new();
+        for committed_entry in committed.entries.iter() {
+            let object_id = committed_entry.object_id;
+            let entry = self.entry(object_id).unwrap_or(committed_entry);
+            if let Some(digest) = entry.object.public_state_digest(object_id)?.0 {
+                objects.push((object_id, digest));
             }
         }
-        hash_json(&snapshots)
+        Ok(PublicStateSnapshot::from_objects(objects).digest)
+    }
+
+    /// The digest of the public state with every public object decoded
+    /// again: what `public_state_snapshot` must give.
+    #[cfg(test)]
+    fn public_state_digest_from_storage(&self) -> Result<String> {
+        let mut objects = Vec::new();
+        for (object_id, object) in self.iter() {
+            if let Some(digest) = PublicObjectDigest::of(object_id, object)?.0 {
+                objects.push((object_id, digest));
+            }
+        }
+        Ok(PublicStateSnapshot::from_objects(objects).digest)
+    }
+
+    /// The entry of `object_id`, looked up as `get` does.
+    fn entry(&self, object_id: u32) -> Option<&RuntimeObjectEntry> {
+        let mut found_index = None;
+        for (index, entry) in self.entries.iter().enumerate() {
+            if entry.object_id == object_id {
+                found_index = Some(index);
+            }
+        }
+        found_index.and_then(|index| self.entries.get(index))
     }
 
     fn get(&self, object_id: u32) -> Option<&RuntimeObject> {
@@ -538,6 +632,13 @@ impl ContractRuntime {
 
     pub(crate) fn public_state_digest(&self) -> Result<String> {
         Ok(self.public_state_snapshot()?.digest)
+    }
+
+    /// The public-state digest with every public object decoded again:
+    /// what `public_state_digest` must give.
+    #[cfg(test)]
+    pub(crate) fn public_state_digest_from_storage(&self) -> Result<String> {
+        self.committed.objects.public_state_digest_from_storage()
     }
 
     /// A digest of the ciphertext the committed state holds in storage.
@@ -924,12 +1025,13 @@ impl CommittedRuntimeState {
                 context
             );
         }
-        if let Some((object_id, _)) = self
+        if let Some(entry) = self
             .objects
+            .entries
             .iter()
-            .find(|(_, object)| !object.committed_cache_is_cold())
+            .find(|entry| !entry.object.is_cold())
         {
-            bail!("object {} was not cold {}", object_id, context);
+            bail!("object {} was not cold {}", entry.object_id, context);
         }
         Ok(())
     }
@@ -1159,10 +1261,6 @@ impl CommittedRuntimeState {
 }
 
 impl RuntimeShadowState {
-    fn public_state_snapshot(&self) -> Result<PublicStateSnapshot> {
-        self.objects.public_state_snapshot()
-    }
-
     pub(in crate::runtime) fn object_mut(&mut self, object_id: u32) -> Result<&mut RuntimeObject> {
         self.objects
             .get_mut(object_id)
@@ -1356,13 +1454,6 @@ impl PublicRuntimeShadowState {
             .ok_or_else(|| anyhow!("public call has no candidate public state"))
     }
 
-    /// The public state the commit left: after a commit the shadow holds
-    /// every object of the contract, those the call did not load as
-    /// committed.
-    pub(in crate::runtime) fn public_state_snapshot(&self) -> Result<PublicStateSnapshot> {
-        self.shadow.public_state_snapshot()
-    }
-
     pub(in crate::runtime) fn commit_against(
         &mut self,
         committed: &CommittedRuntimeState,
@@ -1408,15 +1499,14 @@ pub(in crate::runtime) fn public_state_transition(
     .map_err(anyhow::Error::from)
 }
 
-/// Allocator for hashing the committed public state.
+/// Allocator for decoding a public object's state from storage.
 ///
-/// Snapshotting only decodes public objects through scratch reservations: it
-/// never records kernel ops or stack checks, and the session is dropped without
-/// `finish()`, so its resource-event log is never consumed. The kernel-op and
-/// stack budgets are therefore zero. They only size the eagerly materialized
-/// event log (`(max_kernel_ops + max_stack_words) * 128 + 128` slots), and the
-/// previous `1 << 20` kernel-op budget materialized ~135M slots (~5 GB) on every
-/// digest, three digests per call.
+/// Decoding goes through scratch reservations alone: it never records kernel
+/// ops or stack checks, and the session is dropped without `finish()`, so its
+/// resource-event log is never consumed. The kernel-op and stack budgets are
+/// therefore zero. They only size the eagerly materialized event log
+/// (`(max_kernel_ops + max_stack_words) * 128 + 128` slots), and a `1 << 20`
+/// kernel-op budget materialized ~135M slots (~5 GB) on every decode.
 fn public_state_snapshot_allocator() -> Result<AllocatorSession> {
     AllocatorSession::new(AllocatorPlan {
         arena_bytes: 1 << 20,
@@ -1426,11 +1516,6 @@ fn public_state_snapshot_allocator() -> Result<AllocatorSession> {
         max_commit_ops: 0,
         max_load_ops: 0,
     })
-}
-
-fn hash_json<T: Serialize + ?Sized>(value: &T) -> Result<String> {
-    let payload = serde_json::to_vec(value)?;
-    Ok(hex::encode(Sha256::digest(payload)))
 }
 
 impl RuntimeKernelObjectStore for ConfidentialRuntimeShadowState {

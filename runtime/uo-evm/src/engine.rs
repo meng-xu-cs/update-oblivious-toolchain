@@ -2821,6 +2821,146 @@ bounds:
         assert_eq!(digest(&instance), (last, 0));
     }
 
+    /// PublicLedger with a public array of `capacity` sealed slots, which
+    /// `record` writes, a public sealed cell, which `bump` adds to, and a
+    /// confidential cell, which `hide` adds to.
+    fn public_ledger(capacity: usize) -> uo_core::CompiledArtifact {
+        let source = write_temp(
+            "public-ledger",
+            &format!(
+                r#"
+            contract PublicLedger {{
+                uint256[{capacity}] private history;
+                uint256 private counter;
+                uint256 private secret;
+                function bump(uint256 by) public {{
+                    counter = counter + by;
+                }}
+                function hide(uint256 by) public {{
+                    secret = secret + by;
+                }}
+                function record(uint256 index, uint256 value) public {{
+                    history[index] = value;
+                }}
+            }}
+            "#
+            ),
+        );
+        compile_bench(
+            source.to_str().unwrap(),
+            &format!(
+                r#"
+contract: PublicLedger
+entrypoints:
+  bump(uint256):
+    confidential: false
+    returns: forbidden
+    status: public
+  hide(uint256):
+    secret_args: [by]
+    confidential: true
+    returns: forbidden
+    status: public
+  record(uint256,uint256):
+    confidential: false
+    returns: forbidden
+    status: public
+state:
+  history:
+    kind: array
+    value: uint256
+    capacity: {capacity}
+    backend: full_scan
+    confidential: false
+  counter:
+    kind: cell
+    value: uint256
+    backend: full_scan
+    confidential: false
+  secret:
+    kind: cell
+    value: uint256
+    backend: full_scan
+    confidential: true
+bounds:
+  loops: {{}}
+"#
+            ),
+            ProgramMode::Uo,
+        )
+    }
+
+    /// An object keeps the digest of its public state, so a call's
+    /// snapshots decode the public objects it loaded and no other: `bump`
+    /// decodes the cell it adds to, `hide` nothing, and neither the array,
+    /// at 16 slots as at 4,096; `record` decodes the array. Each snapshot's
+    /// digest is the one that decodes every object again, and the delta of
+    /// each call is the object it wrote.
+    #[test]
+    fn a_call_decodes_the_public_state_of_the_objects_it_loaded() {
+        use crate::instrumentation::take_public_state_decodes;
+        for capacity in [16, 4096] {
+            let mut instance =
+                ContractInstance::deploy_with_seed(public_ledger(capacity), 0x55).unwrap();
+            let history = object_id(&instance, "history");
+            let counter = object_id(&instance, "counter");
+            let fresh_digest = |instance: &ContractInstance| {
+                let digest = instance.state.public_state_digest_from_storage().unwrap();
+                take_public_state_decodes();
+                digest
+            };
+            assert_eq!(
+                instance.state.public_state_digest().unwrap(),
+                fresh_digest(&instance)
+            );
+            take_public_state_decodes();
+            for round in 0..3u64 {
+                let calls: [(&str, Vec<Value>, Option<u32>); 3] = [
+                    ("bump(uint256)", vec![Value::uint(round + 1)], Some(counter)),
+                    ("hide(uint256)", vec![Value::uint(round + 1)], None),
+                    (
+                        "record(uint256,uint256)",
+                        vec![Value::uint(round), Value::uint(round + 7)],
+                        Some(history),
+                    ),
+                ];
+                for (entrypoint, args, decodes) in calls {
+                    let context = format!("capacity {capacity}, round {round}, {entrypoint}");
+                    let before = instance.state.public_state_digest().unwrap();
+                    assert!(take_public_state_decodes().is_empty(), "{context}");
+                    let result = instance.call(entrypoint, args).unwrap();
+                    assert!(!result.aborted, "{context}");
+                    // The call's snapshots decode the object the call loaded
+                    // and no other.
+                    let decoded = take_public_state_decodes();
+                    match decodes {
+                        Some(object) => {
+                            assert!(!decoded.is_empty(), "{context}");
+                            assert!(
+                                decoded.iter().all(|id| *id == object),
+                                "{context}: {decoded:?}"
+                            );
+                        }
+                        None => assert!(decoded.is_empty(), "{context}: {decoded:?}"),
+                    }
+                    // The committed objects keep the digests the call's last
+                    // snapshot took: a digest after the call decodes nothing.
+                    let after = instance.state.public_state_digest().unwrap();
+                    assert!(take_public_state_decodes().is_empty(), "{context}");
+                    assert_eq!(after, fresh_digest(&instance), "{context}");
+                    let transition = result.trace.public_state_transition.as_ref().unwrap();
+                    assert_eq!(transition.initial_public_state_hash, before, "{context}");
+                    assert_eq!(transition.committed_public_state_hash, after, "{context}");
+                    assert_eq!(
+                        transition.public_delta_hash,
+                        public_delta_digest(&decodes.into_iter().collect::<Vec<_>>()).unwrap(),
+                        "{context}"
+                    );
+                }
+            }
+        }
+    }
+
     #[test]
     fn an_abort_on_a_large_full_scan_map_stays_within_the_allocator_budget() {
         // An aborting call once opened every slot of an exact map a second

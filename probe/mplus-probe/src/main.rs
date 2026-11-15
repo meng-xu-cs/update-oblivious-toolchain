@@ -35,6 +35,7 @@ enum ReportKind {
     StashOccupancy,
     StashOccupancyFull,
     StorageBoundary,
+    PublicState,
     TapeSubstitution,
     TapeSubstitutionFull,
     PathOramAvlMapReplay,
@@ -286,6 +287,10 @@ fn main() -> Result<()> {
                 "storage_boundary",
                 &report,
             )?;
+        }
+        Some(ReportKind::PublicState) => {
+            let report = mplus_probe::run_public_state_report()?;
+            write_single_report(&cli.out_dir, "public_state.json", "public_state", &report)?;
         }
         Some(ReportKind::TapeSubstitution) => {
             let report = mplus_probe::run_tape_substitution_report()?;

@@ -1,0 +1,360 @@
+{
+  "accepted": true,
+  "checks": {
+    "a_call_that_does_not_load_the_array_decodes_the_same_at_every_capacity": true,
+    "a_confidential_call_decodes_no_public_object": true,
+    "decoded_the_same_objects_every_round": true
+  },
+  "contract": "PublicLedger",
+  "counts_sha256": "e89358d99ba347fb37fa1953051c39f46b205661e788512bcb931f4a1c6130ab",
+  "parameters": {
+    "capacities": [
+      16,
+      256,
+      4096,
+      16384
+    ],
+    "deploy_seed": 5787775617174798337,
+    "rounds": 9,
+    "warmup_rounds": 2
+  },
+  "rows": [
+    {
+      "capacity": 16,
+      "decoded_the_same_objects_every_round": true,
+      "entrypoint": "bump(uint256)",
+      "loads": "counter",
+      "public_objects_decoded_per_call": 2,
+      "public_state_bytes_decoded_by_round": [
+        106,
+        107,
+        108,
+        108,
+        108,
+        108,
+        108,
+        108,
+        108
+      ],
+      "timing": {
+        "max_ns": 71015,
+        "median_load_ns": 2775,
+        "median_ns": 54887,
+        "median_proof_objects_ns": 20440,
+        "median_staging_ns": 76,
+        "median_storage_commit_ns": 91,
+        "min_ns": 53660,
+        "rounds": 9
+      }
+    },
+    {
+      "capacity": 16,
+      "decoded_the_same_objects_every_round": true,
+      "entrypoint": "hide(uint256)",
+      "loads": "secret",
+      "public_objects_decoded_per_call": 0,
+      "public_state_bytes_decoded_by_round": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "timing": {
+        "max_ns": 248169,
+        "median_load_ns": 3269,
+        "median_ns": 185629,
+        "median_proof_objects_ns": 138934,
+        "median_staging_ns": 85,
+        "median_storage_commit_ns": 137,
+        "min_ns": 168077,
+        "rounds": 9
+      }
+    },
+    {
+      "capacity": 16,
+      "decoded_the_same_objects_every_round": true,
+      "entrypoint": "record(uint256,uint256)",
+      "loads": "history",
+      "public_objects_decoded_per_call": 2,
+      "public_state_bytes_decoded_by_round": [
+        504,
+        504,
+        504,
+        504,
+        504,
+        504,
+        504,
+        505,
+        507
+      ],
+      "timing": {
+        "max_ns": 223886,
+        "median_load_ns": 33071,
+        "median_ns": 192998,
+        "median_proof_objects_ns": 21292,
+        "median_staging_ns": 71,
+        "median_storage_commit_ns": 234,
+        "min_ns": 179539,
+        "rounds": 9
+      }
+    },
+    {
+      "capacity": 256,
+      "decoded_the_same_objects_every_round": true,
+      "entrypoint": "bump(uint256)",
+      "loads": "counter",
+      "public_objects_decoded_per_call": 2,
+      "public_state_bytes_decoded_by_round": [
+        106,
+        107,
+        108,
+        108,
+        108,
+        108,
+        108,
+        108,
+        108
+      ],
+      "timing": {
+        "max_ns": 88706,
+        "median_load_ns": 2547,
+        "median_ns": 53156,
+        "median_proof_objects_ns": 20202,
+        "median_staging_ns": 81,
+        "median_storage_commit_ns": 89,
+        "min_ns": 51859,
+        "rounds": 9
+      }
+    },
+    {
+      "capacity": 256,
+      "decoded_the_same_objects_every_round": true,
+      "entrypoint": "hide(uint256)",
+      "loads": "secret",
+      "public_objects_decoded_per_call": 0,
+      "public_state_bytes_decoded_by_round": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "timing": {
+        "max_ns": 233598,
+        "median_load_ns": 3269,
+        "median_ns": 176544,
+        "median_proof_objects_ns": 136127,
+        "median_staging_ns": 84,
+        "median_storage_commit_ns": 92,
+        "min_ns": 165291,
+        "rounds": 9
+      }
+    },
+    {
+      "capacity": 256,
+      "decoded_the_same_objects_every_round": true,
+      "entrypoint": "record(uint256,uint256)",
+      "loads": "history",
+      "public_objects_decoded_per_call": 2,
+      "public_state_bytes_decoded_by_round": [
+        6744,
+        6744,
+        6744,
+        6744,
+        6744,
+        6744,
+        6744,
+        6745,
+        6747
+      ],
+      "timing": {
+        "max_ns": 2664777,
+        "median_load_ns": 544737,
+        "median_ns": 2471554,
+        "median_proof_objects_ns": 32066,
+        "median_staging_ns": 131,
+        "median_storage_commit_ns": 2661,
+        "min_ns": 2353130,
+        "rounds": 9
+      }
+    },
+    {
+      "capacity": 4096,
+      "decoded_the_same_objects_every_round": true,
+      "entrypoint": "bump(uint256)",
+      "loads": "counter",
+      "public_objects_decoded_per_call": 2,
+      "public_state_bytes_decoded_by_round": [
+        106,
+        107,
+        108,
+        108,
+        108,
+        108,
+        108,
+        108,
+        108
+      ],
+      "timing": {
+        "max_ns": 125175,
+        "median_load_ns": 2792,
+        "median_ns": 53833,
+        "median_proof_objects_ns": 20485,
+        "median_staging_ns": 75,
+        "median_storage_commit_ns": 87,
+        "min_ns": 50375,
+        "rounds": 9
+      }
+    },
+    {
+      "capacity": 4096,
+      "decoded_the_same_objects_every_round": true,
+      "entrypoint": "hide(uint256)",
+      "loads": "secret",
+      "public_objects_decoded_per_call": 0,
+      "public_state_bytes_decoded_by_round": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "timing": {
+        "max_ns": 238344,
+        "median_load_ns": 3522,
+        "median_ns": 202693,
+        "median_proof_objects_ns": 146496,
+        "median_staging_ns": 91,
+        "median_storage_commit_ns": 144,
+        "min_ns": 166184,
+        "rounds": 9
+      }
+    },
+    {
+      "capacity": 4096,
+      "decoded_the_same_objects_every_round": true,
+      "entrypoint": "record(uint256,uint256)",
+      "loads": "history",
+      "public_objects_decoded_per_call": 2,
+      "public_state_bytes_decoded_by_round": [
+        106584,
+        106584,
+        106584,
+        106584,
+        106584,
+        106584,
+        106584,
+        106585,
+        106587
+      ],
+      "timing": {
+        "max_ns": 49547438,
+        "median_load_ns": 10475917,
+        "median_ns": 47422850,
+        "median_proof_objects_ns": 79786,
+        "median_staging_ns": 621,
+        "median_storage_commit_ns": 73706,
+        "min_ns": 39522572,
+        "rounds": 9
+      }
+    },
+    {
+      "capacity": 16384,
+      "decoded_the_same_objects_every_round": true,
+      "entrypoint": "bump(uint256)",
+      "loads": "counter",
+      "public_objects_decoded_per_call": 2,
+      "public_state_bytes_decoded_by_round": [
+        106,
+        107,
+        108,
+        108,
+        108,
+        108,
+        108,
+        108,
+        108
+      ],
+      "timing": {
+        "max_ns": 150821,
+        "median_load_ns": 3699,
+        "median_ns": 84029,
+        "median_proof_objects_ns": 31018,
+        "median_staging_ns": 104,
+        "median_storage_commit_ns": 99,
+        "min_ns": 63897,
+        "rounds": 9
+      }
+    },
+    {
+      "capacity": 16384,
+      "decoded_the_same_objects_every_round": true,
+      "entrypoint": "hide(uint256)",
+      "loads": "secret",
+      "public_objects_decoded_per_call": 0,
+      "public_state_bytes_decoded_by_round": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "timing": {
+        "max_ns": 382899,
+        "median_load_ns": 4675,
+        "median_ns": 287397,
+        "median_proof_objects_ns": 205054,
+        "median_staging_ns": 131,
+        "median_storage_commit_ns": 218,
+        "min_ns": 234884,
+        "rounds": 9
+      }
+    },
+    {
+      "capacity": 16384,
+      "decoded_the_same_objects_every_round": true,
+      "entrypoint": "record(uint256,uint256)",
+      "loads": "history",
+      "public_objects_decoded_per_call": 2,
+      "public_state_bytes_decoded_by_round": [
+        426072,
+        426072,
+        426072,
+        426072,
+        426072,
+        426072,
+        426072,
+        426073,
+        426075
+      ],
+      "timing": {
+        "max_ns": 175495199,
+        "median_load_ns": 37429104,
+        "median_ns": 168920055,
+        "median_proof_objects_ns": 65983,
+        "median_staging_ns": 972,
+        "median_storage_commit_ns": 326904,
+        "min_ns": 148303043,
+        "rounds": 9
+      }
+    }
+  ],
+  "schema": "uo-public-state-v1"
+}

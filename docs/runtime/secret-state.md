@@ -146,6 +146,23 @@ and the ownership boundaries that keep them auditable.
     the ciphertext store (invariant 13) reads the records of the objects
     written since the last digest and of no other.
 
+    An object keeps the digest of its public state in the same way: the
+    hash, with the object's id, of its state as the public-state snapshot
+    decodes it from storage. A snapshot's digest hashes the ids and digests
+    of the public objects in object-id order, and the digest of a call's
+    candidate state takes each object the call loaded as staged and every
+    other object with the digest it keeps. So the snapshots a call takes
+    before it runs, at its commit and after decode the public objects it
+    loaded and no other, and a call that loads no public object decodes
+    none. A public call takes its committed snapshot from the objects as
+    the committed state holds them, as a confidential call does, so that
+    they keep the digests it took. An object also keeps that it was found
+    cold, and forgets it when it is handed out for change, so the checks of
+    a call's boundaries look at an object the call did not load once and
+    not at every call (`results/public_state.json`; the source checks
+    `public_state_digests_are_kept_per_object` and
+    `a_call_copies_no_committed_object`).
+
 17. A run in a trace stands for the events the runtime recorded. The scan
     and the rewrite of an exact object are one item of a trace each, with
     the object's slot count and the length of a sealed slot, and so is the

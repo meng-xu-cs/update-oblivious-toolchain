@@ -51,6 +51,7 @@ pub use acceptance::{
 };
 
 mod capacity_sweep;
+mod public_state;
 mod rust_source;
 mod stash_occupancy;
 mod storage_boundary;
@@ -1375,6 +1376,12 @@ pub fn run_trace_equivalence_report() -> Result<JsonValue> {
 pub fn run_storage_boundary_report() -> Result<JsonValue> {
     let suite = compile_suite()?;
     storage_boundary::run_storage_boundary(&suite)
+}
+
+/// What the public-state snapshot costs a call, by the size of a public
+/// object the call does not load.
+pub fn run_public_state_report() -> Result<JsonValue> {
+    public_state::run_public_state()
 }
 
 pub fn run_leakage_auc_report() -> Result<JsonValue> {
@@ -10178,6 +10185,30 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "benchmark": "SingleAccessMap/pathoram/put",
             "entrypoint": target.entrypoint,
             "mutation": "hand an object out to be changed with the digest of its sealed records kept, so the implementation interface must reject a ciphertext digest that can be the digest of records the object no longer holds",
+        }),
+    )?);
+    let mut tampered_runtime_implementation_public_digest_stale =
+        runtime_implementation_interface.clone();
+    tampered_runtime_implementation_public_digest_stale.state_source = replace_exactly_once(
+        &tampered_runtime_implementation_public_digest_stale.state_source,
+        "        held.public_state = OnceLock::new();\n",
+        "",
+        "runtime implementation public-state digest tamper",
+    )?;
+    scenarios.push(validate_tampered_json_case(
+        "runtime_implementation_interface/committed_object_public_digest_stale_drift",
+        &tampered_runtime_implementation_public_digest_stale,
+        |interface_path| {
+            Ok(Command::new(&runtime_implementation_interface_checker)
+                .arg(interface_path)
+                .output()?)
+        },
+        json!({
+            "scenario": "runtime_implementation_interface/committed_object_public_digest_stale_drift",
+            "artifact_kind": "proofgrade_runtime_implementation_interface",
+            "benchmark": "SingleAccessMap/pathoram/put",
+            "entrypoint": target.entrypoint,
+            "mutation": "hand an object out to be changed with the digest of its public state kept, so the implementation interface must reject a public-state digest that can be the digest of a state the object no longer holds",
         }),
     )?);
     let mut tampered_runtime_implementation_staging_copies =
@@ -28785,7 +28816,7 @@ fn check_a_call_copies_no_committed_object(
     state_source.contains(
         "struct RuntimeObjectEntry {\n    object_id: u32,\n    object: Arc<TableObject>,\n}",
     ) && state_source.contains(
-        "struct TableObject {\n    object: RuntimeObject,\n    sealed_records: OnceLock<SealedRecordsDigest>,\n}",
+        "struct TableObject {\n    object: RuntimeObject,\n    sealed_records: OnceLock<SealedRecordsDigest>,\n    public_state: OnceLock<PublicObjectDigest>,\n    cold: OnceLock<()>,\n}",
     ) && state_source.contains(
         "    fn share(&self) -> Self {\n        Self {\n            object_id: self.object_id,\n            object: Arc::clone(&self.object),\n        }\n    }",
     ) && state_source.contains(
@@ -28802,7 +28833,7 @@ fn check_a_call_copies_no_committed_object(
             "                    let object = entry.into_owned().ok_or_else(|| {\n                        anyhow!(\"object {id} of the call was shared with another state at commit\")\n                    })?;",
         )
         && state_source.contains(
-            "        if Arc::strong_count(&self.object) > 1 {\n            if !self.object.object.committed_cache_is_cold() {\n                bail!(\"object {object_id} was shared with committed state and not cold\");\n            }\n            return Ok(self);\n        }",
+            "        if Arc::strong_count(&self.object) > 1 {\n            if !self.object.is_cold() {\n                bail!(\"object {object_id} was shared with committed state and not cold\");\n            }\n            return Ok(self);\n        }",
         )
         // Nothing clones a committed sealed object.
         && !state_source.contains("clone_cold")
@@ -28814,9 +28845,14 @@ fn check_a_call_copies_no_committed_object(
             "        if let Some(digest) = self.sealed_records.get() {\n            return Ok(*digest);\n        }\n        let digest = SealedRecordsDigest::of(object_id, &self.object)?;",
         )
         && state_source.contains(
-            "        let held = Arc::get_mut(&mut self.object)?;\n        held.sealed_records = OnceLock::new();\n        Some(&mut held.object)",
+            "        let held = Arc::get_mut(&mut self.object)?;\n        held.sealed_records = OnceLock::new();\n        held.public_state = OnceLock::new();\n        held.cold = OnceLock::new();\n        Some(&mut held.object)",
         )
         && state_source.matches("Arc::get_mut(").count() == 1
+        // An object found cold is looked at again only once it was handed
+        // out for change.
+        && state_source.contains(
+            "        if self.cold.get().is_some() {\n            return true;\n        }\n        let cold = self.object.committed_cache_is_cold();",
+        )
         && state_source.contains(
             "        for entry in self.entries.iter() {\n            entry\n                .object\n                .sealed_records_digest(entry.object_id)?\n                .add_to(entry.object_id, &mut store);\n        }",
         )
@@ -28838,6 +28874,45 @@ fn check_a_call_copies_no_committed_object(
             "        for page in &mut self.storage.directory_pages {\n            page.wipe();\n        }\n        for bucket in &mut self.storage.buckets {\n            bucket.wipe();\n        }",
         )
         && !generated_oram_codecs_source.contains("[Box<[u8]>],")
+}
+
+/// Whether the public-state snapshot is built from a digest of each public
+/// object that the object keeps. An object decodes its public state from
+/// storage once and keeps the digest, and forgets it when it is handed out
+/// to be changed. A snapshot hashes the objects' ids and digests, and the
+/// digest of a call's candidate state takes each object the call loaded as
+/// staged and every other object with the digest it keeps. So a snapshot
+/// decodes the public objects loaded or changed since the last one and no
+/// other.
+fn check_public_state_digests_are_kept_per_object(state_source: &str) -> bool {
+    state_source.contains(
+        "struct TableObject {\n    object: RuntimeObject,\n    sealed_records: OnceLock<SealedRecordsDigest>,\n    public_state: OnceLock<PublicObjectDigest>,\n    cold: OnceLock<()>,\n}",
+    )
+        // The digest is the object's own, taken once and kept.
+        && state_source.contains(
+            "        if let Some(digest) = self.public_state.get() {\n            return Ok(*digest);\n        }\n        let digest = PublicObjectDigest::of(object_id, &self.object)?;",
+        )
+        && state_source.contains(
+            "        let held = Arc::get_mut(&mut self.object)?;\n        held.sealed_records = OnceLock::new();\n        held.public_state = OnceLock::new();\n        held.cold = OnceLock::new();\n        Some(&mut held.object)",
+        )
+        // A digest hashes the decoded state of one object, with its id.
+        && state_source.contains(
+            "        let payload = serde_json::to_vec(&payload)?;\n        crate::instrumentation::count_public_state_decode(object_id, payload.len());\n        let mut digest = Sha256::new();\n        digest.update(PUBLIC_OBJECT_DIGEST_DOMAIN);\n        digest.update(object_id.to_be_bytes());\n        digest.update(&payload);",
+        )
+        // A snapshot hashes the ids and digests of the public objects.
+        && state_source.contains(
+            "        for (object_id, digest) in &objects {\n            state.update(object_id.to_be_bytes());\n            state.update(digest);\n        }",
+        )
+        && state_source.contains(
+            "            if let Some(digest) = entry.object.public_state_digest(entry.object_id)?.0 {\n                objects.push((entry.object_id, digest));\n            }",
+        )
+        // The candidate state: the staged object where the call loaded one.
+        && state_source.contains(
+            "            let entry = self.entry(object_id).unwrap_or(committed_entry);\n            if let Some(digest) = entry.object.public_state_digest(object_id)?.0 {",
+        )
+        // No snapshot decodes the whole public state again.
+        && !state_source.contains("hash_json")
+        && !state_source.contains("public_state_snapshot_value(&mut allocator)? {\n                snapshots.push")
 }
 
 /// The names of the types of a run item, and of the variants that hold
@@ -46517,6 +46592,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         &production_source_slice(&oram_source),
         &generated_oram_codecs_source,
     );
+    let public_state_digests_are_kept_per_object =
+        check_public_state_digests_are_kept_per_object(&production_source_slice(&state_source));
     let mut trace_run_type_files = Vec::new();
     for pattern in TRACE_RUN_TYPE_PATTERNS {
         trace_run_type_files.extend(collect_production_pattern_hits(&runtime_src, pattern)?);
@@ -47934,6 +48011,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "production_calls_record_no_position_map_witness": production_calls_record_no_position_map_witness,
         "evidence_builds_audit_the_kept_position_map_witness": evidence_builds_audit_the_kept_position_map_witness,
         "a_call_copies_no_committed_object": a_call_copies_no_committed_object,
+        "public_state_digests_are_kept_per_object": public_state_digests_are_kept_per_object,
         "trace_runs_stand_for_recorded_events": trace_runs_stand_for_recorded_events,
         "production_calls_issue_chained_receipts": production_calls_issue_chained_receipts,
         "theorem_certificate_constructor_checks":
@@ -48885,6 +48963,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && production_calls_record_no_position_map_witness
             && evidence_builds_audit_the_kept_position_map_witness
             && a_call_copies_no_committed_object
+            && public_state_digests_are_kept_per_object
             && trace_runs_stand_for_recorded_events
             && production_calls_issue_chained_receipts
             && theorem_certificate_constructor_surface_restricted
@@ -58330,6 +58409,55 @@ mod tests {
     }
 
     #[test]
+    fn public_state_digest_check_rejects_the_drifts_it_guards() {
+        use super::{check_public_state_digests_are_kept_per_object, repo_root};
+        let root = repo_root();
+        let state = production_source_slice(
+            &std::fs::read_to_string(root.join("runtime/uo-evm/src/state.rs")).unwrap(),
+        );
+        // One place of `source` changed.
+        let drift = |from: &str, to: &str| {
+            assert_eq!(state.matches(from).count(), 1, "{from}");
+            state.replacen(from, to, 1)
+        };
+        assert!(check_public_state_digests_are_kept_per_object(&state));
+
+        // An object that keeps its digest when it is handed out for change.
+        let stale = drift("        held.public_state = OnceLock::new();\n", "");
+        assert!(!check_public_state_digests_are_kept_per_object(&stale));
+        // A digest that is not the decode of what the object holds.
+        let stale = drift(
+            "        let digest = PublicObjectDigest::of(object_id, &self.object)?;",
+            "        let digest = PublicObjectDigest(Some([0u8; 32]));",
+        );
+        assert!(!check_public_state_digests_are_kept_per_object(&stale));
+        // A digest of an object's state without the object's id.
+        let unnamed = drift(
+            "        digest.update(object_id.to_be_bytes());\n        digest.update(&payload);",
+            "        digest.update(&payload);",
+        );
+        assert!(!check_public_state_digests_are_kept_per_object(&unnamed));
+        // A snapshot that decodes every object again.
+        let again = drift(
+            "            if let Some(digest) = entry.object.public_state_digest(entry.object_id)?.0 {",
+            "            if let Some(digest) = PublicObjectDigest::of(entry.object_id, entry.object())?.0 {",
+        );
+        assert!(!check_public_state_digests_are_kept_per_object(&again));
+        // A candidate state with the committed object where the call loaded
+        // one.
+        let committed = drift(
+            "            let entry = self.entry(object_id).unwrap_or(committed_entry);\n",
+            "            let entry = committed_entry;\n",
+        );
+        assert!(!check_public_state_digests_are_kept_per_object(&committed));
+        // One hash over the whole public state's JSON.
+        let whole = format!(
+            "{state}\nfn hash_json<T: Serialize + ?Sized>(value: &T) -> Result<String> {{\n    todo!()\n}}\n"
+        );
+        assert!(!check_public_state_digests_are_kept_per_object(&whole));
+    }
+
+    #[test]
     fn committed_object_sharing_check_rejects_the_drifts_it_guards() {
         use super::{check_a_call_copies_no_committed_object, repo_root};
         let root = repo_root();
@@ -58380,6 +58508,10 @@ mod tests {
             "",
         );
         assert!(!ok(&stale, &objects, &oram, &codecs));
+        // An object that keeps, when it is handed out for change, that it
+        // was found cold.
+        let stale = drift(&state, "        held.cold = OnceLock::new();\n", "");
+        assert!(!ok(&stale, &objects, &oram, &codecs));
         // A digest that is taken from before whatever the object holds now.
         let stale = drift(
             &state,
@@ -58390,7 +58522,7 @@ mod tests {
         // A shared object that is taken for cold without a look.
         let unchecked = drift(
             &state,
-            "            if !self.object.object.committed_cache_is_cold() {\n                bail!(\"object {object_id} was shared with committed state and not cold\");\n            }\n",
+            "            if !self.object.is_cold() {\n                bail!(\"object {object_id} was shared with committed state and not cold\");\n            }\n",
             "",
         );
         assert!(!ok(&unchecked, &objects, &oram, &codecs));

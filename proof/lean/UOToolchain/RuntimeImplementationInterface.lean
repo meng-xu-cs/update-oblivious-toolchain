@@ -4043,9 +4043,12 @@ def RuntimeImplementationInterface.runtimeShadowStateUsesFixedSortedCommitTable
     , "let object = entry.into_owned().ok_or_else(|| {"
     , "found_index.and_then(|index| self.entries.get(index).map(RuntimeObjectEntry::object))"
     , ".and_then(RuntimeObjectEntry::object_mut)"
-    -- An object keeps the digest of its sealed records, and forgets it
-    -- when it is handed out to be changed.
-    , "let held = Arc::get_mut(&mut self.object)?;\n        held.sealed_records = OnceLock::new();\n        Some(&mut held.object)"
+    -- An object keeps the digests of its sealed records and of its public
+    -- state, and forgets both when it is handed out to be changed.
+    , "let held = Arc::get_mut(&mut self.object)?;\n        held.sealed_records = OnceLock::new();\n        held.public_state = OnceLock::new();\n        held.cold = OnceLock::new();\n        Some(&mut held.object)"
+    -- A public-state snapshot takes the digest each object keeps.
+    , "if let Some(digest) = self.public_state.get() {\n            return Ok(*digest);\n        }"
+    , "if let Some(digest) = entry.object.public_state_digest(entry.object_id)?.0 {"
     , "self.objects = RuntimeObjectTable::new(next_objects.finish()?);"
     , "committed_object_ids.finish()"
     ] ∧
@@ -4084,9 +4087,12 @@ def RuntimeImplementationInterface.checkRuntimeShadowStateUsesFixedSortedCommitT
     , "let object = entry.into_owned().ok_or_else(|| {"
     , "found_index.and_then(|index| self.entries.get(index).map(RuntimeObjectEntry::object))"
     , ".and_then(RuntimeObjectEntry::object_mut)"
-    -- An object keeps the digest of its sealed records, and forgets it
-    -- when it is handed out to be changed.
-    , "let held = Arc::get_mut(&mut self.object)?;\n        held.sealed_records = OnceLock::new();\n        Some(&mut held.object)"
+    -- An object keeps the digests of its sealed records and of its public
+    -- state, and forgets both when it is handed out to be changed.
+    , "let held = Arc::get_mut(&mut self.object)?;\n        held.sealed_records = OnceLock::new();\n        held.public_state = OnceLock::new();\n        held.cold = OnceLock::new();\n        Some(&mut held.object)"
+    -- A public-state snapshot takes the digest each object keeps.
+    , "if let Some(digest) = self.public_state.get() {\n            return Ok(*digest);\n        }"
+    , "if let Some(digest) = entry.object.public_state_digest(entry.object_id)?.0 {"
     , "self.objects = RuntimeObjectTable::new(next_objects.finish()?);"
     , "committed_object_ids.finish()"
     ] &&

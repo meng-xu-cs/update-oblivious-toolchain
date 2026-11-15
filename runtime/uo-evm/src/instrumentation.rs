@@ -9,7 +9,8 @@
 //! load that no call made, and for an audit, which compares the kept witness
 //! with that decode. Every call audits its witness before and after, unless
 //! a measurement turns the audit off for its thread. The module also counts
-//! the sealed records those decodes open, which no trace records.
+//! the sealed records those decodes open, which no trace records, and the
+//! public objects whose state a public-state snapshot decodes.
 //! Diagnostics builds keep the totals, the audit switch and the count of
 //! audits per thread; other builds run the timed work as is.
 
@@ -42,6 +43,12 @@ pub struct InstrumentationTotals {
     pub storage_commit_ns: u128,
     /// Sealed records the decodes of position-map witnesses opened.
     pub witness_records_opened: u64,
+    /// Public objects whose state the public-state snapshots decoded from
+    /// storage: an object keeps the digest of its state, so those loaded or
+    /// changed since a snapshot last read them.
+    pub public_state_objects_decoded: u64,
+    /// The bytes of the JSON of the states those decodes gave.
+    pub public_state_bytes_decoded: u64,
 }
 
 #[cfg(feature = "diagnostics")]
@@ -54,6 +61,8 @@ thread_local! {
             proof_objects_ns: 0,
             storage_commit_ns: 0,
             witness_records_opened: 0,
+            public_state_objects_decoded: 0,
+            public_state_bytes_decoded: 0,
         })
     };
 }
@@ -211,6 +220,49 @@ pub(crate) fn sealed_records_digests_computed() -> u64 {
     sealed_records_digests::computed()
 }
 
+/// Record that a public-state snapshot decoded the state of object
+/// `object_id`, whose JSON is `bytes` long: a test keeps the object, and a
+/// diagnostics build adds the decode to its totals. A production build
+/// counts nothing.
+pub(crate) fn count_public_state_decode(object_id: u32, bytes: usize) {
+    record_public_state_decode(object_id);
+    add_public_state_decode(bytes);
+}
+
+/// Keep the object a test's snapshot decoded.
+#[cfg(test)]
+fn record_public_state_decode(object_id: u32) {
+    public_state_decodes::record(object_id);
+}
+
+/// A build other than a test's keeps no object.
+#[cfg(not(test))]
+fn record_public_state_decode(_object_id: u32) {}
+
+/// Add a decode to the totals of a diagnostics build.
+#[cfg(feature = "diagnostics")]
+fn add_public_state_decode(bytes: usize) {
+    TOTALS.with(|totals| {
+        let mut total = totals.get();
+        total.public_state_objects_decoded = total.public_state_objects_decoded.saturating_add(1);
+        total.public_state_bytes_decoded = total
+            .public_state_bytes_decoded
+            .saturating_add(u64::try_from(bytes).unwrap_or(u64::MAX));
+        totals.set(total);
+    });
+}
+
+/// A build without diagnostics keeps no totals.
+#[cfg(not(feature = "diagnostics"))]
+fn add_public_state_decode(_bytes: usize) {}
+
+/// The objects whose public state this thread's snapshots decoded since
+/// the last time this was asked, in the order they were decoded.
+#[cfg(test)]
+pub(crate) fn take_public_state_decodes() -> Vec<u32> {
+    public_state_decodes::take()
+}
+
 /// Record that a position-map witness opened `records` sealed records.
 #[cfg(any(test, feature = "diagnostics"))]
 pub(crate) fn count_witness_records(records: usize) {
@@ -242,5 +294,20 @@ mod sealed_records_digests {
 
     pub(super) fn computed() -> u64 {
         DIGESTS.with(std::cell::Cell::get)
+    }
+}
+
+#[cfg(test)]
+mod public_state_decodes {
+    thread_local! {
+        static DECODED: std::cell::RefCell<Vec<u32>> = const { std::cell::RefCell::new(Vec::new()) };
+    }
+
+    pub(super) fn record(object_id: u32) {
+        DECODED.with(|decoded| decoded.borrow_mut().push(object_id));
+    }
+
+    pub(super) fn take() -> Vec<u32> {
+        DECODED.with(|decoded| std::mem::take(&mut *decoded.borrow_mut()))
     }
 }

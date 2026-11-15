@@ -1166,6 +1166,7 @@
   "public_call_summary_fields_private": true,
   "public_kernel_facade_restricted_to_runtime": true,
   "public_shell_is_runtime_owned": true,
+  "public_state_digests_are_kept_per_object": true,
   "public_trace_helper_surface_checks": [
     {
       "expected_files": [

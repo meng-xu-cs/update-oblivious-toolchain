@@ -71,18 +71,23 @@ pub(in crate::runtime) fn run_public_entrypoint(
         &mut kernel,
     )?;
     runtime.commit_public_shadow(&mut kernel, &mut shadow, execution.aborted, recorder)?;
-    let public_state_transition = public_state_transition(
-        &initial_public_state,
-        shadow.candidate_public_state_hash()?,
-        &shadow.public_state_snapshot()?,
-        execution.aborted,
-    )?;
+    let candidate_public_state_hash = shadow.candidate_public_state_hash()?;
     let (runtime_kernel_machine_finish_witness, runtime_kernel_finish_bundle) =
         kernel.finish_with_machine_witness(&function.signature)?;
     runtime.replace_with_cold_public_shadow(shadow)?;
     runtime.ensure_cold_call_boundary(
         &public_object_ids,
         "after completing the call and returning to committed storage",
+    )?;
+    // The committed public state, read from the objects as the committed
+    // state holds them, as a confidential call reads it: the objects keep
+    // the digests the snapshot takes, and the next call's snapshots read
+    // none of them again.
+    let public_state_transition = public_state_transition(
+        &initial_public_state,
+        candidate_public_state_hash,
+        &runtime.public_state_snapshot()?,
+        execution.aborted,
     )?;
     Ok(RuntimeCallOutcome::from_runtime_execution(
         runtime_kernel_machine_finish_witness,
