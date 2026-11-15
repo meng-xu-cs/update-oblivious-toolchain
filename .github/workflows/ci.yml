@@ -119,8 +119,18 @@ jobs:
     # Heavy end-to-end validation. Manual or nightly only.
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 180
     steps:
+      # The validation builds the workspace in several profiles and feature
+      # sets, and the Lean checkers; with the runner's preinstalled SDKs the
+      # disk ran out before it finished (2026-11-15). None of them is used.
+      - name: Free runner disk
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /usr/local/.ghcup /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          sudo docker image prune --all --force || true
+          df -h /
       - uses: actions/checkout@v4
       - run: rustup show
       - uses: Swatinem/rust-cache@v2
