@@ -134,7 +134,10 @@ and its private-scheme counterpart, `UOToolchain/PathOramKernelPaperMain.lean`).
 Their boundary schedule leaves and re-enters the enclave around each of the
 call's ORAM accesses (`kernelOramBoundarySchedule`), whose number the program
 and its maps' schemes fix: a private-scheme ERC20Lite `transfer` at 256
-entries makes 90, its two writes reusing the presence their reads found. Those theorems keep the ORAM premise, which bundle evidence
+entries makes 90, its two writes reusing the presence their reads found.
+Which lookups reuse what an earlier lookup of their key found is a function
+of the program alone (`UOToolchain/FactReuse.lean`: `run_plan`, and
+`run_reuse_sound` for the key a reused fact was found under). Those theorems keep the ORAM premise, which bundle evidence
 discharges (see Backend Scope), and link the ORAM model's configurations to
 kernel runs through a `KernelDenotation`: every admitted configuration denotes
 an admitted run, and configurations with the same public projection denote

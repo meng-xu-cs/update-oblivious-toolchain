@@ -56,7 +56,7 @@ use generated_oram_codecs::{
 #[cfg_attr(not(any(test, feature = "diagnostics")), allow(unused_imports))]
 use generated_oram_codecs::{
     bootstrap_tree_storage, decide_pending_tree_put, refresh_tree_state_from_storage,
-    reused_tree_presence, run_tree_get, run_tree_put, tree_entries_from_storage,
+    reused_fact_presence, run_tree_get, run_tree_put, tree_entries_from_storage,
     tree_position_map_witness_leaves, tree_put_accesses, tree_shape_for_spec, TreeState,
 };
 #[allow(unused_imports)]
@@ -1189,14 +1189,15 @@ impl OramState {
         run_tree_get(self, spec, key, allocator, leaf_coins)
     }
 
-    /// The presence a write to the private scheme's tree reuses from the
-    /// call's last get of the map, and whether the reuse failed.
-    pub(crate) fn reuse_tree_presence(
+    /// The presence a lookup takes from a fact an earlier lookup of the
+    /// call found under `fact_key`, and whether the reuse failed.
+    pub(crate) fn reuse_fact_presence(
         &self,
-        last_get: &(Value, bool),
+        fact_key: &Value,
+        found: bool,
         key: &Value,
     ) -> (bool, bool) {
-        reused_tree_presence(last_get, key)
+        reused_fact_presence(fact_key, found, key)
     }
 
     /// Decide a pending write to the private scheme's tree: whether it
@@ -2543,15 +2544,28 @@ mod tests {
         use super::super::generated_oram_codecs::{
             bucket_on_leaf_path, clone_tree_node, compaction_network, expansion_network,
             for_each_bucket_on_leaf_path_leaf_to_root, odd_even_merge_sort_network,
-            tree_avl_height, tree_bootstrap_nodes, tree_get, tree_get_accesses, tree_key_lt,
-            tree_place_nodes, tree_put, tree_put_accesses, TreeAccessRecord, TreeHeader, TreeLink,
-            TreeNode, TreePathStore, TreeShape, TreeStash,
+            reused_fact_presence, tree_avl_height, tree_bootstrap_nodes, tree_get,
+            tree_get_accesses, tree_key_lt, tree_place_nodes, tree_put, tree_put_accesses,
+            TreeAccessRecord, TreeHeader, TreeLink, TreeNode, TreePathStore, TreeShape, TreeStash,
         };
         use anyhow::Result;
         use rand::{Rng, SeedableRng};
         use rand_chacha::ChaCha20Rng;
         use std::collections::BTreeMap;
         use uo_core::{ScalarType, Type, Uint256, Value};
+
+        /// A lookup that reuses a fact takes the fact's presence under the
+        /// key the fact was found under; under another key the reuse fails
+        /// and takes no presence.
+        #[test]
+        fn a_reused_fact_serves_only_its_own_key() {
+            let key = Value::Bytes32([4u8; 32]);
+            let other = Value::Bytes32([5u8; 32]);
+            assert_eq!(reused_fact_presence(&key, true, &key), (true, false));
+            assert_eq!(reused_fact_presence(&key, false, &key), (false, false));
+            assert_eq!(reused_fact_presence(&key, true, &other), (false, true));
+            assert_eq!(reused_fact_presence(&key, false, &other), (false, true));
+        }
 
         struct MemoryTreeStore {
             buckets: Vec<Box<[TreeNode]>>,

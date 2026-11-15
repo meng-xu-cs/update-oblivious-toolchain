@@ -179,28 +179,48 @@ The Lean development states more than it currently proves for Path ORAM:
   When an operation ends, each node it read takes the coin of the access that
   read it as its new leaf, every pointer to it is fixed, and the nodes return
   to the stash. A map read makes a get, and a map write a get that finds
-  whether the key is present and a put at commit. The tree is written only
-  when the call commits, so every get of a key during the call finds the
-  same presence, and a write reuses it when the program shows that the most
-  recent access to its map is a get of the same key: a key expression equal
-  to the write's, built only from variables, literals and pure operators,
-  none of whose variables is bound again in between (`uo_core::presence_reuse`).
-  Such a write makes only the put. The rule reads only the program, so which
-  writes reuse a presence is public; the compiler, `uo-check` and the Lean
-  translation checker count the accesses with it, the runtime follows it
-  from the slot program it runs and checks that the two keys are equal, and
-  the tamper suite rejects a manifest that ignores it
-  (`translation/presence_reuse_drift`). For example, in ERC20Lite's
-  `transfer`, `balances[from] = fromBalance - amount` reuses the presence the
-  declaration `fromBalance = balances[from]` found, and
-  `balances[to] = balances[to] + amount` the presence of the get in its own
-  value. The manifest counts these
+  whether the key is present and a put at commit, unless it reuses what an
+  earlier lookup of its key found (the fact reuse below): such a read makes
+  no access and such a write only the put. The manifest counts these
   node accesses as the entrypoint's ORAM accesses, and the logical-trace
   checks accept a private-scheme access with all the metadata pages or none
   (`consumeOramAccessMetadataEvents`). Every access remaps what it touches
   to a fresh leaf: on the local scheme the key, including under a masked write
   that leaves it unchanged (a write under a false predicate), on the private
   scheme every node the operation reads.
+- Fact reuse. A call writes a Path ORAM map only when it commits, so what a
+  lookup finds about the committed map, a key's value and, on the private
+  scheme, its presence, is the same at every lookup of that key during the
+  call. A lookup is a get, or on the private scheme the get a write makes.
+  It reuses the fact an earlier lookup of the same map found when the
+  program shows the two keys equal: key expressions equal as text, built
+  only from variables, literals and pure operators, none of whose variables
+  is bound again in between (`uo_core::fact_reuse`). The call's accesses to
+  other keys and its writes do not stop it, and a reused get applies the
+  call's pending writes over the fact as a made get does. The rule reads
+  only the program, so which lookups reuse a fact is public:
+  `UOToolchain/FactReuse.lean` proves that every run makes the plan's
+  lookups and reuses the plan's facts whatever its values (`run_plan`), and
+  that a reused fact was found under the lookup's key (`run_reuse_sound`).
+  The compiler, `uo-check` and the Lean translation checker count the
+  accesses with it; the runtime follows it from the slot program it runs and
+  compares the two keys in the generated codecs without a secret branch, a
+  mismatch failing the call; and the tamper suite rejects manifests that
+  ignore it (`translation/presence_reuse_drift`,
+  `translation/fact_reuse_value_drift`, `translation/fact_reuse_swap_drift`).
+  For example, in ERC20Lite's `transfer` on the private scheme,
+  `balances[from] = fromBalance - amount` reuses the presence the
+  declaration `fromBalance = balances[from]` found, and
+  `balances[to] = balances[to] + amount` the presence of the get in its own
+  value. In a swap, `x = m[a]; y = m[b]; m[a] = y; m[b] = x;`, each write
+  reuses the presence of its key's get, where the rule before Issue 48 of
+  the review, which asked the most recent access to the map to be a get of
+  the write's key, reused neither. In `require(m[k] >= a); m[k] = m[k] - a;`
+  the second get reuses the first's value on either scheme, so on the local
+  scheme the call makes two accesses instead of three. No benchmark makes
+  such a call; the test contract `benches/raw/FactReuseMap.sol` does, and
+  the runtime's tests run it on both schemes against a reference map. A
+  read and an update of one key are not fused into one access.
 - What the tree costs: ERC20Lite `transferFrom` with its `balances` map on
   the private scheme makes 90 node accesses at capacity 256 (two gets of 11
   and two puts of 34, each write reusing the presence its read found), and
@@ -720,11 +740,11 @@ implementation of the AVL map (node ids, leaves, the free list, the stash)
 is replayed against the model and run against a reference map in the
 runtime's tests, not proved; and the stash bound for operations that hold
 their nodes until they end is assumed (`stashOverflowBounded`) and measured
-over ten million node accesses, not proved. A write
-whose key the program does not show equal to a preceding get's (another key
-expression, a key read from storage, or a key variable bound again in
-between) still makes its own presence get, and the tree costs more than a
-flat position map below a few thousand entries.
+over ten million node accesses, not proved. A lookup
+whose key the program does not show equal to an earlier lookup's (another
+key expression, a key read from storage, or a key variable bound again in
+between) still makes its own accesses, and the tree costs more than a flat
+position map below a few thousand entries.
 The instrumented runtime keeps the position-map witnesses its checks
 consume and compares them with a decode of every bucket of a tree before
 and after each call, so an audited call takes time linear in the capacity

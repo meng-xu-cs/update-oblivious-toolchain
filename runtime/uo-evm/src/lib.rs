@@ -1293,6 +1293,149 @@ bounds:
         assert_eq!(read_back.return_value, Some(Value::uint(7)));
     }
 
+    /// Issue 48 of the external review: on both Path ORAM schemes a lookup of
+    /// FactReuseMap's records whose key the program shows equal to an earlier
+    /// lookup's in the call reuses what that lookup found
+    /// (`uo_core::fact_reuse`). The manifest counts the accesses with the
+    /// rule, every call makes them, the map ends as a reference map does, and
+    /// a call traces the same for other keys and values.
+    #[test]
+    fn path_oram_lookups_reuse_the_facts_earlier_lookups_found() {
+        for (metadata, tree) in [
+            (
+                include_str!(bench_raw!("FactReuseMap.pathoram.yaml")),
+                false,
+            ),
+            (
+                include_str!(bench_raw!("FactReuseMap.private-posmap.yaml")),
+                true,
+            ),
+        ] {
+            let artifact = compile_bench(bench_raw!("FactReuseMap.sol"), metadata, ProgramMode::Uo);
+            let records = artifact
+                .contract
+                .state
+                .iter()
+                .find(|object| object.name == "records")
+                .unwrap();
+            let capacity = records.capacity.unwrap();
+            let get = uo_core::manifest::oram_accesses_per_map_operation(
+                &records.oram_scheme,
+                capacity,
+                false,
+            );
+            let write = uo_core::manifest::oram_accesses_per_map_operation(
+                &records.oram_scheme,
+                capacity,
+                true,
+            );
+            let accesses = |entrypoint: &str| {
+                artifact.contract.manifest.entrypoints[entrypoint].oram_accesses[&records.id]
+            };
+            // swap makes two gets and two writes. On the private scheme each
+            // write reuses the presence the get of its key found, with an
+            // access to the other key between them; on the local scheme a
+            // write looks nothing up.
+            let swap_reuses = if tree { 2 } else { 0 };
+            assert_eq!(
+                accesses("swap(bytes32,bytes32)"),
+                2 * get + 2 * write - swap_reuses * get
+            );
+            // take's second get reuses the value its first found, on either
+            // scheme, and on the private scheme its write the presence.
+            let take_reuses = if tree { 2 } else { 1 };
+            assert_eq!(
+                accesses("take(bytes32,uint256)"),
+                2 * get + write - take_reuses * get
+            );
+
+            let key = |byte: u8| Value::Bytes32([byte; 32]);
+            let mut instance = ContractInstance::deploy_with_seed(artifact.clone(), 48).unwrap();
+            let mut reference = std::collections::BTreeMap::<u8, u64>::new();
+            let calls: [(&str, Vec<Value>); 8] = [
+                ("put(bytes32,uint256)", vec![key(1), Value::uint(5)]),
+                ("put(bytes32,uint256)", vec![key(2), Value::uint(9)]),
+                ("swap(bytes32,bytes32)", vec![key(1), key(2)]),
+                ("take(bytes32,uint256)", vec![key(1), Value::uint(4)]),
+                ("take(bytes32,uint256)", vec![key(2), Value::uint(6)]),
+                // A key not in the map: its write inserts it.
+                ("swap(bytes32,bytes32)", vec![key(1), key(3)]),
+                // One key twice: the second write, of the value first read, wins.
+                ("swap(bytes32,bytes32)", vec![key(3), key(3)]),
+                ("take(bytes32,uint256)", vec![key(3), Value::uint(5)]),
+            ];
+            for (entrypoint, args) in calls {
+                let byte = |value: &Value| match value {
+                    Value::Bytes32(bytes) => bytes[0],
+                    _ => unreachable!(),
+                };
+                let amount = |value: &Value| value.as_uint().unwrap().to_usize_saturating() as u64;
+                let expect_abort = match entrypoint {
+                    "put(bytes32,uint256)" => {
+                        reference.insert(byte(&args[0]), amount(&args[1]));
+                        false
+                    }
+                    "swap(bytes32,bytes32)" => {
+                        let (a, b) = (byte(&args[0]), byte(&args[1]));
+                        let x = reference.get(&a).copied().unwrap_or(0);
+                        let y = reference.get(&b).copied().unwrap_or(0);
+                        reference.insert(a, y);
+                        reference.insert(b, x);
+                        false
+                    }
+                    _ => {
+                        let (k, take) = (byte(&args[0]), amount(&args[1]));
+                        let held = reference.get(&k).copied().unwrap_or(0);
+                        if held >= take {
+                            reference.insert(k, held - take);
+                        }
+                        held < take
+                    }
+                };
+                let result = instance.call(entrypoint, args).unwrap();
+                assert_eq!(result.aborted, expect_abort, "{entrypoint} tree={tree}");
+                assert_eq!(
+                    result.trace.theorem_trace.boundary_schedule.len(),
+                    2 * accesses(entrypoint) + 2,
+                    "{entrypoint} tree={tree}"
+                );
+            }
+            for byte in 1..=3u8 {
+                let read = instance.call("read(bytes32)", vec![key(byte)]).unwrap();
+                assert_eq!(
+                    read.return_value,
+                    Some(Value::uint(reference.get(&byte).copied().unwrap_or(0))),
+                    "key {byte} tree={tree}"
+                );
+            }
+
+            // Which lookups reuse a fact is public: a call traces the same
+            // for other keys and values.
+            let theorem_trace = |keys: (u8, u8), values: (u64, u64), entrypoint: &str| {
+                let mut instance = ContractInstance::deploy(artifact.clone()).unwrap();
+                for (k, v) in [(keys.0, values.0), (keys.1, values.1)] {
+                    instance
+                        .call("put(bytes32,uint256)", vec![key(k), Value::uint(v)])
+                        .unwrap();
+                }
+                let args = match entrypoint {
+                    "swap(bytes32,bytes32)" => vec![key(keys.0), key(keys.1)],
+                    _ => vec![key(keys.0), Value::uint(1)],
+                };
+                let result = instance.call(entrypoint, args).unwrap();
+                assert!(!result.aborted);
+                result.trace.theorem_trace.clone()
+            };
+            for entrypoint in ["swap(bytes32,bytes32)", "take(bytes32,uint256)"] {
+                assert_eq!(
+                    theorem_trace((1, 2), (5, 9), entrypoint),
+                    theorem_trace((7, 4), (300, 1), entrypoint),
+                    "{entrypoint} tree={tree}"
+                );
+            }
+        }
+    }
+
     #[test]
     fn execution_trace_exports_refinement_witness() {
         let artifact = compile_bench(

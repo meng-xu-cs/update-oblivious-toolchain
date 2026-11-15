@@ -5544,6 +5544,85 @@ fn run_tamper_validation() -> Result<JsonValue> {
         }),
     )?);
 
+    // Fact reuse (Issue 48): a lookup reuses the fact an earlier lookup of
+    // the same key found, whatever the call did in between but bind a
+    // variable of the key. FactReuseMap's take, on the local scheme, reads
+    // records[key] in its require and again in its write's value, and the
+    // second get reuses the first's value; its swap, on the private scheme,
+    // writes records[a] and records[b] after reading both, and each write
+    // reuses the presence the get of its key found though another access
+    // comes between. A manifest that counts the reused lookups is rejected,
+    // in source and artifact alike.
+    for (scenario, metadata, entrypoint, reused, benchmark, mutation) in [
+        (
+            "translation/fact_reuse_value_drift",
+            "benches/raw/FactReuseMap.pathoram.yaml",
+            "take(bytes32,uint256)",
+            1usize,
+            "FactReuseMap/oram/take",
+            "count an access for take's second get of records, which reuses the value its first get found, in both source and artifact projections",
+        ),
+        (
+            "translation/fact_reuse_swap_drift",
+            "benches/raw/FactReuseMap.private-posmap.yaml",
+            "swap(bytes32,bytes32)",
+            2usize,
+            "FactReuseMap/oram_private_posmap/swap",
+            "count a presence get for each of swap's two records writes, which reuse the presence the gets of their keys found with another access between, in both source and artifact projections",
+        ),
+    ] {
+        let mut fact_reuse_drift =
+            compile_artifact("benches/raw/FactReuseMap.sol", metadata, ProgramMode::Uo)?;
+        let records = fact_reuse_drift
+            .contract
+            .state
+            .iter()
+            .find(|object| object.name == "records")
+            .cloned()
+            .ok_or_else(|| anyhow!("fact-reuse tamper scenario missing records"))?;
+        let per_lookup = uo_core::manifest::oram_accesses_per_map_operation(
+            &records.oram_scheme,
+            records.capacity.unwrap_or(0),
+            false,
+        );
+        let records_accesses = fact_reuse_drift
+            .contract
+            .manifest
+            .entrypoints
+            .get_mut(entrypoint)
+            .ok_or_else(|| anyhow!("fact-reuse tamper scenario missing {entrypoint}"))?
+            .oram_accesses
+            .get_mut(&records.id)
+            .ok_or_else(|| anyhow!("fact-reuse tamper scenario missing records accesses"))?;
+        let reused_count = *records_accesses;
+        *records_accesses += reused * per_lookup;
+        let unreused_count = *records_accesses;
+        scenarios.push(validate_tampered_json_pair_case(
+            scenario,
+            "source_artifact",
+            &fact_reuse_drift,
+            "artifact",
+            &fact_reuse_drift,
+            |source_artifact_path, artifact_path| {
+                Ok(Command::new(&translation_checker)
+                    .arg("FactReuseMap")
+                    .arg(source_artifact_path)
+                    .arg(artifact_path)
+                    .output()?)
+            },
+            json!({
+                "scenario": scenario,
+                "artifact_kind": "proofgrade_translation_artifacts",
+                "benchmark": benchmark,
+                "entrypoint": entrypoint,
+                "object_id": records.id,
+                "manifest_accesses": reused_count,
+                "tampered_accesses": unreused_count,
+                "mutation": mutation,
+            }),
+        )?);
+    }
+
     // Runtime admission: flipping a confidential UO target to public while
     // leaving a UO backend is rejected before execution by the runtime (Issue
     // 08), independent of the compiler/Lean confidential-object checks.

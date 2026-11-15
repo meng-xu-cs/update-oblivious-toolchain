@@ -72,6 +72,16 @@
       "ok": true
     },
     {
+      "detail": "doc_anchor \"UOToolchain/FactReuse.lean\" for path-oram-fact-reuse-plan appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:path-oram-fact-reuse-plan",
+      "ok": true
+    },
+    {
+      "detail": "path-oram-fact-reuse-plan declares an allowed status (Lean-proved)",
+      "name": "status-allowed:path-oram-fact-reuse-plan",
+      "ok": true
+    },
+    {
       "detail": "doc_anchor \"tape_substitution_full.json\" for path-oram-tape-substitution-tested appears in docs/claim-boundary.md",
       "name": "anchor-in-doc:path-oram-tape-substitution-tested",
       "ok": true
@@ -517,7 +527,7 @@
       "ok": true
     },
     {
-      "detail": "14 manifest entries in category claim",
+      "detail": "15 manifest entries in category claim",
       "name": "category-present:claim",
       "ok": true
     },
@@ -744,6 +754,31 @@
     {
       "detail": "artifact runtime/uo-evm/src/generated_oram_codecs.rs referenced by path-oram-private-avl-map-semantics exists",
       "name": "file-exists:path-oram-private-avl-map-semantics:runtime/uo-evm/src/generated_oram_codecs.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact crates/uo-core/src/fact_reuse.rs referenced by path-oram-fact-reuse-plan exists",
+      "name": "file-exists:path-oram-fact-reuse-plan:crates/uo-core/src/fact_reuse.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact proof/lean/UOToolchain/FactReuse.lean referenced by path-oram-fact-reuse-plan exists",
+      "name": "file-exists:path-oram-fact-reuse-plan:proof/lean/UOToolchain/FactReuse.lean",
+      "ok": true
+    },
+    {
+      "detail": "artifact proof/lean/UOToolchain/TranslationValidationJson.lean referenced by path-oram-fact-reuse-plan exists",
+      "name": "file-exists:path-oram-fact-reuse-plan:proof/lean/UOToolchain/TranslationValidationJson.lean",
+      "ok": true
+    },
+    {
+      "detail": "artifact runtime/uo-evm/src/objects.rs referenced by path-oram-fact-reuse-plan exists",
+      "name": "file-exists:path-oram-fact-reuse-plan:runtime/uo-evm/src/objects.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact compiler/uo-solc/src/lib.rs referenced by path-oram-fact-reuse-plan exists",
+      "name": "file-exists:path-oram-fact-reuse-plan:compiler/uo-solc/src/lib.rs",
       "ok": true
     },
     {
@@ -1122,7 +1157,7 @@
       "ok": true
     }
   ],
-  "claim_count": 39,
+  "claim_count": 40,
   "claims": [
     {
       "category": "claim",
@@ -1172,6 +1207,13 @@
       "status": "Lean-proved",
       "text": "The private scheme's AVL map algorithm, modeled over inductive trees with the runtime's walk, successor delete, rotation rule and node-access counts, implements a finite map: with the walk bounded by the capacity's largest AVL height, a get returns the key's value and a put writes, updates or deletes it, keeps the tree sorted, balanced and within the capacity, and overflows exactly when it would insert into a full map; the runtime's tree_get and tree_put are replayed against the model, not proved to follow it.",
       "validation_command": "cargo run -q -p mplus-probe -- --only path-oram-avl-map-replay --out-dir results"
+    },
+    {
+      "category": "claim",
+      "id": "path-oram-fact-reuse-plan",
+      "status": "Lean-proved",
+      "text": "Which lookups of a Path ORAM map in a call reuse the fact an earlier lookup of the same key found, a value or on the private scheme a presence, is a function of the program: over a straight-line body's events every run makes the plan's lookups and reuses the plan's facts, whatever the values of its variables and of what it binds, and every lookup that reuses a fact has, in every run, the key the fact was found under. That the compiler, uo-check, the Lean translation checker and the runtime follow the plan is checked by the translation checker, the runtime's tests and the tamper suite, not proved of the Rust code.",
+      "validation_command": "cargo test -p uo-core fact_reuse"
     },
     {
       "category": "claim",
@@ -1402,7 +1444,7 @@
   "schema": "uo.claim_status.v1",
   "source_of_truth": "docs/claim-boundary.md",
   "status_counts": {
-    "Lean-proved": 5,
+    "Lean-proved": 6,
     "empirically-tested": 3,
     "experimental": 1,
     "generated-and-checked": 4,

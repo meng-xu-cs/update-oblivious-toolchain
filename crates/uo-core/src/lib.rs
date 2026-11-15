@@ -1,6 +1,7 @@
 pub mod artifact;
 pub mod confidential_core;
 pub mod confidential_kernel;
+pub mod fact_reuse;
 pub mod fixed_buffer;
 pub mod fragment;
 pub mod ir;
@@ -8,7 +9,6 @@ pub mod kernel_dsl;
 pub mod manifest;
 pub mod metadata;
 pub mod observer_coverage;
-pub mod presence_reuse;
 pub mod runtime_boundary_schema;
 pub mod scaling;
 pub mod shell_boundary;

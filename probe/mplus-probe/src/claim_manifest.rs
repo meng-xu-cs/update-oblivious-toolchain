@@ -189,6 +189,24 @@ const CLAIM_ENTRIES: &[ClaimEntry] = &[
         validation_command: "cargo run -q -p mplus-probe -- --only path-oram-avl-map-replay --out-dir results",
     },
     ClaimEntry {
+        id: "path-oram-fact-reuse-plan",
+        category: "claim",
+        text: "Which lookups of a Path ORAM map in a call reuse the fact an earlier lookup of the same key found, a value or on the private scheme a presence, is a function of the program: over a straight-line body's events every run makes the plan's lookups and reuses the plan's facts, whatever the values of its variables and of what it binds, and every lookup that reuses a fact has, in every run, the key the fact was found under. That the compiler, uo-check, the Lean translation checker and the runtime follow the plan is checked by the translation checker, the runtime's tests and the tamper suite, not proved of the Rust code.",
+        status: STATUS_LEAN_PROVED,
+        doc_anchor: "UOToolchain/FactReuse.lean",
+        source_files: &["crates/uo-core/src/fact_reuse.rs"],
+        lean_modules: &[
+            "proof/lean/UOToolchain/FactReuse.lean",
+            "proof/lean/UOToolchain/TranslationValidationJson.lean",
+        ],
+        runtime_compiler_files: &[
+            "runtime/uo-evm/src/objects.rs",
+            "compiler/uo-solc/src/lib.rs",
+        ],
+        benchmark_result_files: &["results/tamper_validation.json"],
+        validation_command: "cargo test -p uo-core fact_reuse",
+    },
+    ClaimEntry {
         id: "path-oram-tape-substitution-tested",
         category: "claim",
         text: "That a runtime run of a call on another tape is the representative run with that tape's leaves substituted, which the tape-family theorems take from one runtime run, is tested and not proved of the Rust runtime: on maps of both Path ORAM schemes at three capacities each, calls of seven kinds (a read that hits, one that misses, an insert, an overwrite, a delete, a delete of an absent key and a write that aborts), each after a setup with deletes and aborts, run on 16 other deployment seeds each, and the Lean checker finds every one of the 1,344 runs equal to the substituted run.",

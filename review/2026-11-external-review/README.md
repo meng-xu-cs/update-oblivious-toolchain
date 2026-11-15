@@ -57,13 +57,15 @@ validation and the capacity sweep.
 
 ## Decisions
 
-Issue 22 has the options and the reasoning.
+Issue 22 has the options and the reasoning for D1 to D3, and Issue 48 for
+D4.
 
 | Decision | Status | Outcome |
 | --- | --- | --- |
 | D1, the unit the storage observer classifies | decided 2026-11-12 | the 32-byte word, as an EVM `SSTORE` classifies it; the unit size stays a parameter of the codec's Lean statement |
 | D2, where private evidence may go | decided 2026-11-12 | position maps and leaf schedules do not leave the runtime: a production build exports no private evidence, and only the diagnostics build exports it, to the Lean checkers |
 | D3, the lifetime budget of the stash bound | decided 2026-11-12 | a cap of 152: at most `2^-60` over `2^48` node accesses of a map |
+| D4, what Issue 48 builds | decided 2026-11-15 | fact reuse alone: a lookup reuses what an earlier lookup of its key found; a read and an update of one key are not fused into one access |
 
 ## Order of Work
 
@@ -111,7 +113,10 @@ Issue 22 has the options and the reasoning.
    and planner rest on what the sweep measures, so they come after the two
    issues that change it. Issue 47 is done: a node access evicts through
    fixed networks, with every block where it was, and in a control a tree
-   call's own work is 2.1 to 2.4 times faster.
+   call's own work is 2.1 to 2.4 times faster. Issue 48 is done: a lookup
+   of a Path ORAM map reuses what an earlier lookup of its key found, and
+   Lean proves that which lookups do is a function of the program; no
+   benchmark's counts move.
 
 The research issues (43 to 46) start once the issues they depend on are
 done. Issue 50 is deferred, and the folding of this directory into the
@@ -151,7 +156,7 @@ its engineering part is Wave 4, its certified part is research.
 | 45 | State security over call histories with a quantified bound | research | R | 24, 39, 40 | todo | |
 | 46 | Prove that the runtime's run on every tape is the substituted run | research | R | 42 | todo | |
 | 47 | Try an oblivious routing network for tree eviction | 8 | M | 27 | done | `ba0b958` |
-| 48 | Fuse scans and generalize the reuse analysis | 8 | M | 31, 32 | todo | |
+| 48 | Fuse scans and generalize the reuse analysis | 8 | M | 31, 32 | done | |
 | 49 | Write the related-work boundary and add matched baselines | 8 | M | 27 | todo | |
 | 50 | Bridge a scoped subset to Solidity 0.8 semantics | backlog | L | | deferred | |
 | 51 | Remove the generator that a seal no longer reads | 7 | S to M | 24 | done | `48915bb` |

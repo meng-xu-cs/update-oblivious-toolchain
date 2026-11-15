@@ -1643,6 +1643,48 @@ the same key, and a version-aware analysis that generalizes
 accesses. Each transformation is accepted only with a Lean statement that
 the optimized schedule is still a function of the program.
 
+**As built.** The maintainer chose the reuse analysis alone (D4): a read
+and an update of one key are not fused into one checked operation. A lookup
+of a Path ORAM map is a get or, on the private scheme, the get a write makes
+to find whether its key is present. `uo_core::fact_reuse` replaces
+`uo_core::presence_reuse`: a lookup reuses the fact an earlier lookup of the
+same map found, the key's value and presence, when the two key expressions
+are equal as text, built only from variables, literals and pure operators,
+none of whose variables is bound again in between. A call writes the map
+only at commit, so the facts survive its writes and its accesses to other
+keys; a lookup takes the latest fact that serves it, and a reused get
+applies the call's pending writes over it as a made get does. The old rule
+asked the map's most recent access to be a get of the write's key, and
+reused presences alone, for writes on the private scheme.
+
+`UOToolchain/FactReuse.lean` states the plan over a straight-line body's
+events and proves two things of it. `run_plan`: every run makes the plan's
+lookups and reuses the plan's facts, whatever the values of its variables
+and of what it binds, so the schedule of a call's accesses is a function of
+the program (`run_schedule_independent` for two runs). `run_reuse_sound`: a
+lookup that reuses a fact has, in every run, the key the fact was found
+under, so it returns what a fresh lookup would. The Lean translation
+checker counts accesses with the plan (`FactReuse.reuseCount`), as the
+compiler and `uo-check` do with `fact_reuses`, and the claim manifest lists
+the two theorems (`path-oram-fact-reuse-plan`). The runtime installs each
+map's plan from the slot program it runs, keeps what each made lookup found
+until the call ends, and compares a reusing lookup's key with the fact's in
+the generated codecs without a secret branch (`reused_fact_presence`), a
+mismatch failing the call as a failed node access does.
+
+No benchmark makes a lookup that the new rule reuses and the old did not,
+so their counts and results are unchanged but for provenance. A test
+contract, `benches/raw/FactReuseMap.sol`, makes such lookups: its `swap` on
+the private scheme saves two gets (8h + 2 node accesses instead of
+10h + 2), and its `take` one access on the local scheme (two instead of
+three) and two gets on the private scheme. The runtime's tests run it on
+both schemes against a reference map, check every call's accesses against
+the manifest, and compare its traces across keys and values. Two tamper
+scenarios give the manifest the counts without the reuse,
+`translation/fact_reuse_value_drift` (`take`, local scheme) and
+`translation/fact_reuse_swap_drift` (`swap`, private scheme), and the Lean
+checker rejects both (428 scenarios in all).
+
 ### Issue 49 — Write the related-work boundary and add matched baselines
 
 Source: F9 (§9, §10). Size: M. Depends on: Issue 27.

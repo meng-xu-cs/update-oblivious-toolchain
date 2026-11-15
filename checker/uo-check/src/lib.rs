@@ -296,7 +296,7 @@ pub fn check_artifact(artifact: &CompiledArtifact) -> Result<Vec<String>> {
         )?;
         let mut expected_accesses = count_oram_accesses(&function.body, &artifact.contract.state)?;
         if function.confidential {
-            apply_tree_presence_reuse(
+            apply_fact_reuse(
                 &function.body,
                 &artifact.contract.state,
                 &mut expected_accesses,
@@ -1249,32 +1249,35 @@ fn collect_accessed_object_ids_expr(expr: &Expr, accessed: &mut BTreeSet<u32>) -
     }
 }
 
-/// A write to a private-scheme map that reuses the presence a preceding get
-/// of the same key found makes no presence get (`uo_core::presence_reuse`).
-fn apply_tree_presence_reuse(
+/// A lookup of a Path ORAM map that reuses the fact an earlier lookup of the
+/// same key found makes no ORAM access (`uo_core::fact_reuse`).
+fn apply_fact_reuse(
     body: &[Statement],
     state: &[StateObject],
     counts: &mut BTreeMap<u32, usize>,
 ) -> Result<()> {
-    let is_tree = |object_id: u32| {
-        state.iter().any(|object| {
-            object.id == object_id
-                && object.backend == BackendKind::Oram
-                && object.oram_scheme == uo_core::PATH_ORAM_PRIVATE_POSMAP_SCHEME
-        })
+    let scheme = |object_id: u32| {
+        state
+            .iter()
+            .find(|object| object.id == object_id)
+            .and_then(uo_core::fact_reuse::lookup_scheme)
     };
-    for (object_id, reuses) in uo_core::presence_reuse::tree_presence_reuses(body, &is_tree) {
+    for (object_id, reuses) in uo_core::fact_reuse::fact_reuses(body, &scheme) {
         let Some(object) = state.iter().find(|object| object.id == object_id) else {
-            bail!("presence reuse on unknown object {object_id}");
+            bail!("fact reuse on unknown object {object_id}");
         };
-        let saved =
-            reuses * uo_core::manifest::path_oram_tree_get_accesses(object.capacity.unwrap_or(0));
+        let saved = reuses
+            * uo_core::manifest::oram_accesses_per_map_operation(
+                &object.oram_scheme,
+                object.capacity.unwrap_or(0),
+                false,
+            );
         let Some(count) = counts.get_mut(&object_id) else {
-            bail!("presence reuse on {} without ORAM accesses", object.name);
+            bail!("fact reuse on {} without ORAM accesses", object.name);
         };
         let Some(reduced) = count.checked_sub(saved) else {
             bail!(
-                "presence reuse on {} saves more accesses than its writes make",
+                "fact reuse on {} saves more accesses than its lookups make",
                 object.name
             );
         };

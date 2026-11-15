@@ -433,21 +433,53 @@ pub(crate) struct OramMapObject {
     // the call return.
     pending_view: Option<Box<[MapEntry]>>,
     pending_puts: Vec<PendingOramPut>,
-    // The private scheme: whether each of the call's writes, in order, reuses
-    // the presence the preceding get of its key found (public, from the
-    // program), the next write's index, and the last get's key and presence.
-    presence_plan: Box<[bool]>,
-    next_put: usize,
-    last_get: Option<(Value, bool)>,
+    // Path ORAM schemes: for each of the call's lookups of the map, in order,
+    // the made lookup whose fact it reuses, or none (`uo_core::fact_reuse`:
+    // public, from the program); the next lookup's index; and what each made
+    // lookup found about the committed map.
+    fact_plan: Box<[Option<usize>]>,
+    next_lookup: usize,
+    facts: Vec<OramFact>,
+}
+
+/// What a made lookup of a Path ORAM map found about the committed map: the
+/// key, its value and whether it is present. The map is written only at
+/// commit, so a later lookup of the same key in the call would find the same.
+/// The map's object holds its facts, as it holds the call's pending writes,
+/// until the call ends.
+#[derive(Debug)]
+struct OramFact {
+    key: Value,
+    value: Value,
+    found: bool,
 }
 
 impl OramMapObject {
     fn clear_pending(&mut self) {
         self.pending_view = None;
         self.pending_puts.clear();
-        self.presence_plan = Box::default();
-        self.next_put = 0;
-        self.last_get = None;
+        self.fact_plan = Box::default();
+        self.next_lookup = 0;
+        self.facts.clear();
+    }
+
+    /// The plan's word on the call's next lookup of the map: the made lookup
+    /// whose fact it reuses, or none, when it is made. Without a plan, every
+    /// lookup is made.
+    fn next_lookup_reuse(&mut self) -> Option<usize> {
+        let reuse = self.fact_plan.get(self.next_lookup).copied().flatten();
+        self.next_lookup += 1;
+        reuse
+    }
+
+    /// The fact the `index`-th made lookup of the call found.
+    fn reused_fact(&self, index: usize) -> Result<&OramFact> {
+        self.facts.get(index).ok_or_else(|| {
+            anyhow!(
+                "lookup of {} reuses a fact that no lookup found",
+                self.spec.name
+            )
+        })
     }
 
     fn wipe_secrets(&mut self) {
@@ -664,9 +696,9 @@ impl RuntimeObject {
                     leaf_coin_seed,
                     pending_view: None,
                     pending_puts: Vec::new(),
-                    presence_plan: Box::default(),
-                    next_put: 0,
-                    last_get: None,
+                    fact_plan: Box::default(),
+                    next_lookup: 0,
+                    facts: Vec::new(),
                 }))
             }
         }
@@ -872,9 +904,9 @@ impl RuntimeObject {
                 leaf_coin_source: PathOramLeafCoinSource::from_domain_seed(&object.leaf_coin_seed),
                 pending_view: None,
                 pending_puts: Vec::with_capacity(object.oram.parameters().accesses_per_call),
-                presence_plan: Box::default(),
-                next_put: 0,
-                last_get: None,
+                fact_plan: Box::default(),
+                next_lookup: 0,
+                facts: Vec::new(),
             })),
         }
     }
@@ -1311,32 +1343,75 @@ impl RuntimeObject {
             Self::UoOramMap(object) if object.oram.is_tree() => {
                 object.accessed = true;
                 // A get on the private scheme's tree: one ORAM access per
-                // node access.
-                let (value, found, transcripts, update_failed) = object.oram.tree_get(
-                    &object.spec,
-                    key,
-                    allocator,
-                    &mut object.leaf_coin_source,
-                )?;
-                record_tree_transcripts(trace, &object.spec, &object.oram, transcripts)?;
-                // A later write of the same key may reuse the presence.
-                object.last_get = Some((key.clone(), found));
+                // node access, unless the program shows that an earlier
+                // lookup of the call had the same key (`uo_core::fact_reuse`):
+                // the tree is written only at commit, so the get takes the
+                // value that lookup found. The keys are compared, and a
+                // mismatch fails the get as a failed node access does.
+                let (value, update_failed) = match object.next_lookup_reuse() {
+                    Some(index) => {
+                        let fact = object.reused_fact(index)?;
+                        let (_, mismatch) =
+                            object.oram.reuse_fact_presence(&fact.key, fact.found, key);
+                        (fact.value.clone(), mismatch)
+                    }
+                    None => {
+                        let (value, found, transcripts, update_failed) = object.oram.tree_get(
+                            &object.spec,
+                            key,
+                            allocator,
+                            &mut object.leaf_coin_source,
+                        )?;
+                        record_tree_transcripts(trace, &object.spec, &object.oram, transcripts)?;
+                        object.facts.push(OramFact {
+                            key: key.clone(),
+                            value: value.clone(),
+                            found,
+                        });
+                        (value, update_failed)
+                    }
+                };
                 let value = select_pending_put_value(&object.pending_puts, key, value)?;
                 Ok((value, update_failed))
             }
             Self::UoOramMap(object) => {
                 object.accessed = true;
-                trace.record_oram_access(object.spec.id, object.oram.parameters());
-                let (value, transcript, update_failed) =
-                    object
-                        .oram
-                        .get(&object.spec, key, allocator, &mut object.leaf_coin_source)?;
-                record_oram_transcript(
-                    trace,
-                    &object.spec,
-                    object.oram.path_bucket_count(),
-                    transcript,
-                )?;
+                // A get on the local scheme is one ORAM access, unless the
+                // program shows that an earlier get of the call had the same
+                // key (`uo_core::fact_reuse`): the map is written only at
+                // commit, so the get takes the value that get found. The keys
+                // are compared, and a mismatch fails the get.
+                let (value, update_failed) = match object.next_lookup_reuse() {
+                    Some(index) => {
+                        let fact = object.reused_fact(index)?;
+                        let (_, mismatch) =
+                            object.oram.reuse_fact_presence(&fact.key, fact.found, key);
+                        (fact.value.clone(), mismatch)
+                    }
+                    None => {
+                        trace.record_oram_access(object.spec.id, object.oram.parameters());
+                        let (value, transcript, update_failed) = object.oram.get(
+                            &object.spec,
+                            key,
+                            allocator,
+                            &mut object.leaf_coin_source,
+                        )?;
+                        record_oram_transcript(
+                            trace,
+                            &object.spec,
+                            object.oram.path_bucket_count(),
+                            transcript,
+                        )?;
+                        if is_path_oram_scheme(&object.spec.oram_scheme) {
+                            object.facts.push(OramFact {
+                                key: key.clone(),
+                                value: value.clone(),
+                                found: false,
+                            });
+                        }
+                        (value, update_failed)
+                    }
+                };
                 // Writes earlier in the call reach the ORAM at commit; until
                 // then a read of a key the call wrote takes the last write's
                 // value.
@@ -1386,39 +1461,36 @@ impl RuntimeObject {
             Self::UoOramMap(object) if object.oram.is_tree() => {
                 object.accessed = true;
                 // A write to the private scheme's tree reaches it at commit,
-                // as one put. Here a get finds whether the key is present,
+                // as one put. Here a lookup finds whether the key is present,
                 // and the map's pending size decides whether the write
                 // overflows the map. The tree is not written before the call
-                // commits, so a write that the program shows to follow a get
-                // of the same key reuses that get's presence instead
-                // (`uo_core::presence_reuse`); which writes do is public.
-                let reuses = object
-                    .presence_plan
-                    .get(object.next_put)
-                    .copied()
-                    .unwrap_or(false);
-                object.next_put += 1;
-                let (found, update_failed) = if reuses {
-                    let Some(last_get) = object.last_get.take() else {
-                        bail!(
-                            "write to {} reuses a presence that no get found",
-                            object.spec.name
-                        );
-                    };
-                    // The program makes the keys equal; a mismatch fails the
-                    // write.
-                    object.oram.reuse_tree_presence(&last_get, &key)
-                } else {
-                    let (_value, found, transcripts, update_failed) = object.oram.tree_get(
-                        &object.spec,
-                        &key,
-                        allocator,
-                        &mut object.leaf_coin_source,
-                    )?;
-                    record_tree_transcripts(trace, &object.spec, &object.oram, transcripts)?;
-                    (found, update_failed)
+                // commits, so a write that the program shows to have the key
+                // of an earlier lookup of the call reuses that lookup's
+                // presence instead (`uo_core::fact_reuse`); which writes do is
+                // public.
+                let (found, update_failed) = match object.next_lookup_reuse() {
+                    Some(index) => {
+                        let fact = object.reused_fact(index)?;
+                        // The program makes the keys equal; a mismatch fails
+                        // the write.
+                        object.oram.reuse_fact_presence(&fact.key, fact.found, &key)
+                    }
+                    None => {
+                        let (value, found, transcripts, update_failed) = object.oram.tree_get(
+                            &object.spec,
+                            &key,
+                            allocator,
+                            &mut object.leaf_coin_source,
+                        )?;
+                        record_tree_transcripts(trace, &object.spec, &object.oram, transcripts)?;
+                        object.facts.push(OramFact {
+                            key: key.clone(),
+                            value,
+                            found,
+                        });
+                        (found, update_failed)
+                    }
                 };
-                object.last_get = None;
                 let capacity_overflowed = object.oram.decide_pending_tree_put(
                     &object.spec,
                     &object.pending_puts,
@@ -1899,27 +1971,39 @@ impl RuntimeObject {
         }
     }
 
-    /// Whether the object is a map on the private Path ORAM scheme.
-    pub(in crate::runtime) fn is_private_scheme_map(&self) -> bool {
-        matches!(self, Self::UoOramMap(object) if object.oram.is_tree())
-    }
-
-    /// Install a private-scheme map's presence-reuse plan for the call:
-    /// whether each of its writes, in order, reuses the presence the
-    /// preceding get of its key found.
-    pub(in crate::runtime) fn install_presence_reuse_plan(
-        &mut self,
-        plan: Box<[bool]>,
-    ) -> Result<()> {
+    /// How the object's map operations look the map up, for the fact-reuse
+    /// plan: a Path ORAM map's gets, and on the private scheme its writes'
+    /// presence gets.
+    pub(in crate::runtime) fn fact_lookup_scheme(
+        &self,
+    ) -> Option<uo_core::fact_reuse::LookupScheme> {
         match self {
             Self::UoOramMap(object) if object.oram.is_tree() => {
-                object.presence_plan = plan;
-                object.next_put = 0;
-                object.last_get = None;
+                Some(uo_core::fact_reuse::LookupScheme::Tree)
+            }
+            Self::UoOramMap(object) if is_path_oram_scheme(&object.spec.oram_scheme) => {
+                Some(uo_core::fact_reuse::LookupScheme::Local)
+            }
+            _ => None,
+        }
+    }
+
+    /// Install a Path ORAM map's fact-reuse plan for the call: for each of
+    /// its lookups, in order, the made lookup whose fact it reuses, or none.
+    pub(in crate::runtime) fn install_fact_reuse_plan(
+        &mut self,
+        plan: Box<[Option<usize>]>,
+    ) -> Result<()> {
+        let looks_up = self.fact_lookup_scheme().is_some();
+        match self {
+            Self::UoOramMap(object) if looks_up => {
+                object.fact_plan = plan;
+                object.next_lookup = 0;
+                object.facts.clear();
                 Ok(())
             }
-            _ if plan.iter().all(|reuses| !reuses) => Ok(()),
-            _ => bail!("{} is not a private-scheme map", self.name()),
+            _ if plan.iter().all(Option::is_none) => Ok(()),
+            _ => bail!("{} is not a Path ORAM map", self.name()),
         }
     }
 

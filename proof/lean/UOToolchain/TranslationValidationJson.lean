@@ -1,6 +1,7 @@
 import Lean.Data.Json
 import UOToolchain.RuntimeKernelDslJson
 import UOToolchain.PathOramTreeShape
+import UOToolchain.FactReuse
 import UOToolchain.RuntimeValueOpsSemantics
 
 open Lean
@@ -1891,15 +1892,17 @@ def countOramAccessesInBodyStrings
     pure <| mergePairCounts acc
       (← collectOramStatementAccesses (← parseJsonString item) state)
 
-/-! ### Presence reuse
+/-! ### Fact reuse
 
-A write to a private-scheme map makes a get that finds whether its key is
-present, unless it reuses the presence a preceding get of the same key found
-(`uo_core::presence_reuse`): the most recent access to the map is a get under
-a key expression equal to the write's, built only from variables, literals and
-pure operators, none of whose variables is bound again in between. The tree is
-written only when the call commits, so both gets find the same presence. The
-rule applies to a confidential entrypoint's linearized, straight-line body. -/
+A lookup of a Path ORAM map, a get or, on the private scheme, the get a write
+makes to find whether its key is present, makes no ORAM access when it reuses
+the fact an earlier lookup of the same map found (`uo_core::fact_reuse`): an
+earlier lookup under a key expression equal to its own, built only from
+variables, literals and pure operators, none of whose variables is bound again
+in between. The map is written only when the call commits, so both find the
+same. The rule applies to a confidential entrypoint's linearized,
+straight-line body, and `UOToolchain.FactReuse` states it and proves it sound
+(`run_plan`, `run_reuse_sound`). -/
 
 /-- One step of a straight-line body, in evaluation order: a get or a write of
 a map, under a key the rule can compare (its JSON text and its variables) or
@@ -2023,33 +2026,42 @@ private def presenceBodyEvents (body : List String) :
         | none => pure none
         | some more => pure (some (events ++ more))
 
-/-- How many writes to each map `isTree` selects reuse a presence. -/
-def presenceReuseCounts (isTree : Nat → Bool) (events : List PresenceEvent) :
-    List (Nat × Nat) :=
-  let step := fun (state : List (Nat × String × List String) × List (Nat × Nat))
-      (event : PresenceEvent) =>
-    let lastGet := state.1
-    let counts := state.2
-    let forget := fun (objectId : Nat) => lastGet.filter (fun entry => entry.1 != objectId)
-    match event with
-    | .get objectId (some (text, vars)) => ((objectId, text, vars) :: forget objectId, counts)
-    | .get objectId none => (forget objectId, counts)
-    | .put objectId key =>
-        let reuses :=
-          isTree objectId &&
-            match key, lastGet.find? (fun entry => entry.1 == objectId) with
-            | some (text, _), some (_, lastText, _) => text == lastText
-            | _, _ => false
-        (forget objectId, if reuses then addPairCount objectId 1 counts else counts)
-    | .bind var => (lastGet.filter (fun entry => !entry.2.2.contains var), counts)
-  (events.foldl step ([], [])).2
+/-- How a map's operations look it up (`uo_core::fact_reuse::LookupScheme`):
+a local-scheme map's gets, and a private-scheme map's gets and writes. -/
+inductive FactLookupScheme where
+  | localPosmap
+  | tree
+deriving DecidableEq
 
-private def isPrivateSchemeObject
-  (state : List ImportedProofRelevantStateObjectView) (objectId : Nat) : Bool :=
+/-- How a state object is looked up, if it is a Path ORAM map
+(`uo_core::fact_reuse::lookup_scheme`). -/
+private def factLookupScheme
+  (state : List ImportedProofRelevantStateObjectView) (objectId : Nat) :
+  Option FactLookupScheme :=
   match stateObjectById? state objectId with
   | some object =>
-      object.backend == "oram" && object.oram_scheme == translationPathOramPrivatePosmapScheme
-  | none => false
+      if object.kind == "map" && object.backend == "oram" then
+        if object.oram_scheme == translationPathOramPrivatePosmapScheme then
+          some .tree
+        else if object.oram_scheme == translationPathOramScheme then
+          some .localPosmap
+        else
+          none
+      else
+        none
+  | none => none
+
+/-- The lookups and binds among a body's events: a get of a Path ORAM map, and
+a write to a private-scheme map, look the map up. -/
+def factReuseEvents (scheme : Nat → Option FactLookupScheme) (events : List PresenceEvent) :
+    List UOToolchain.FactReuse.Event :=
+  let factKey := fun (key : Option (String × List String)) =>
+    key.map fun entry => ({ text := entry.1, vars := entry.2 } : UOToolchain.FactReuse.FactKey)
+  events.filterMap fun
+    | .get objectId key => (scheme objectId).map fun _ => .lookup objectId (factKey key)
+    | .put objectId key =>
+        if scheme objectId == some .tree then some (.lookup objectId (factKey key)) else none
+    | .bind var => some (.bind var)
 
 private def subtractPairCount (objectId delta : Nat) : List (Nat × Nat) → List (Nat × Nat)
   | [] => []
@@ -2060,8 +2072,9 @@ private def subtractPairCount (objectId delta : Nat) : List (Nat × Nat) → Lis
         (currentId, currentCount) :: subtractPairCount objectId delta rest
 
 /-- A function's ORAM accesses: those of its body's map operations, less, for
-a confidential entrypoint, a get's node accesses for each write to a
-private-scheme map that reuses a preceding get's presence. -/
+a confidential entrypoint, a lookup's accesses for each lookup of a Path ORAM
+map that reuses a fact (`UOToolchain.FactReuse.reuseCount`): a get's node
+accesses on the private scheme, and one access on the local scheme. -/
 def countFunctionOramAccesses
   (fn : ImportedProofRelevantFunctionView)
   (state : List ImportedProofRelevantStateObjectView) :
@@ -2072,14 +2085,26 @@ def countFunctionOramAccesses
   match ← presenceBodyEvents fn.body with
   | none => pure base
   | some events =>
-      (presenceReuseCounts (isPrivateSchemeObject state) events).foldlM (init := base)
-        fun acc entry => do
-          let capacity := ((stateObjectById? state entry.1).bind (·.capacity)).getD 0
-          let saved := entry.2 * pathOramTreeGetAccesses capacity
-          if saved ≤ lookupPairCount entry.1 acc then
-            pure (subtractPairCount entry.1 saved acc)
+      let lookups := factReuseEvents (factLookupScheme state) events
+      let objectIds := (lookups.filterMap fun
+        | .lookup objectId _ => some objectId
+        | .bind _ => none).eraseDups
+      objectIds.foldlM (init := base) fun acc objectId => do
+        let reuses := UOToolchain.FactReuse.reuseCount lookups objectId
+        if reuses == 0 then
+          pure acc
+        else
+          let capacity := ((stateObjectById? state objectId).bind (·.capacity)).getD 0
+          let perLookup :=
+            if factLookupScheme state objectId == some .tree then
+              pathOramTreeGetAccesses capacity
+            else
+              1
+          let saved := reuses * perLookup
+          if saved ≤ lookupPairCount objectId acc then
+            pure (subtractPairCount objectId saved acc)
           else
-            throw s!"presence reuse on object {entry.1} saves more accesses than its writes make"
+            throw s!"fact reuse on object {objectId} saves more accesses than its lookups make"
 
 def oramAccessesMatchExpected
   (expected : List (Nat × Nat))
