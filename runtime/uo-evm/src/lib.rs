@@ -21,8 +21,9 @@ pub use deployment::{
     production_build_profile_sha256, production_call_evidence_sha256,
     production_deployment_request_sha256, production_public_environment_sha256,
     production_public_environment_transcript, production_public_receipt_sha256,
-    production_translation_validation_certificate_sha256, ProductionCallEvidence,
-    ProductionReceipt, ProductionRuntimePolicy, PRODUCTION_NO_RECEIPT_SHA256,
+    production_translation_validation_certificate_sha256, verify_production_receipt,
+    ProductionCallEvidence, ProductionReceipt, ProductionRuntimePolicy,
+    PRODUCTION_NO_RECEIPT_SHA256,
 };
 #[cfg(any(test, feature = "diagnostics"))]
 pub use engine::run_artifact_with_seed;

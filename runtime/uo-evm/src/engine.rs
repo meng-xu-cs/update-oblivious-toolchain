@@ -1,7 +1,7 @@
 use crate::deployment::{
-    validate_production_artifact, validate_production_call_preflight, validate_production_policy,
-    validate_production_public_environment_trace, ProductionCallEvidence, ProductionReceipt,
-    ProductionRuntimePolicy,
+    production_receipt_tag, validate_production_artifact, validate_production_call_preflight,
+    validate_production_policy, validate_production_public_environment_trace,
+    ProductionCallEvidence, ProductionReceipt, ProductionRuntimePolicy,
 };
 use crate::freshness::RuntimeFreshnessState;
 use crate::return_channel::ReturnChannelSession;
@@ -154,12 +154,16 @@ pub struct ProductionContractInstance {
     last_receipt_sha256: String,
 }
 
-/// What an accepted production call returns: the call's result, and the
-/// runtime's receipt for it, which follows the receipt the call named.
+/// What an accepted production call returns: the call's result, the
+/// runtime's receipt for it, which follows the receipt the call named, and
+/// the receipt's tag under the call's session.
 #[derive(Debug)]
 pub struct ProductionCallResult {
     pub call: CallResult,
     pub receipt: ProductionReceipt,
+    /// The receipt's tag under the call's session, which the caller checks
+    /// with `verify_production_receipt`.
+    pub receipt_tag: String,
 }
 
 #[cfg(feature = "diagnostics")]
@@ -200,6 +204,19 @@ impl ProductionContractInstance {
     /// its counters.
     pub fn last_receipt(&self) -> &ProductionReceipt {
         &self.last_receipt
+    }
+
+    /// The receipt the runtime issued last, with its tag under `session`.
+    /// A caller holding a session checks with it a receipt that no call of
+    /// its own returned, the deployment's among them, and makes no call.
+    pub fn authenticated_last_receipt(
+        &self,
+        session: &ReturnChannelSession,
+    ) -> Result<(ProductionReceipt, String)> {
+        Ok((
+            self.last_receipt.clone(),
+            production_receipt_tag(session, &self.last_receipt_sha256)?,
+        ))
     }
 
     #[cfg(any(test, feature = "diagnostics"))]
@@ -280,10 +297,15 @@ impl ProductionContractInstance {
             staged.state.ciphertext_store_digest()?,
         )?;
         let receipt_sha256 = receipt.sha256()?;
+        let receipt_tag = production_receipt_tag(session, &receipt_sha256)?;
         let call = self.inner.commit_staged(staged)?.0;
         self.last_receipt = receipt.clone();
         self.last_receipt_sha256 = receipt_sha256;
-        Ok(ProductionCallResult { call, receipt })
+        Ok(ProductionCallResult {
+            call,
+            receipt,
+            receipt_tag,
+        })
     }
 }
 

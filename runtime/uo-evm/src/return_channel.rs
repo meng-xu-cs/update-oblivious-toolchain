@@ -1,17 +1,22 @@
 use crate::freshness::RuntimeCallFreshness;
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Result};
 use chacha20poly1305::aead::AeadInPlace;
 use chacha20poly1305::{ChaCha20Poly1305, KeyInit, Nonce, Tag};
+use hkdf::hmac::{Hmac, Mac};
+use hkdf::Hkdf;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::fmt;
 use uo_core::{CompiledArtifact, EncryptedReturnPayload, ReturnChannelPublicBinding, Value};
-use zeroize::Zeroize;
+use zeroize::{Zeroize, Zeroizing};
 
 pub const RETURN_CHANNEL_SCHEME: &str = "chacha20poly1305_session_v1";
 const NONCE_BYTES: usize = 12;
 const TAG_BYTES: usize = 16;
 const SHA256_HEX_BYTES: usize = 64;
+/// The salt of the key of a production receipt's tag, and the domain of what
+/// the tag is computed over.
+const PRODUCTION_RECEIPT_TAG_DOMAIN: &[u8] = b"uo-production-receipt-tag/v1";
 
 #[derive(PartialEq, Eq)]
 pub struct ReturnChannelSession {
@@ -40,6 +45,23 @@ impl ReturnChannelSession {
 
     pub fn binding(&self) -> &ReturnChannelPublicBinding {
         &self.binding
+    }
+
+    /// The MAC of the production receipt whose hash is `receipt_sha256`
+    /// under this session: HMAC-SHA256 under a key that HKDF derives from
+    /// the session's key for receipts alone, so that no tag is a value the
+    /// return channel computes. The runtime finishes it into a receipt's
+    /// tag, and a caller holding the session into a check of one.
+    pub(crate) fn production_receipt_mac(&self, receipt_sha256: &str) -> Result<Hmac<Sha256>> {
+        let mut key = Zeroizing::new([0u8; 32]);
+        Hkdf::<Sha256>::new(Some(PRODUCTION_RECEIPT_TAG_DOMAIN), &self.key)
+            .expand(self.binding.session_id.as_bytes(), key.as_mut_slice())
+            .map_err(|_| anyhow!("the key of a production receipt's tag cannot be derived"))?;
+        let mut mac = <Hmac<Sha256> as Mac>::new_from_slice(key.as_slice())
+            .map_err(|_| anyhow!("the key of a production receipt's tag has the wrong length"))?;
+        mac.update(PRODUCTION_RECEIPT_TAG_DOMAIN);
+        mac.update(receipt_sha256.as_bytes());
+        Ok(mac)
     }
 }
 

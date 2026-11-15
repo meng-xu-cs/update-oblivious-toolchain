@@ -193,6 +193,24 @@ freshness counters after the call. The receipts of a deployment form a
 chain: a call that names any receipt but the last is rejected, and a holder
 of two receipts can check that one follows the other.
 
+The runtime gives each receipt a tag under the session of the caller it
+answers: an HMAC-SHA256 over the receipt's hash, under a key that HKDF
+derives from the session's key and id for receipts alone. A call returns
+its receipt's tag, and the runtime tags its last receipt, the deployment's
+included, for any session that asks. A caller holding the session checks
+the tag of a receipt it holds with `verify_production_receipt`, and makes
+no call to do it: a receipt changed in any field, the digest of the
+ciphertext store after its call among them, is rejected, as is a tag made
+under another session. What a verifier of a tag may conclude is in
+`UOToolchain/DeploymentAcceptance.lean`: under two assumptions, which the
+module states as hypotheses, that two receipts with one hash are one
+receipt and that only the runtime makes a tag that verifies under a
+session's key, a receipt whose tag verifies is one the runtime issued, with
+every field as issued (`deployment_receipt_tag_verifies_issued`; the row
+"Production receipt MAC" under Explicit Assumptions). A tag
+convinces its session's holder alone: a MAC is no signature, and a third
+party who is shown a receipt and its tag learns nothing from the tag.
+
 No proof object and no private evidence leaves a production runtime, and
 nothing in a receipt derives from either. What a production result rests on
 is therefore: the attested binary and policy that the evidence names; the
@@ -597,7 +615,8 @@ checked by recompiling the source.
 | `metadataEncryptionINDCPA` | hides encrypted position-map metadata pages | trusted; named in Lean and not formalized, as the row above, and paired with the same concrete sealed-record crypto route |
 | `stashOverflowBounded` | bounds Path ORAM stash failure for deployed parameters | trusted; named in Lean and not formalized, as the first row, and paired with the JACM Path ORAM stash theorem at `Z = 5` and pinned deployed parameters: a cap of 152 blocks, for at most `2^-60` over `2^48` node accesses of a map. For the private scheme it also assumes that operations which hold their nodes until they end keep the theorem's tail, which a simulation of ten million node accesses measures and does not prove |
 | Runtime key derivation | gives each object a storage key, an initial placement and Path ORAM leaf coins that are pseudo-random and independent of the other objects', which the two encryption assumptions and the leaf-coin model take as given | trusted, not modeled in Lean: a 256-bit master secret from the OS, HKDF-SHA256 (RFC 5869) with one label per use, and the ChaCha20 generator. `runtime_secrets_derive_from_the_master_secret` in `runtime_boundary_validation.json` pins the derivation's call sites, and `runtime/uo-evm/src/secret.rs` tests the RFC's first test vector |
-| Return-channel AEAD | hides a value returned under `encrypted_to_client` from the host. The theorems erase the payload's ciphertext and tag as a declared release, so what those bytes show of the value is in no Lean statement | trusted, not named in Lean: `ChaCha20Poly1305` under the session key, with the associated data and the nonce that `runtime/uo-evm/src/return_channel.rs` builds. The nonce is the first 96 bits of a hash of the runtime's freshness epoch, rollback counter and call counter, the session binding and the hash of the associated data, so two calls of a deployment seal under different nonces unless those 96 bits collide. That the session key is fresh and known to the client alone comes from the attested key exchange of the deployment, which the repository does not implement (the next row) |
+| Return-channel AEAD | hides a value returned under `encrypted_to_client` from the host. The theorems erase the payload's ciphertext and tag as a declared release, so what those bytes show of the value is in no Lean statement | trusted, not named in Lean: `ChaCha20Poly1305` under the session key, with the associated data and the nonce that `runtime/uo-evm/src/return_channel.rs` builds. The nonce is the first 96 bits of a hash of the runtime's freshness epoch, rollback counter and call counter, the session binding and the hash of the associated data, so two calls of a deployment seal under different nonces unless those 96 bits collide. That the session key is fresh and known to the client alone comes from the attested key exchange of the deployment, which the repository does not implement (the TEE deployment row) |
+| Production receipt MAC | lets the holder of a session conclude from a receipt's tag that the runtime issued the receipt as it is | trusted, stated in Lean as the two hypotheses of `deployment_receipt_tag_verifies_issued` in `UOToolchain/DeploymentAcceptance.lean` and not proved: HMAC-SHA256, under a key that HKDF-SHA256 derives from the session key and id, is unforgeable, and two receipts with one SHA-256 hash are one receipt. The session key comes from the attested key exchange, as in the row above |
 | TEE deployment assumptions | enclave memory confidentiality/integrity, attestation authenticity, rollback resistance, freshness, crash recovery discipline, patch-level trust | explicit Lean bundle `SgxDeploymentAssumptions`, paired with Intel SGX provenance and probe drift checks |
 | Parser/preprocessing equivalence | connects raw Solidity-like source text to the post-resolution AST consumed by Lean | still trusted front-end surface |
 | Real Keccak equivalence | connects runtime `tiny_keccak::Keccak::v256()` to the Lean mock-hash abstraction | not yet proved; Lean preservation uses the shared abstraction |

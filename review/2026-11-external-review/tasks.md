@@ -1687,6 +1687,54 @@ deployment theorem what a verifier of the signature may conclude.
 Acceptance: a changed last receipt is rejected by a check the caller can
 run, without another call.
 
+As built. The receipts are authenticated under the session, with no new
+key. A signature would convince a third party too, but it needs a signing
+key that the attestation transcript binds, and the runtime has none: the
+transcript enters the repository as a hash that the session's binding
+carries. `ReturnChannelSession::production_receipt_mac`
+(`runtime/uo-evm/src/return_channel.rs`) derives a key for receipts alone
+from the session's key, with HKDF-SHA256, the salt
+`uo-production-receipt-tag/v1` and the session's id, and a receipt's tag is
+HMAC-SHA256 under that key of the salt and the receipt's hash. A production
+call computes its receipt's tag before it commits and returns it
+(`ProductionCallResult::receipt_tag`), and
+`ProductionContractInstance::authenticated_last_receipt` tags the last
+receipt for any session that asks, the deployment's receipt before any
+call included. The caller's check is `verify_production_receipt(session,
+receipt, tag)` in `runtime/uo-evm/src/deployment.rs`: it computes the tag
+of the receipt's hash again and compares the two with `Mac::verify_slice`,
+in constant time, and makes no call.
+
+`a_changed_last_receipt_is_rejected_by_its_tag` in
+`runtime/uo-evm/tests/production_boundary.rs` changes each of the receipt's
+ten fields in turn, the digest of the ciphertext store after the call among
+them, and the check rejects every one. It rejects a changed tag, a tag that
+is not hex and a tag made under another session too, and accepts the tags
+of the deployment's receipt and of a call's.
+
+What a verifier may conclude is a new section of
+`UOToolchain/DeploymentAcceptance.lean`, in which tags and hashes are
+opaque. The two assumptions are stated as hypotheses
+(`DeploymentReceiptTags.HashInjective` and `Unforgeable`): two receipts with
+one hash are one receipt, and a tag that verifies under a session's key is
+the tag of the hash of a receipt the runtime issued. Under them, a receipt
+whose tag verifies is one the runtime issued, with every field as issued
+(`deployment_receipt_tag_verifies_issued`); a receipt it did not issue has
+no tag that verifies (`deployment_receipt_not_issued_tag_rejected`); and,
+with the receipts of calls as the runtime issues them
+(`DeploymentReceiptIssued`), a receipt whose tag verifies is the receipt of
+a call in a state the runtime was in
+(`deployment_receipt_tag_verifies_issued_in_a_state`). The claim boundary
+lists the two as the trusted assumption "Production receipt MAC", with an
+entry in the claim manifest. A tag convinces the holder of its session
+alone: a MAC is not a signature.
+
+`production_receipts_carry_session_tags` in
+`runtime_boundary_validation.json` pins the key's derivation, the MAC, the
+constant-time check, the tag computed before the commit and the tagged last
+receipt, with a unit test of five drifts, and
+`production_calls_issue_chained_receipts` pins the call as it now ends.
+
 ### Issue 54 — Compare a runtime trace with the exact encoding in Lean
 
 Source: Issue 38. Size: M. Depends on: Issue 38.

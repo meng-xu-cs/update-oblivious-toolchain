@@ -28550,11 +28550,46 @@ fn check_production_calls_issue_chained_receipts(
             "            self.inner.freshness.snapshot(),\n            &self.last_receipt_sha256,\n        )?;",
         )
         && engine_impl_source.contains(
-            "        let receipt = ProductionReceipt::for_call(\n            evidence,\n            &self.last_receipt,\n            &staged.trace.receipt,\n            staged.freshness.snapshot(),\n            staged.state.public_state_digest()?,\n            staged.state.ciphertext_store_digest()?,\n        )?;\n        let receipt_sha256 = receipt.sha256()?;\n        let call = self.inner.commit_staged(staged)?.0;\n        self.last_receipt = receipt.clone();\n        self.last_receipt_sha256 = receipt_sha256;\n        Ok(ProductionCallResult { call, receipt })",
+            "        let receipt = ProductionReceipt::for_call(\n            evidence,\n            &self.last_receipt,\n            &staged.trace.receipt,\n            staged.freshness.snapshot(),\n            staged.state.public_state_digest()?,\n            staged.state.ciphertext_store_digest()?,\n        )?;\n        let receipt_sha256 = receipt.sha256()?;\n        let receipt_tag = production_receipt_tag(session, &receipt_sha256)?;\n        let call = self.inner.commit_staged(staged)?.0;\n        self.last_receipt = receipt.clone();\n        self.last_receipt_sha256 = receipt_sha256;\n        Ok(ProductionCallResult {\n            call,\n            receipt,\n            receipt_tag,\n        })",
         )
         && engine_impl_source.matches("self.last_receipt = ").count() == 1
         && engine_impl_source.matches("self.last_receipt_sha256 = ").count() == 1
         && engine_impl_source.matches("commit_staged(staged)").count() == 2
+}
+
+/// Whether every production receipt the runtime hands out carries a tag
+/// under the caller's session, which the caller checks with no call. The
+/// tag is an HMAC-SHA256 over the receipt's hash, under a key that HKDF
+/// derives from the session's key for receipts alone. A call computes its
+/// receipt's tag before it commits, so a call that commits returns one, and
+/// the runtime tags its last receipt for any session that asks. The check
+/// recomputes the tag of the receipt it is given and compares the two in
+/// constant time.
+fn check_production_receipts_carry_session_tags(
+    deployment_source: &str,
+    engine_impl_source: &str,
+    return_channel_source: &str,
+) -> bool {
+    return_channel_source.contains(
+        "        Hkdf::<Sha256>::new(Some(PRODUCTION_RECEIPT_TAG_DOMAIN), &self.key)\n            .expand(self.binding.session_id.as_bytes(), key.as_mut_slice())",
+    ) && return_channel_source.contains(
+        "        let mut mac = <Hmac<Sha256> as Mac>::new_from_slice(key.as_slice())",
+    ) && return_channel_source.contains(
+        "        mac.update(PRODUCTION_RECEIPT_TAG_DOMAIN);\n        mac.update(receipt_sha256.as_bytes());\n        Ok(mac)",
+    ) && deployment_source.contains(
+        "    session\n        .production_receipt_mac(&receipt.sha256()?)?\n        .verify_slice(&tag)\n        .map_err(|_| anyhow!(\"production receipt tag mismatch\"))",
+    ) && deployment_source.contains(
+        "        session\n            .production_receipt_mac(receipt_sha256)?\n            .finalize()\n            .into_bytes(),",
+    ) && engine_impl_source.contains(
+        "        let receipt_sha256 = receipt.sha256()?;\n        let receipt_tag = production_receipt_tag(session, &receipt_sha256)?;\n        let call = self.inner.commit_staged(staged)?.0;",
+    ) && engine_impl_source.contains(
+        "            production_receipt_tag(session, &self.last_receipt_sha256)?,",
+    ) && engine_impl_source.matches("production_receipt_tag(").count() == 2
+        // A tag is compared by the MAC, in constant time, and is never a
+        // value the return channel computes.
+        && !deployment_source.contains("== tag")
+        && !deployment_source.contains("tag ==")
+        && return_channel_source.matches("PRODUCTION_RECEIPT_TAG_DOMAIN").count() == 3
 }
 
 /// Whether the production path's freshness errors carry no runtime value. An
@@ -46578,6 +46613,13 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     );
     let production_calls_issue_chained_receipts =
         check_production_calls_issue_chained_receipts(&deployment_source, &engine_impl_source);
+    let production_receipts_carry_session_tags = check_production_receipts_carry_session_tags(
+        &production_source_slice(&deployment_source),
+        &engine_impl_source,
+        &production_source_slice(&fs::read_to_string(
+            root.join("runtime/uo-evm/src/return_channel.rs"),
+        )?),
+    );
     let production_calls_record_no_position_map_witness =
         check_production_calls_record_no_position_map_witness(
             &production_source_slice(&state_source),
@@ -48014,6 +48056,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "public_state_digests_are_kept_per_object": public_state_digests_are_kept_per_object,
         "trace_runs_stand_for_recorded_events": trace_runs_stand_for_recorded_events,
         "production_calls_issue_chained_receipts": production_calls_issue_chained_receipts,
+        "production_receipts_carry_session_tags": production_receipts_carry_session_tags,
         "theorem_certificate_constructor_checks":
             theorem_certificate_constructor_checks,
         "theorem_certificate_constructor_surface_restricted":
@@ -48966,6 +49009,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && public_state_digests_are_kept_per_object
             && trace_runs_stand_for_recorded_events
             && production_calls_issue_chained_receipts
+            && production_receipts_carry_session_tags
             && theorem_certificate_constructor_surface_restricted
             && runtime_public_call_trace_bundle_surface_restricted
             && runtime_public_call_trace_bundle_fields_private
@@ -57522,6 +57566,60 @@ mod tests {
     }
 
     #[test]
+    fn production_receipt_tag_check_rejects_the_drifts_it_guards() {
+        use super::{check_production_receipts_carry_session_tags, repo_root};
+        let root = repo_root();
+        let read =
+            |rel: &str| production_source_slice(&std::fs::read_to_string(root.join(rel)).unwrap());
+        let deployment = read("runtime/uo-evm/src/deployment.rs");
+        let engine = read("runtime/uo-evm/src/engine.rs");
+        let channel = read("runtime/uo-evm/src/return_channel.rs");
+        let ok = |deployment: &str, engine: &str, channel: &str| {
+            check_production_receipts_carry_session_tags(deployment, engine, channel)
+        };
+        assert!(ok(&deployment, &engine, &channel));
+        let drift = |source: &str, from: &str, to: &str| {
+            let changed = source.replace(from, to);
+            assert_ne!(changed, source, "no {from:?} to change");
+            changed
+        };
+        // A tag under the session's own key, which the return channel uses.
+        let shared = drift(
+            &channel,
+            "        let mut mac = <Hmac<Sha256> as Mac>::new_from_slice(key.as_slice())",
+            "        let mut mac = <Hmac<Sha256> as Mac>::new_from_slice(&self.key)",
+        );
+        assert!(!ok(&deployment, &engine, &shared));
+        // A key that is the same for every session.
+        let same = drift(
+            &channel,
+            ".expand(self.binding.session_id.as_bytes(), key.as_mut_slice())",
+            ".expand(b\"receipt\", key.as_mut_slice())",
+        );
+        assert!(!ok(&deployment, &engine, &same));
+        // A check that compares two tags as strings, which stops at the
+        // first byte that differs.
+        let plain = format!(
+            "{deployment}\nfn same_tag(tag: &str, other: &str) -> bool {{\n    other == tag\n}}\n"
+        );
+        assert!(!ok(&plain, &engine, &channel));
+        // A call that commits before its receipt has a tag.
+        let late = drift(
+            &engine,
+            "        let receipt_tag = production_receipt_tag(session, &receipt_sha256)?;\n        let call = self.inner.commit_staged(staged)?.0;",
+            "        let call = self.inner.commit_staged(staged)?.0;\n        let receipt_tag = production_receipt_tag(session, &receipt_sha256)?;",
+        );
+        assert!(!ok(&deployment, &late, &channel));
+        // A last receipt handed out with no tag.
+        let untagged = drift(
+            &engine,
+            "            production_receipt_tag(session, &self.last_receipt_sha256)?,",
+            "            String::new(),",
+        );
+        assert!(!ok(&deployment, &untagged, &channel));
+    }
+
+    #[test]
     fn dropped_call_seal_check_rejects_the_drifts_it_guards() {
         use super::{check_dropped_calls_leave_fixed_seal_counts, repo_root};
         let root = repo_root();
@@ -58810,8 +58908,8 @@ mod tests {
 
         // A call that commits before its receipt exists.
         let early = engine.replacen(
-            "        let receipt_sha256 = receipt.sha256()?;\n        let call = self.inner.commit_staged(staged)?.0;\n",
-            "        let call = self.inner.commit_staged(staged)?.0;\n        let receipt_sha256 = receipt.sha256()?;\n",
+            "        let receipt_sha256 = receipt.sha256()?;\n        let receipt_tag = production_receipt_tag(session, &receipt_sha256)?;\n        let call = self.inner.commit_staged(staged)?.0;\n",
+            "        let call = self.inner.commit_staged(staged)?.0;\n        let receipt_sha256 = receipt.sha256()?;\n        let receipt_tag = production_receipt_tag(session, &receipt_sha256)?;\n",
             1,
         );
         rejects("early commit", &early, &engine, ok(&deployment, &early));

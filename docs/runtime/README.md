@@ -72,5 +72,9 @@ toolchain manifest digest, runtime binary hash, proof-root hash, accepted SGX
 quote hash, attested return-channel session transcript, freshness/rollback
 counters matching the runtime state at call entry, and the hash of the
 receipt the runtime issued last. It answers an accepted call with the next
-`ProductionReceipt` of the deployment's chain; see the Deployment Theorem in
+`ProductionReceipt` of the deployment's chain and the receipt's tag under
+the call's session, which the caller checks with
+`verify_production_receipt` and no call;
+`ProductionContractInstance::authenticated_last_receipt` tags the last
+receipt for any session. See the Deployment Theorem in
 [`../claim-boundary.md`](../claim-boundary.md).

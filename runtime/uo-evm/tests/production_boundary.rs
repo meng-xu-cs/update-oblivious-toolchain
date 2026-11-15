@@ -15,9 +15,9 @@ use uo_core::{
 use uo_evm::{
     production_build_profile_sha256, production_public_environment_sha256,
     production_public_environment_transcript, production_translation_validation_certificate_sha256,
-    ContractInstance, ProductionCallEvidence, ProductionContractInstance, ProductionReceipt,
-    ProductionRuntimePolicy, ReturnChannelSession, PRODUCTION_NO_RECEIPT_SHA256,
-    RETURN_CHANNEL_SCHEME,
+    verify_production_receipt, ContractInstance, ProductionCallEvidence,
+    ProductionContractInstance, ProductionReceipt, ProductionRuntimePolicy, ReturnChannelSession,
+    PRODUCTION_NO_RECEIPT_SHA256, RETURN_CHANNEL_SCHEME,
 };
 
 fn single_access_map() -> CompiledArtifact {
@@ -565,4 +565,79 @@ fn production_calls_run_without_a_position_map_witness() {
         .is_err());
     let read = instance.call("balanceOf(address)", vec![owner]).unwrap();
     assert_eq!(read.return_value, Some(Value::uint(5)));
+}
+
+/// A second session, with another key and another id.
+fn other_session() -> ReturnChannelSession {
+    ReturnChannelSession::new(
+        [9u8; 32],
+        ReturnChannelPublicBinding {
+            scheme: RETURN_CHANNEL_SCHEME.into(),
+            session_id: "44".repeat(32),
+            client_public_key_hash: "55".repeat(32),
+            attestation_transcript_hash: "33".repeat(32),
+        },
+    )
+    .unwrap()
+}
+
+/// A caller holding a session checks the tag of the receipt it holds, the
+/// last one included, and makes no call. A receipt changed in any field is
+/// rejected, the digest of the ciphertext after the call among them, which
+/// nothing else the caller holds binds; so is a changed tag, and a tag under
+/// another session. The deployment's receipt gets its tag on request.
+#[test]
+fn a_changed_last_receipt_is_rejected_by_its_tag() {
+    let artifact = single_access_map();
+    let policy = policy();
+    let session = session();
+    let environment = PublicEnvironment::default();
+    let mut production =
+        ProductionContractInstance::deploy(artifact.clone(), policy.clone()).unwrap();
+    let (deployed, deployed_tag) = production.authenticated_last_receipt(&session).unwrap();
+    assert_eq!(&deployed, production.last_receipt());
+    verify_production_receipt(&session, &deployed, &deployed_tag).unwrap();
+    let evidence = public_evidence(&artifact, &policy, &session, &environment, &deployed);
+    let result = production
+        .call_authorized("put(bytes32,uint256)", put(7, 5), &session, &evidence)
+        .unwrap();
+    let (receipt, tag) = (&result.receipt, &result.receipt_tag);
+    verify_production_receipt(&session, receipt, tag).unwrap();
+    assert_eq!(
+        production.authenticated_last_receipt(&session).unwrap(),
+        (receipt.clone(), tag.clone())
+    );
+
+    // Every field of the last receipt is bound by its tag.
+    let fields = serde_json::to_value(receipt).unwrap();
+    let fields = fields.as_object().unwrap();
+    assert_eq!(fields.len(), 10);
+    for (field, value) in fields {
+        let mut changed = serde_json::to_value(receipt).unwrap();
+        changed[field] = match value {
+            serde_json::Value::String(_) => serde_json::json!("5a".repeat(32)),
+            serde_json::Value::Number(number) => serde_json::json!(number.as_u64().unwrap() + 1),
+            other => panic!("{field}: {other}"),
+        };
+        let changed: ProductionReceipt = serde_json::from_value(changed).unwrap();
+        assert_ne!(&changed, receipt, "{field}");
+        assert!(
+            verify_production_receipt(&session, &changed, tag).is_err(),
+            "{field}"
+        );
+    }
+    // A changed tag, and a tag that is not hex, are rejected.
+    let mut flipped = tag.clone().into_bytes();
+    flipped[0] = if flipped[0] == b'0' { b'1' } else { b'0' };
+    let flipped = String::from_utf8(flipped).unwrap();
+    assert!(verify_production_receipt(&session, receipt, &flipped).is_err());
+    assert!(verify_production_receipt(&session, receipt, "not hex").is_err());
+    // A tag is its session's: another session's check rejects it, and the
+    // runtime gives the other session a tag of its own.
+    let other = other_session();
+    assert!(verify_production_receipt(&other, receipt, tag).is_err());
+    let (_, other_tag) = production.authenticated_last_receipt(&other).unwrap();
+    assert_ne!(&other_tag, tag);
+    verify_production_receipt(&other, receipt, &other_tag).unwrap();
+    assert!(verify_production_receipt(&session, receipt, &other_tag).is_err());
 }

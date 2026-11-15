@@ -109,7 +109,8 @@ binary hash, proof-root hash, accepted SGX quote hash, return-channel session
 id, attestation transcript hash, freshness/rollback counters, and the hash
 of the receipt the runtime issued last. An accepted call is answered with
 the next receipt of the deployment's chain, which carries nothing derived
-from the call's private evidence.
+from the call's private evidence, and with the receipt's tag under the
+call's session, an HMAC that the session's holder checks.
 
 ## Non-Claim
 

@@ -357,6 +357,22 @@ const CLAIM_ENTRIES: &[ClaimEntry] = &[
             "cargo run -q -p mplus-probe -- --only trace-equivalence --out-dir results",
     },
     ClaimEntry {
+        id: "assumption-production-receipt-mac",
+        category: "assumption",
+        text: "Production receipt MAC: a receipt's tag is HMAC-SHA256 under a key that HKDF-SHA256 derives from the session key and id; that a tag which verifies is one the runtime made, and that two receipts with one SHA-256 hash are one receipt, are the hypotheses of deployment_receipt_tag_verifies_issued, trusted and not proved, and the session key comes from an attested key exchange the repository does not implement.",
+        status: STATUS_TRUSTED,
+        doc_anchor: "Production receipt MAC",
+        source_files: &["runtime/uo-evm/src/return_channel.rs"],
+        lean_modules: &["proof/lean/UOToolchain/DeploymentAcceptance.lean"],
+        runtime_compiler_files: &[
+            "runtime/uo-evm/src/return_channel.rs",
+            "runtime/uo-evm/src/deployment.rs",
+        ],
+        benchmark_result_files: &["results/runtime_boundary_validation.json"],
+        validation_command:
+            "cargo run -q -p mplus-probe -- --only runtime-boundary-validation --out-dir results",
+    },
+    ClaimEntry {
         id: "assumption-tee-deployment",
         category: "assumption",
         text: "TEE deployment assumptions: enclave memory confidentiality/integrity, attestation authenticity, rollback resistance, freshness, crash recovery, and patch-level trust; explicit Lean bundle SgxDeploymentAssumptions.",

@@ -192,6 +192,16 @@
       "ok": true
     },
     {
+      "detail": "doc_anchor \"Production receipt MAC\" for assumption-production-receipt-mac appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:assumption-production-receipt-mac",
+      "ok": true
+    },
+    {
+      "detail": "assumption-production-receipt-mac declares an allowed status (trusted)",
+      "name": "status-allowed:assumption-production-receipt-mac",
+      "ok": true
+    },
+    {
       "detail": "doc_anchor \"TEE deployment assumptions\" for assumption-tee-deployment appears in docs/claim-boundary.md",
       "name": "anchor-in-doc:assumption-tee-deployment",
       "ok": true
@@ -407,6 +417,11 @@
       "ok": true
     },
     {
+      "detail": "assumption-table row \"Production receipt MAC\" is covered by the manifest",
+      "name": "assumption-covered:Production receipt MAC",
+      "ok": true
+    },
+    {
       "detail": "assumption-table row \"TEE deployment assumptions\" is covered by the manifest",
       "name": "assumption-covered:TEE deployment assumptions",
       "ok": true
@@ -507,7 +522,7 @@
       "ok": true
     },
     {
-      "detail": "8 manifest entries in category assumption",
+      "detail": "9 manifest entries in category assumption",
       "name": "category-present:assumption",
       "ok": true
     },
@@ -924,6 +939,26 @@
     {
       "detail": "artifact runtime/uo-evm/src/freshness.rs referenced by assumption-return-channel-aead exists",
       "name": "file-exists:assumption-return-channel-aead:runtime/uo-evm/src/freshness.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact runtime/uo-evm/src/return_channel.rs referenced by assumption-production-receipt-mac exists",
+      "name": "file-exists:assumption-production-receipt-mac:runtime/uo-evm/src/return_channel.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact proof/lean/UOToolchain/DeploymentAcceptance.lean referenced by assumption-production-receipt-mac exists",
+      "name": "file-exists:assumption-production-receipt-mac:proof/lean/UOToolchain/DeploymentAcceptance.lean",
+      "ok": true
+    },
+    {
+      "detail": "artifact runtime/uo-evm/src/return_channel.rs referenced by assumption-production-receipt-mac exists",
+      "name": "file-exists:assumption-production-receipt-mac:runtime/uo-evm/src/return_channel.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact runtime/uo-evm/src/deployment.rs referenced by assumption-production-receipt-mac exists",
+      "name": "file-exists:assumption-production-receipt-mac:runtime/uo-evm/src/deployment.rs",
       "ok": true
     },
     {
@@ -1501,6 +1536,27 @@
     },
     {
       "benchmark_result_files": [
+        "results/runtime_boundary_validation.json"
+      ],
+      "category": "assumption",
+      "doc_anchor": "Production receipt MAC",
+      "id": "assumption-production-receipt-mac",
+      "lean_modules": [
+        "proof/lean/UOToolchain/DeploymentAcceptance.lean"
+      ],
+      "runtime_compiler_files": [
+        "runtime/uo-evm/src/return_channel.rs",
+        "runtime/uo-evm/src/deployment.rs"
+      ],
+      "source_files": [
+        "runtime/uo-evm/src/return_channel.rs"
+      ],
+      "status": "trusted",
+      "text": "Production receipt MAC: a receipt's tag is HMAC-SHA256 under a key that HKDF-SHA256 derives from the session key and id; that a tag which verifies is one the runtime made, and that two receipts with one SHA-256 hash are one receipt, are the hypotheses of deployment_receipt_tag_verifies_issued, trusted and not proved, and the session key comes from an attested key exchange the repository does not implement.",
+      "validation_command": "cargo run -q -p mplus-probe -- --only runtime-boundary-validation --out-dir results"
+    },
+    {
+      "benchmark_result_files": [
         "results/lean_assumption_budget.json"
       ],
       "category": "assumption",
@@ -1812,7 +1868,7 @@
       "validation_command": "cargo run -q -p mplus-probe -- --only acceptance-check --out-dir results"
     }
   ],
-  "entry_count": 38,
+  "entry_count": 39,
   "schema": "uo.claim_artifact_manifest.v1",
   "source_of_truth": "docs/claim-boundary.md"
 }

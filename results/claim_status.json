@@ -192,6 +192,16 @@
       "ok": true
     },
     {
+      "detail": "doc_anchor \"Production receipt MAC\" for assumption-production-receipt-mac appears in docs/claim-boundary.md",
+      "name": "anchor-in-doc:assumption-production-receipt-mac",
+      "ok": true
+    },
+    {
+      "detail": "assumption-production-receipt-mac declares an allowed status (trusted)",
+      "name": "status-allowed:assumption-production-receipt-mac",
+      "ok": true
+    },
+    {
       "detail": "doc_anchor \"TEE deployment assumptions\" for assumption-tee-deployment appears in docs/claim-boundary.md",
       "name": "anchor-in-doc:assumption-tee-deployment",
       "ok": true
@@ -407,6 +417,11 @@
       "ok": true
     },
     {
+      "detail": "assumption-table row \"Production receipt MAC\" is covered by the manifest",
+      "name": "assumption-covered:Production receipt MAC",
+      "ok": true
+    },
+    {
       "detail": "assumption-table row \"TEE deployment assumptions\" is covered by the manifest",
       "name": "assumption-covered:TEE deployment assumptions",
       "ok": true
@@ -507,7 +522,7 @@
       "ok": true
     },
     {
-      "detail": "8 manifest entries in category assumption",
+      "detail": "9 manifest entries in category assumption",
       "name": "category-present:assumption",
       "ok": true
     },
@@ -927,6 +942,26 @@
       "ok": true
     },
     {
+      "detail": "artifact runtime/uo-evm/src/return_channel.rs referenced by assumption-production-receipt-mac exists",
+      "name": "file-exists:assumption-production-receipt-mac:runtime/uo-evm/src/return_channel.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact proof/lean/UOToolchain/DeploymentAcceptance.lean referenced by assumption-production-receipt-mac exists",
+      "name": "file-exists:assumption-production-receipt-mac:proof/lean/UOToolchain/DeploymentAcceptance.lean",
+      "ok": true
+    },
+    {
+      "detail": "artifact runtime/uo-evm/src/return_channel.rs referenced by assumption-production-receipt-mac exists",
+      "name": "file-exists:assumption-production-receipt-mac:runtime/uo-evm/src/return_channel.rs",
+      "ok": true
+    },
+    {
+      "detail": "artifact runtime/uo-evm/src/deployment.rs referenced by assumption-production-receipt-mac exists",
+      "name": "file-exists:assumption-production-receipt-mac:runtime/uo-evm/src/deployment.rs",
+      "ok": true
+    },
+    {
       "detail": "artifact crates/uo-core/src/lib.rs referenced by assumption-tee-deployment exists",
       "name": "file-exists:assumption-tee-deployment:crates/uo-core/src/lib.rs",
       "ok": true
@@ -1087,7 +1122,7 @@
       "ok": true
     }
   ],
-  "claim_count": 38,
+  "claim_count": 39,
   "claims": [
     {
       "category": "claim",
@@ -1221,6 +1256,13 @@
       "status": "trusted",
       "text": "Return-channel AEAD: a value returned under encrypted_to_client is hidden from the host by ChaCha20Poly1305 under the session key, with associated data that bind the package, the entrypoint, the public arguments and the session, and a nonce hashed from the runtime's freshness counters; the theorems erase the ciphertext and the tag as a declared release, so the assumption is trusted and not named in Lean, and the session key comes from an attested key exchange the repository does not implement.",
       "validation_command": "cargo run -q -p mplus-probe -- --only trace-equivalence --out-dir results"
+    },
+    {
+      "category": "assumption",
+      "id": "assumption-production-receipt-mac",
+      "status": "trusted",
+      "text": "Production receipt MAC: a receipt's tag is HMAC-SHA256 under a key that HKDF-SHA256 derives from the session key and id; that a tag which verifies is one the runtime made, and that two receipts with one SHA-256 hash are one receipt, are the hypotheses of deployment_receipt_tag_verifies_issued, trusted and not proved, and the session key comes from an attested key exchange the repository does not implement.",
+      "validation_command": "cargo run -q -p mplus-probe -- --only runtime-boundary-validation --out-dir results"
     },
     {
       "category": "assumption",
@@ -1366,6 +1408,6 @@
     "generated-and-checked": 4,
     "non-claim": 7,
     "source-frozen": 1,
-    "trusted": 17
+    "trusted": 18
   }
 }

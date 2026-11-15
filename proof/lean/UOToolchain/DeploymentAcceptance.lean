@@ -418,4 +418,84 @@ theorem deployment_receipt_follows_binds_state
     next.freshnessEpoch = previous.freshnessEpoch :=
   ⟨hFollows.1, hFollows.2.1, hFollows.2.2.1, hFollows.2.2.2.1⟩
 
+/-! ## Authenticated receipts
+
+The runtime gives each receipt a tag under the session of the caller it
+answers: a MAC over the receipt's hash, under a key derived from the
+session's key (`verify_production_receipt` in
+`runtime/uo-evm/src/deployment.rs`). A caller holding the session checks the
+tag of a receipt it holds, the last one included, and makes no call. Tags
+and hashes are opaque here. What a verifier may conclude rests on two
+assumptions, which this module states as hypotheses and does not prove: two
+receipts with one hash are one receipt, and a tag that verifies under a
+session's key is one the runtime made, which it does only for the receipts
+it issues. -/
+
+/-- A deployment's hash of a receipt, and the tag of a receipt's hash under
+a session key. -/
+structure DeploymentReceiptTags where
+  receiptHash : DeploymentCallReceipt → String
+  tag : String → String → String
+
+/-- `tag` is the tag of `receipt` under `sessionKey`: the verifier's check. -/
+def DeploymentReceiptTags.Verifies
+    (tags : DeploymentReceiptTags) (sessionKey : String)
+    (receipt : DeploymentCallReceipt) (tag : String) : Prop :=
+  tag = tags.tag sessionKey (tags.receiptHash receipt)
+
+/-- The hash's assumption: two receipts with one hash are one receipt. -/
+def DeploymentReceiptTags.HashInjective (tags : DeploymentReceiptTags) : Prop :=
+  ∀ lhs rhs, tags.receiptHash lhs = tags.receiptHash rhs → lhs = rhs
+
+/-- The MAC's assumption for one session: a tag that verifies under its key
+is the tag of the hash of a receipt the runtime issued, `issued` being the
+receipts the runtime issued in the deployment. -/
+def DeploymentReceiptTags.Unforgeable
+    (tags : DeploymentReceiptTags) (sessionKey : String)
+    (issued : DeploymentCallReceipt → Prop) : Prop :=
+  ∀ receiptHash tag, tag = tags.tag sessionKey receiptHash →
+    ∃ receipt, issued receipt ∧ tags.receiptHash receipt = receiptHash
+
+/-- **What a verifier of a receipt's tag may conclude.** Under the two
+assumptions, a receipt whose tag verifies under a session's key is a receipt
+the runtime issued, with every field as it was issued. A receipt changed in
+any field after it was issued, the digest of the ciphertext store after its
+call among them, is rejected by its holder's own check, and the holder needs
+no call to run it. -/
+theorem deployment_receipt_tag_verifies_issued
+    {tags : DeploymentReceiptTags} {sessionKey tag : String}
+    {issued : DeploymentCallReceipt → Prop} {receipt : DeploymentCallReceipt}
+    (hHash : tags.HashInjective)
+    (hUnforgeable : tags.Unforgeable sessionKey issued)
+    (hVerifies : tags.Verifies sessionKey receipt tag) :
+    issued receipt := by
+  obtain ⟨issuedReceipt, hIssued, hSameHash⟩ := hUnforgeable _ tag hVerifies
+  exact hHash _ _ hSameHash ▸ hIssued
+
+/-- A receipt the runtime did not issue has no tag that verifies. -/
+theorem deployment_receipt_not_issued_tag_rejected
+    {tags : DeploymentReceiptTags} {sessionKey tag : String}
+    {issued : DeploymentCallReceipt → Prop} {receipt : DeploymentCallReceipt}
+    (hHash : tags.HashInjective)
+    (hUnforgeable : tags.Unforgeable sessionKey issued)
+    (hNotIssued : ¬ issued receipt) :
+    ¬ tags.Verifies sessionKey receipt tag :=
+  fun hVerifies =>
+    hNotIssued (deployment_receipt_tag_verifies_issued hHash hUnforgeable hVerifies)
+
+/-- With the receipts of calls as the runtime issues them
+(`DeploymentReceiptIssued`), a receipt whose tag verifies names its request
+and the receipt before it, starts from the commitments of a state the
+runtime was in, keeps that state's epoch, and moves its counters on by one
+call. -/
+theorem deployment_receipt_tag_verifies_issued_in_a_state
+    {tags : DeploymentReceiptTags} {sessionKey tag : String}
+    {receipt : DeploymentCallReceipt}
+    (hHash : tags.HashInjective)
+    (hUnforgeable : tags.Unforgeable sessionKey
+      (fun issued => ∃ state evidenceHash, DeploymentReceiptIssued state evidenceHash issued))
+    (hVerifies : tags.Verifies sessionKey receipt tag) :
+    ∃ state evidenceHash, DeploymentReceiptIssued state evidenceHash receipt :=
+  deployment_receipt_tag_verifies_issued hHash hUnforgeable hVerifies
+
 end UOToolchain

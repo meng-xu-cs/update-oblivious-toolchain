@@ -1,6 +1,7 @@
 use crate::freshness::RuntimeFreshnessSnapshot;
 use crate::return_channel::ReturnChannelSession;
 use anyhow::{anyhow, bail, Result};
+use hkdf::hmac::Mac;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use uo_core::{CompiledArtifact, PublicEnvironment, PublicReceipt};
@@ -121,8 +122,9 @@ impl ProductionReceipt {
     /// and its epoch and counters are the evidence's, moved on by one call.
     ///
     /// The digest of the ciphertext store after the call is bound by neither
-    /// argument. The next receipt binds it, and so does the storage itself,
-    /// from which a holder can compute it again.
+    /// argument. The receipt's tag binds it for the caller that holds the
+    /// session (`verify_production_receipt`), the next receipt binds it, and
+    /// so does the storage itself, from which a holder can compute it again.
     pub fn binds_call(
         &self,
         evidence: &ProductionCallEvidence,
@@ -251,6 +253,39 @@ impl ProductionReceipt {
         receipt.binds_call(evidence, public_receipt)?;
         Ok(receipt)
     }
+}
+
+/// The tag of the receipt whose hash is `receipt_sha256` under `session`:
+/// what the runtime gives a receipt for the caller that holds the session.
+pub(crate) fn production_receipt_tag(
+    session: &ReturnChannelSession,
+    receipt_sha256: &str,
+) -> Result<String> {
+    Ok(hex::encode(
+        session
+            .production_receipt_mac(receipt_sha256)?
+            .finalize()
+            .into_bytes(),
+    ))
+}
+
+/// Check that `tag` is the tag of `receipt` under `session`: that the
+/// runtime the session was established with issued `receipt` as it is. A
+/// receipt changed in any field has another hash, and so another tag, the
+/// digest of the ciphertext store after its call included, which nothing
+/// else a caller holds binds until the next receipt. The comparison takes
+/// the same time wherever two tags differ. A caller holding the session
+/// runs this on the receipt it holds, with no call.
+pub fn verify_production_receipt(
+    session: &ReturnChannelSession,
+    receipt: &ProductionReceipt,
+    tag: &str,
+) -> Result<()> {
+    let tag = hex::decode(tag).map_err(|_| anyhow!("production receipt tag is not hex"))?;
+    session
+        .production_receipt_mac(&receipt.sha256()?)?
+        .verify_slice(&tag)
+        .map_err(|_| anyhow!("production receipt tag mismatch"))
 }
 
 /// The hash a receipt carries for the evidence its call was accepted on.

@@ -1160,6 +1160,7 @@
   "production_calls_issue_chained_receipts": true,
   "production_calls_record_no_position_map_witness": true,
   "production_errors_carry_no_runtime_freshness_value": true,
+  "production_receipts_carry_session_tags": true,
   "proof_grade_canonical_pair_instantiation_threads_runtime_boundary": true,
   "proof_grade_paper_main_bundles_discharge_minimal_runtime_boundary": true,
   "public_call_summary_api_is_explicit": true,
