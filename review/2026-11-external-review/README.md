@@ -11,7 +11,7 @@ directory holds the response.
 | [`capacity_sweep_control_before_wave4.json`](./capacity_sweep_control_before_wave4.json), [`capacity_sweep_control_after_wave4.json`](./capacity_sweep_control_after_wave4.json) | a control for Issues 36 to 38: the full profile's rounds on the maps of 4,096, 8,192 and 16,384 entries at 2 keys, on the code before those issues (`cb92f8c`) and on the code after them (`9d93471`), one run after the other on one machine |
 | [`capacity_sweep_control_before_cap152.json`](./capacity_sweep_control_before_cap152.json), [`capacity_sweep_control_after_cap152.json`](./capacity_sweep_control_after_cap152.json) | the same control for the stash cap of Issue 40: on the code before it (`ece1167`, a cap of 114) and on the code after it (`305c1a2`, a cap of 152) |
 | [`capacity_sweep_control_before_store.json`](./capacity_sweep_control_before_store.json), [`capacity_sweep_control_after_store_memory.json`](./capacity_sweep_control_after_store_memory.json), [`capacity_sweep_control_after_store_files.json`](./capacity_sweep_control_after_store_files.json), [`capacity_sweep_control_after_store_files_synced.json`](./capacity_sweep_control_after_store_files_synced.json) | the same control for the storage adapter of Issue 41: on the code before it (`b6b9fce`), and on the code after it with the maps' records in memory, in files, and in files with every commit synced |
-| [`capacity_sweep_control_before_eviction_networks.json`](./capacity_sweep_control_before_eviction_networks.json), [`capacity_sweep_control_after_eviction_networks.json`](./capacity_sweep_control_after_eviction_networks.json) | the same control for the eviction networks of Issue 47: on the code before them (`990b054`) and on the code after them |
+| [`capacity_sweep_control_before_eviction_networks.json`](./capacity_sweep_control_before_eviction_networks.json), [`capacity_sweep_control_after_eviction_networks.json`](./capacity_sweep_control_after_eviction_networks.json) | the same control for the eviction networks of Issue 47: on the code before them (`990b054`) and on the code after them (`ba0b958`, before rustfmt changed the layout of three of its statements) |
 | this file | the positions in brief, the order of work, and the tracker |
 
 The review text is not in the repository; `validation.md` restates each
@@ -150,7 +150,7 @@ its engineering part is Wave 4, its certified part is research.
 | 44 | Certify state transitions incrementally | research | R | 36, 37, 41 | todo | |
 | 45 | State security over call histories with a quantified bound | research | R | 24, 39, 40 | todo | |
 | 46 | Prove that the runtime's run on every tape is the substituted run | research | R | 42 | todo | |
-| 47 | Try an oblivious routing network for tree eviction | 8 | M | 27 | done | |
+| 47 | Try an oblivious routing network for tree eviction | 8 | M | 27 | done | `ba0b958` |
 | 48 | Fuse scans and generalize the reuse analysis | 8 | M | 31, 32 | todo | |
 | 49 | Write the related-work boundary and add matched baselines | 8 | M | 27 | todo | |
 | 50 | Bridge a scoped subset to Solidity 0.8 semantics | backlog | L | | deferred | |

@@ -1,12 +1,12 @@
 {
-  "schema": "uo-tree-eviction-instructions-v1",
+  "schema": "uo-tree-eviction-instructions-v2",
   "metric": "callgrind instruction reads (Ir), inclusive of callees",
   "workload": {
     "command": "mplus-probe --only capacity-sweep (release build)",
     "UO_SWEEP_CAPACITIES": 4096,
     "UO_SWEEP_TRIALS": 1,
     "scheme": "path_oram_private_posmap_v1",
-    "note": "SingleAccessMap read and put on every backend of the sweep; the counts below are those of the private scheme's tree functions, and node_accesses is the number of calls to tree_access"
+    "note": "SingleAccessMap's calls on every backend of the sweep; the counts below are those of the private scheme's tree functions, node_accesses is the number of calls to tree_access, the eviction is evict_bucket and compact before Issue 47 and evict_path since, and a masked node move is a call of assign_tree_node or a masked swap of two nodes (two calls of swap_tree_value)"
   },
   "tools": {
     "valgrind": "valgrind-3.22.0",
@@ -17,123 +17,190 @@
   "revisions": [
     {
       "label": "before",
-      "commit": "9522bd5ec74770b18d57cf5f3bdaa610c7319050",
+      "commit": "990b054d1ec082e3871694c124dbedbeef0fc224",
       "runs": [
         {
-          "node_accesses": 211,
+          "node_accesses": 455,
           "functions": {
             "tree_access": {
-              "calls": 211,
-              "inclusive_ir": 3424302873,
-              "inclusive_ir_per_node_access": 16228923.6
+              "calls": 455,
+              "inclusive_ir": 3908058823,
+              "inclusive_ir_per_node_access": 8589140.3
             },
             "evict_bucket": {
-              "calls": 2743,
-              "inclusive_ir": 2017962011,
-              "inclusive_ir_per_node_access": 9563801.0
+              "calls": 5915,
+              "inclusive_ir": 2099342191,
+              "inclusive_ir_per_node_access": 4613938.9
             },
             "compact": {
-              "calls": 211,
-              "inclusive_ir": 1168924808,
-              "inclusive_ir_per_node_access": 5539928.0
+              "calls": 455,
+              "inclusive_ir": 1301322295,
+              "inclusive_ir_per_node_access": 2860049.0
+            },
+            "evict_path": {
+              "calls": 0,
+              "inclusive_ir": 0,
+              "inclusive_ir_per_node_access": 0.0
+            },
+            "take": {
+              "calls": 455,
+              "inclusive_ir": 52712637,
+              "inclusive_ir_per_node_access": 115851.9
             },
             "assign_tree_node": {
-              "calls": 7059045,
-              "inclusive_ir": 3543640590,
-              "inclusive_ir_per_node_access": 16794505.2
+              "calls": 16823317,
+              "inclusive_ir": 3432002370,
+              "inclusive_ir_per_node_access": 7542862.4
+            },
+            "swap_tree_value": {
+              "calls": 0,
+              "inclusive_ir": 0,
+              "inclusive_ir_per_node_access": 0.0
             }
-          }
+          },
+          "eviction_ir_per_node_access": 7473987.9,
+          "masked_node_moves_per_node_access": 36974.3
         },
         {
-          "node_accesses": 211,
+          "node_accesses": 455,
           "functions": {
             "tree_access": {
-              "calls": 211,
-              "inclusive_ir": 3424302873,
-              "inclusive_ir_per_node_access": 16228923.6
+              "calls": 455,
+              "inclusive_ir": 3908059025,
+              "inclusive_ir_per_node_access": 8589140.7
             },
             "evict_bucket": {
-              "calls": 2743,
-              "inclusive_ir": 2017962011,
-              "inclusive_ir_per_node_access": 9563801.0
+              "calls": 5915,
+              "inclusive_ir": 2099342191,
+              "inclusive_ir_per_node_access": 4613938.9
             },
             "compact": {
-              "calls": 211,
-              "inclusive_ir": 1168924808,
-              "inclusive_ir_per_node_access": 5539928.0
+              "calls": 455,
+              "inclusive_ir": 1301322295,
+              "inclusive_ir_per_node_access": 2860049.0
+            },
+            "evict_path": {
+              "calls": 0,
+              "inclusive_ir": 0,
+              "inclusive_ir_per_node_access": 0.0
+            },
+            "take": {
+              "calls": 455,
+              "inclusive_ir": 52712637,
+              "inclusive_ir_per_node_access": 115851.9
             },
             "assign_tree_node": {
-              "calls": 7059045,
-              "inclusive_ir": 3543640590,
-              "inclusive_ir_per_node_access": 16794505.2
+              "calls": 16823317,
+              "inclusive_ir": 3432002370,
+              "inclusive_ir_per_node_access": 7542862.4
+            },
+            "swap_tree_value": {
+              "calls": 0,
+              "inclusive_ir": 0,
+              "inclusive_ir_per_node_access": 0.0
             }
-          }
+          },
+          "eviction_ir_per_node_access": 7473987.9,
+          "masked_node_moves_per_node_access": 36974.3
         }
       ],
-      "runs_agree": true
+      "runs_agree": false
     },
     {
       "label": "after",
-      "commit": "c89ec4effa3bde148e6dabfbc3e0434725cf844f",
+      "commit": "ba0b958bf98eff655fdac04aa1fb4ffe4bb3c4dc",
       "runs": [
         {
-          "node_accesses": 211,
+          "node_accesses": 455,
           "functions": {
             "tree_access": {
-              "calls": 211,
-              "inclusive_ir": 1533420638,
-              "inclusive_ir_per_node_access": 7267396.4
+              "calls": 455,
+              "inclusive_ir": 1284663835,
+              "inclusive_ir_per_node_access": 2823437.0
             },
             "evict_bucket": {
-              "calls": 2743,
-              "inclusive_ir": 834909873,
-              "inclusive_ir_per_node_access": 3956918.8
+              "calls": 0,
+              "inclusive_ir": 0,
+              "inclusive_ir_per_node_access": 0.0
             },
             "compact": {
-              "calls": 211,
-              "inclusive_ir": 489869627,
-              "inclusive_ir_per_node_access": 2321657.0
+              "calls": 0,
+              "inclusive_ir": 0,
+              "inclusive_ir_per_node_access": 0.0
+            },
+            "evict_path": {
+              "calls": 455,
+              "inclusive_ir": 777362078,
+              "inclusive_ir_per_node_access": 1708488.1
+            },
+            "take": {
+              "calls": 455,
+              "inclusive_ir": 52712637,
+              "inclusive_ir_per_node_access": 115851.9
             },
             "assign_tree_node": {
-              "calls": 7059045,
-              "inclusive_ir": 1440086022,
-              "inclusive_ir_per_node_access": 6825052.2
+              "calls": 3480897,
+              "inclusive_ir": 710685387,
+              "inclusive_ir_per_node_access": 1561945.9
+            },
+            "swap_tree_value": {
+              "calls": 617890,
+              "inclusive_ir": 45415187,
+              "inclusive_ir_per_node_access": 99813.6
             }
-          }
+          },
+          "eviction_ir_per_node_access": 1708488.1,
+          "masked_node_moves_per_node_access": 8329.3
         },
         {
-          "node_accesses": 211,
+          "node_accesses": 455,
           "functions": {
             "tree_access": {
-              "calls": 211,
-              "inclusive_ir": 1533420638,
-              "inclusive_ir_per_node_access": 7267396.4
+              "calls": 455,
+              "inclusive_ir": 1284663834,
+              "inclusive_ir_per_node_access": 2823437.0
             },
             "evict_bucket": {
-              "calls": 2743,
-              "inclusive_ir": 834909873,
-              "inclusive_ir_per_node_access": 3956918.8
+              "calls": 0,
+              "inclusive_ir": 0,
+              "inclusive_ir_per_node_access": 0.0
             },
             "compact": {
-              "calls": 211,
-              "inclusive_ir": 489869627,
-              "inclusive_ir_per_node_access": 2321657.0
+              "calls": 0,
+              "inclusive_ir": 0,
+              "inclusive_ir_per_node_access": 0.0
+            },
+            "evict_path": {
+              "calls": 455,
+              "inclusive_ir": 777362078,
+              "inclusive_ir_per_node_access": 1708488.1
+            },
+            "take": {
+              "calls": 455,
+              "inclusive_ir": 52712637,
+              "inclusive_ir_per_node_access": 115851.9
             },
             "assign_tree_node": {
-              "calls": 7059045,
-              "inclusive_ir": 1440086022,
-              "inclusive_ir_per_node_access": 6825052.2
+              "calls": 3480897,
+              "inclusive_ir": 710685387,
+              "inclusive_ir_per_node_access": 1561945.9
+            },
+            "swap_tree_value": {
+              "calls": 617890,
+              "inclusive_ir": 45415187,
+              "inclusive_ir_per_node_access": 99813.6
             }
-          }
+          },
+          "eviction_ir_per_node_access": 1708488.1,
+          "masked_node_moves_per_node_access": 8329.3
         }
       ],
-      "runs_agree": true
+      "runs_agree": false
     }
   ],
   "before_over_after_per_node_access": {
-    "tree_access": 2.23,
-    "evict_bucket": 2.42,
-    "compact": 2.39,
-    "assign_tree_node": 2.46
+    "tree_access": 3.04,
+    "eviction": 4.37,
+    "masked_node_moves": 4.44
   }
 }
