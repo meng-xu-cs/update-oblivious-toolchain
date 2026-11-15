@@ -2,7 +2,7 @@ use crate::freshness::PathOramLeafSeed;
 use anyhow::{anyhow, bail, Result};
 use rand_chacha::ChaCha20Rng;
 use serde_json::json;
-use std::sync::Arc;
+use std::collections::BTreeMap;
 use uo_allocator::{AllocatorPlan, AllocatorSession};
 use uo_core::ir::StateObject;
 use uo_core::manifest::{
@@ -17,7 +17,7 @@ use uo_core::{
     RuntimeOramAccessCounterWitness, RuntimePathOramPositionMapWitness,
     RuntimePathOramTransitionWitness,
 };
-use uo_store::{StorageHandle, StoreCipher};
+use uo_store::{sealed_record_len, StorageHandle, StoreCipher};
 
 #[path = "generated_object_helpers.rs"]
 mod generated_object_helpers;
@@ -56,7 +56,7 @@ use generated_oram_codecs::{
 use generated_oram_codecs::{
     bootstrap_tree_storage, decide_pending_tree_put, refresh_tree_state_from_storage,
     reused_tree_presence, run_tree_get, run_tree_put, tree_entries_from_storage,
-    tree_position_map_witness_leaves, tree_put_accesses, TreeState,
+    tree_position_map_witness_leaves, tree_put_accesses, tree_shape_for_spec, TreeState,
 };
 #[allow(unused_imports)]
 pub(crate) use generated_oram_codecs::{OramBlock, OramBucket};
@@ -127,6 +127,20 @@ impl OramParameters {
 }
 
 impl OramParameters {
+    /// The public lengths of the map's sealed records: a bucket, a metadata
+    /// page and the access counter.
+    pub(crate) fn bucket_record_len(&self) -> usize {
+        sealed_record_len(self.bucket_size)
+    }
+
+    pub(crate) fn page_record_len(&self) -> usize {
+        sealed_record_len(self.directory_page_bytes)
+    }
+
+    pub(crate) fn counter_record_len(&self) -> usize {
+        sealed_record_len(8)
+    }
+
     fn is_surrogate(&self) -> bool {
         self.scheme == SURROGATE_ORAM_SCHEME
     }
@@ -161,45 +175,79 @@ impl OramParameters {
     }
 }
 
-/// The record a store keeps at `location`, which must have the public
-/// length `len` of the record it stands for.
-pub(crate) fn stored_record(
-    storage: &StorageHandle,
-    location: &str,
-    len: usize,
-) -> Result<Box<[u8]>> {
-    let record = storage
-        .record(location)
-        .ok_or_else(|| anyhow!("the store holds no record at {location}"))?;
-    if record.len() != len {
-        bail!(
-            "the store's record at {} has {} bytes where the object has {}",
-            location,
-            record.len(),
-            len
-        );
-    }
-    Ok(record)
-}
-
-#[derive(Debug)]
+/// The sealed records of a map's storage that a state holds. The store
+/// keeps every record, and a committed map holds none. A call's copy of the
+/// map holds the records it read from the store until it seals their next
+/// versions over them and hands those to the store: the counter and the
+/// metadata pages from the call's load to its commit, and the buckets of a
+/// path from the access that reads them to the next. A call that is dropped
+/// leaves the store as it was, which keeps the records it replaced until
+/// the call commits.
+#[derive(Debug, Default)]
 pub(crate) struct OramStorage {
     directory_pages: Box<[SealedPage]>,
-    buckets: Box<[SealedPage]>,
+    buckets: BucketTable,
     access_counter_slot: Box<[u8]>,
 }
 
-/// One sealed record of a map's storage: a bucket or a metadata page. The
-/// committed map and the copy of it that a call loads hold the same record,
-/// so loading a map copies no record. A write to a record that another
-/// state holds copies it first and changes the copy: the committed map is
-/// as it was until the call commits. A record this state alone holds is
-/// written in place.
-#[derive(Clone, Debug)]
-pub(crate) struct SealedPage(Arc<[u8]>);
+impl OramStorage {
+    /// The storage of a map that holds no record, of `bucket_count` buckets.
+    fn empty(bucket_count: usize) -> Self {
+        Self {
+            directory_pages: Box::default(),
+            buckets: BucketTable::empty(bucket_count),
+            access_counter_slot: Box::default(),
+        }
+    }
+
+    /// Whether the storage holds no record.
+    fn holds_none(&self) -> bool {
+        self.directory_pages.is_empty()
+            && self.buckets.holds_none()
+            && self.access_counter_slot.is_empty()
+    }
+
+    /// Read the counter and every metadata page from the store, where they
+    /// cross the storage boundary, and hold them.
+    fn read_counter_and_pages(
+        &mut self,
+        spec: &StateObject,
+        parameters: &OramParameters,
+        cipher: &StoreCipher,
+    ) -> Result<()> {
+        self.access_counter_slot = cipher.read_stored_record(
+            &format!("{}@counter", spec.name),
+            parameters.counter_record_len(),
+        )?;
+        self.directory_pages =
+            read_metadata_pages(spec, parameters, cipher, parameters.metadata_pages)?;
+        Ok(())
+    }
+}
+
+/// The first `pages` metadata pages of a map, read from the store.
+fn read_metadata_pages(
+    spec: &StateObject,
+    parameters: &OramParameters,
+    cipher: &StoreCipher,
+    pages: usize,
+) -> Result<Box<[SealedPage]>> {
+    let mut read = FixedBoxBuilder::new(pages);
+    for page in 0..pages {
+        read.push(SealedPage(cipher.read_stored_record(
+            &format!("{}@meta{page}", spec.name),
+            parameters.page_record_len(),
+        )?))?;
+    }
+    read.finish()
+}
+
+/// One sealed record of a map's storage that a state holds: a bucket or a
+/// metadata page it read from the store, or a deployment sealed.
+#[derive(Debug)]
+pub(crate) struct SealedPage(Box<[u8]>);
 
 impl SealedPage {
-    /// The records of a map's storage, each held by this state alone.
     fn from_records(records: Box<[Box<[u8]>]>) -> Result<Box<[Self]>> {
         let mut pages = FixedBoxBuilder::new(records.len());
         for record in std::iter::IntoIterator::into_iter(records) {
@@ -208,18 +256,14 @@ impl SealedPage {
         pages.finish()
     }
 
-    /// Zero the record if no other state holds it. A record that another
-    /// state holds is ciphertext that state still reads.
     pub(crate) fn wipe(&mut self) {
-        if let Some(bytes) = Arc::get_mut(&mut self.0) {
-            bytes.fill(0);
-        }
+        self.0.fill(0);
     }
 }
 
 impl From<Box<[u8]>> for SealedPage {
     fn from(record: Box<[u8]>) -> Self {
-        Self(Arc::from(record))
+        Self(record)
     }
 }
 
@@ -232,9 +276,106 @@ impl std::ops::Deref for SealedPage {
 }
 
 impl std::ops::DerefMut for SealedPage {
-    /// The record, to write it: a copy of it if another state holds it.
     fn deref_mut(&mut self) -> &mut [u8] {
-        Arc::make_mut(&mut self.0)
+        &mut self.0
+    }
+}
+
+/// The buckets of a map that a state holds, by index: those of the path an
+/// access read from the store, until the next access, or every bucket a
+/// deployment sealed, until the store takes them. `len` is the map's public
+/// count of buckets; a committed map holds none of them.
+#[derive(Debug, Default)]
+pub(crate) struct BucketTable {
+    len: usize,
+    held: BTreeMap<usize, SealedPage>,
+}
+
+impl BucketTable {
+    fn empty(len: usize) -> Self {
+        Self {
+            len,
+            held: BTreeMap::new(),
+        }
+    }
+
+    fn from_records(records: Box<[Box<[u8]>]>) -> Self {
+        let len = records.len();
+        let held = std::iter::IntoIterator::into_iter(records)
+            .enumerate()
+            .map(|(index, record)| (index, SealedPage::from(record)))
+            .collect();
+        Self { len, held }
+    }
+
+    /// The map's public count of buckets.
+    pub(crate) fn len(&self) -> usize {
+        self.len
+    }
+
+    pub(crate) fn get(&self, index: usize) -> Option<&SealedPage> {
+        self.held.get(&index)
+    }
+
+    pub(crate) fn get_mut(&mut self, index: usize) -> Option<&mut SealedPage> {
+        self.held.get_mut(&index)
+    }
+
+    /// Read bucket `index` from the store, where it crosses the storage
+    /// boundary, and hold it in place of a copy held before.
+    pub(crate) fn read(
+        &mut self,
+        cipher: &StoreCipher,
+        spec: &StateObject,
+        parameters: &OramParameters,
+        index: usize,
+    ) -> Result<()> {
+        if index >= self.len {
+            bail!(
+                "bucket {} of {} is outside its {} buckets",
+                index,
+                spec.name,
+                self.len
+            );
+        }
+        let record = cipher.read_stored_record(
+            &format!("{}@bucket{index}", spec.name),
+            parameters.bucket_record_len(),
+        )?;
+        self.held.insert(index, SealedPage(record));
+        Ok(())
+    }
+
+    /// Read every bucket from the store: what a decode of the whole map reads.
+    fn read_all(
+        spec: &StateObject,
+        parameters: &OramParameters,
+        cipher: &StoreCipher,
+    ) -> Result<Self> {
+        let mut table = Self::empty(parameters.bucket_count);
+        for index in 0..parameters.bucket_count {
+            table.read(cipher, spec, parameters, index)?;
+        }
+        Ok(table)
+    }
+
+    /// Drop every bucket held: the store keeps them.
+    pub(crate) fn release(&mut self) {
+        self.held.clear();
+    }
+
+    pub(crate) fn wipe(&mut self) {
+        for page in self.held.values_mut() {
+            page.wipe();
+        }
+    }
+
+    fn holds_none(&self) -> bool {
+        self.held.is_empty()
+    }
+
+    fn take_held(&mut self) -> BTreeMap<usize, SealedPage> {
+        std::mem::take(&mut self.held)
     }
 }
 
@@ -416,21 +557,24 @@ impl OramState {
         &self,
         spec: &StateObject,
     ) -> Result<RuntimePathOramPositionMapWitness> {
-        // What the decoders open, outside any trace: the tree's every bucket
-        // and metadata page, the local scheme's every position-map page.
+        // What the decoders open, outside any trace, read from the store:
+        // the tree's every bucket and metadata page, the local scheme's every
+        // position-map page.
         let leaves = if self.is_tree() {
             crate::instrumentation::count_witness_records(
                 self.parameters.bucket_count + self.parameters.metadata_pages,
             );
-            tree_position_map_witness_leaves(spec, &self.parameters, &self.cipher, &self.storage)?
+            let storage = self.read_buckets_and_pages(spec)?;
+            tree_position_map_witness_leaves(spec, &self.parameters, &self.cipher, &storage)?
         } else {
             crate::instrumentation::count_witness_records(self.parameters.position_map_pages());
-            path_position_map_witness_leaves(
+            let pages = read_metadata_pages(
                 spec,
                 &self.parameters,
                 &self.cipher,
-                &self.storage.directory_pages,
-            )?
+                self.parameters.position_map_pages(),
+            )?;
+            path_position_map_witness_leaves(spec, &self.parameters, &self.cipher, &pages)?
         };
         Ok(RuntimePathOramPositionMapWitness {
             object_id: spec.id,
@@ -460,21 +604,23 @@ impl OramState {
     ) -> Result<serde_json::Value> {
         let stored_entries;
         let entries: &[MapEntry] = if self.is_tree() {
+            let storage = self.read_buckets_and_pages(spec)?;
             stored_entries = tree_entries_from_storage(
                 spec,
                 &self.parameters,
                 &self.cipher,
-                &self.storage,
+                &storage,
                 &self.empty_entry,
             )?;
             &stored_entries
         } else if self.parameters.is_path_oram() {
+            let storage = self.read_buckets_and_pages(spec)?;
             stored_entries = path_entries_from_storage(
                 spec,
                 &self.parameters,
                 &self.cipher,
-                &self.storage.directory_pages,
-                &self.storage.buckets,
+                &storage.directory_pages,
+                &storage.buckets,
                 &self.empty_entry,
             )?;
             &stored_entries
@@ -501,74 +647,93 @@ impl OramState {
     /// Put the map behind a store. The map's cipher keeps the handle, so
     /// every record the map opens or seals from now on crosses to the store,
     /// and the store takes the map's records as their first, under the
-    /// names the map's accesses read and write them by.
+    /// names the map's accesses read and write them by. The map keeps none
+    /// of them.
     pub(crate) fn deploy_into_storage(
         &mut self,
         spec: &StateObject,
         storage: StorageHandle,
     ) -> Result<()> {
         self.cipher.attach_storage(storage);
-        for (page, record) in self.storage.directory_pages.iter().enumerate() {
+        let mut records = std::mem::replace(
+            &mut self.storage,
+            OramStorage::empty(self.parameters.bucket_count),
+        );
+        for (page, record) in records.directory_pages.iter().enumerate() {
             self.cipher
                 .store_first_record(&format!("{}@meta{page}", spec.name), record)?;
         }
-        for (index, record) in self.storage.buckets.iter().enumerate() {
+        for (index, record) in records.buckets.take_held() {
             self.cipher
-                .store_first_record(&format!("{}@bucket{index}", spec.name), record)?;
+                .store_first_record(&format!("{}@bucket{index}", spec.name), &record)?;
         }
         self.cipher.store_first_record(
             &format!("{}@counter", spec.name),
-            &self.storage.access_counter_slot,
+            &records.access_counter_slot,
         )
     }
 
-    /// Take the map's records from a store that a deployment of the same
-    /// contract and secret left: how a runtime that restarts finds the map.
-    /// The cipher resumes at the seal count the store has reserved, so it
-    /// repeats no nonce of a record the store was handed.
+    /// Find the map in a store that a deployment of the same contract and
+    /// secret left: how a runtime that restarts finds the map. The store
+    /// keeps the map's records, and the map holds none of them. The cipher
+    /// resumes at the seal count the store has reserved, so it repeats no
+    /// nonce of a record the store was handed, and the map reads its access
+    /// counter from the store.
     pub(crate) fn restore_from_storage(
         &mut self,
         spec: &StateObject,
         storage: StorageHandle,
         allocator: &mut AllocatorSession,
     ) -> Result<()> {
-        for (page, record) in self.storage.directory_pages.iter_mut().enumerate() {
-            let stored =
-                stored_record(&storage, &format!("{}@meta{page}", spec.name), record.len())?;
-            *record = SealedPage::from(stored);
-        }
-        for (index, record) in self.storage.buckets.iter_mut().enumerate() {
-            let stored = stored_record(
-                &storage,
-                &format!("{}@bucket{index}", spec.name),
-                record.len(),
-            )?;
-            *record = SealedPage::from(stored);
-        }
-        self.storage.access_counter_slot = stored_record(
-            &storage,
-            &format!("{}@counter", spec.name),
-            self.storage.access_counter_slot.len(),
-        )?;
         self.cipher.resume_seal_count(storage.reserved_seals());
         self.cipher.attach_storage(storage);
-        self.access_counter = read_oram_counter_from_storage(
-            spec,
-            &self.cipher,
-            allocator,
-            &self.storage.access_counter_slot,
+        let counter = self.cipher.read_stored_record(
+            &format!("{}@counter", spec.name),
+            self.parameters.counter_record_len(),
         )?;
+        self.access_counter =
+            read_oram_counter_from_storage(spec, &self.cipher, allocator, &counter)?;
         Ok(())
     }
 
-    /// Hand each sealed record the map holds in storage to `visit`: its
-    /// metadata pages, its buckets and its counter slot, in that order.
-    pub(crate) fn for_each_sealed_record(&self, visit: &mut dyn FnMut(&[u8])) {
-        let storage = &self.storage;
-        for record in storage.directory_pages.iter().chain(storage.buckets.iter()) {
-            visit(record);
+    /// Hand each sealed record the store keeps for the map to `visit`: its
+    /// metadata pages, its buckets and its counter, in that order.
+    pub(crate) fn for_each_sealed_record(
+        &self,
+        spec: &StateObject,
+        visit: &mut dyn FnMut(&[u8]),
+    ) -> Result<()> {
+        let pages =
+            (0..self.parameters.metadata_pages).map(|page| format!("{}@meta{page}", spec.name));
+        let buckets =
+            (0..self.parameters.bucket_count).map(|index| format!("{}@bucket{index}", spec.name));
+        for location in pages
+            .chain(buckets)
+            .chain(std::iter::once(format!("{}@counter", spec.name)))
+        {
+            crate::runtime::objects::visit_stored_record(&self.cipher, &location, &mut *visit)?;
         }
-        visit(&storage.access_counter_slot);
+        Ok(())
+    }
+
+    /// Every bucket and metadata page of the map, read from the store: what
+    /// a decode of the whole map opens.
+    fn read_buckets_and_pages(&self, spec: &StateObject) -> Result<OramStorage> {
+        Ok(OramStorage {
+            directory_pages: read_metadata_pages(
+                spec,
+                &self.parameters,
+                &self.cipher,
+                self.parameters.metadata_pages,
+            )?,
+            buckets: BucketTable::read_all(spec, &self.parameters, &self.cipher)?,
+            access_counter_slot: Box::default(),
+        })
+    }
+
+    /// Whether the map holds no sealed record: the store keeps them all.
+    pub(crate) fn holds_no_sealed_record(&self) -> bool {
+        self.storage.holds_none()
     }
 
     #[cfg(test)]
@@ -576,18 +741,9 @@ impl OramState {
         self.access_counter
     }
 
-    /// The map's cipher and every sealed record it holds in storage.
     #[cfg(test)]
-    pub(crate) fn sealed_storage_for_test(&self) -> (&StoreCipher, Vec<&[u8]>) {
-        let storage = &self.storage;
-        let records = storage
-            .directory_pages
-            .iter()
-            .chain(storage.buckets.iter())
-            .map(|record| &record[..])
-            .chain(std::iter::once(&storage.access_counter_slot[..]))
-            .collect();
-        (&self.cipher, records)
+    pub(crate) fn cipher_for_test(&self) -> &StoreCipher {
+        &self.cipher
     }
 
     #[cfg(test)]
@@ -616,12 +772,13 @@ impl OramState {
     /// The map's contents as stored: every bucket and the stash.
     #[cfg(test)]
     pub(crate) fn stored_entries_for_test(&self, spec: &StateObject) -> Vec<MapEntry> {
+        let storage = self.read_buckets_and_pages(spec).unwrap();
         path_entries_from_storage(
             spec,
             &self.parameters,
             &self.cipher,
-            &self.storage.directory_pages,
-            &self.storage.buckets,
+            &storage.directory_pages,
+            &storage.buckets,
             &self.empty_entry,
         )
         .unwrap()
@@ -676,6 +833,13 @@ impl OramState {
     }
 
     pub(crate) fn cold_commit(&mut self) {
+        self.cold_plaintext();
+        // The store keeps the map's records: a committed map holds none.
+        self.storage = OramStorage::empty(self.parameters.bucket_count);
+    }
+
+    /// Zero what the map holds in the clear, and keep its records.
+    fn cold_plaintext(&mut self) {
         cold_commit_oram_state(
             &mut self.position_map,
             &mut self.entries,
@@ -692,10 +856,20 @@ impl OramState {
         self.cipher.clone_for_runtime_state()
     }
 
-    pub(crate) fn instantiate(spec: &StateObject, rng: &mut ChaCha20Rng) -> Result<Self> {
+    /// A fresh map. With `seal`, it holds the first records a deployment
+    /// hands its store; without, it is the map a restart finds, which holds
+    /// no record and seals nothing, as the store keeps its records.
+    pub(crate) fn instantiate(
+        spec: &StateObject,
+        rng: &mut ChaCha20Rng,
+        seal: bool,
+    ) -> Result<Self> {
         let parameters = OramParameters::for_spec(spec)?;
         let cipher = StoreCipher::from_rng(rng);
         let empty_entry = empty_map_entry(spec)?;
+        if !seal {
+            return Self::unsealed(spec, parameters, cipher, empty_entry);
+        }
         if parameters.scheme == PATH_ORAM_PRIVATE_POSMAP_SCHEME {
             // The private scheme's map is an AVL tree in the ORAM: no flat
             // slots or position map in the enclave.
@@ -710,13 +884,13 @@ impl OramState {
                 tree: Some(tree),
                 storage: OramStorage {
                     directory_pages: SealedPage::from_records(directory_pages)?,
-                    buckets: SealedPage::from_records(buckets)?,
+                    buckets: BucketTable::from_records(buckets),
                     access_counter_slot: bootstrap_oram_counter_slot(spec, &cipher)?,
                 },
                 access_counter: 0,
                 cipher,
             };
-            state.cold_commit();
+            state.cold_plaintext();
             return Ok(state);
         }
         let entries = repeat_boxed_map_entries(parameters.capacity, &empty_entry)?;
@@ -742,13 +916,13 @@ impl OramState {
                 tree: None,
                 storage: OramStorage {
                     directory_pages: SealedPage::from_records(directory_pages)?,
-                    buckets: SealedPage::from_records(buckets)?,
+                    buckets: BucketTable::from_records(buckets),
                     access_counter_slot: bootstrap_oram_counter_slot(spec, &cipher)?,
                 },
                 access_counter: 0,
                 cipher,
             };
-            state.cold_commit();
+            state.cold_plaintext();
             Ok(state)
         } else {
             let position_map =
@@ -787,22 +961,65 @@ impl OramState {
                 tree: None,
                 storage: OramStorage {
                     directory_pages: SealedPage::from_records(directory_pages)?,
-                    buckets: SealedPage::from_records(buckets)?,
+                    buckets: BucketTable::from_records(buckets),
                     access_counter_slot: bootstrap_oram_counter_slot(spec, &cipher)?,
                 },
                 access_counter: 0,
                 cipher,
             };
-            state.cold_commit();
+            state.cold_plaintext();
             Ok(state)
         }
     }
 
+    /// The cold map a restart finds: its key, its public shape and its cold
+    /// plaintext, and no record.
+    fn unsealed(
+        spec: &StateObject,
+        parameters: OramParameters,
+        cipher: StoreCipher,
+        empty_entry: MapEntry,
+    ) -> Result<Self> {
+        let tree = if parameters.scheme == PATH_ORAM_PRIVATE_POSMAP_SCHEME {
+            Some(TreeState::cold(
+                &tree_shape_for_spec(spec, &parameters)?,
+                parameters.buckets_per_access,
+            )?)
+        } else {
+            None
+        };
+        let flat = tree.is_none();
+        let slots = if flat { parameters.capacity } else { 0 };
+        let stash = if flat && !parameters.is_surrogate() {
+            FixedStash::with_capacity(spec, working_stash_capacity(&parameters)?)?
+        } else {
+            FixedStash::placeholder()
+        };
+        let mut state = Self {
+            entries: repeat_boxed_map_entries(slots, &empty_entry)?,
+            position_map: repeat_boxed_masked_usize_options(slots, &MaskedUsizeOption::none())?,
+            empty_entry,
+            stash,
+            tree,
+            storage: OramStorage::empty(parameters.bucket_count),
+            parameters,
+            access_counter: 0,
+            cipher,
+        };
+        state.cold_commit();
+        Ok(state)
+    }
+
+    /// Load the map for a call: read its counter and its metadata pages
+    /// from the store, which the call holds until it commits, and open
+    /// them.
     pub(crate) fn refresh_from_storage(
         &mut self,
         spec: &StateObject,
         allocator: &mut AllocatorSession,
     ) -> Result<()> {
+        self.storage
+            .read_counter_and_pages(spec, &self.parameters, &self.cipher)?;
         self.access_counter = read_oram_counter_from_storage(
             spec,
             &self.cipher,
@@ -884,20 +1101,20 @@ impl OramState {
         if self.parameters.is_surrogate() {
             let mut next = self;
             if aborted {
+                // The pages the call read at its load: the committed ones,
+                // which a surrogate map's call writes only below.
                 decode_surrogate_entries_from_storage_into(
                     spec,
                     &old.parameters,
                     &old.cipher,
-                    &old.storage.directory_pages,
+                    &next.storage.directory_pages,
                     allocator,
                     &old.empty_entry,
                     &mut next.entries,
                 )?;
             }
             let empty_entry = empty_map_entry(spec)?;
-            if old.storage.directory_pages.len() != next.parameters.metadata_pages
-                || next.storage.directory_pages.len() != next.parameters.metadata_pages
-            {
+            if next.storage.directory_pages.len() != next.parameters.metadata_pages {
                 bail!(
                     "surrogate ORAM directory page count did not match public metadata count for {}",
                     spec.name
@@ -1072,8 +1289,8 @@ mod tests {
     };
     use super::{
         empty_map_entry, encode_path_metadata_pages, repeat_boxed_map_entries,
-        repeat_boxed_masked_usize_options, MapEntry, MaskedUsizeOption, OramBlock, OramParameters,
-        OramState, PathOramLeafCoinSource, SealedPage, SURROGATE_ORAM_SCHEME,
+        repeat_boxed_masked_usize_options, MapEntry, MaskedUsizeOption, OramBlock, OramBucket,
+        OramParameters, OramState, PathOramLeafCoinSource, SealedPage, SURROGATE_ORAM_SCHEME,
     };
     use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
@@ -1082,7 +1299,7 @@ mod tests {
     use uo_core::manifest::PATH_ORAM_SCHEME;
     use uo_core::trace::WriteClass;
     use uo_core::{ScalarType, Type, Value};
-    use uo_store::StoreCipher;
+    use uo_store::{SharedStorage, StoreCipher};
 
     fn oram_spec() -> StateObject {
         StateObject {
@@ -1169,13 +1386,53 @@ mod tests {
         shapes
     }
 
+    /// A fresh map deployed into a store of its own, which keeps its
+    /// records: a committed map, which holds none of them.
+    fn deployed(spec: &StateObject, seed: u64) -> OramState {
+        let mut rng = ChaCha20Rng::seed_from_u64(seed);
+        let mut state = OramState::instantiate(spec, &mut rng, true).unwrap();
+        state
+            .deploy_into_storage(spec, SharedStorage::memory().handle(&spec.name))
+            .unwrap();
+        state
+    }
+
+    /// A fresh map as a call loads it, its counter and metadata pages read
+    /// from its store.
+    fn loaded(spec: &StateObject, seed: u64) -> OramState {
+        let mut state = deployed(spec, seed);
+        let mut allocator = allocator_for_path_oram(&state.parameters);
+        state.refresh_from_storage(spec, &mut allocator).unwrap();
+        allocator.finish().unwrap();
+        state
+    }
+
+    /// Hold the counter and the metadata pages of a deployed map, as a call
+    /// that loads it does, and keep its plaintext as it is.
+    fn hold_counter_and_pages(state: &mut OramState, spec: &StateObject) {
+        let parameters = state.parameters.clone();
+        let cipher = state.cipher.clone_for_runtime_state();
+        state
+            .storage
+            .read_counter_and_pages(spec, &parameters, &cipher)
+            .unwrap();
+    }
+
+    /// Put `record` at `location` in the store of `state`, in place of the
+    /// record it keeps there.
+    fn put_stored_record(state: &OramState, location: &str, record: &[u8]) {
+        let storage = state.cipher.storage().unwrap();
+        storage.reserve_seals(state.cipher.seal_count()).unwrap();
+        storage.write(location, record).unwrap();
+    }
+
     fn path_oram_state_with_stash(
         spec: &StateObject,
         stash: Vec<OramBlock>,
         seed: u64,
     ) -> OramState {
         let mut rng = ChaCha20Rng::seed_from_u64(seed);
-        let mut state = OramState::instantiate(spec, &mut rng).unwrap();
+        let mut state = OramState::instantiate(spec, &mut rng, true).unwrap();
         let mut entries =
             repeat_boxed_map_entries(state.parameters.capacity, &empty_map_entry(spec).unwrap())
                 .unwrap()
@@ -1216,6 +1473,11 @@ mod tests {
             .unwrap(),
         )
         .unwrap();
+        // The store takes the pages, and the map holds them as a call does.
+        state
+            .deploy_into_storage(spec, SharedStorage::memory().handle(&spec.name))
+            .unwrap();
+        hold_counter_and_pages(&mut state, spec);
         state
     }
 
@@ -1260,19 +1522,31 @@ mod tests {
         for (slot, key) in directory {
             entries[*slot] = MapEntry::new(true, key.clone(), Value::uint(0));
         }
-        state.storage.directory_pages = SealedPage::from_records(
-            encode_path_metadata_pages(
-                spec,
-                &state.parameters,
-                &state.cipher,
-                &masked_position_map,
-                &entries,
-                stash,
-                &mut allocator,
-            )
-            .unwrap(),
+        let pages = encode_path_metadata_pages(
+            spec,
+            &state.parameters,
+            &state.cipher,
+            &masked_position_map,
+            &entries,
+            stash,
+            &mut allocator,
         )
         .unwrap();
+        for (page, record) in pages.iter().enumerate() {
+            put_stored_record(state, &format!("{}@meta{page}", spec.name), record);
+        }
+    }
+
+    /// Seal `bucket` as bucket `index` of `state`'s map and put it in the
+    /// store.
+    fn put_stored_bucket(state: &OramState, spec: &StateObject, index: usize, bucket: &OramBucket) {
+        let aad = oram_bucket_aad(spec, index);
+        let mut payload = oram_bucket_bytes(bucket, spec).unwrap();
+        let record = state
+            .cipher
+            .seal_and_wipe_boxed(aad.as_bytes(), &mut payload)
+            .unwrap();
+        put_stored_record(state, &format!("{}@bucket{index}", spec.name), &record);
     }
 
     #[test]
@@ -1374,12 +1648,8 @@ mod tests {
             .iter()
             .map(|page| page.as_ptr())
             .collect::<Vec<_>>();
-        let bucket_ptrs = state
-            .storage
-            .buckets
-            .iter()
-            .map(|bucket| bucket.as_ptr())
-            .collect::<Vec<_>>();
+        assert_eq!(directory_page_ptrs.len(), state.parameters.metadata_pages);
+        assert!(state.storage.buckets.holds_none());
         let counter_ptr = state.storage.access_counter_slot.as_ptr();
 
         let mut allocator = allocator_for_path_oram(&state.parameters);
@@ -1405,16 +1675,16 @@ mod tests {
                 .collect::<Vec<_>>(),
             directory_page_ptrs
         );
-        assert_eq!(
-            state
-                .storage
-                .buckets
-                .iter()
-                .map(|bucket| bucket.as_ptr())
-                .collect::<Vec<_>>(),
-            bucket_ptrs
-        );
         assert_eq!(state.storage.access_counter_slot.as_ptr(), counter_ptr);
+        // The map holds the buckets of the path it read and resealed, which
+        // are the records the store now keeps.
+        let held: Vec<usize> = state.storage.buckets.held.keys().copied().collect();
+        assert_eq!(held.len(), state.parameters.buckets_per_access);
+        for index in held {
+            let location = format!("{}@bucket{index}", spec.name);
+            let stored = state.cipher.storage().unwrap().record(&location).unwrap();
+            assert_eq!(&**state.storage.buckets.get(index).unwrap(), &*stored);
+        }
     }
 
     /// A stash that holds more blocks than its bound is an overflow. The
@@ -1424,8 +1694,7 @@ mod tests {
     #[test]
     fn path_oram_get_fails_on_a_stash_overflow() {
         let spec = path_oram_spec();
-        let mut rng = ChaCha20Rng::seed_from_u64(0x5010);
-        let mut state = OramState::instantiate(&spec, &mut rng).unwrap();
+        let mut state = loaded(&spec, 0x5010);
         let stash_capacity = state.stash.capacity();
         let leaf_count = state.parameters.leaf_count();
 
@@ -1460,86 +1729,107 @@ mod tests {
         );
     }
 
-    /// A sealed record of a map's storage is shared by the states that
-    /// hold it. A write to a record that another state holds changes a copy
-    /// and leaves the other state its own; a write to a record held alone
-    /// is made in place. Wiping zeroes a record only when no other state
-    /// holds it.
+    /// A committed map holds no sealed record: its store keeps them. A call
+    /// reads from the store the counter and the metadata pages when it
+    /// loads the map, and the buckets of a path when it accesses it, and
+    /// holds those until it seals their next versions over them and hands
+    /// them to the store. Making the map cold drops every record it holds.
     #[test]
-    fn a_shared_sealed_record_is_copied_when_it_is_written() {
-        let record: Box<[u8]> = vec![7u8; 64].into_boxed_slice();
-        let mut committed = SealedPage::from(record);
-        let committed_ptr = committed.as_ptr();
+    fn a_committed_map_holds_no_record_and_a_call_reads_the_ones_it_opens() {
+        let spec = path_oram_spec();
+        let committed = deployed(&spec, 0x5EA1);
+        assert!(committed.holds_no_sealed_record());
+        let storage = committed.cipher.storage().unwrap().clone();
+        let stored = |location: &str| storage.record(location).unwrap();
 
-        // A record held alone is written where it is.
-        committed[0] = 8;
-        assert_eq!(committed.as_ptr(), committed_ptr);
+        let mut allocator = allocator_for_path_oram(&committed.parameters);
+        let mut state = committed.clone_for_tx(&spec, &mut allocator).unwrap();
+        assert!(committed.holds_no_sealed_record());
+        // The load holds the counter and the metadata pages, as the store
+        // keeps them, and no bucket.
+        assert_eq!(
+            &*state.storage.access_counter_slot,
+            &*stored(&format!("{}@counter", spec.name))
+        );
+        assert_eq!(
+            state.storage.directory_pages.len(),
+            state.parameters.metadata_pages
+        );
+        for (page, record) in state.storage.directory_pages.iter().enumerate() {
+            assert_eq!(&**record, &*stored(&format!("{}@meta{page}", spec.name)));
+        }
+        assert!(state.storage.buckets.holds_none());
 
-        // Loading shares it.
-        let mut loaded = committed.clone();
-        assert_eq!(loaded.as_ptr(), committed_ptr);
-        // Wiping a shared record leaves it.
-        loaded.wipe();
-        assert_eq!(loaded[..2], [8, 7]);
-        assert_eq!(loaded.as_ptr(), committed_ptr);
-
-        // A write copies it, and the other holder has the record as it was.
-        loaded[1] = 9;
-        assert_ne!(loaded.as_ptr(), committed_ptr);
-        assert_eq!(loaded[..2], [8, 9]);
-        assert_eq!(committed[..2], [8, 7]);
-        assert_eq!(committed.as_ptr(), committed_ptr);
-        // The copy is now held alone and is written in place.
-        let loaded_ptr = loaded.as_ptr();
-        loaded[2] = 10;
-        assert_eq!(loaded.as_ptr(), loaded_ptr);
-
-        // A record held alone is zeroed by a wipe.
-        loaded.wipe();
-        assert!(loaded.iter().all(|byte| *byte == 0));
-        assert_eq!(committed[..2], [8, 7]);
-        // Once the other holder is gone, so is this one.
-        let mut last = committed.clone();
-        drop(committed);
-        last.wipe();
-        assert!(last.iter().all(|byte| *byte == 0));
+        let mut leaf_coins = PathOramLeafCoinSource::random();
+        state
+            .put(
+                &spec,
+                Value::Address([0x5E; 20]),
+                Value::uint(3),
+                true,
+                &mut allocator,
+                &mut leaf_coins,
+            )
+            .unwrap();
+        // The access holds the buckets of its path, each the record it
+        // sealed and handed to the store, and every bucket it holds is on
+        // the path it read.
+        let leaf = state.parameters.leaf_count();
+        let held: Vec<usize> = state.storage.buckets.held.keys().copied().collect();
+        assert!(!held.is_empty() && held.len() < state.parameters.bucket_count);
+        assert!(held
+            .iter()
+            .all(|index| *index < state.parameters.bucket_count));
+        let _ = leaf;
+        for index in &held {
+            assert_eq!(
+                &**state.storage.buckets.get(*index).unwrap(),
+                &*stored(&format!("{}@bucket{index}", spec.name))
+            );
+        }
+        state.cold_commit();
+        assert!(state.holds_no_sealed_record());
     }
 
     #[test]
     fn surrogate_commit_reads_old_entries_from_storage_on_abort() {
         let spec = oram_spec();
-        let mut rng = ChaCha20Rng::seed_from_u64(0x5153);
-        let mut old = OramState::instantiate(&spec, &mut rng).unwrap();
+        let mut old = deployed(&spec, 0x5153);
+        let storage = old.cipher.storage().unwrap().clone();
+        let records = |prefix: &str, count: usize| -> Vec<Box<[u8]>> {
+            (0..count)
+                .map(|index| {
+                    storage
+                        .record(&format!("{}@{prefix}{index}", spec.name))
+                        .unwrap()
+                })
+                .collect()
+        };
         let mut old_allocator = allocator_for_path_oram(&old.parameters);
         old.refresh_from_storage(&spec, &mut old_allocator).unwrap();
         old_allocator.finish().unwrap();
-        let expected_entries = map_entries_snapshot(&old.entries);
+        old.cold_commit();
+        let expected_entries = {
+            let mut allocator = allocator_for_path_oram(&old.parameters);
+            map_entries_snapshot(&old.clone_for_tx(&spec, &mut allocator).unwrap().entries)
+        };
+        // What the committed map holds of its contents in the clear is not
+        // what a call reads: a call reads the store.
         old.entries[0] = MapEntry {
             occupied: true,
             key: Value::Address([0x11; 20]),
             value: Value::uint(7),
         };
-
-        // Where the records of a state's storage are, and what they hold.
-        fn page_ptrs(pages: &[SealedPage]) -> Vec<*const u8> {
-            pages.iter().map(|page| page.as_ptr()).collect()
-        }
-        fn page_bytes(pages: &[SealedPage]) -> Vec<Vec<u8>> {
-            pages.iter().map(|page| page.to_vec()).collect()
-        }
-        let old_directory_pages = page_bytes(&old.storage.directory_pages);
-        let old_buckets = page_bytes(&old.storage.buckets);
+        let (pages, buckets) = (old.parameters.metadata_pages, old.parameters.bucket_count);
+        let old_pages = records("meta", pages);
+        let old_buckets = records("bucket", buckets);
+        let old_counter = storage.record(&format!("{}@counter", spec.name)).unwrap();
 
         let mut shadow_allocator = allocator_for_path_oram(&old.parameters);
         let mut new = old.clone_for_tx(&spec, &mut shadow_allocator).unwrap();
         shadow_allocator.finish().unwrap();
+        assert!(old.holds_no_sealed_record());
         let entries_ptr = new.entries.as_ptr();
-        // The loaded map holds the committed map's records: none is copied.
-        let directory_page_ptrs = page_ptrs(&new.storage.directory_pages);
-        let bucket_ptrs = page_ptrs(&new.storage.buckets);
-        assert_eq!(directory_page_ptrs, page_ptrs(&old.storage.directory_pages));
-        assert_eq!(bucket_ptrs, page_ptrs(&old.storage.buckets));
-        let counter_ptr = new.storage.access_counter_slot.as_ptr();
         new.entries[0] = MapEntry {
             occupied: true,
             key: Value::Address([0x22; 20]),
@@ -1554,52 +1844,33 @@ mod tests {
 
         assert_eq!(map_entries_snapshot(&commit.next.entries), expected_entries);
         assert_eq!(commit.next.entries.as_ptr(), entries_ptr);
-        // The commit wrote every metadata page and a window of buckets. A
-        // record it wrote is a copy of its own, since the committed map
-        // holds the record it replaces; a record it did not write is still
-        // the committed map's. The committed map is as it was.
-        let next_directory_page_ptrs = page_ptrs(&commit.next.storage.directory_pages);
-        assert_eq!(next_directory_page_ptrs.len(), directory_page_ptrs.len());
-        assert!(next_directory_page_ptrs
+        // The commit wrote every metadata page, a window of buckets and the
+        // counter in the store, and no other bucket.
+        assert!(records("meta", pages)
             .iter()
-            .zip(&directory_page_ptrs)
-            .all(|(next, loaded)| next != loaded));
-        let next_bucket_ptrs = page_ptrs(&commit.next.storage.buckets);
-        assert_eq!(next_bucket_ptrs.len(), bucket_ptrs.len());
-        let written_buckets = next_bucket_ptrs
+            .zip(&old_pages)
+            .all(|(next, before)| next != before));
+        let written_buckets = records("bucket", buckets)
             .iter()
-            .zip(&bucket_ptrs)
-            .filter(|(next, loaded)| next != loaded)
+            .zip(&old_buckets)
+            .filter(|(next, before)| next != before)
             .count();
         assert_eq!(
             written_buckets,
-            commit
-                .next
-                .parameters
-                .buckets_per_access
-                .min(bucket_ptrs.len())
+            commit.next.parameters.buckets_per_access.min(buckets)
         );
-        assert_eq!(page_ptrs(&old.storage.buckets), bucket_ptrs);
-        assert_eq!(
-            page_bytes(&old.storage.directory_pages),
-            old_directory_pages
-        );
-        assert_eq!(page_bytes(&old.storage.buckets), old_buckets);
         assert_ne!(
-            page_bytes(&commit.next.storage.directory_pages),
-            old_directory_pages
-        );
-        assert_eq!(
-            commit.next.storage.access_counter_slot.as_ptr(),
-            counter_ptr
+            storage.record(&format!("{}@counter", spec.name)).unwrap(),
+            old_counter
         );
         assert_eq!(commit.next.access_counter, 1);
+        assert!(old.holds_no_sealed_record());
 
-        let mut refresh_allocator = allocator_for_path_oram(&commit.next.parameters);
-        let rebuilt = commit
-            .next
-            .clone_for_tx(&spec, &mut refresh_allocator)
-            .unwrap();
+        let mut next = commit.next;
+        next.cold_commit();
+        assert!(next.holds_no_sealed_record());
+        let mut refresh_allocator = allocator_for_path_oram(&next.parameters);
+        let rebuilt = next.clone_for_tx(&spec, &mut refresh_allocator).unwrap();
         refresh_allocator.finish().unwrap();
         assert_eq!(map_entries_snapshot(&rebuilt.entries), expected_entries);
     }
@@ -1608,7 +1879,7 @@ mod tests {
     fn surrogate_get_returns_zero_for_missing_key_after_full_scan_lookup() {
         let spec = oram_spec();
         let mut rng = ChaCha20Rng::seed_from_u64(0x5154);
-        let mut state = OramState::instantiate(&spec, &mut rng).unwrap();
+        let mut state = OramState::instantiate(&spec, &mut rng, true).unwrap();
         state.entries[0] = MapEntry {
             occupied: true,
             key: Value::Address([0x11; 20]),
@@ -1633,7 +1904,7 @@ mod tests {
     fn surrogate_put_with_false_apply_preserves_existing_entries() {
         let spec = oram_spec();
         let mut rng = ChaCha20Rng::seed_from_u64(0x5155);
-        let mut state = OramState::instantiate(&spec, &mut rng).unwrap();
+        let mut state = OramState::instantiate(&spec, &mut rng, true).unwrap();
         state.entries[0] = MapEntry {
             occupied: true,
             key: Value::Address([0x11; 20]),
@@ -2018,8 +2289,8 @@ mod tests {
 
     #[test]
     fn path_oram_refresh_reads_no_bucket() {
-        // A call starts from the metadata pages alone: corrupting every
-        // bucket leaves the refresh untouched.
+        // A call starts from the counter and the metadata pages alone: its
+        // load reads them from the store, and no bucket.
         let spec = path_oram_spec();
         let original_stash = vec![OramBlock {
             occupied: true,
@@ -2029,11 +2300,14 @@ mod tests {
             value: Value::uint(4),
         }];
         let mut state = path_oram_state_with_stash(&spec, original_stash, 0xB0C7);
-        for bucket in state.storage.buckets.iter_mut() {
-            bucket.fill(0xFF);
-        }
+        state.cold_commit();
+        let storage = state.cipher.storage().unwrap().clone();
         let mut allocator = allocator_for_path_oram(&state.parameters);
+        let reads_before = storage.stats().reads;
         let cloned = state.clone_for_tx(&spec, &mut allocator).unwrap();
+        let reads = storage.stats().reads - reads_before;
+        assert_eq!(reads as usize, 1 + state.parameters.metadata_pages);
+        assert!(cloned.storage.buckets.holds_none());
         assert_eq!(cloned.position_map[2].to_option(), Some(1));
         assert!(cloned.entries[2].matches_key(&Value::Address([0x33; 20])));
         assert_eq!(cloned.entries[2].value(), &Value::uint(0));
@@ -2044,8 +2318,7 @@ mod tests {
         // The value comes from the key's block once its path is read; the
         // directory holds no value.
         let spec = path_oram_spec();
-        let mut rng = ChaCha20Rng::seed_from_u64(0x7A1E);
-        let mut state = OramState::instantiate(&spec, &mut rng).unwrap();
+        let mut state = deployed(&spec, 0x7A1E);
         let leaf = 2usize;
         let block = OramBlock {
             occupied: true,
@@ -2065,13 +2338,7 @@ mod tests {
         );
         let leaf_bucket = state.parameters.leaf_count() - 1 + leaf;
         let bucket = oram_bucket_with_live_blocks(&spec, 0, leaf_bucket, 1, &[block]).unwrap();
-        let aad = oram_bucket_aad(&spec, leaf_bucket);
-        let mut payload = oram_bucket_bytes(&bucket, &spec).unwrap();
-        state.storage.buckets[leaf_bucket] = state
-            .cipher
-            .seal_and_wipe_boxed(aad.as_bytes(), &mut payload)
-            .unwrap()
-            .into();
+        put_stored_bucket(&state, &spec, leaf_bucket, &bucket);
 
         let mut allocator = allocator_for_path_oram(&state.parameters);
         state.refresh_from_storage(&spec, &mut allocator).unwrap();
@@ -2093,8 +2360,7 @@ mod tests {
     #[test]
     fn path_oram_get_reports_duplicate_live_block_in_band() {
         let spec = path_oram_spec();
-        let mut rng = ChaCha20Rng::seed_from_u64(0xBAD5EED);
-        let mut state = OramState::instantiate(&spec, &mut rng).unwrap();
+        let mut state = deployed(&spec, 0xBAD5EED);
         let duplicate = OramBlock {
             occupied: true,
             slot_index: 0,
@@ -2115,13 +2381,7 @@ mod tests {
             std::slice::from_ref(&duplicate),
         );
         let bucket = oram_bucket_with_live_blocks(&spec, 0, 0, 1, &[duplicate]).unwrap();
-        let aad = oram_bucket_aad(&spec, 0);
-        let mut payload = oram_bucket_bytes(&bucket, &spec).unwrap();
-        state.storage.buckets[0] = state
-            .cipher
-            .seal_and_wipe_boxed(aad.as_bytes(), &mut payload)
-            .unwrap()
-            .into();
+        put_stored_bucket(&state, &spec, 0, &bucket);
 
         let mut allocator = allocator_for_path_oram(&state.parameters);
         state.refresh_from_storage(&spec, &mut allocator).unwrap();
@@ -2140,8 +2400,7 @@ mod tests {
     #[test]
     fn path_oram_get_reports_position_map_leaf_mismatch_in_band() {
         let spec = path_oram_spec();
-        let mut rng = ChaCha20Rng::seed_from_u64(0xBADC0DE);
-        let mut state = OramState::instantiate(&spec, &mut rng).unwrap();
+        let mut state = deployed(&spec, 0xBADC0DE);
         let block = OramBlock {
             occupied: true,
             slot_index: 0,
@@ -2179,8 +2438,7 @@ mod tests {
     #[test]
     fn path_oram_access_rejects_bucket_block_off_its_path() {
         let spec = path_oram_spec();
-        let mut rng = ChaCha20Rng::seed_from_u64(0xFACE123);
-        let mut state = OramState::instantiate(&spec, &mut rng).unwrap();
+        let mut state = deployed(&spec, 0xFACE123);
         let leaf = state.parameters.leaf_count() - 1;
         let block = OramBlock {
             occupied: true,
@@ -2208,13 +2466,7 @@ mod tests {
             leaf
         ));
         let bucket = oram_bucket_with_live_blocks(&spec, 0, off_path_bucket, 1, &[block]).unwrap();
-        let aad = oram_bucket_aad(&spec, off_path_bucket);
-        let mut payload = oram_bucket_bytes(&bucket, &spec).unwrap();
-        state.storage.buckets[off_path_bucket] = state
-            .cipher
-            .seal_and_wipe_boxed(aad.as_bytes(), &mut payload)
-            .unwrap()
-            .into();
+        put_stored_bucket(&state, &spec, off_path_bucket, &bucket);
 
         let mut allocator = allocator_for_path_oram(&state.parameters);
         state.refresh_from_storage(&spec, &mut allocator).unwrap();

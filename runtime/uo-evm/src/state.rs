@@ -167,8 +167,8 @@ pub(in crate::runtime) struct PublicRuntimeShadowState {
 }
 
 impl SealedRecordsDigest {
-    /// Read every sealed record of `object`: the digest of the records,
-    /// each with its length, and their count.
+    /// Read every sealed record the store keeps for `object`: the digest of
+    /// the records, each with its length, and their count.
     fn of(object_id: u32, object: &RuntimeObject) -> Result<Self> {
         let mut records = Sha256::new();
         let mut count = 0u64;
@@ -180,7 +180,7 @@ impl SealedRecordsDigest {
                 Err(_) => too_long = true,
             }
             records.update(record);
-        });
+        })?;
         if too_long {
             bail!("a sealed record of object {object_id} is too long to digest");
         }
@@ -986,13 +986,18 @@ impl CommittedRuntimeState {
         let mut objects = FixedBoxBuilder::new(contract_state.len());
         for spec in contract_state {
             let secret = master.object_secret(spec.id, &spec.name)?;
-            let mut object = RuntimeObject::instantiate(spec, &secret)?;
-            if restore {
+            // A restart seals nothing: the store keeps every record of the
+            // objects it finds.
+            let object = if restore {
+                let mut object = RuntimeObject::instantiate_for_restart(spec, &secret)?;
                 let mut allocator = public_state_snapshot_allocator()?;
                 object.restore_from_storage(storage, &mut allocator)?;
+                object
             } else {
+                let mut object = RuntimeObject::instantiate(spec, &secret)?;
                 object.deploy_into_storage(storage)?;
-            }
+                object
+            };
             objects.push(RuntimeObjectEntry::new(spec.id, object))?;
         }
         let mut objects = objects.finish()?;

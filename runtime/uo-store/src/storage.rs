@@ -90,10 +90,11 @@ pub trait StorageAdapter: Send + fmt::Debug {
     /// Take the first record of `location`, which belongs to `object`.
     fn create(&mut self, object: &str, location: &str, record: &[u8]) -> Result<()>;
 
-    /// The runtime is about to open the record at `location`, and `held` is
-    /// its copy of it. Fails unless the record the adapter keeps there has
-    /// the same bytes. The read is logged with the adapter's record.
-    fn read(&mut self, location: &str, held: &[u8]) -> Result<()>;
+    /// A copy of the record at `location`, which the runtime is about to
+    /// open: the runtime holds no record of its own, so the record crosses
+    /// to it here, and the read is logged with the adapter's record. Fails
+    /// unless the record has the public length `len` the runtime expects.
+    fn read(&mut self, location: &str, len: usize) -> Result<Box<[u8]>>;
 
     /// Take `record` in place of the record at `location`, and return the
     /// class of the write, computed from the record the adapter kept and the
@@ -388,7 +389,7 @@ impl StorageAdapter for MemoryStorage {
         Ok(())
     }
 
-    fn read(&mut self, location: &str, held: &[u8]) -> Result<()> {
+    fn read(&mut self, location: &str, len: usize) -> Result<Box<[u8]>> {
         let id = *self
             .locations
             .get(location)
@@ -397,14 +398,19 @@ impl StorageAdapter for MemoryStorage {
             .records
             .get(id as usize)
             .ok_or_else(|| anyhow!("the store's index names a record it does not hold"))?;
-        if &*record.bytes != held {
-            bail!("the record the runtime holds for {location} is not the record the store keeps");
+        if record.bytes.len() != len {
+            bail!(
+                "the store's record at {} has {} bytes where the runtime reads {}",
+                location,
+                record.bytes.len(),
+                len
+            );
         }
-        let len = record.bytes.len();
+        let bytes = record.bytes.clone();
         self.stats.reads += 1;
         self.stats.read_bytes += len as u64;
         self.push_log(id, len, None);
-        Ok(())
+        Ok(bytes)
     }
 
     fn write(&mut self, location: &str, record: &[u8]) -> Result<WriteClass> {
@@ -983,8 +989,8 @@ impl StorageAdapter for FileStorage {
         self.image.create(object, location, record)
     }
 
-    fn read(&mut self, location: &str, held: &[u8]) -> Result<()> {
-        self.image.read(location, held)
+    fn read(&mut self, location: &str, len: usize) -> Result<Box<[u8]>> {
+        self.image.read(location, len)
     }
 
     fn write(&mut self, location: &str, record: &[u8]) -> Result<WriteClass> {
@@ -1153,8 +1159,8 @@ impl StorageHandle {
     }
 
     /// See `StorageAdapter::read`.
-    pub fn read(&self, location: &str, held: &[u8]) -> Result<()> {
-        self.storage.with(|adapter| adapter.read(location, held))
+    pub fn read(&self, location: &str, len: usize) -> Result<Box<[u8]>> {
+        self.storage.with(|adapter| adapter.read(location, len))
     }
 
     /// See `StorageAdapter::write`.
@@ -1190,9 +1196,21 @@ impl StorageHandle {
             .with(|adapter| adapter.record(location).map(Box::from))
     }
 
+    /// Hand `visit` the record the store keeps at `location`, with no copy
+    /// and no read logged: what a digest of the store's ciphertext reads.
+    pub fn with_record<T>(&self, location: &str, visit: impl FnOnce(&[u8]) -> T) -> Option<T> {
+        self.storage
+            .with(|adapter| adapter.record(location).map(visit))
+    }
+
     pub fn public_records(&self) -> Vec<(String, Vec<u8>)> {
         self.storage
             .with(|adapter| adapter.public_records(&self.object))
+    }
+
+    /// The counts of the store this object's records are in.
+    pub fn stats(&self) -> StorageStats {
+        self.storage.with(|adapter| adapter.stats())
     }
 }
 
@@ -1239,7 +1257,7 @@ mod tests {
         store.commit(b"deployed").unwrap();
 
         store.begin().unwrap();
-        store.read("balances#0", &first).unwrap();
+        assert_eq!(*store.read("balances#0", first.len()).unwrap(), *first);
         let second = resealed(&cipher, &first, &[2u8; 40]);
         assert_eq!(
             store.write("balances#0", &second).unwrap(),
@@ -1254,7 +1272,7 @@ mod tests {
         store.abandon();
         store.begin().unwrap();
         assert!(store.log().is_empty());
-        store.read("balances#0", &first).unwrap();
+        assert_eq!(*store.read("balances#0", first.len()).unwrap(), *first);
         assert_eq!(
             store.write("balances#0", &second).unwrap(),
             WriteClass::Update
@@ -1305,7 +1323,7 @@ mod tests {
     }
 
     #[test]
-    fn a_read_fails_unless_the_runtime_holds_the_stored_record() {
+    fn a_read_copies_the_stored_record_of_the_length_the_runtime_expects() {
         let cipher = StoreCipher::random();
         let mut store = MemoryStorage::new();
         store.reserve_seals("cell", 10).unwrap();
@@ -1313,13 +1331,11 @@ mod tests {
         store.create("cell", "cell", &record).unwrap();
         store.commit(b"").unwrap();
         store.begin().unwrap();
-        let mut other = record.clone();
-        other[40] ^= 1;
-        assert!(store.read("cell", &other).is_err());
-        assert!(store.read("cell", &record[..32]).is_err());
-        assert!(store.read("missing", &record).is_err());
+        assert!(store.read("cell", record.len() - 32).is_err());
+        assert!(store.read("cell", record.len() + 32).is_err());
+        assert!(store.read("missing", record.len()).is_err());
         assert!(store.log().is_empty());
-        store.read("cell", &record).unwrap();
+        assert_eq!(*store.read("cell", record.len()).unwrap(), *record);
         assert_eq!(store.log().len(), 1);
         assert_eq!(store.stats().reads, 1);
         assert_eq!(store.stats().read_bytes, record.len() as u64);
@@ -1364,7 +1380,7 @@ mod tests {
         // to.
         store.begin().unwrap();
         store.set_logging(false);
-        store.read("map#0", &first).unwrap();
+        store.read("map#0", first.len()).unwrap();
         store.write("map#0", &second).unwrap();
         store.write("map#0", &third).unwrap();
         store.commit(b"two").unwrap();
@@ -1372,7 +1388,7 @@ mod tests {
         assert_eq!(store.record("map#0"), Some(&*third));
         store.set_logging(true);
         store.begin().unwrap();
-        store.read("map#0", &third).unwrap();
+        assert_eq!(*store.read("map#0", third.len()).unwrap(), *third);
         assert_eq!(store.log().len(), 1);
     }
 
@@ -1455,7 +1471,7 @@ mod tests {
                 vec![("owner".to_string(), b"\"a\"".to_vec())]
             );
             store.begin().unwrap();
-            store.read("map#0", &second).unwrap();
+            assert_eq!(*store.read("map#0", second.len()).unwrap(), *second);
             store.write("map#0", &third).unwrap();
             store.commit(b"second call").unwrap();
             store.checkpoint().unwrap();

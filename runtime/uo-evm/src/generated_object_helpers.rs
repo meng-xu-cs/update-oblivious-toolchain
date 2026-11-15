@@ -28,9 +28,9 @@ where
     F: FnOnce(&[u8]) -> Result<T>,
 {
     let _io_guard = allocator.reserve_guard(ScratchRegion::IoScratch, payload_len)?;
-    // The record crosses the storage boundary here: the store keeps the
-    // record at this location, and it must be the one the runtime opens.
-    cipher.check_stored_record(&location, physical)?;
+    // The runtime holds no record of its own: `physical` is the record it
+    // read from the store at this location, where the record crossed the
+    // storage boundary, and it opens what it read.
     cipher
         .with_opened_payload(aad.as_bytes(), payload_len, physical, open)
         .ok_or_else(|| anyhow!("failed to decode sealed payload for {}", location))?

@@ -10332,15 +10332,16 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "mutation": "let a node access of the private scheme's tree go on when a block finds no room in the stash, so that the block is dropped and the access can commit; the implementation interface must reject a stash overflow that is not an error of the access",
         }),
     )?);
-    // Issue 41: every sealed record crosses to the contract's store where it
-    // is opened and where it is sealed.
+    // Issues 41 and 59: every sealed record a call opens is read from the
+    // contract's store, which alone keeps it, and crosses to the runtime
+    // there.
     let mut tampered_runtime_implementation_sealed_open_store_check =
         runtime_implementation_interface.clone();
-    tampered_runtime_implementation_sealed_open_store_check.generated_object_helpers_source = replace_exactly_once(
-        &tampered_runtime_implementation_sealed_open_store_check.generated_object_helpers_source,
-        "    cipher.check_stored_record(&location, physical)?;\n    cipher\n        .with_opened_payload(",
-        "    cipher\n        .with_opened_payload(",
-        "runtime implementation sealed-open store-check tamper",
+    tampered_runtime_implementation_sealed_open_store_check.objects_source = replace_exactly_once(
+        &tampered_runtime_implementation_sealed_open_store_check.objects_source,
+        "        records.push(cipher.read_stored_record(&locations.location(index), record_len)?)?;",
+        "        records.push(vec![0u8; record_len].into_boxed_slice())?;",
+        "runtime implementation sealed-open store-read tamper",
     )?;
     scenarios.push(validate_tampered_json_case(
         "runtime_implementation_interface/sealed_open_store_check_skip_drift",
@@ -10355,7 +10356,7 @@ fn run_tamper_validation() -> Result<JsonValue> {
             "artifact_kind": "proofgrade_runtime_implementation_interface",
             "benchmark": "SingleAccessMap/pathoram/put",
             "entrypoint": target.entrypoint,
-            "mutation": "open a sealed record without naming it to the contract's store, so that the store neither compares the record the runtime holds with the one it keeps nor logs the read; the implementation interface must reject an open that does not cross the storage boundary",
+            "mutation": "load an exact object's slots from somewhere other than the contract's store, which keeps the records, so that the store logs no read of a record the call opens; the implementation interface must reject a load that does not cross the storage boundary",
         }),
     )?);
     let mut tampered_runtime_implementation_sealed_write_store =
@@ -28266,15 +28267,17 @@ fn check_sealed_writes_are_classified_from_their_bytes(
         )
 }
 
-/// Every sealed record crosses to the contract's store where it is opened
-/// and where it is sealed, and nowhere else (invariant 18).
+/// Every sealed record crosses between the runtime and the contract's store
+/// where it is read to be opened and where it is sealed, and nowhere else
+/// (invariant 18).
 ///
-/// The generated helpers open a record in one function, which first names
-/// the record to the store, and seal one in place in one function, which
-/// hands the store the new record before the write is recorded. The cipher
-/// reaches the store: a read is the store's comparison with the record it
-/// keeps, and a write is preceded by the reservation of the seal counts made
-/// so far and must come back classified as an `Update`. The store refuses a
+/// The generated helpers open a record in one function, which opens the
+/// record the runtime read from the store, and seal one in place in one
+/// function, which hands the store the new record before the write is
+/// recorded. The cipher reaches the store: a read copies out the record the
+/// store keeps, of the length the runtime expects, and a write is preceded
+/// by the reservation of the seal counts made so far and must come back
+/// classified as an `Update`. The store refuses a
 /// sealed record whose seal count is not below its reservation, classifies
 /// a write from the record it kept, and a store in files journals a
 /// reservation before it takes effect. The engine commits a call in the
@@ -28290,21 +28293,24 @@ fn check_sealed_records_cross_the_storage_boundary(
     let helpers = generated_object_helpers_production_source;
     let surface = generated_store_surface_production_source;
     let storage = storage_production_source;
-    // One open, behind the store's comparison.
+    // One open, of a record the runtime read from the store.
     helpers.contains(
-        "    cipher.check_stored_record(&location, physical)?;\n    cipher\n        .with_opened_payload(aad.as_bytes(), payload_len, physical, open)",
+        "    // The runtime holds no record of its own: `physical` is the record it\n    // read from the store at this location, where the record crossed the\n    // storage boundary, and it opens what it read.\n    cipher\n        .with_opened_payload(aad.as_bytes(), payload_len, physical, open)",
     ) && helpers.matches(".with_opened_payload(").count() == 1
-        && helpers.matches("check_stored_record(").count() == 1
+        && !helpers.contains("check_stored_record(")
+        && !surface.contains("check_stored_record(")
         // One seal in place; the store takes the record before the event.
         && helpers.contains(
             "    cipher.store_sealed_record(location, physical)?;\n    record_write(physical.len())",
         )
         && helpers.matches("store_sealed_record(").count() == 1
         && helpers.matches("    record_write(").count() == 1
-        // The cipher's side.
+        // The cipher's side: a read copies the store's record out, and a
+        // cipher with no store has no record to read.
         && surface.contains(
-            "        match &self.storage {\n            Some(storage) => storage.read(location, record),\n            None => Ok(()),\n        }",
+            "        match &self.storage {\n            Some(storage) => storage.read(location, len),\n            None => bail!(\"no store keeps the record at {}\", location),\n        }",
         )
+        && surface.matches("storage.read(").count() == 1
         && surface.contains(
             "        storage.reserve_seals(self.seal_count())?;\n        let class = storage.write(location, record)?;\n        if class != WriteClass::Update {\n            bail!(",
         )
@@ -28320,8 +28326,12 @@ fn check_sealed_records_cross_the_storage_boundary(
             "        .find(|class| *class != WriteClass::Update)\n        .unwrap_or(WriteClass::Update)",
         )
         && storage.matches("WriteClass::Update").count() == 2
-        // The store's side.
-        && storage.contains("        if &*record.bytes != held {\n            bail!(")
+        // The store's side: a read is of the length the runtime expects, and
+        // it is counted and logged.
+        && storage.contains("        if record.bytes.len() != len {\n            bail!(")
+        && storage.contains(
+            "        let bytes = record.bytes.clone();\n        self.stats.reads += 1;\n        self.stats.read_bytes += len as u64;\n        self.push_log(id, len, None);\n        Ok(bytes)",
+        )
         && storage.contains("        if count >= reserved {\n            bail!(")
         && storage.matches("self.ensure_nonce_reserved(object, location, record)?;").count() == 2
         && storage.contains("        let class = sealed_write_class(&stored.bytes, record);")
@@ -28836,10 +28846,10 @@ fn probe_production_sources() -> Result<BTreeMap<String, String>> {
 /// store. A committed object is held by reference: the state a call is
 /// staged on is a table of the committed objects, and a commit puts new
 /// objects in the place of those the call loaded and keeps the others. No
-/// sealed object has a cold clone. A Path ORAM map's sealed records are held
-/// by reference too: the copy of the map that a call loads shares them, a
-/// write copies the record it replaces, and a record is zeroed only by its
-/// last holder. An object keeps the digest of its sealed records and
+/// sealed object has a cold clone. The copy of a Path ORAM map that a call
+/// loads holds none of the committed map's records, which the store keeps:
+/// it reads from the store the records it opens. An object keeps the digest
+/// of its sealed records and
 /// forgets it when it is handed out to be changed, so a digest of the
 /// ciphertext reads the objects written since the last one.
 fn check_a_call_copies_no_committed_object(
@@ -28891,24 +28901,95 @@ fn check_a_call_copies_no_committed_object(
         && state_source.contains(
             "        for entry in self.entries.iter() {\n            entry\n                .object\n                .sealed_records_digest(entry.object_id)?\n                .add_to(entry.object_id, &mut store);\n        }",
         )
-        // The sealed records of a Path ORAM map.
+        // The copy of a Path ORAM map that a call loads holds no record of
+        // the committed map: the store keeps them.
         && oram_source.contains(
-            "pub(crate) struct OramStorage {\n    directory_pages: Box<[SealedPage]>,\n    buckets: Box<[SealedPage]>,\n    access_counter_slot: Box<[u8]>,\n}",
+            "#[derive(Debug, Default)]\npub(crate) struct OramStorage {\n    directory_pages: Box<[SealedPage]>,\n    buckets: BucketTable,\n    access_counter_slot: Box<[u8]>,\n}",
         )
-        && oram_source.contains("#[derive(Clone, Debug)]\npub(crate) struct SealedPage(Arc<[u8]>);")
-        && oram_source.contains(
-            "    fn deref_mut(&mut self) -> &mut [u8] {\n        Arc::make_mut(&mut self.0)\n    }",
-        )
-        && oram_source.contains(
-            "    pub(crate) fn wipe(&mut self) {\n        if let Some(bytes) = Arc::get_mut(&mut self.0) {\n            bytes.fill(0);\n        }\n    }",
+        && oram_source.contains("#[derive(Debug)]\npub(crate) struct SealedPage(Box<[u8]>);")
+        && !oram_source.contains("Arc<[u8]>")
+        && generated_oram_codecs_source.contains(
+            "fn clone_oram_storage(storage: &super::OramStorage) -> super::OramStorage {\n    super::OramStorage::empty(storage.buckets.len())\n}",
         )
         && generated_oram_codecs_source.contains(
-            "fn clone_oram_storage(storage: &super::OramStorage) -> super::OramStorage {\n    super::OramStorage {\n        directory_pages: storage.directory_pages.clone(),\n        buckets: storage.buckets.clone(),\n        access_counter_slot: storage.access_counter_slot.clone(),\n    }\n}",
-        )
-        && generated_oram_codecs_source.contains(
-            "        for page in &mut self.storage.directory_pages {\n            page.wipe();\n        }\n        for bucket in &mut self.storage.buckets {\n            bucket.wipe();\n        }",
+            "        for page in &mut self.storage.directory_pages {\n            page.wipe();\n        }\n        self.storage.buckets.wipe();",
         )
         && !generated_oram_codecs_source.contains("[Box<[u8]>],")
+}
+
+/// Whether the store alone keeps the sealed records (invariant 18 of
+/// `docs/runtime/secret-state.md`). A committed object holds none: making
+/// an object cold drops the records it holds, and an object is cold only if
+/// it holds none. A call reads every record it opens from the store and
+/// holds it until it seals the next one over it: an exact object's slots
+/// from its load to its commit, a Path ORAM map's counter and metadata
+/// pages from its load to its commit, and the buckets of a path from the
+/// access that reads them to the next. A deployment hands its first records
+/// to the store and keeps none, and a restart instantiates its objects
+/// without a seal.
+fn check_sealed_records_are_kept_in_the_store_alone(
+    objects_source: &str,
+    oram_source: &str,
+    generated_oram_codecs_source: &str,
+    state_source: &str,
+) -> bool {
+    // An exact object reads its slots from the store when a call loads it,
+    // and a cold one holds none.
+    objects_source.contains(
+        "        records.push(cipher.read_stored_record(&locations.location(index), record_len)?)?;",
+    ) && objects_source
+        .matches("        read_exact_slots(\n            &self.cipher,\n")
+        .count()
+        == 2
+        && objects_source.contains(
+            "        self.cipher.read_stored_record(\n            &self.spec.name,\n            sealed_record_len(self.spec.value_type.canonical_len()),\n        )",
+        )
+        && objects_source.matches("        self.physical_slots = Box::default();\n").count() == 2
+        && objects_source.matches("        self.physical = Box::default();\n").count() == 1
+        && objects_source.contains(
+            "        self.holds_no_sealed_record()\n            && match self {",
+        )
+        // A deployment hands its records over and keeps none.
+        && objects_source.matches("std::mem::take(&mut object.physical_slots);").count() == 2
+        && objects_source.contains("let physical = std::mem::take(&mut object.physical);")
+        // A restart seals nothing.
+        && state_source.contains(
+            "                let mut object = RuntimeObject::instantiate_for_restart(spec, &secret)?;",
+        )
+        && objects_source.contains("        Self::instantiate_with(spec, secret, false)")
+        && oram_source.contains(
+            "        if !seal {\n            return Self::unsealed(spec, parameters, cipher, empty_entry);\n        }",
+        )
+        && !objects_source.contains("stored_record(&handle")
+        && !oram_source.contains("stored_record(&storage")
+        // A Path ORAM map holds the records a call read, and a cold one none.
+        && oram_source.contains(
+            "pub(crate) struct OramStorage {\n    directory_pages: Box<[SealedPage]>,\n    buckets: BucketTable,\n    access_counter_slot: Box<[u8]>,\n}",
+        )
+        && oram_source.contains("pub(crate) struct SealedPage(Box<[u8]>);")
+        && oram_source.contains(
+            "        // The store keeps the map's records: a committed map holds none.\n        self.storage = OramStorage::empty(self.parameters.bucket_count);",
+        )
+        && oram_source.contains(
+            "        let record = cipher.read_stored_record(\n            &format!(\"{}@bucket{index}\", spec.name),\n            parameters.bucket_record_len(),\n        )?;\n        self.held.insert(index, SealedPage(record));",
+        )
+        && oram_source.contains(
+            "        self.storage\n            .read_counter_and_pages(spec, &self.parameters, &self.cipher)?;",
+        )
+        && !oram_source.contains("Arc<[u8]>")
+        && !oram_source.contains("make_mut")
+        && generated_oram_codecs_source
+            .contains("    super::OramStorage::empty(storage.buckets.len())\n}")
+        // Every bucket an access or a commit seals is one it read.
+        && generated_oram_codecs_source.contains(
+            "    read_path_buckets(\n        spec,\n        &state.parameters,\n        &state.cipher,\n        &mut state.storage.buckets,\n        access_leaf,\n    )?;\n    load_path_buckets_into_stash(",
+        )
+        && generated_oram_codecs_source.contains(
+            "        self.storage\n            .buckets\n            .read(self.cipher, self.spec, self.parameters, index)?;",
+        )
+        && generated_oram_codecs_source
+            .contains("            buckets.read(cipher, spec, parameters, index)?;\n")
+        && generated_oram_codecs_source.matches(".read(cipher, spec, parameters").count() == 2
 }
 
 /// Whether the public-state snapshot is built from a digest of each public
@@ -29076,7 +29157,7 @@ fn check_trace_runs_stand_for_recorded_events(
             "    for (index, slot) in physical_slots.iter().enumerate() {\n        trace.physical_read(object_name, slots.location(index), slot.len());\n    }",
         )
         && objects.contains(
-            "        trace.physical_scan(\n            &self.spec.name,\n            ExactObjectKind::Cell,\n            1,\n            self.physical.len(),\n        );",
+            "        trace.physical_scan(&self.spec.name, ExactObjectKind::Cell, 1, physical.len());",
         )
         && objects.matches("trace.physical_scan(").count() == 2
         && objects.contains(
@@ -30424,7 +30505,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && objects_source.contains("!slots.iter().any(|written| *written)")
         && objects_source.contains("Self::UoCell(object) => !object.accessed && !object.written,")
         && objects_source.contains(
-            "Self::UoArray(object) => !object.accessed && no_written_slots(&object.written_slots),",
+            "Self::UoArray(object) => {\n                    !object.accessed && no_written_slots(&object.written_slots)\n                }",
         )
         && objects_source.contains("Self::UoSmallMap(object) => !object.accessed && !object.dirty,")
         && objects_source.contains("Self::UoOramMap(object) => !object.accessed && !object.dirty,")
@@ -30442,7 +30523,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
         && objects_source.contains(".unwrap_or_else(|| cold_zero_value(&object.spec.value_type));")
         && !objects_production_source.contains("Value::zero_for_type(")
         && !objects_production_source.contains("MapEntry::new(")
-        && objects_source.contains("physical: seal_value(&aad, &logical, &cipher)?,")
+        && objects_source.contains("seal_value(&cell_slot_aad(&spec.name), &logical, &cipher)?")
         && objects_source.contains("physical_slots.push(seal_value(&aad, &zero_value, &cipher)?)?;")
         && objects_source.contains("physical_slots.push(seal_map_record(&aad, &zero_entry, &cipher)?)?;")
         && objects_source.contains("decode_cell_value_from_storage(")
@@ -30661,7 +30742,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             .contains("let aad = format!(\"small_map:{}:{index}\", spec.name);")
         && generated_object_helpers_source.contains("format!(\"{}#{index}\", spec.name),");
     let objects_runtime_uses_shared_boxed_seal_helper = objects_source
-        .contains("physical: seal_value(&aad, &logical, &cipher)?,")
+        .contains("seal_value(&cell_slot_aad(&spec.name), &logical, &cipher)?")
         && objects_source
             .contains("physical_slots.push(seal_value(&aad, &zero_value, &cipher)?)?;")
         && objects_source
@@ -31115,7 +31196,7 @@ fn run_kernel_model_alignment_validation() -> Result<JsonValue> {
             .contains("let mut live_slots = repeat_boxed(parameters.capacity, MaskedUsizeOption::none())?;")
         && generated_oram_codecs_source.contains("impl OramState {")
         && generated_oram_codecs_source.contains("pub(crate) fn placeholder() -> Self {")
-        && generated_oram_codecs_source.contains("storage: super::OramStorage {")
+        && generated_oram_codecs_source.contains("storage: super::OramStorage::default(),")
         && generated_oram_codecs_source.contains("fn wipe_secrets(&mut self) {")
         && generated_oram_codecs_source.contains("impl Drop for OramState {")
         && generated_oram_codecs_source.contains("impl Drop for PathOramLeafCoinSource {")
@@ -41533,10 +41614,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         && generated_oram_codecs_source.contains("entries: Box::<[MapEntry]>::default(),")
         && generated_oram_codecs_source
             .contains("position_map: Box::<[MaskedUsizeOption]>::default(),")
-        && generated_oram_codecs_source
-            .contains("directory_pages: Box::<[SealedPage]>::default(),")
-        && generated_oram_codecs_source.contains("buckets: Box::<[SealedPage]>::default(),")
-        && generated_oram_codecs_source.contains("access_counter_slot: Box::<[u8]>::default(),");
+        && generated_oram_codecs_source.contains("storage: super::OramStorage::default(),");
     let contract_instance_public_clone_removed = !engine_source
         .contains("impl Clone for ContractInstance")
         && !engine_source.contains("state: self.state.clone()")
@@ -45284,11 +45362,11 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             )],
         ),
         (
-            "values: self.decode_values_from_storage(allocator)?,",
+            "values: self.decode_values(&physical_slots, allocator)?,",
             vec![String::from("runtime/uo-evm/src/objects.rs")],
         ),
         (
-            "entries: self.decode_entries_from_storage(allocator)?,",
+            "entries: self.decode_entries(&physical_slots, allocator)?,",
             vec![String::from("runtime/uo-evm/src/objects.rs")],
         ),
         ("next.physical = old.physical.clone();", vec![]),
@@ -46634,6 +46712,13 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         &production_source_slice(&oram_source),
         &generated_oram_codecs_source,
     );
+    let sealed_records_are_kept_in_the_store_alone =
+        check_sealed_records_are_kept_in_the_store_alone(
+            &objects_production_source,
+            &production_source_slice(&oram_source),
+            &production_source_slice(&generated_oram_codecs_source),
+            &production_source_slice(&state_source),
+        );
     let public_state_digests_are_kept_per_object =
         check_public_state_digests_are_kept_per_object(&production_source_slice(&state_source));
     let mut trace_run_type_files = Vec::new();
@@ -47031,15 +47116,15 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let runtime_public_field_surface_is_public_shape_only =
         runtime_public_field_lines == expected_runtime_public_field_lines;
     let oram_storage_fields_private = oram_source.contains("directory_pages: Box<[SealedPage]>,")
-        && oram_source.contains("buckets: Box<[SealedPage]>,")
+        && oram_source.contains("buckets: BucketTable,")
         && oram_source.contains("access_counter_slot: Box<[u8]>,")
         && !oram_source.contains("pub directory_pages:")
         && !oram_source.contains("pub buckets:")
         && !oram_source.contains("pub access_counter_slot:");
     let oram_storage_uses_fixed_page_arrays = oram_source
         .contains("directory_pages: Box<[SealedPage]>,")
-        && oram_source.contains("buckets: Box<[SealedPage]>,")
-        && oram_source.contains("pub(crate) struct SealedPage(Arc<[u8]>);");
+        && oram_source.contains("buckets: BucketTable,")
+        && oram_source.contains("pub(crate) struct SealedPage(Box<[u8]>);");
     let oram_storage_uses_fixed_counter_buffer =
         oram_source.contains("access_counter_slot: Box<[u8]>,");
     let oram_state_uses_fixed_entry_buffer = oram_source.contains("entries: Box<[MapEntry]>,");
@@ -48053,6 +48138,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "production_calls_record_no_position_map_witness": production_calls_record_no_position_map_witness,
         "evidence_builds_audit_the_kept_position_map_witness": evidence_builds_audit_the_kept_position_map_witness,
         "a_call_copies_no_committed_object": a_call_copies_no_committed_object,
+        "sealed_records_are_kept_in_the_store_alone": sealed_records_are_kept_in_the_store_alone,
         "public_state_digests_are_kept_per_object": public_state_digests_are_kept_per_object,
         "trace_runs_stand_for_recorded_events": trace_runs_stand_for_recorded_events,
         "production_calls_issue_chained_receipts": production_calls_issue_chained_receipts,
@@ -49006,6 +49092,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && production_calls_record_no_position_map_witness
             && evidence_builds_audit_the_kept_position_map_witness
             && a_call_copies_no_committed_object
+            && sealed_records_are_kept_in_the_store_alone
             && public_state_digests_are_kept_per_object
             && trace_runs_stand_for_recorded_events
             && production_calls_issue_chained_receipts
@@ -57714,11 +57801,12 @@ mod tests {
             assert_ne!(changed, source, "no {from:?} to change");
             changed
         };
-        // A record opened without the store's comparison.
+        // An open that names the record to the store again, as the
+        // runtime's own copy, beside the read that copied it out.
         let unchecked_open = drift(
             &helpers,
-            "    cipher.check_stored_record(&location, physical)?;\n",
-            "",
+            "    cipher\n        .with_opened_payload(aad.as_bytes(), payload_len, physical, open)",
+            "    cipher.check_stored_record(&location, physical)?;\n    cipher\n        .with_opened_payload(aad.as_bytes(), payload_len, physical, open)",
         );
         assert!(!ok(
             &unchecked_open,
@@ -57764,10 +57852,17 @@ mod tests {
         // A cipher whose read does not reach the store.
         let unread = drift(
             &surface,
-            "            Some(storage) => storage.read(location, record),",
-            "            Some(_) => Ok(()),",
+            "            Some(storage) => storage.read(location, len),",
+            "            Some(_) => Ok(vec![0u8; len].into_boxed_slice()),",
         );
         assert!(!ok(&helpers, &unread, &storage, &engine, &store_meta));
+        // A cipher with no store that hands out a record read from nowhere.
+        let silent = drift(
+            &surface,
+            "            None => bail!(\"no store keeps the record at {}\", location),",
+            "            None => Ok(vec![0u8; len].into_boxed_slice()),",
+        );
+        assert!(!ok(&helpers, &silent, &storage, &engine, &store_meta));
         // A store that takes a record whatever its seal count.
         let unbounded = drift(
             &storage,
@@ -57775,13 +57870,21 @@ mod tests {
             "        if false {\n            bail!(",
         );
         assert!(!ok(&helpers, &surface, &unbounded, &engine, &store_meta));
-        // A store that logs a read of a record it does not compare.
+        // A store that hands out a record of another length than the
+        // runtime expects.
         let uncompared = drift(
             &storage,
-            "        if &*record.bytes != held {\n            bail!(",
+            "        if record.bytes.len() != len {\n            bail!(",
             "        if false {\n            bail!(",
         );
         assert!(!ok(&helpers, &surface, &uncompared, &engine, &store_meta));
+        // A store that hands out a record and logs no read.
+        let unlogged = drift(
+            &storage,
+            "        self.push_log(id, len, None);\n        Ok(bytes)",
+            "        Ok(bytes)",
+        );
+        assert!(!ok(&helpers, &surface, &unlogged, &engine, &store_meta));
         // A store that takes its caller's word for the class.
         let unclassified = drift(
             &storage,
@@ -58624,33 +58727,109 @@ mod tests {
             "",
         );
         assert!(!ok(&unchecked, &objects, &oram, &codecs));
-        // Storage whose records each state owns: a load copies them all.
+        // A map whose buckets the committed map holds, and a load copies.
         let owned = drift(
             &oram,
+            "    directory_pages: Box<[SealedPage]>,\n    buckets: BucketTable,\n",
             "    directory_pages: Box<[SealedPage]>,\n    buckets: Box<[SealedPage]>,\n",
-            "    directory_pages: Box<[Box<[u8]>]>,\n    buckets: Box<[Box<[u8]>]>,\n",
         );
         assert!(!ok(&state, &objects, &owned, &codecs));
-        // A wipe that zeroes a copy of every record another state holds.
-        let wiped = drift(
+        // Records shared by reference between the committed map and a
+        // call's copy of it, back in the map.
+        let shared = drift(
             &oram,
-            "        if let Some(bytes) = Arc::get_mut(&mut self.0) {\n            bytes.fill(0);\n        }\n",
-            "        Arc::make_mut(&mut self.0).fill(0);\n",
+            "pub(crate) struct SealedPage(Box<[u8]>);",
+            "pub(crate) struct SealedPage(Arc<[u8]>);",
         );
-        assert!(!ok(&state, &objects, &wiped, &codecs));
-        let wiped = drift(
+        assert!(!ok(&state, &objects, &shared, &codecs));
+        // A load that copies the committed map's records.
+        let copied = drift(
             &codecs,
-            "        for bucket in &mut self.storage.buckets {\n            bucket.wipe();\n        }",
-            "        for bucket in &mut self.storage.buckets {\n            bucket.fill(0);\n        }",
+            "    super::OramStorage::empty(storage.buckets.len())\n",
+            "    super::OramStorage {\n        directory_pages: storage.directory_pages.clone(),\n        buckets: storage.buckets.clone(),\n        access_counter_slot: storage.access_counter_slot.clone(),\n    }\n",
         );
+        assert!(!ok(&state, &objects, &oram, &copied));
+        // A wipe that leaves the buckets a state holds.
+        let wiped = drift(&codecs, "        self.storage.buckets.wipe();\n", "");
         assert!(!ok(&state, &objects, &oram, &wiped));
-        // A generated function that takes owned records.
-        let owned = drift(
-            &codecs,
-            "    buckets: &mut [SealedPage],\n    access_leaf: usize,",
-            "    buckets: &mut [Box<[u8]>],\n    access_leaf: usize,",
+    }
+
+    #[test]
+    fn store_alone_check_rejects_the_drifts_it_guards() {
+        use super::{check_sealed_records_are_kept_in_the_store_alone, repo_root};
+        let root = repo_root();
+        let read =
+            |rel: &str| production_source_slice(&std::fs::read_to_string(root.join(rel)).unwrap());
+        let objects = read("runtime/uo-evm/src/objects.rs");
+        let oram = read("runtime/uo-evm/src/oram.rs");
+        let codecs = read("runtime/uo-evm/src/generated_oram_codecs.rs");
+        let state = read("runtime/uo-evm/src/state.rs");
+        let ok = |objects: &str, oram: &str, codecs: &str, state: &str| {
+            check_sealed_records_are_kept_in_the_store_alone(objects, oram, codecs, state)
+        };
+        assert!(ok(&objects, &oram, &codecs, &state));
+        let drift = |source: &str, from: &str, to: &str| {
+            assert_eq!(source.matches(from).count(), 1, "{from}");
+            source.replacen(from, to, 1)
+        };
+        // An exact object that loads its slots from somewhere other than
+        // the store.
+        let unread = drift(
+            &objects,
+            "        records.push(cipher.read_stored_record(&locations.location(index), record_len)?)?;",
+            "        records.push(vec![0u8; record_len].into_boxed_slice())?;",
         );
-        assert!(!ok(&state, &objects, &oram, &owned));
+        assert!(!ok(&unread, &oram, &codecs, &state));
+        // A committed cell that keeps the record its call read.
+        let kept = drift(&objects, "        self.physical = Box::default();\n", "");
+        assert!(!ok(&kept, &oram, &codecs, &state));
+        // An object found cold whatever records it holds.
+        let blind = drift(
+            &objects,
+            "        self.holds_no_sealed_record()\n            && match self {",
+            "        true && match self {",
+        );
+        assert!(!ok(&blind, &oram, &codecs, &state));
+        // A deployment that keeps a copy of the records it hands the store.
+        let copied = drift(
+            &objects,
+            "let physical = std::mem::take(&mut object.physical);",
+            "let physical = object.physical.clone();",
+        );
+        assert!(!ok(&copied, &oram, &codecs, &state));
+        // A restart that seals its objects' first records again.
+        let resealed = drift(
+            &state,
+            "RuntimeObject::instantiate_for_restart(spec, &secret)?",
+            "RuntimeObject::instantiate(spec, &secret)?",
+        );
+        assert!(!ok(&objects, &oram, &codecs, &resealed));
+        // A committed Path ORAM map that keeps the records its call read.
+        let kept = drift(
+            &oram,
+            "        self.storage = OramStorage::empty(self.parameters.bucket_count);",
+            "",
+        );
+        assert!(!ok(&objects, &kept, &codecs, &state));
+        // An access that seals over buckets it did not read from the store.
+        let unread = drift(
+            &codecs,
+            "    read_path_buckets(\n        spec,\n        &state.parameters,\n        &state.cipher,\n        &mut state.storage.buckets,\n        access_leaf,\n    )?;\n",
+            "",
+        );
+        assert!(!ok(&objects, &oram, &unread, &state));
+        let unread = drift(
+            &codecs,
+            "            buckets.read(cipher, spec, parameters, index)?;\n",
+            "",
+        );
+        assert!(!ok(&objects, &oram, &unread, &state));
+        let unread = drift(
+            &codecs,
+            "        self.storage\n            .buckets\n            .read(self.cipher, self.spec, self.parameters, index)?;",
+            "",
+        );
+        assert!(!ok(&objects, &oram, &unread, &state));
     }
 
     #[test]

@@ -3000,7 +3000,7 @@ def RuntimeImplementationInterface.storeCipherUsesExactSizeNonzeroBuffers
     , "seals: Arc::clone(&self.seals),"
     , "storage: self.storage.clone(),"
     , "self.seals.fetch_max(count, Ordering::SeqCst);"
-    , "Some(storage) => storage.read(location, record),"
+    , "Some(storage) => storage.read(location, len),"
     , "storage.reserve_seals(self.seal_count())?;\n        let class = storage.write(location, record)?;\n        if class != WriteClass::Update {"
     , "storage.reserve_seals(self.seal_count())?;\n        storage.create(location, record)"
     , "fn next_seal_nonce(&self) -> Option<[u8; SEALED_NONCE_BYTES]> {"
@@ -3401,7 +3401,7 @@ def RuntimeImplementationInterface.storeLibrarySurfaceKeepsGeneratedHelpersPriva
   sourceContainsAll iface.storeLibProductionSource
     [ "pub mod codec;"
     , "mod store;"
-    , "pub use codec::{sealed_record_seal_count, StoreCipher};"
+    , "pub use codec::{sealed_record_len, sealed_record_seal_count, StoreCipher};"
     , "pub use store::StoreExecutionMetrics;"
     ] ∧
   sourceLacksAll iface.storeLibProductionSource
@@ -3528,7 +3528,7 @@ def RuntimeImplementationInterface.checkStoreCipherUsesExactSizeNonzeroBuffers
     , "seals: Arc::clone(&self.seals),"
     , "storage: self.storage.clone(),"
     , "self.seals.fetch_max(count, Ordering::SeqCst);"
-    , "Some(storage) => storage.read(location, record),"
+    , "Some(storage) => storage.read(location, len),"
     , "storage.reserve_seals(self.seal_count())?;\n        let class = storage.write(location, record)?;\n        if class != WriteClass::Update {"
     , "storage.reserve_seals(self.seal_count())?;\n        storage.create(location, record)"
     , "fn next_seal_nonce(&self) -> Option<[u8; SEALED_NONCE_BYTES]> {"
@@ -3923,7 +3923,7 @@ def RuntimeImplementationInterface.checkStoreLibrarySurfaceKeepsGeneratedHelpers
   checkSourceContainsAll iface.storeLibProductionSource
     [ "pub mod codec;"
     , "mod store;"
-    , "pub use codec::{sealed_record_seal_count, StoreCipher};"
+    , "pub use codec::{sealed_record_len, sealed_record_seal_count, StoreCipher};"
     , "pub use store::StoreExecutionMetrics;"
     ] &&
   checkSourceLacksAll iface.storeLibProductionSource
@@ -4666,13 +4666,18 @@ def RuntimeImplementationInterface.runtimeObjectOpenUsesSharedDecodeShell
     , "decode_cell_value_from_storage("
     , "decode_array_values_from_storage("
     , "decode_small_map_entries_from_storage("
+    -- An exact object holds no record between calls: a call reads every
+    -- slot it opens from the store, where the record crosses the storage
+    -- boundary.
+    , "records.push(cipher.read_stored_record(&locations.location(index), record_len)?)?;"
+    , "self.cipher.read_stored_record(\n            &self.spec.name,\n            sealed_record_len(self.spec.value_type.canonical_len()),\n        )"
     ] ∧
   sourceContainsAll iface.generatedObjectHelpersProductionSource
     [ "use uo_core::ir::StateObject;"
     , "fn with_opened_payload<T, F>("
     , "allocator.reserve_guard(ScratchRegion::IoScratch, payload_len)?;"
     , ".with_opened_payload(aad.as_bytes(), payload_len, physical, open)"
-    , "cipher.check_stored_record(&location, physical)?;\n    cipher\n        .with_opened_payload(aad.as_bytes(), payload_len, physical, open)"
+    , "// storage boundary, and it opens what it read.\n    cipher\n        .with_opened_payload(aad.as_bytes(), payload_len, physical, open)"
     , "pub(super) fn with_opened_object_payload<T, F>("
     , "with_opened_payload(\n        location,\n        aad,\n        payload_len,\n        physical,\n        cipher,\n        allocator,\n        open,\n    )"
     , "pub(super) fn decode_sealed_value("
@@ -4708,7 +4713,7 @@ def RuntimeImplementationInterface.runtimeObjectBootstrapUsesSharedBoxedSealHelp
   sourceContainsAll iface.objectsProductionSource
     [ "#[path = \"generated_object_helpers.rs\"]"
     , "mod generated_object_helpers;"
-    , "physical: seal_value(&aad, &logical, &cipher)?,"
+    , "seal_value(&cell_slot_aad(&spec.name), &logical, &cipher)?"
     , "let logical = cold_zero_value(&spec.value_type);"
     , "let values = cold_zero_boxed_values(capacity, &spec.value_type);"
     , "let entries = cold_zero_small_map_entries(capacity, key_type, &spec.value_type);"
@@ -4776,7 +4781,7 @@ def RuntimeImplementationInterface.runtimeObjectResetUsesLeanGeneratedHelpers
     , "slots.fill(false);"
     , "fn no_written_slots(slots: &[bool]) -> bool {"
     , "!slots.iter().any(|written| *written)"
-    , "Self::UoArray(object) => !object.accessed && no_written_slots(&object.written_slots),"
+    , "Self::UoArray(object) => {\n                    !object.accessed && no_written_slots(&object.written_slots)\n                }"
     , "Self::UoSmallMap(object) => !object.accessed && !object.dirty,"
     , "Self::UoOramMap(object) => !object.accessed && !object.dirty,"
     ] ∧
@@ -4879,7 +4884,7 @@ def RuntimeImplementationInterface.checkRuntimeObjectResetUsesLeanGeneratedHelpe
     , "slots.fill(false);"
     , "fn no_written_slots(slots: &[bool]) -> bool {"
     , "!slots.iter().any(|written| *written)"
-    , "Self::UoArray(object) => !object.accessed && no_written_slots(&object.written_slots),"
+    , "Self::UoArray(object) => {\n                    !object.accessed && no_written_slots(&object.written_slots)\n                }"
     , "Self::UoSmallMap(object) => !object.accessed && !object.dirty,"
     , "Self::UoOramMap(object) => !object.accessed && !object.dirty,"
     ] &&
@@ -4936,13 +4941,15 @@ def RuntimeImplementationInterface.checkRuntimeObjectOpenUsesSharedDecodeShell
     , "decode_cell_value_from_storage("
     , "decode_array_values_from_storage("
     , "decode_small_map_entries_from_storage("
+    , "records.push(cipher.read_stored_record(&locations.location(index), record_len)?)?;"
+    , "self.cipher.read_stored_record(\n            &self.spec.name,\n            sealed_record_len(self.spec.value_type.canonical_len()),\n        )"
     ] &&
   checkSourceContainsAll iface.generatedObjectHelpersProductionSource
     [ "use uo_core::ir::StateObject;"
     , "fn with_opened_payload<T, F>("
     , "allocator.reserve_guard(ScratchRegion::IoScratch, payload_len)?;"
     , ".with_opened_payload(aad.as_bytes(), payload_len, physical, open)"
-    , "cipher.check_stored_record(&location, physical)?;\n    cipher\n        .with_opened_payload(aad.as_bytes(), payload_len, physical, open)"
+    , "// storage boundary, and it opens what it read.\n    cipher\n        .with_opened_payload(aad.as_bytes(), payload_len, physical, open)"
     , "pub(super) fn with_opened_object_payload<T, F>("
     , "with_opened_payload(\n        location,\n        aad,\n        payload_len,\n        physical,\n        cipher,\n        allocator,\n        open,\n    )"
     , "pub(super) fn decode_sealed_value("
@@ -4986,7 +4993,7 @@ def RuntimeImplementationInterface.checkRuntimeObjectBootstrapUsesSharedBoxedSea
   checkSourceContainsAll iface.objectsProductionSource
     [ "#[path = \"generated_object_helpers.rs\"]"
     , "mod generated_object_helpers;"
-    , "physical: seal_value(&aad, &logical, &cipher)?,"
+    , "seal_value(&cell_slot_aad(&spec.name), &logical, &cipher)?"
     , "let logical = cold_zero_value(&spec.value_type);"
     , "let values = cold_zero_boxed_values(capacity, &spec.value_type);"
     , "let entries = cold_zero_small_map_entries(capacity, key_type, &spec.value_type);"
@@ -5324,13 +5331,15 @@ def RuntimeImplementationInterface.runtimeOramUsesLeanGeneratedBlockBucketCodecs
     -- evidence: a production build records no hidden ORAM state.
     , "#[cfg(any(test, feature = \"diagnostics\"))]\n    pub(crate) fn path_position_map_witness("
     , "#[cfg(any(test, feature = \"diagnostics\"))]\n    pub(crate) fn access_counter_witness("
-    -- The sealed records of a map's storage are held by reference: the
-    -- copy of a map that a call loads shares them, a write copies the
-    -- record it replaces, and only its last holder zeroes a record.
-    , "directory_pages: Box<[SealedPage]>,\n    buckets: Box<[SealedPage]>,"
-    , "pub(crate) struct SealedPage(Arc<[u8]>);"
-    , "fn deref_mut(&mut self) -> &mut [u8] {\n        Arc::make_mut(&mut self.0)\n    }"
-    , "if let Some(bytes) = Arc::get_mut(&mut self.0) {\n            bytes.fill(0);\n        }"
+    -- The store keeps the sealed records of a map's storage: a committed
+    -- map holds none, and a call holds the records it read from the store
+    -- until it seals their next versions over them.
+    , "directory_pages: Box<[SealedPage]>,\n    buckets: BucketTable,"
+    , "pub(crate) struct SealedPage(Box<[u8]>);"
+    , "// The store keeps the map's records: a committed map holds none.\n        self.storage = OramStorage::empty(self.parameters.bucket_count);"
+    , "let record = cipher.read_stored_record(\n            &format!(\"{}@bucket{index}\", spec.name),\n            parameters.bucket_record_len(),\n        )?;\n        self.held.insert(index, SealedPage(record));"
+    , "self.access_counter_slot = cipher.read_stored_record(\n            &format!(\"{}@counter\", spec.name),\n            parameters.counter_record_len(),\n        )?;"
+    , "read.push(SealedPage(cipher.read_stored_record(\n            &format!(\"{}@meta{page}\", spec.name),\n            parameters.page_record_len(),\n        )?))?;"
     , "cold_commit_oram_state("
     , "bootstrap_surrogate_directory_pages("
     , "bootstrap_filler_buckets(spec, &parameters, &cipher)?;"
@@ -5439,7 +5448,7 @@ def RuntimeImplementationInterface.runtimeOramUsesLeanGeneratedBlockBucketCodecs
     , "let apply = put.apply & !aborted;"
     , "impl OramState {"
     , "pub(crate) fn placeholder() -> Self {"
-    , "storage: super::OramStorage {"
+    , "storage: super::OramStorage::default(),"
     , "fn wipe_secrets(&mut self) {"
     , "impl Drop for OramState {"
     , "impl Drop for PathOramLeafCoinSource {"
@@ -6097,13 +6106,15 @@ def RuntimeImplementationInterface.checkRuntimeOramUsesLeanGeneratedBlockBucketC
     -- evidence: a production build records no hidden ORAM state.
     , "#[cfg(any(test, feature = \"diagnostics\"))]\n    pub(crate) fn path_position_map_witness("
     , "#[cfg(any(test, feature = \"diagnostics\"))]\n    pub(crate) fn access_counter_witness("
-    -- The sealed records of a map's storage are held by reference: the
-    -- copy of a map that a call loads shares them, a write copies the
-    -- record it replaces, and only its last holder zeroes a record.
-    , "directory_pages: Box<[SealedPage]>,\n    buckets: Box<[SealedPage]>,"
-    , "pub(crate) struct SealedPage(Arc<[u8]>);"
-    , "fn deref_mut(&mut self) -> &mut [u8] {\n        Arc::make_mut(&mut self.0)\n    }"
-    , "if let Some(bytes) = Arc::get_mut(&mut self.0) {\n            bytes.fill(0);\n        }"
+    -- The store keeps the sealed records of a map's storage: a committed
+    -- map holds none, and a call holds the records it read from the store
+    -- until it seals their next versions over them.
+    , "directory_pages: Box<[SealedPage]>,\n    buckets: BucketTable,"
+    , "pub(crate) struct SealedPage(Box<[u8]>);"
+    , "// The store keeps the map's records: a committed map holds none.\n        self.storage = OramStorage::empty(self.parameters.bucket_count);"
+    , "let record = cipher.read_stored_record(\n            &format!(\"{}@bucket{index}\", spec.name),\n            parameters.bucket_record_len(),\n        )?;\n        self.held.insert(index, SealedPage(record));"
+    , "self.access_counter_slot = cipher.read_stored_record(\n            &format!(\"{}@counter\", spec.name),\n            parameters.counter_record_len(),\n        )?;"
+    , "read.push(SealedPage(cipher.read_stored_record(\n            &format!(\"{}@meta{page}\", spec.name),\n            parameters.page_record_len(),\n        )?))?;"
     , "cold_commit_oram_state("
     , "bootstrap_surrogate_directory_pages("
     , "bootstrap_filler_buckets(spec, &parameters, &cipher)?;"
@@ -6212,7 +6223,7 @@ def RuntimeImplementationInterface.checkRuntimeOramUsesLeanGeneratedBlockBucketC
     , "let apply = put.apply & !aborted;"
     , "impl OramState {"
     , "pub(crate) fn placeholder() -> Self {"
-    , "storage: super::OramStorage {"
+    , "storage: super::OramStorage::default(),"
     , "fn wipe_secrets(&mut self) {"
     , "impl Drop for OramState {"
     , "impl Drop for PathOramLeafCoinSource {"
@@ -7734,7 +7745,7 @@ def RuntimeImplementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyIn
     , "clone_runtime_value_for_read(&object.value)"
     , "Self::UoCell(object) => !object.accessed && !object.written,"
     , "written_slots: Box<[bool]>,"
-    , "Self::UoArray(object) => !object.accessed && no_written_slots(&object.written_slots),"
+    , "Self::UoArray(object) => {\n                    !object.accessed && no_written_slots(&object.written_slots)\n                }"
     , "Self::UoSmallMap(object) => !object.accessed && !object.dirty,"
     , "Self::UoOramMap(object) => !object.accessed && !object.dirty,"
     , "reconcile_cell_commit_value("
@@ -7770,7 +7781,7 @@ def RuntimeImplementationInterface.runtimeHandwrittenConfidentialWorkLivesOnlyIn
     , "fn record_load_scan("
     , "for (index, slot) in physical_slots.iter().enumerate() {"
     , "trace.physical_scan(object_name, kind, physical_slots.len(), len);"
-    , "ExactObjectKind::Array,\n            &self.physical_slots,"
+    , "ExactObjectKind::Array,\n            &physical_slots,"
     , "keep_loaded_cell_value(&mut object.loaded_value, &object.value);"
     , "keep_loaded_array_values(&mut object.loaded_values, &object.values)?;"
     , "keep_loaded_small_map_entries(&mut object.loaded_entries, &object.entries)?;"
@@ -8054,7 +8065,7 @@ def RuntimeImplementationInterface.checkRuntimeHandwrittenConfidentialWorkLivesO
     , "clone_runtime_value_for_read(&object.value)"
     , "Self::UoCell(object) => !object.accessed && !object.written,"
     , "written_slots: Box<[bool]>,"
-    , "Self::UoArray(object) => !object.accessed && no_written_slots(&object.written_slots),"
+    , "Self::UoArray(object) => {\n                    !object.accessed && no_written_slots(&object.written_slots)\n                }"
     , "Self::UoSmallMap(object) => !object.accessed && !object.dirty,"
     , "Self::UoOramMap(object) => !object.accessed && !object.dirty,"
     , "reconcile_cell_commit_value("
@@ -8090,7 +8101,7 @@ def RuntimeImplementationInterface.checkRuntimeHandwrittenConfidentialWorkLivesO
     , "fn record_load_scan("
     , "for (index, slot) in physical_slots.iter().enumerate() {"
     , "trace.physical_scan(object_name, kind, physical_slots.len(), len);"
-    , "ExactObjectKind::Array,\n            &self.physical_slots,"
+    , "ExactObjectKind::Array,\n            &physical_slots,"
     , "keep_loaded_cell_value(&mut object.loaded_value, &object.value);"
     , "keep_loaded_array_values(&mut object.loaded_values, &object.values)?;"
     , "keep_loaded_small_map_entries(&mut object.loaded_entries, &object.entries)?;"

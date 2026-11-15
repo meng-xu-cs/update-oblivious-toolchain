@@ -1807,7 +1807,13 @@ bounds:
             .object_entries_for_test()
             .filter_map(|(id, object)| {
                 let (_, records) = object.sealed_storage_for_test()?;
-                Some((id, records.into_iter().map(sealed_record_counter).collect()))
+                Some((
+                    id,
+                    records
+                        .iter()
+                        .map(|record| sealed_record_counter(record))
+                        .collect(),
+                ))
             })
             .collect()
     }
@@ -2629,25 +2635,31 @@ bounds:
         assert_eq!(aborted, 1);
     }
 
-    /// Where each sealed record of each object of a runtime is in memory.
-    fn sealed_record_addresses(runtime: &ContractRuntime) -> BTreeMap<u32, Vec<*const u8>> {
+    /// Where each object of a runtime is in memory.
+    fn object_addresses(runtime: &ContractRuntime) -> BTreeMap<u32, *const RuntimeObject> {
+        runtime
+            .object_entries_for_test()
+            .map(|(object_id, object)| (object_id, object as *const RuntimeObject))
+            .collect()
+    }
+
+    /// The sealed records the store keeps for each object of a runtime.
+    fn stored_records(runtime: &ContractRuntime) -> BTreeMap<u32, Vec<Box<[u8]>>> {
         runtime
             .object_entries_for_test()
             .filter_map(|(object_id, object)| {
                 let (_, records) = object.sealed_storage_for_test()?;
-                Some((
-                    object_id,
-                    records.into_iter().map(<[u8]>::as_ptr).collect::<Vec<_>>(),
-                ))
+                Some((object_id, records))
             })
             .collect()
     }
 
     /// Staging a call copies no object: the staged runtime holds the
-    /// committed objects themselves. A call replaces the objects it loaded
+    /// committed objects themselves, and no committed object holds a sealed
+    /// record, which the store keeps. A call replaces the objects it loaded
     /// and no other, so an object a call did not load stays where it was in
-    /// memory through any number of calls, whether they commit, abort or
-    /// fail.
+    /// memory, with its records in the store, through any number of calls,
+    /// whether they commit, abort or fail.
     #[test]
     fn staging_a_call_copies_no_object_and_a_call_replaces_only_its_own() {
         let artifact = compile_bench(
@@ -2672,13 +2684,22 @@ bounds:
         let (balances, allowances) = (object_id("balances"), object_id("allowances"));
         assert_eq!(ids.len(), 2);
 
-        // The staged runtime's records are the committed runtime's.
-        let committed = sealed_record_addresses(&instance.state);
-        assert!(committed.values().all(|records| !records.is_empty()));
+        // The staged runtime's objects are the committed runtime's, and
+        // they hold no record: the store keeps every one.
+        let holds_none = |runtime: &ContractRuntime| {
+            runtime
+                .object_entries_for_test()
+                .all(|(_, object)| object.holds_no_sealed_record())
+        };
+        let committed = object_addresses(&instance.state);
+        assert!(holds_none(&instance.state));
+        assert!(stored_records(&instance.state)
+            .values()
+            .all(|records| !records.is_empty()));
         let staged = crate::runtime::stage_contract_runtime(&instance.state).unwrap();
-        assert_eq!(sealed_record_addresses(&staged), committed);
+        assert_eq!(object_addresses(&staged), committed);
         drop(staged);
-        assert_eq!(sealed_record_addresses(&instance.state), committed);
+        assert_eq!(object_addresses(&instance.state), committed);
 
         let owner = Value::Address([0xA1; 20]);
         let spender = Value::Address([0xB2; 20]);
@@ -2724,40 +2745,48 @@ bounds:
             ),
         ];
         for (index, (entrypoint, args, aborts, loaded)) in calls.into_iter().enumerate() {
-            let before = sealed_record_addresses(&instance.state);
+            let before = object_addresses(&instance.state);
+            let records_before = stored_records(&instance.state);
             let result = instance.call(entrypoint, args).unwrap();
             assert_eq!(result.aborted, aborts, "call {index}, {entrypoint}");
-            let after = sealed_record_addresses(&instance.state);
+            assert!(holds_none(&instance.state), "call {index}, {entrypoint}");
+            let after = object_addresses(&instance.state);
+            let records_after = stored_records(&instance.state);
             for id in &ids {
                 assert_eq!(
                     after[id] != before[id],
                     loaded.contains(id),
                     "call {index}, {entrypoint}, object {id}"
                 );
-                // Of a map it loaded, a call replaces the records it wrote:
-                // the paths it read and the metadata pages. The others are
-                // the committed map's own records still.
+                // Of a map it loaded, a call replaces the records it wrote in
+                // the store: the paths it read and the metadata pages. The
+                // others are the committed map's own records still; the
+                // records of a map it did not load are all as they were.
+                let replaced = records_after[id]
+                    .iter()
+                    .zip(&records_before[id])
+                    .filter(|(after, before)| after != before)
+                    .count();
                 if loaded.contains(id) {
-                    let replaced = after[id]
-                        .iter()
-                        .zip(&before[id])
-                        .filter(|(after, before)| after != before)
-                        .count();
                     assert!(
-                        0 < replaced && replaced < after[id].len(),
+                        0 < replaced && replaced < records_after[id].len(),
                         "call {index}, {entrypoint}, object {id}: {replaced} of {}",
-                        after[id].len()
+                        records_after[id].len()
                     );
+                } else {
+                    assert_eq!(replaced, 0, "call {index}, {entrypoint}, object {id}");
                 }
             }
         }
 
         // A call that fails replaces nothing.
-        let before = sealed_record_addresses(&instance.state);
+        let before = object_addresses(&instance.state);
+        let records_before = stored_records(&instance.state);
         assert!(instance
             .call("mint(address,uint256)", vec![owner.clone()])
             .is_err());
-        assert_eq!(sealed_record_addresses(&instance.state), before);
+        assert_eq!(object_addresses(&instance.state), before);
+        assert_eq!(stored_records(&instance.state), records_before);
     }
 
     /// An object keeps the digest of its sealed records, so a digest of the
@@ -3815,8 +3844,8 @@ bounds:
         fn create(&mut self, object: &str, location: &str, record: &[u8]) -> anyhow::Result<()> {
             self.inner.create(object, location, record)
         }
-        fn read(&mut self, location: &str, held: &[u8]) -> anyhow::Result<()> {
-            self.inner.read(location, held)
+        fn read(&mut self, location: &str, len: usize) -> anyhow::Result<Box<[u8]>> {
+            self.inner.read(location, len)
         }
         fn write(&mut self, location: &str, record: &[u8]) -> anyhow::Result<uo_core::WriteClass> {
             use std::sync::atomic::Ordering;

@@ -4,7 +4,7 @@ pub mod codec;
 pub mod storage;
 mod store;
 
-pub use codec::{sealed_record_seal_count, StoreCipher};
+pub use codec::{sealed_record_len, sealed_record_seal_count, StoreCipher};
 pub use storage::{
     sealed_write_class, FileStorage, MemoryStorage, SharedStorage, StorageAdapter, StorageHandle,
     StorageIo, StorageStats, SyncPolicy, SEAL_RESERVATION_STEP,

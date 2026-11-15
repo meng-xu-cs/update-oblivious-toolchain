@@ -362,12 +362,10 @@ pub(super) fn clone_boxed_map_entries(entries: &[MapEntry]) -> Result<Box<[MapEn
     values.finish()
 }
 
+/// The storage of a map a call loads: none of its records, which the call
+/// reads from the store as it opens them.
 fn clone_oram_storage(storage: &super::OramStorage) -> super::OramStorage {
-    super::OramStorage {
-        directory_pages: storage.directory_pages.clone(),
-        buckets: storage.buckets.clone(),
-        access_counter_slot: storage.access_counter_slot.clone(),
-    }
+    super::OramStorage::empty(storage.buckets.len())
 }
 
 impl OramWrite {
@@ -518,11 +516,7 @@ impl OramState {
             position_map: Box::<[MaskedUsizeOption]>::default(),
             stash: FixedStash::placeholder(),
             tree: None,
-            storage: super::OramStorage {
-                directory_pages: Box::<[SealedPage]>::default(),
-                buckets: Box::<[SealedPage]>::default(),
-                access_counter_slot: Box::<[u8]>::default(),
-            },
+            storage: super::OramStorage::default(),
             access_counter: 0,
             cipher: StoreCipher::random(),
         }
@@ -544,9 +538,7 @@ impl OramState {
         for page in &mut self.storage.directory_pages {
             page.wipe();
         }
-        for bucket in &mut self.storage.buckets {
-            bucket.wipe();
-        }
+        self.storage.buckets.wipe();
         self.storage.access_counter_slot.fill(0);
         self.access_counter = 0;
     }
@@ -744,13 +736,6 @@ pub(super) fn surrogate_access_transcript(
     if bucket_count != 0 {
         for offset in 0..state.parameters.buckets_per_access {
             let index = ((state.access_counter as usize) + offset) % bucket_count;
-            let bucket = state.storage.buckets.get(index).ok_or_else(|| {
-                anyhow!(
-                    "surrogate ORAM transcript bucket index {} missing despite public count guard for {}",
-                    index,
-                    spec.name
-                )
-            })?;
             logical_accesses.push(LogicalEvent {
                 kind: "uooram_bucket_scan".into(),
                 object: spec.name.clone(),
@@ -759,7 +744,7 @@ pub(super) fn surrogate_access_transcript(
             physical_reads.push(PhysicalReadEvent {
                 object: spec.name.clone(),
                 location: format!("{}@bucket{index}", spec.name),
-                len: bucket.len(),
+                len: state.parameters.bucket_record_len(),
             })?;
         }
     }
@@ -1039,7 +1024,7 @@ pub(super) fn rewrite_surrogate_bucket_window_in_place(
     entries: &[MapEntry],
     access_counter: u64,
     allocator: &mut AllocatorSession,
-    buckets: &mut [SealedPage],
+    buckets: &mut super::BucketTable,
     writes: &mut OramWriteLog,
 ) -> Result<()> {
     if buckets.len() != parameters.bucket_count {
@@ -1057,6 +1042,10 @@ pub(super) fn rewrite_surrogate_bucket_window_in_place(
         |index| {
             let bucket = oram_bucket_from_entries(spec, entries, access_counter, index)?;
             let mut payload = oram_bucket_bytes(&bucket, spec)?;
+            // The window's buckets cross from the store here, as its
+            // transcript names them, and their next records are sealed over
+            // them.
+            buckets.read(cipher, spec, parameters, index)?;
             let sealed_bucket = buckets.get_mut(index).ok_or_else(|| {
                 anyhow!(
                     "surrogate ORAM bucket index {} missing despite public count guard for {}",
@@ -2803,11 +2792,37 @@ pub(super) fn decode_path_metadata_pages_into(
     Ok(())
 }
 
+/// Read the buckets of the path to `access_leaf` from the store, root to
+/// leaf, where they cross the storage boundary: the access holds them in
+/// place of the path it held before, and seals their next versions over
+/// them.
+pub(super) fn read_path_buckets(
+    spec: &StateObject,
+    parameters: &OramParameters,
+    cipher: &StoreCipher,
+    buckets: &mut super::BucketTable,
+    access_leaf: usize,
+) -> Result<()> {
+    buckets.release();
+    let mut read_result = Ok(());
+    for_each_bucket_on_leaf_path_root_to_leaf(
+        parameters.leaf_count(),
+        access_leaf,
+        |bucket_index| {
+            if read_result.is_err() {
+                return;
+            }
+            read_result = buckets.read(cipher, spec, parameters, bucket_index);
+        },
+    );
+    read_result
+}
+
 pub(super) fn load_path_buckets_into_stash(
     spec: &StateObject,
     parameters: &OramParameters,
     cipher: &StoreCipher,
-    buckets: &[SealedPage],
+    buckets: &super::BucketTable,
     access_leaf: usize,
     allocator: &mut AllocatorSession,
     stash: &mut FixedStash,
@@ -2897,7 +2912,7 @@ pub(super) fn rebuild_path_buckets_from_stash(
     spec: &StateObject,
     parameters: &OramParameters,
     cipher: &StoreCipher,
-    buckets: &mut [SealedPage],
+    buckets: &mut super::BucketTable,
     access_leaf: usize,
     allocator: &mut AllocatorSession,
     writes: &mut OramWriteLog,
@@ -2969,6 +2984,13 @@ where
         );
     }
 
+    read_path_buckets(
+        spec,
+        &state.parameters,
+        &state.cipher,
+        &mut state.storage.buckets,
+        access_leaf,
+    )?;
     load_path_buckets_into_stash(
         spec,
         &state.parameters,
@@ -3040,7 +3062,7 @@ pub(super) fn reconstruct_path_entries_from_storage_into(
     spec: &StateObject,
     parameters: &OramParameters,
     cipher: &StoreCipher,
-    buckets: &[SealedPage],
+    buckets: &super::BucketTable,
     allocator: &mut AllocatorSession,
     empty_entry: &MapEntry,
     position_map: &[MaskedUsizeOption],
@@ -3182,7 +3204,7 @@ pub(super) fn path_entries_from_storage(
     parameters: &OramParameters,
     cipher: &StoreCipher,
     directory_pages: &[SealedPage],
-    buckets: &[SealedPage],
+    buckets: &super::BucketTable,
     empty_entry: &MapEntry,
 ) -> Result<Box<[MapEntry]>> {
     let scratch = parameters
@@ -5445,6 +5467,11 @@ impl TreePathStore for SealedTreeStore<'_> {
     }
 
     fn load_bucket(&mut self, index: usize, stash: &mut TreeStash) -> Result<()> {
+        // The bucket crosses from the store here, and the access holds it
+        // until it seals the bucket's next version over it.
+        self.storage
+            .buckets
+            .read(self.cipher, self.spec, self.parameters, index)?;
         let sealed = self
             .storage
             .buckets
@@ -5556,6 +5583,8 @@ impl TreePathStore for SealedTreeStore<'_> {
             &mut trace.writes,
         )?;
         *self.access_counter = next_counter;
+        // The access has sealed the next version of every bucket it read.
+        self.storage.buckets.release();
         // A real access reads a node under its leaf and gives it the coin as
         // its next leaf; a dummy access reads the coin's path.
         let slot = masked_select_option_usize(
@@ -5740,7 +5769,11 @@ pub(super) fn tree_position_map_witness_leaves(
         Ok(())
     };
     let mut stash = TreeStash::with_capacity(0, shape.blocks_per_bucket, &empty)?;
-    for (index, sealed) in storage.buckets.iter().enumerate() {
+    for index in 0..storage.buckets.len() {
+        let sealed = storage
+            .buckets
+            .get(index)
+            .ok_or_else(|| anyhow!("tree bucket {} missing for {}", index, spec.name))?;
         stash.fill = 0;
         with_opened_oram_payload(
             format!("{}@bucket{}", spec.name, index),
@@ -5813,7 +5846,11 @@ pub(super) fn tree_entries_from_storage(
         Ok(())
     };
     let mut stash = TreeStash::with_capacity(0, shape.blocks_per_bucket, &empty)?;
-    for (index, sealed) in storage.buckets.iter().enumerate() {
+    for index in 0..storage.buckets.len() {
+        let sealed = storage
+            .buckets
+            .get(index)
+            .ok_or_else(|| anyhow!("tree bucket {} missing for {}", index, spec.name))?;
         stash.fill = 0;
         with_opened_oram_payload(
             format!("{}@bucket{}", spec.name, index),

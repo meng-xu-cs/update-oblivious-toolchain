@@ -19,7 +19,7 @@ and the ownership boundaries that keep them auditable.
 | `CommittedRuntimeWitnessSnapshot` | `crates/uo-core/src/trace.rs` | hidden witness snapshot wrapper built from `state.rs`: the access counters and position maps of the contract's Path ORAM objects. A test or diagnostics runtime keeps one from call to call (`ContractRuntime::kept_witness`) and copies it only through `duplicate`; a production runtime builds and keeps none (invariant 15) |
 | `RuntimeShadowState` / `ConfidentialRuntimeShadowState` / `PublicRuntimeShadowState` | `runtime/uo-evm/src/state.rs` | runtime-only reopened state; public shell receives only public wrapper |
 | `RuntimeObject` graph | `runtime/uo-evm/src/objects.rs` | runtime-owned object state and commit/restore paths. A committed object is cold and is never changed: the committed state and the states staged from it hold the same object (invariant 16) |
-| `OramState` and ORAM transcript/write evidence | `runtime/uo-evm/src/oram.rs` | runtime-owned ORAM state; generated helpers own codec/rebuild/write-log internals. The sealed records of a map's storage (`SealedPage`) are held by reference by the committed map and by the copy a call loads |
+| `OramState` and ORAM transcript/write evidence | `runtime/uo-evm/src/oram.rs` | runtime-owned ORAM state; generated helpers own codec/rebuild/write-log internals. The contract's store keeps the sealed records of a map's storage, and a committed map holds none of them: a call holds the records it read from the store (`OramStorage`, `BucketTable`) until it seals their next versions over them (invariant 18) |
 | Store cipher key and plaintext staging buffers | `runtime/uo-store/src/*` | store/codec layer; generated helpers own exact-size seal/open/filler surface. The cipher also holds the count of the seals under its key, which is public, and its object's part of the contract's store |
 | Commit-metadata key (`StoreMetaKey`) | `runtime/uo-evm/src/secret.rs` | an HKDF-SHA256 expansion of the master secret, kept by the contract instance. It tags the public metadata of every commit, so a restart takes only metadata that a runtime with the same secret wrote. It is wiped on drop and has no `Clone`, no serialization and an opaque `Debug` form |
 | Storage adapter (`StorageAdapter`: `MemoryStorage`, `FileStorage`) | `runtime/uo-store/src/storage.rs` | holds no secret: the sealed records as a host keeps them, the values of the public objects, the seal-count reservations and the tagged commit metadata |
@@ -133,13 +133,16 @@ and the ownership boundaries that keep them auditable.
     more than one table holds cannot be changed, since only the one holder
     of an object is handed it for change.
 
-    The sealed records of a Path ORAM map are held by reference in the same
-    way. The copy of a map that a call loads shares the committed map's
-    records, a write to a shared record changes a copy of it, and a record
-    is zeroed only when its last holder is dropped: the copy a failed call
-    wrote is zeroed, and the committed record it would have replaced is
-    not. An exact object (a cell, an array or a full-scan map) is opened
-    whole when a call loads it, and its sealed slots are copied then.
+    A committed object holds no sealed record: the store keeps them
+    (invariant 18). The copy of an object that a call loads holds the
+    records it read from the store: an exact object (a cell, an array or a
+    full-scan map) is opened whole when a call loads it, and the call holds
+    its slots until it seals the next ones over them; the copy of a Path
+    ORAM map holds its counter and metadata pages from the call's load to
+    its commit, and the buckets of a path from the access that reads them
+    to the next. Making the object cold drops them. A call that fails
+    leaves the store as it was: the store puts back the records the call
+    replaced.
 
     An object keeps the digest of its sealed records once it was asked
     for, and forgets it when it is handed out for change. So the digest of
@@ -178,21 +181,26 @@ and the ownership boundaries that keep them auditable.
     and is recorded by itself. A run that names a Path ORAM object is
     rejected, so no run holds an event of a Path ORAM access.
 
-18. Every sealed record crosses to the contract's store where it is opened
-    and where it is sealed. A deployed contract has a store
+18. The contract's store alone keeps the sealed records, and every sealed
+    record crosses between the store and the runtime where it is read to
+    be opened and where it is sealed. A deployed contract has a store
     (`StorageAdapter` in `runtime/uo-store/src/storage.rs`), in memory
-    unless it is deployed with one in files. The store keeps a copy of
-    every sealed record under the name a trace gives the record's location.
-    The one function that opens a record first names it to the store
-    (`check_stored_record`): the store compares the runtime's copy with the
-    record it keeps, fails the call if they differ, and logs the read. The
+    unless it is deployed with one in files. The store keeps every sealed
+    record under the name a trace gives the record's location, and the
+    runtime holds none of them between calls: a committed object holds no
+    sealed record, and an object is cold only if it holds none
+    (`RuntimeObject::committed_cache_is_cold`). A call reads each record it
+    opens from the store (`read_stored_record`), which copies it out, of
+    the public length the runtime expects, and logs the read; the call
+    holds it until it seals the next one over it (invariant 16). The one
+    function that opens a record opens a record the runtime read so. The
     one function that seals a record in place hands the store the new
     record (`store_sealed_record`), after the check of invariant 14 and
     before the write's event is recorded: the store classifies the write
     from the record it kept and logs it, and the call fails unless that
     class is `Update` too. So the store writes its log of a call from its
-    own records, and the runtime's copies of the records are a cache that
-    every open compares with the store.
+    own records, and a deployment holds each sealed record once. A
+    deployment hands the store its first records and keeps none of them.
 
     A call's records are pending in the store until the call is committed.
     The engine commits them there, with the commit metadata, before it
@@ -212,7 +220,9 @@ and the ownership boundaries that keep them auditable.
     A restart (`ContractInstance::restart_with_seed`, in test and
     diagnostics builds) takes the commit metadata only with the tag of the
     deployment's secret, compares its rollback counter with an attested
-    one, takes each object's records from the store, and compares the
+    one, builds each object with its key and no record, sealing nothing
+    (`RuntimeObject::instantiate_for_restart`), finds the object's records
+    in the store, and compares the
     digest of the public state it restored with the one the metadata
     names. It does not detect a store that was rolled back together with
     the attested counter, nor a record replaced by an older record of its

@@ -1,6 +1,6 @@
 {
   "accepted": true,
-  "artifact_json_bytes": 1770422,
+  "artifact_json_bytes": 1791573,
   "checker": "proof/lean/.lake/build/bin/checkProofGradeRuntimeResidualHelperShellBoundary",
   "generated_object_helpers_match_lean_generator_theorem_checked": true,
   "generated_oram_codecs_match_lean_generator_theorem_checked": true,
@@ -10,7 +10,7 @@
   "handwritten_runtime_public_only_theorem_checked": true,
   "lean_checker_input": "source-backed runtime residual helper-shell boundary",
   "lean_checker_kind": "runtime residual helper-shell boundary",
-  "lean_stdout": "validated runtime residual helper-shell boundary for source-backed uo-evm helper shell (267512 helper bytes)",
+  "lean_stdout": "validated runtime residual helper-shell boundary for source-backed uo-evm helper shell (284982 helper bytes)",
   "oram_block_codec_roundtrip_theorem_checked": true,
   "oram_bucket_bytes_match_codec_theorem_checked": true,
   "oram_bucket_bytes_public_formula_theorem_checked": true,
@@ -252,14 +252,14 @@
   "runtime_host_visible_error_taxonomy_theorem_checked": true,
   "source_bytes": {
     "generated_object_helpers": 28345,
-    "generated_oram_codecs": 206086,
+    "generated_oram_codecs": 207408,
     "generated_store_codec": 4846,
     "generated_store_helpers": 11452,
-    "generated_store_surface": 10867,
-    "objects": 131183,
-    "oram": 99280,
-    "store_codec": 16141,
-    "store_lib": 383,
+    "generated_store_surface": 11029,
+    "objects": 139192,
+    "oram": 108493,
+    "store_codec": 16389,
+    "store_lib": 402,
     "store_store": 4610
   },
   "source_files": [

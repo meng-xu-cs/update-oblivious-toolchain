@@ -12,6 +12,12 @@ use generated_codec::{
     SEALED_NONCE_BYTES, SEALED_TAG_BYTES,
 };
 
+/// The length of a sealed record of a `payload_len`-byte payload: what the
+/// runtime reads from its store for a record it is about to open.
+pub fn sealed_record_len(payload_len: usize) -> usize {
+    generated_sealed_encoded_len(payload_len)
+}
+
 /// The count a sealed record's nonce carries: how many records were sealed
 /// under its key before it. `None` if the bytes are not a sealed record. The
 /// count is in the clear, as the nonce is.

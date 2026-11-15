@@ -2020,3 +2020,62 @@ Acceptance: a deployment holds each sealed record once; the capacity
 sweep's resident memory at 16,384 entries falls by about the size of the
 map's ciphertext; a restart seals no record; the storage-boundary report
 is unchanged.
+
+As built. The store alone keeps the sealed records. A committed object
+holds none: making an object cold drops the records it holds, and an object
+is taken for cold only if it holds none (`holds_no_sealed_record` in
+`RuntimeObject::committed_cache_is_cold`), so the check at every call
+boundary enforces it. A call reads each record it opens from the store
+(`StoreCipher::read_stored_record`, which replaces `check_stored_record`):
+the store copies the record out, of the public length the runtime expects,
+and logs the read, where it compared a copy the runtime held. The call
+holds what it read until it seals the next record over it: an exact
+object's slots from its load to its commit (`read_exact_slots` in
+`runtime/uo-evm/src/objects.rs`), a Path ORAM map's counter and metadata
+pages from its load to its commit (`OramStorage::read_counter_and_pages`),
+and the buckets of a path from the access that reads them to the next
+(`BucketTable`, in place of the map's array of every bucket). Every record
+a call seals is one it read in the call. The surrogate scheme's commit
+sealed a window of buckets it never read; it now reads them, as its
+transcript already said it did, and no surrogate map is in the
+storage-boundary report. The copy-on-write sharing of Path ORAM pages
+(Issue 37) went with the shared records (`SealedPage` holds a `Box`): the
+store's pending state keeps the committed records that a dropped call
+replaced, as it did before. A deployment hands its first records to the
+store and keeps none, and a restart builds each object with its key and no
+record (`RuntimeObject::instantiate_for_restart`), so it seals nothing. The
+digest of the ciphertext reads the store's records, with the same formula,
+so every digest is the same.
+
+Measured. The storage-boundary report is unchanged but for its provenance.
+At 16,384 entries the store keeps 22.0 MB of the tree's ciphertext, in
+32,796 records, and 1.6 MB of the full scan's, in 16,384. The quick profile
+of the capacity sweep at that capacity alone, run before and after on one
+machine, gives:
+
+| Resident memory | Before | After |
+| --- | --- | --- |
+| Tree, during a call | 117.9 MB | 92.9 MB |
+| Full scan, during a call | 29.9 MB | 29.1 MB |
+| Full scan, after the fill | 21.5 MB | 19.7 MB |
+
+A full-scan call holds what it read for its whole length, so its peak falls
+by less than a copy of the map. Callgrind counts 3.5% more instructions for
+four writes and four reads of a full-scan map of 4,096 slots (720.5 million
+to 746.0 million), where each slot's location is now named once more and
+its record copied out of the store rather than compared, and 0.7% more for
+the same calls on a tree of 1,024 entries (11.38 billion to 11.47 billion).
+
+`sealed_records_are_kept_in_the_store_alone` in
+`runtime_boundary_validation.json` pins the reads, the drops and the
+restart, with a unit test of nine drifts;
+`sealed_records_cross_the_storage_boundary` pins the store's read, and
+`a_call_copies_no_committed_object` that a map's records are not shared.
+The Lean implementation interface pins the store's reads of an exact
+object's slots and of a map's counter, pages and buckets. The tamper
+scenario that skipped the store's comparison now loads an exact object's
+slots from somewhere other than the store (426 in all). The tests
+`an_object_built_for_a_restart_seals_nothing` and
+`a_committed_map_holds_no_record_and_a_call_reads_the_ones_it_opens` are
+new, and the engine's test of staging checks that no committed object
+holds a record and which of the store's records a call replaces.

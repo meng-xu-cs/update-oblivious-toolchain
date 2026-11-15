@@ -539,8 +539,11 @@ either backend, and the tree's witness 0.1 ms to 1.1 ms. Serializing the
 trace takes another 0.06 ms for the full-scan read and 4.4 ms for the
 tree's, and Lean checks the witness of the call in 117 ms and 130 ms. The
 probe's resident memory at 16,384 entries is 122 MB on the full scan and 153
-MB on the tree, and a call does not raise it; the store keeps a copy of
-every sealed record beside the runtime's (Issue 59 of the review). These are
+MB on the tree, and a call does not raise it. That run predates Issue 59 of
+the review, after which the store alone keeps the sealed records and a
+committed map holds none: in the quick profile at 16,384 entries the
+resident memory during a tree call fell from 117.9 MB to 92.9 MB, about the
+22.0 MB of the map's ciphertext and the allocations that held it. These are
 calls of the diagnostics build, which the sweep runs. A production call
 builds no proof bundle and keeps no witness. It issues a receipt, and the
 receipt's digest of the ciphertext reads every sealed record of a Path ORAM
@@ -674,15 +677,16 @@ production call do not pay for the audit, and a production call exports no
 witness.
 
 A call no longer copies the store either (Issue 37 of the review). It is
-staged on the committed objects themselves, which are held by reference,
-and the copy of a Path ORAM map that it loads shares the map's sealed
-records: a write copies the record it replaces, and the others stay the
-committed map's. An object keeps the digest of its sealed records, so the
-ciphertext digest of a production receipt reads the objects the call wrote
-and no other. What a call on the tree still does in the size of the map is
-small: it takes a reference to each record when it loads the map and drops
-one when it commits. The digest of a map the call wrote reads the whole
-map; a tree of digests over its buckets is future work (Issue 44).
+staged on the committed objects themselves, which are held by reference.
+The copy of a Path ORAM map that it loads holds none of the map's sealed
+records, which the store alone keeps (Issue 59): it reads the counter and
+the metadata pages from the store when it loads the map, and the buckets of
+a path when it accesses it, and holds those until it seals their next
+versions over them. A call that is dropped leaves the store as it was. An
+object keeps the digest of its sealed records, which it reads from the
+store, so the ciphertext digest of a production receipt reads the objects
+the call wrote and no other. The digest of a map the call wrote reads the
+whole map; a tree of digests over its buckets is future work (Issue 44).
 
 ## Current Route
 

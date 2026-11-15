@@ -1,8 +1,8 @@
 use crate::controller::CallRecorder;
 use crate::freshness::PathOramLeafSeed;
 use crate::oram::{
-    select_pending_put_value, stored_record, MapEntry, OramState, OramTranscript,
-    PathOramLeafCoinSource, PendingOramPut,
+    select_pending_put_value, MapEntry, OramState, OramTranscript, PathOramLeafCoinSource,
+    PendingOramPut,
 };
 use crate::secret::ObjectSecret;
 use anyhow::{anyhow, bail, Result};
@@ -17,7 +17,7 @@ use uo_core::Value;
 use uo_core::{
     FixedBoxBuilder, RuntimeOramAccessCounterWitness, RuntimePathOramPositionMapWitness,
 };
-use uo_store::{SharedStorage, StorageHandle, StoreCipher};
+use uo_store::{sealed_record_len, SharedStorage, StorageHandle, StoreCipher};
 
 #[path = "generated_object_helpers.rs"]
 mod generated_object_helpers;
@@ -71,33 +71,43 @@ impl CellObject {
         self.written = false;
     }
 
-    fn decode_value_from_storage(&self, allocator: &mut AllocatorSession) -> Result<Value> {
+    /// The cell's sealed record, read from its store.
+    fn read_record(&self) -> Result<Box<[u8]>> {
+        self.cipher.read_stored_record(
+            &self.spec.name,
+            sealed_record_len(self.spec.value_type.canonical_len()),
+        )
+    }
+
+    fn decode_value(&self, physical: &[u8], allocator: &mut AllocatorSession) -> Result<Value> {
         decode_cell_value_from_storage(
             &self.spec.name,
             &self.spec.value_type,
-            &self.physical,
+            physical,
             &self.cipher,
             allocator,
         )
     }
 
-    /// Load the cell for a call: read its sealed record, once for the call,
-    /// and open it. The call's accesses work on the opened value.
+    fn decode_value_from_storage(&self, allocator: &mut AllocatorSession) -> Result<Value> {
+        let physical = self.read_record()?;
+        self.decode_value(&physical, allocator)
+    }
+
+    /// Load the cell for a call: read its sealed record from the store, once
+    /// for the call, and open it. The call's accesses work on the opened
+    /// value, and the call keeps the record to seal the next one over it.
     fn clone_for_tx(
         &self,
         trace: &mut CallRecorder,
         allocator: &mut AllocatorSession,
     ) -> Result<Self> {
-        trace.physical_scan(
-            &self.spec.name,
-            ExactObjectKind::Cell,
-            1,
-            self.physical.len(),
-        );
+        let physical = self.read_record()?;
+        trace.physical_scan(&self.spec.name, ExactObjectKind::Cell, 1, physical.len());
         Ok(Self {
             spec: self.spec.clone(),
-            value: self.decode_value_from_storage(allocator)?,
-            physical: self.physical.clone(),
+            value: self.decode_value(&physical, allocator)?,
+            physical,
             cipher: self.cipher.clone_for_runtime_state(),
             accessed: false,
             written: false,
@@ -108,6 +118,8 @@ impl CellObject {
     fn cold_commit(&mut self) -> Result<()> {
         cold_commit_value_to_zero(&mut self.value, &self.spec.value_type);
         wipe_loaded_cell_value(&mut self.loaded_value);
+        // The store keeps the cell's record: a committed cell holds none.
+        self.physical = Box::default();
         self.accessed = false;
         self.written = false;
         Ok(())
@@ -154,36 +166,59 @@ impl ArrayObject {
         clear_written_slots(&mut self.written_slots);
     }
 
-    fn decode_values_from_storage(&self, allocator: &mut AllocatorSession) -> Result<Box<[Value]>> {
+    /// The array's sealed slots, read from its store in slot order.
+    fn read_records(&self) -> Result<Box<[Box<[u8]>]>> {
+        read_exact_slots(
+            &self.cipher,
+            &self.spec.name,
+            ExactObjectKind::Array,
+            self.values.len(),
+            sealed_record_len(self.spec.value_type.canonical_len()),
+        )
+    }
+
+    fn decode_values(
+        &self,
+        physical_slots: &[Box<[u8]>],
+        allocator: &mut AllocatorSession,
+    ) -> Result<Box<[Value]>> {
         decode_array_values_from_storage(
             &self.spec.name,
             &self.spec.value_type,
-            &self.physical_slots,
+            physical_slots,
             &self.cipher,
             allocator,
         )
     }
 
-    /// Load the array for a call: read every sealed slot, once for the
-    /// call, and open it. The call's accesses work on the opened values.
+    fn decode_values_from_storage(&self, allocator: &mut AllocatorSession) -> Result<Box<[Value]>> {
+        let physical_slots = self.read_records()?;
+        self.decode_values(&physical_slots, allocator)
+    }
+
+    /// Load the array for a call: read every sealed slot from the store,
+    /// once for the call, and open it. The call's accesses work on the
+    /// opened values, and the call keeps the records to seal the next ones
+    /// over them.
     fn clone_for_tx(
         &self,
         trace: &mut CallRecorder,
         allocator: &mut AllocatorSession,
     ) -> Result<Self> {
+        let physical_slots = self.read_records()?;
         record_load_scan(
             trace,
             &self.spec.name,
             ExactObjectKind::Array,
-            &self.physical_slots,
+            &physical_slots,
         );
         Ok(Self {
             spec: self.spec.clone(),
-            values: self.decode_values_from_storage(allocator)?,
-            physical_slots: self.physical_slots.clone(),
+            values: self.decode_values(&physical_slots, allocator)?,
+            written_slots: boxed_false_flags(physical_slots.len()),
+            physical_slots,
             cipher: self.cipher.clone_for_runtime_state(),
             accessed: false,
-            written_slots: boxed_false_flags(self.physical_slots.len()),
             loaded_values: None,
         })
     }
@@ -191,6 +226,8 @@ impl ArrayObject {
     fn cold_commit(&mut self) -> Result<()> {
         cold_commit_boxed_values(&mut self.values, &self.spec.value_type);
         wipe_loaded_array_values(&mut self.loaded_values);
+        // The store keeps the array's records: a committed array holds none.
+        self.physical_slots = Box::default();
         self.accessed = false;
         clear_written_slots(&mut self.written_slots);
         Ok(())
@@ -302,35 +339,58 @@ impl SmallMapObject {
         self.dirty = false;
     }
 
+    /// The map's sealed slots, read from its store in slot order.
+    fn read_records(&self) -> Result<Box<[Box<[u8]>]>> {
+        let key_type = self
+            .spec
+            .key_type
+            .as_ref()
+            .ok_or_else(|| anyhow!("small-map object {} missing key type", self.spec.name))?;
+        read_exact_slots(
+            &self.cipher,
+            &self.spec.name,
+            ExactObjectKind::Map,
+            self.entries.len(),
+            sealed_record_len(1 + key_type.canonical_len() + self.spec.value_type.canonical_len()),
+        )
+    }
+
+    fn decode_entries(
+        &self,
+        physical_slots: &[Box<[u8]>],
+        allocator: &mut AllocatorSession,
+    ) -> Result<Box<[MapEntry]>> {
+        decode_small_map_entries_from_storage(&self.spec, physical_slots, &self.cipher, allocator)
+    }
+
     fn decode_entries_from_storage(
         &self,
         allocator: &mut AllocatorSession,
     ) -> Result<Box<[MapEntry]>> {
-        decode_small_map_entries_from_storage(
-            &self.spec,
-            &self.physical_slots,
-            &self.cipher,
-            allocator,
-        )
+        let physical_slots = self.read_records()?;
+        self.decode_entries(&physical_slots, allocator)
     }
 
-    /// Load the map for a call: read every sealed slot, once for the call,
-    /// and open it. The call's accesses scan the opened entries.
+    /// Load the map for a call: read every sealed slot from the store, once
+    /// for the call, and open it. The call's accesses scan the opened
+    /// entries, and the call keeps the records to seal the next ones over
+    /// them.
     fn clone_for_tx(
         &self,
         trace: &mut CallRecorder,
         allocator: &mut AllocatorSession,
     ) -> Result<Self> {
+        let physical_slots = self.read_records()?;
         record_load_scan(
             trace,
             &self.spec.name,
             ExactObjectKind::Map,
-            &self.physical_slots,
+            &physical_slots,
         );
         Ok(Self {
             spec: self.spec.clone(),
-            entries: self.decode_entries_from_storage(allocator)?,
-            physical_slots: self.physical_slots.clone(),
+            entries: self.decode_entries(&physical_slots, allocator)?,
+            physical_slots,
             cipher: self.cipher.clone_for_runtime_state(),
             accessed: false,
             dirty: false,
@@ -345,6 +405,8 @@ impl SmallMapObject {
             .as_ref()
             .ok_or_else(|| anyhow!("small-map object {} missing key type", self.spec.name))?;
         cold_commit_small_map_entries(&mut self.entries, key_type, &self.spec.value_type);
+        // The store keeps the map's records: a committed map holds none.
+        self.physical_slots = Box::default();
         self.loaded_entries = None;
         self.accessed = false;
         self.dirty = false;
@@ -456,13 +518,28 @@ impl RuntimeObject {
         Ok(key_type.canonical_len())
     }
 
-    /// A fresh object. Its storage key and its initial placement come from a
-    /// generator seeded with 256 bits of the object's secret, and its Path
-    /// ORAM leaf coins from a seed derived from the same secret.
+    /// A fresh object, with its first records sealed for a deployment to
+    /// hand to its store. Its storage key and its initial placement come
+    /// from a generator seeded with 256 bits of the object's secret, and its
+    /// Path ORAM leaf coins from a seed derived from the same secret.
     pub(in crate::runtime) fn instantiate(
         spec: &StateObject,
         secret: &ObjectSecret,
     ) -> Result<Self> {
+        Self::instantiate_with(spec, secret, true)
+    }
+
+    /// The object a restart finds in a store: the same key and leaf coins as
+    /// a fresh object of the same secret, and no record. Nothing is sealed:
+    /// the store keeps the object's records.
+    pub(in crate::runtime) fn instantiate_for_restart(
+        spec: &StateObject,
+        secret: &ObjectSecret,
+    ) -> Result<Self> {
+        Self::instantiate_with(spec, secret, false)
+    }
+
+    fn instantiate_with(spec: &StateObject, secret: &ObjectSecret, seal: bool) -> Result<Self> {
         #[cfg(not(feature = "insecure-eval-raw"))]
         if spec.confidential && matches!(spec.backend, BackendKind::Raw) {
             bail!("confidential object {} uses raw backend", spec.name);
@@ -484,10 +561,14 @@ impl RuntimeObject {
             (ContainerKind::Cell, _) => {
                 let logical = cold_zero_value(&spec.value_type);
                 let cipher = StoreCipher::from_rng(&mut rng);
-                let aad = cell_slot_aad(&spec.name);
+                let physical = if seal {
+                    seal_value(&cell_slot_aad(&spec.name), &logical, &cipher)?
+                } else {
+                    Box::default()
+                };
                 Ok(Self::UoCell(CellObject {
                     spec: spec.clone(),
-                    physical: seal_value(&aad, &logical, &cipher)?,
+                    physical,
                     value: logical,
                     cipher,
                     accessed: false,
@@ -523,8 +604,9 @@ impl RuntimeObject {
                 let zero_value = cold_zero_value(&spec.value_type);
                 let cipher = StoreCipher::from_rng(&mut rng);
                 let values = cold_zero_boxed_values(capacity, &spec.value_type);
-                let mut physical_slots = FixedBoxBuilder::new(capacity);
-                for index in 0..capacity {
+                let sealed = if seal { capacity } else { 0 };
+                let mut physical_slots = FixedBoxBuilder::new(sealed);
+                for index in 0..sealed {
                     let aad = array_slot_aad(&spec.name, index);
                     physical_slots.push(seal_value(&aad, &zero_value, &cipher)?)?;
                 }
@@ -555,8 +637,9 @@ impl RuntimeObject {
                 let entries = cold_zero_small_map_entries(capacity, key_type, &spec.value_type);
                 let zero_entry = cold_zero_small_map_entry(key_type, &spec.value_type);
                 let cipher = StoreCipher::from_rng(&mut rng);
-                let mut physical_slots = FixedBoxBuilder::new(capacity);
-                for index in 0..capacity {
+                let sealed = if seal { capacity } else { 0 };
+                let mut physical_slots = FixedBoxBuilder::new(sealed);
+                for index in 0..sealed {
                     let aad = small_map_slot_aad(&spec.name, index);
                     physical_slots.push(seal_map_record(&aad, &zero_entry, &cipher)?)?;
                 }
@@ -574,7 +657,7 @@ impl RuntimeObject {
                 let leaf_coin_seed = secret.path_oram_leaf_seed()?;
                 Ok(Self::UoOramMap(OramMapObject {
                     spec: spec.clone(),
-                    oram: OramState::instantiate(spec, &mut rng)?,
+                    oram: OramState::instantiate(spec, &mut rng, seal)?,
                     accessed: false,
                     dirty: false,
                     leaf_coin_source: PathOramLeafCoinSource::from_domain_seed(&leaf_coin_seed),
@@ -589,10 +672,13 @@ impl RuntimeObject {
         }
     }
 
-    /// An object whose secret a test can reproduce from a seed.
+    /// An object whose secret a test can reproduce from a seed, deployed
+    /// into a store of its own, which keeps the object's records.
     #[cfg(test)]
     pub fn instantiate_with_seed(spec: &StateObject, seed: u64) -> Result<Self> {
-        Self::instantiate(spec, &ObjectSecret::from_diagnostic_seed(seed))
+        let mut object = Self::instantiate(spec, &ObjectSecret::from_diagnostic_seed(seed))?;
+        object.deploy_into_storage(&SharedStorage::memory())?;
+        Ok(object)
     }
 
     /// The object's cipher, sharing its key's count of seals, if the object
@@ -615,8 +701,8 @@ impl RuntimeObject {
     /// sealed object's cipher keeps its part of the store, so every record
     /// the object opens or seals from now on crosses to the store, and the
     /// store takes the object's records as their first, under the names a
-    /// call's trace gives them. A public object keeps its part of the store
-    /// for the values a call commits.
+    /// call's trace gives them; the object keeps none of them. A public
+    /// object keeps its part of the store for the values a call commits.
     pub(in crate::runtime) fn deploy_into_storage(
         &mut self,
         storage: &SharedStorage,
@@ -625,14 +711,16 @@ impl RuntimeObject {
         match self {
             Self::UoCell(object) => {
                 object.cipher.attach_storage(handle);
+                let physical = std::mem::take(&mut object.physical);
                 object
                     .cipher
-                    .store_first_record(&object.spec.name, &object.physical)
+                    .store_first_record(&object.spec.name, &physical)
             }
             Self::UoArray(object) => {
                 object.cipher.attach_storage(handle);
                 let slots = ExactObjectSlots::none_of(&object.spec.name, ExactObjectKind::Array);
-                for (index, slot) in object.physical_slots.iter().enumerate() {
+                let physical_slots = std::mem::take(&mut object.physical_slots);
+                for (index, slot) in physical_slots.iter().enumerate() {
                     object
                         .cipher
                         .store_first_record(&slots.location(index), slot)?;
@@ -642,7 +730,8 @@ impl RuntimeObject {
             Self::UoSmallMap(object) => {
                 object.cipher.attach_storage(handle);
                 let slots = ExactObjectSlots::none_of(&object.spec.name, ExactObjectKind::Map);
-                for (index, slot) in object.physical_slots.iter().enumerate() {
+                let physical_slots = std::mem::take(&mut object.physical_slots);
+                for (index, slot) in physical_slots.iter().enumerate() {
                     object
                         .cipher
                         .store_first_record(&slots.location(index), slot)?;
@@ -665,12 +754,13 @@ impl RuntimeObject {
         }
     }
 
-    /// Give a newly instantiated object the state a store keeps for it: how
-    /// a runtime that restarts finds the object a deployment of the same
-    /// contract and secret left. A sealed object takes the store's records
-    /// in place of its own, and its cipher resumes at the seal count the
-    /// store has reserved, so it repeats no nonce of a record the store was
-    /// handed. A public object takes the values the store keeps.
+    /// Give an object instantiated for a restart the state a store keeps
+    /// for it: how a runtime that restarts finds the object a deployment of
+    /// the same contract and secret left. A sealed object holds no record:
+    /// its cipher takes its part of the store, which keeps its records, and
+    /// resumes at the seal count the store has reserved, so it repeats no
+    /// nonce of a record the store was handed. A public object takes the
+    /// values the store keeps.
     pub(in crate::runtime) fn restore_from_storage(
         &mut self,
         storage: &SharedStorage,
@@ -679,23 +769,14 @@ impl RuntimeObject {
         let handle = storage.handle(self.name());
         match self {
             Self::UoCell(object) => {
-                object.physical = stored_record(&handle, &object.spec.name, object.physical.len())?;
                 object.cipher.resume_seal_count(handle.reserved_seals());
                 object.cipher.attach_storage(handle);
             }
             Self::UoArray(object) => {
-                let slots = ExactObjectSlots::none_of(&object.spec.name, ExactObjectKind::Array);
-                for (index, slot) in object.physical_slots.iter_mut().enumerate() {
-                    *slot = stored_record(&handle, &slots.location(index), slot.len())?;
-                }
                 object.cipher.resume_seal_count(handle.reserved_seals());
                 object.cipher.attach_storage(handle);
             }
             Self::UoSmallMap(object) => {
-                let slots = ExactObjectSlots::none_of(&object.spec.name, ExactObjectKind::Map);
-                for (index, slot) in object.physical_slots.iter_mut().enumerate() {
-                    *slot = stored_record(&handle, &slots.location(index), slot.len())?;
-                }
                 object.cipher.resume_seal_count(handle.reserved_seals());
                 object.cipher.attach_storage(handle);
             }
@@ -810,13 +891,17 @@ impl RuntimeObject {
     pub(in crate::runtime) fn committed_cache_is_cold(&self) -> bool {
         // This boundary check is public-only. Secret zeroization is enforced by
         // cold_commit/drop paths instead of rescanning cached confidential data.
-        match self {
-            Self::UoCell(object) => !object.accessed && !object.written,
-            Self::UoArray(object) => !object.accessed && no_written_slots(&object.written_slots),
-            Self::UoSmallMap(object) => !object.accessed && !object.dirty,
-            Self::UoOramMap(object) => !object.accessed && !object.dirty,
-            _ => true,
-        }
+        // A committed object holds no sealed record: the store keeps them.
+        self.holds_no_sealed_record()
+            && match self {
+                Self::UoCell(object) => !object.accessed && !object.written,
+                Self::UoArray(object) => {
+                    !object.accessed && no_written_slots(&object.written_slots)
+                }
+                Self::UoSmallMap(object) => !object.accessed && !object.dirty,
+                Self::UoOramMap(object) => !object.accessed && !object.dirty,
+                _ => true,
+            }
     }
 
     #[cfg(test)]
@@ -842,41 +927,67 @@ impl RuntimeObject {
         }
     }
 
-    /// Hand each sealed record the object holds in storage to `visit`, in
-    /// slot order. These are the bytes a host that keeps the storage sees. A
-    /// raw object seals nothing.
-    pub(in crate::runtime) fn for_each_sealed_record(&self, visit: &mut dyn FnMut(&[u8])) {
+    /// Hand each sealed record the store keeps for the object to `visit`,
+    /// in slot order. These are the bytes a host that keeps the storage
+    /// sees; the object holds none of them. A raw object seals nothing.
+    pub(in crate::runtime) fn for_each_sealed_record(
+        &self,
+        visit: &mut dyn FnMut(&[u8]),
+    ) -> Result<()> {
+        let mut visit_slots = |cipher: &StoreCipher, name: &str, kind, slots: usize| {
+            let locations = ExactObjectSlots::none_of(name, kind);
+            (0..slots).try_for_each(|index| {
+                visit_stored_record(cipher, &locations.location(index), &mut *visit)
+            })
+        };
         match self {
-            Self::UoCell(object) => visit(&object.physical),
-            Self::UoArray(object) => {
-                for slot in object.physical_slots.iter() {
-                    visit(slot);
-                }
+            Self::UoCell(object) => {
+                visit_slots(&object.cipher, &object.spec.name, ExactObjectKind::Cell, 1)
             }
-            Self::UoSmallMap(object) => {
-                for slot in object.physical_slots.iter() {
-                    visit(slot);
-                }
-            }
-            Self::UoOramMap(object) => object.oram.for_each_sealed_record(visit),
-            Self::RawCell(_) | Self::RawArray(_) | Self::RawMap(_) => {}
+            Self::UoArray(object) => visit_slots(
+                &object.cipher,
+                &object.spec.name,
+                ExactObjectKind::Array,
+                object.values.len(),
+            ),
+            Self::UoSmallMap(object) => visit_slots(
+                &object.cipher,
+                &object.spec.name,
+                ExactObjectKind::Map,
+                object.entries.len(),
+            ),
+            Self::UoOramMap(object) => object.oram.for_each_sealed_record(&object.spec, visit),
+            Self::RawCell(_) | Self::RawArray(_) | Self::RawMap(_) => Ok(()),
         }
     }
 
-    /// The object's cipher and its sealed records in storage, so that a test
-    /// can compare the keys of two objects and read the records' nonces. A
-    /// raw object seals nothing.
+    /// The object's cipher and the sealed records its store keeps, so that
+    /// a test can compare the keys of two objects and read the records'
+    /// nonces. A raw object seals nothing.
     #[cfg(test)]
-    pub(crate) fn sealed_storage_for_test(&self) -> Option<(&StoreCipher, Vec<&[u8]>)> {
-        fn records(slots: &[Box<[u8]>]) -> Vec<&[u8]> {
-            slots.iter().map(|slot| &slot[..]).collect()
-        }
+    pub(crate) fn sealed_storage_for_test(&self) -> Option<(&StoreCipher, Vec<Box<[u8]>>)> {
+        let cipher = match self {
+            Self::UoCell(object) => &object.cipher,
+            Self::UoArray(object) => &object.cipher,
+            Self::UoSmallMap(object) => &object.cipher,
+            Self::UoOramMap(object) => object.oram.cipher_for_test(),
+            Self::RawCell(_) | Self::RawArray(_) | Self::RawMap(_) => return None,
+        };
+        let mut records = Vec::new();
+        self.for_each_sealed_record(&mut |record| records.push(Box::from(record)))
+            .ok()?;
+        Some((cipher, records))
+    }
+
+    /// Whether the object holds no sealed record: the store keeps them all.
+    /// A loaded object holds the records it read until the call commits.
+    pub(crate) fn holds_no_sealed_record(&self) -> bool {
         match self {
-            Self::UoCell(object) => Some((&object.cipher, vec![&object.physical[..]])),
-            Self::UoArray(object) => Some((&object.cipher, records(&object.physical_slots))),
-            Self::UoSmallMap(object) => Some((&object.cipher, records(&object.physical_slots))),
-            Self::UoOramMap(object) => Some(object.oram.sealed_storage_for_test()),
-            Self::RawCell(_) | Self::RawArray(_) | Self::RawMap(_) => None,
+            Self::UoCell(object) => object.physical.is_empty(),
+            Self::UoArray(object) => object.physical_slots.is_empty(),
+            Self::UoSmallMap(object) => object.physical_slots.is_empty(),
+            Self::UoOramMap(object) => object.oram.holds_no_sealed_record(),
+            Self::RawCell(_) | Self::RawArray(_) | Self::RawMap(_) => true,
         }
     }
 
@@ -1922,6 +2033,40 @@ fn record_small_map_scan(object: &SmallMapObject, trace: &mut CallRecorder) {
 /// Trace the read of every sealed slot of an exact object, in slot order: the
 /// call's one read of the object, made when the call loads it. The slots of
 /// an object have one length, so the trace holds the scan as one item.
+/// The sealed records of the `slots` slots of an exact object, read from the
+/// object's store in slot order. A call reads every slot of an exact object
+/// it loads, once, and here: the store keeps the records, and they cross the
+/// storage boundary as they are read. The call keeps them to seal the slots'
+/// next records over them; a committed object holds none.
+fn read_exact_slots(
+    cipher: &StoreCipher,
+    object_name: &str,
+    kind: ExactObjectKind,
+    slots: usize,
+    record_len: usize,
+) -> Result<Box<[Box<[u8]>]>> {
+    let locations = ExactObjectSlots::none_of(object_name, kind);
+    let mut records = FixedBoxBuilder::new(slots);
+    for index in 0..slots {
+        records.push(cipher.read_stored_record(&locations.location(index), record_len)?)?;
+    }
+    records.finish()
+}
+
+/// Hand `visit` the record the store of `cipher` keeps at `location`, with
+/// no copy and no read logged: what a digest of the store's ciphertext reads.
+pub(crate) fn visit_stored_record(
+    cipher: &StoreCipher,
+    location: &str,
+    visit: &mut dyn FnMut(&[u8]),
+) -> Result<()> {
+    cipher
+        .storage()
+        .ok_or_else(|| anyhow!("no store keeps the record at {location}"))?
+        .with_record(location, |record| visit(record))
+        .ok_or_else(|| anyhow!("the store holds no record at {location}"))
+}
+
 fn record_load_scan(
     trace: &mut CallRecorder,
     object_name: &str,
@@ -2082,15 +2227,52 @@ mod tests {
         }
     }
 
+    /// A restart seals nothing. The object it builds has the key of a fresh
+    /// object of the same secret and no record, and its key's seal count
+    /// stands at zero until the store it is restored from resumes it; a
+    /// fresh object seals its first records for its deployment.
+    #[test]
+    fn an_object_built_for_a_restart_seals_nothing() {
+        let surrogate = StateObject {
+            oram_scheme: uo_core::manifest::SURROGATE_ORAM_SCHEME.into(),
+            ..path_oram_spec()
+        };
+        let tree = StateObject {
+            oram_scheme: uo_core::manifest::PATH_ORAM_PRIVATE_POSMAP_SCHEME.into(),
+            ..path_oram_spec()
+        };
+        for spec in [
+            cell_spec(),
+            array_spec(),
+            small_map_spec(),
+            path_oram_spec(),
+            surrogate,
+            tree,
+        ] {
+            let secret = crate::secret::ObjectSecret::from_diagnostic_seed(0x5E57);
+            let fresh = RuntimeObject::instantiate(&spec, &secret).unwrap();
+            let restarted = RuntimeObject::instantiate_for_restart(&spec, &secret).unwrap();
+            let (fresh_cipher, restarted_cipher) = (
+                fresh.seal_cipher().unwrap(),
+                restarted.seal_cipher().unwrap(),
+            );
+            assert!(fresh_cipher.seal_count() > 0, "{}", spec.name);
+            assert!(!fresh.holds_no_sealed_record(), "{}", spec.name);
+            assert_eq!(restarted_cipher.seal_count(), 0, "{}", spec.name);
+            assert!(restarted.holds_no_sealed_record(), "{}", spec.name);
+            assert!(fresh_cipher == restarted_cipher, "{}", spec.name);
+            assert!(restarted.committed_cache_is_cold(), "{}", spec.name);
+        }
+    }
+
     #[test]
     fn uo_cell_clone_for_tx_rebuilds_from_sealed_storage() {
         let spec = cell_spec();
         let mut object = RuntimeObject::instantiate_with_seed(&spec, 0xC311).unwrap();
         let zero = Value::zero_for_type(&spec.value_type);
-        let original_physical = match &object {
-            RuntimeObject::UoCell(cell) => cell.physical.clone(),
-            _ => unreachable!(),
-        };
+        // The committed cell holds no record: the store keeps it.
+        assert!(object.holds_no_sealed_record());
+        let original_physical = object.sealed_storage_for_test().unwrap().1[0].clone();
 
         match &mut object {
             RuntimeObject::UoCell(cell) => {
@@ -2123,10 +2305,13 @@ mod tests {
         let spec = array_spec();
         let mut object = RuntimeObject::instantiate_with_seed(&spec, 0xA22A).unwrap();
         let zero = Value::zero_for_type(&spec.value_type);
-        let original_slots = match &object {
-            RuntimeObject::UoArray(array) => array.physical_slots.clone(),
-            _ => unreachable!(),
-        };
+        // The committed array holds no record: the store keeps them.
+        assert!(object.holds_no_sealed_record());
+        let original_slots = object
+            .sealed_storage_for_test()
+            .unwrap()
+            .1
+            .into_boxed_slice();
 
         match &mut object {
             RuntimeObject::UoArray(array) => {
@@ -2183,10 +2368,13 @@ mod tests {
         let mut object = RuntimeObject::instantiate_with_seed(&spec, 0x5AA1).unwrap();
         let zero_key = Value::zero_for_type(spec.key_type.as_ref().unwrap());
         let zero_value = Value::zero_for_type(&spec.value_type);
-        let original_slots = match &object {
-            RuntimeObject::UoSmallMap(map) => map.physical_slots.clone(),
-            _ => unreachable!(),
-        };
+        // The committed map holds no record: the store keeps them.
+        assert!(object.holds_no_sealed_record());
+        let original_slots = object
+            .sealed_storage_for_test()
+            .unwrap()
+            .1
+            .into_boxed_slice();
 
         match &mut object {
             RuntimeObject::UoSmallMap(map) => {
@@ -2349,7 +2537,7 @@ mod tests {
         // aborted, do not change it.
         fn sealed(object: &RuntimeObject) -> Vec<Vec<u8>> {
             let (_, records) = object.sealed_storage_for_test().unwrap();
-            records.into_iter().map(<[u8]>::to_vec).collect()
+            records.iter().map(|record| record.to_vec()).collect()
         }
         fn mark_accessed(object: &mut RuntimeObject) {
             match object {
@@ -2413,6 +2601,8 @@ mod tests {
                     assert_eq!(recorder.physical_write_count(), 0, "{case}");
                     assert_eq!(sealed(&committed), stored, "{case}");
                 }
+                assert!(!committed.holds_no_sealed_record(), "{case}");
+                let committed = committed.into_cold_committed().unwrap();
                 assert!(committed.committed_cache_is_cold(), "{case}");
             }
         }
@@ -2468,7 +2658,7 @@ mod tests {
         }
         fn records(object: &RuntimeObject) -> Vec<Vec<u8>> {
             let (_, records) = object.sealed_storage_for_test().unwrap();
-            records.into_iter().map(<[u8]>::to_vec).collect()
+            records.iter().map(|record| record.to_vec()).collect()
         }
         for (spec, seed) in [(cell_spec(), 0xF201u64), (small_map_spec(), 0xF202)] {
             let deployed = RuntimeObject::instantiate_with_seed(&spec, seed).unwrap();
@@ -2482,7 +2672,9 @@ mod tests {
             // that stands where the object's stood before its first write.
             let twin = RuntimeObject::instantiate_with_seed(&spec, seed).unwrap();
             let mut rolled_back = first;
-            set_cipher(&mut rolled_back, cipher_of(&twin));
+            let mut cipher = cipher_of(&twin);
+            cipher.attach_storage(cipher_of(&rolled_back).storage().unwrap().clone());
+            set_cipher(&mut rolled_back, cipher);
             let mut recorder = crate::controller::CallRecorder::begin("repeated_nonce", &[]);
             let second = written(&rolled_back, &mut recorder).unwrap();
             assert_eq!(recorder.physical_write_count(), slots, "{}", spec.name);
