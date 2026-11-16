@@ -59,14 +59,15 @@ Issue 60 has the options and the reasoning.
 
 | Decision | Status | Outcome |
 | --- | --- | --- |
-| D8, what a storage error means for a call | open | recommended: outcome unknown; the store is poisoned until a restart, whose last receipt tells whether the call committed |
-| D9, what a restart checks of the store's freshness | open | recommended: a generation advanced by every commit and reservation, with each key's reserved count in the tagged metadata |
-| D10, the route of the receipt proof | open | recommended: the MAC assumption over an adversary's outputs, with a non-vacuity model |
+| D8, what a storage error means for a call | decided 2026-11-16 | outcome unknown: a failed journal append poisons the store until the deployment restarts from its files, and the restarted deployment's last receipt says whether the call committed |
+| D9, what a restart checks of the store's freshness | decided 2026-11-16 | authenticated reservations: each key's reserved count is in the tagged commit metadata, and every commit and every reservation advances a generation that the restart compares with the attested one |
+| D10, the route of the receipt proof | decided 2026-11-16 | over an adversary's outputs: the MAC assumption speaks of the hash and tag pairs an adversary of the session can produce, with a non-vacuity model |
 
 ## Order of Work
 
-1. **Wave 9, Issue 60: the decisions.** It blocks Issues 64 to 68. The
-   issues of Wave 10 need none of them and can go on meanwhile.
+1. **Wave 9, Issue 60: the decisions.** Done: the maintainer took the
+   recommended option of each of D8 to D10 on 2026-11-16, which unblocks
+   Issues 64 to 68.
 2. **Wave 10, the gates that check the evidence: Issues 61, 62 and 63.**
    The review rates them below the guarantees, but every later repair is
    validated through them. A repair that a gate cannot fail proves less, so
@@ -94,13 +95,13 @@ baseline of Issue 69. Issue 50 stays deferred.
 
 | Issue | Title | Wave | Size | Depends on | Status | Commit |
 | --- | --- | --- | --- | --- | --- | --- |
-| 60 | Decide the storage-error contract, the recovery mechanism and the receipt proof's route | 9 | S | maintainer | todo | |
+| 60 | Decide the storage-error contract, the recovery mechanism and the receipt proof's route | 9 | S | maintainer | done | |
 | 61 | Make the false-path snapshot see false leaves, and classify them as the acceptance gate does | 10 | S | | todo | |
 | 62 | Give the acceptance gate an evidence contract | 10 | M | 61 | todo | |
 | 63 | Make the matched baselines' coverage fail closed, and test the planner under a budget | 10 | S | | todo | |
-| 64 | State the receipt MAC assumption over what an adversary can produce, with a non-vacuity model | 11 | S to M | 60 (D10) | blocked | |
-| 65 | Fail closed on storage errors, and test every failure | 11 | M to L | 60 (D8) | blocked | |
-| 66 | Make a dropped call's restart point durable before the call runs, and bound a call's seals | 11 | M | 65 | blocked | |
-| 67 | Advance a commit generation with every committed call, and check it at restart | 11 | M | 60 (D9), 65 | blocked | |
-| 68 | Keep a restart from resuming a key below a count it has used | 11 | S to L | 66, 67 | blocked | |
+| 64 | State the receipt MAC assumption over what an adversary can produce, with a non-vacuity model | 11 | S to M | 60 (D10) | todo | |
+| 65 | Fail closed on storage errors, and test every failure | 11 | M to L | 60 (D8) | todo | |
+| 66 | Make a dropped call's restart point durable before the call runs, and bound a call's seals | 11 | M | 65 | todo | |
+| 67 | Advance a commit generation with every committed call, and check it at restart | 11 | M | 60 (D9), 65 | todo | |
+| 68 | Keep a restart from resuming a key below a count it has used | 11 | M | 66, 67 | todo | |
 | 69 | Measure the repaired baseline | 12 | M | 61 to 68 | todo | |

@@ -43,7 +43,7 @@ status.
 | Cost | a restart after every storage error | more states to test; and the certainty rests on a sync after a failed sync, which some file systems do not honor |
 
 Recommended: (a). It is the smaller contract, and storage errors are rare
-enough that a restart is a fair price.
+enough that a restart is a fair price. Decided on 2026-11-16: (a).
 
 **D9, what a restart checks of the store's freshness.** Blocks Issues 67
 and 68. Whatever is chosen, the commit generation of Issue 67 should
@@ -59,7 +59,8 @@ reservations.
 
 Recommended: (a). (b) is the stronger design if a restart that rewrites
 the store is acceptable; (c) leaves nonce safety resting on the host's
-honesty about the files.
+honesty about the files. Decided on 2026-11-16: (a), with the generation of
+Issue 67.
 
 **D10, the route of the receipt proof.** Blocks Issue 64.
 
@@ -75,6 +76,7 @@ honesty about the files.
 
 Recommended: (a). It keeps a theorem that says what a verifier may
 conclude, and the non-vacuity model makes a later vacuity a build error.
+Decided on 2026-11-16: (a).
 
 #### How to fix
 
@@ -231,7 +233,7 @@ of the receipt MAC's assumption.
 
 #### How to fix
 
-With D10 (a):
+D10 chose (a):
 
 1. In `proof/lean/UOToolchain/DeploymentAcceptance.lean`, replace
    `Unforgeable` by an assumption over a relation `Produced` of the hash and
@@ -279,7 +281,7 @@ last receipt untouched, which the files may contradict.
 
 #### How to fix
 
-With D8 (a):
+D8 chose (a):
 
 1. `FileStorage` gets a poisoned state. A failed append (write or sync), a
    failed truncation and a failed checkpoint set it, and every later
@@ -408,8 +410,8 @@ committed aborts passes the check.
 
 ### Issue 68 — Keep a restart from resuming a key below a count it has used
 
-Source: R2 (§3). Size: M with D9 (a), L with (b), S with (c). Depends on:
-Issues 66 and 67.
+Source: R2 (§3). Size: M (D9 chose (a); L with (b), S with (c)). Depends
+on: Issues 66 and 67.
 
 #### Issue description
 
@@ -422,7 +424,7 @@ the ones the runtime wrote last excludes it.
 
 #### How to fix
 
-With D9 (a):
+D9 chose (a):
 
 1. `StoreMeta` carries each key's reserved count. A reservation is a
    metadata commit, a journal entry with the tagged metadata and no
