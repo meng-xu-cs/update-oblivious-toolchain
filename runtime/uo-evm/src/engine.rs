@@ -292,10 +292,16 @@ impl ProductionContractInstance {
     /// The receipt the runtime issued last, with its tag under `session`.
     /// A caller holding a session checks with it a receipt that no call of
     /// its own returned, the deployment's among them, and makes no call.
+    /// Refused once the store refuses operations: after a call whose outcome
+    /// is unknown, the receipt this instance holds may not be the last one
+    /// in the files.
     pub fn authenticated_last_receipt(
         &self,
         session: &ReturnChannelSession,
     ) -> Result<(ProductionReceipt, String)> {
+        if let Some(reason) = self.inner.storage.poisoned() {
+            bail!("the store refuses every operation since {reason}; restart the deployment from its files for its last receipt");
+        }
         Ok((
             self.last_receipt.clone(),
             production_receipt_tag(session, &self.last_receipt_sha256)?,
@@ -363,7 +369,12 @@ impl ProductionContractInstance {
         // Stage the call, run the production checks on the staged trace and
         // build the call's receipt from the staged state, and commit only if
         // all of it succeeds. A failure leaves committed state, freshness
-        // and the last receipt untouched.
+        // and the last receipt untouched here. If the store failed while it
+        // wrote the commit, the call's outcome is unknown: the files may hold
+        // it. The store then refuses every operation, so the instance refuses
+        // every call, and the deployment restarted from its files has as its
+        // last receipt this call's or the one before
+        // (`resolve_production_call_outcome`).
         let staged =
             self.inner
                 .stage_call(entrypoint, args, None, execution_session, Some(environment))?;

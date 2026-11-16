@@ -1192,6 +1192,7 @@
     "a_dropped_call_leaves_the_store_as_it_was": true,
     "a_record_reaches_the_store_only_under_a_reserved_nonce": true,
     "every_restart_continues_its_deployment": true,
+    "every_storage_fault_fails_closed": true,
     "store_log_agrees_with_trace_in_every_call": true,
     "store_reads_are_the_traced_reads": true,
     "store_writes_are_the_traced_writes": true
@@ -1229,6 +1230,725 @@
       "store_holds_what_it_held": true
     }
   ],
+  "fault_matrix": [
+    {
+      "backend": "full_scan",
+      "bytes_cut_on_open": 6,
+      "call": "outcome_unknown",
+      "entrypoint": "mint(address,uint256)",
+      "fault": {
+        "entry": "commit",
+        "failure": "write_stops_in_header",
+        "operation": "append"
+      },
+      "files_hold": "the_state_before_the_call",
+      "files_hold_the_state_before_or_after_the_call": true,
+      "holds": true,
+      "next_call_refused": true,
+      "reads_answer_as_the_files_say": true,
+      "rollback_counters_a_restart_accepts": [
+        1
+      ],
+      "storage_failure": "outcome_unknown",
+      "store_refuses_operations": true,
+      "takes_calls_after_restart": true
+    },
+    {
+      "backend": "full_scan",
+      "bytes_cut_on_open": 646,
+      "call": "outcome_unknown",
+      "entrypoint": "mint(address,uint256)",
+      "fault": {
+        "entry": "commit",
+        "failure": "write_stops_in_payload",
+        "operation": "append"
+      },
+      "files_hold": "the_state_before_the_call",
+      "files_hold_the_state_before_or_after_the_call": true,
+      "holds": true,
+      "next_call_refused": true,
+      "reads_answer_as_the_files_say": true,
+      "rollback_counters_a_restart_accepts": [
+        1
+      ],
+      "storage_failure": "outcome_unknown",
+      "store_refuses_operations": true,
+      "takes_calls_after_restart": true
+    },
+    {
+      "backend": "full_scan",
+      "bytes_cut_on_open": 1312,
+      "call": "outcome_unknown",
+      "entrypoint": "mint(address,uint256)",
+      "fault": {
+        "entry": "commit",
+        "failure": "write_stops_in_digest",
+        "operation": "append"
+      },
+      "files_hold": "the_state_before_the_call",
+      "files_hold_the_state_before_or_after_the_call": true,
+      "holds": true,
+      "next_call_refused": true,
+      "reads_answer_as_the_files_say": true,
+      "rollback_counters_a_restart_accepts": [
+        1
+      ],
+      "storage_failure": "outcome_unknown",
+      "store_refuses_operations": true,
+      "takes_calls_after_restart": true
+    },
+    {
+      "backend": "full_scan",
+      "bytes_cut_on_open": 0,
+      "call": "outcome_unknown",
+      "entrypoint": "mint(address,uint256)",
+      "fault": {
+        "entry": "commit",
+        "failure": "sync_fails",
+        "operation": "append"
+      },
+      "files_hold": "the_call",
+      "files_hold_the_state_before_or_after_the_call": true,
+      "holds": true,
+      "next_call_refused": true,
+      "reads_answer_as_the_files_say": true,
+      "rollback_counters_a_restart_accepts": [
+        2
+      ],
+      "storage_failure": "outcome_unknown",
+      "store_refuses_operations": true,
+      "takes_calls_after_restart": true
+    },
+    {
+      "backend": "full_scan",
+      "bytes_cut_on_open": 6,
+      "call": "failed",
+      "entrypoint": "approve(address,address,uint256)",
+      "fault": {
+        "entry": "reservation",
+        "failure": "write_stops_in_header",
+        "operation": "append"
+      },
+      "files_hold": "the_state_before_the_call",
+      "files_hold_the_state_before_or_after_the_call": true,
+      "holds": true,
+      "next_call_refused": true,
+      "reads_answer_as_the_files_say": true,
+      "rollback_counters_a_restart_accepts": [
+        1
+      ],
+      "storage_failure": null,
+      "store_refuses_operations": true,
+      "takes_calls_after_restart": true
+    },
+    {
+      "backend": "full_scan",
+      "bytes_cut_on_open": 22,
+      "call": "failed",
+      "entrypoint": "approve(address,address,uint256)",
+      "fault": {
+        "entry": "reservation",
+        "failure": "write_stops_in_payload",
+        "operation": "append"
+      },
+      "files_hold": "the_state_before_the_call",
+      "files_hold_the_state_before_or_after_the_call": true,
+      "holds": true,
+      "next_call_refused": true,
+      "reads_answer_as_the_files_say": true,
+      "rollback_counters_a_restart_accepts": [
+        1
+      ],
+      "storage_failure": null,
+      "store_refuses_operations": true,
+      "takes_calls_after_restart": true
+    },
+    {
+      "backend": "full_scan",
+      "bytes_cut_on_open": 64,
+      "call": "failed",
+      "entrypoint": "approve(address,address,uint256)",
+      "fault": {
+        "entry": "reservation",
+        "failure": "write_stops_in_digest",
+        "operation": "append"
+      },
+      "files_hold": "the_state_before_the_call",
+      "files_hold_the_state_before_or_after_the_call": true,
+      "holds": true,
+      "next_call_refused": true,
+      "reads_answer_as_the_files_say": true,
+      "rollback_counters_a_restart_accepts": [
+        1
+      ],
+      "storage_failure": null,
+      "store_refuses_operations": true,
+      "takes_calls_after_restart": true
+    },
+    {
+      "backend": "full_scan",
+      "bytes_cut_on_open": 0,
+      "call": "failed",
+      "entrypoint": "approve(address,address,uint256)",
+      "fault": {
+        "entry": "reservation",
+        "failure": "sync_fails",
+        "operation": "append"
+      },
+      "files_hold": "the_state_before_the_call",
+      "files_hold_the_state_before_or_after_the_call": true,
+      "holds": true,
+      "next_call_refused": true,
+      "reads_answer_as_the_files_say": true,
+      "rollback_counters_a_restart_accepts": [
+        1
+      ],
+      "storage_failure": null,
+      "store_refuses_operations": true,
+      "takes_calls_after_restart": true
+    },
+    {
+      "backend": "full_scan",
+      "bytes_cut_on_open": 0,
+      "call": "returned",
+      "entrypoint": "mint(address,uint256)",
+      "fault": {
+        "operation": "checkpoint",
+        "step": "snapshot_write"
+      },
+      "files_hold": "the_call",
+      "files_hold_the_state_before_or_after_the_call": true,
+      "holds": true,
+      "next_call_refused": true,
+      "reads_answer_as_the_files_say": true,
+      "rollback_counters_a_restart_accepts": [
+        2
+      ],
+      "storage_failure": null,
+      "store_refuses_operations": true,
+      "takes_calls_after_restart": true
+    },
+    {
+      "backend": "full_scan",
+      "bytes_cut_on_open": 0,
+      "call": "returned",
+      "entrypoint": "mint(address,uint256)",
+      "fault": {
+        "operation": "checkpoint",
+        "step": "snapshot_rename"
+      },
+      "files_hold": "the_call",
+      "files_hold_the_state_before_or_after_the_call": true,
+      "holds": true,
+      "next_call_refused": true,
+      "reads_answer_as_the_files_say": true,
+      "rollback_counters_a_restart_accepts": [
+        2
+      ],
+      "storage_failure": null,
+      "store_refuses_operations": true,
+      "takes_calls_after_restart": true
+    },
+    {
+      "backend": "full_scan",
+      "bytes_cut_on_open": 0,
+      "call": "returned",
+      "entrypoint": "mint(address,uint256)",
+      "fault": {
+        "operation": "checkpoint",
+        "step": "journal_truncation"
+      },
+      "files_hold": "the_call",
+      "files_hold_the_state_before_or_after_the_call": true,
+      "holds": true,
+      "next_call_refused": true,
+      "reads_answer_as_the_files_say": true,
+      "rollback_counters_a_restart_accepts": [
+        2
+      ],
+      "storage_failure": null,
+      "store_refuses_operations": true,
+      "takes_calls_after_restart": true
+    },
+    {
+      "backend": "oram",
+      "bytes_cut_on_open": 6,
+      "call": "outcome_unknown",
+      "entrypoint": "mint(address,uint256)",
+      "fault": {
+        "entry": "commit",
+        "failure": "write_stops_in_header",
+        "operation": "append"
+      },
+      "files_hold": "the_state_before_the_call",
+      "files_hold_the_state_before_or_after_the_call": true,
+      "holds": true,
+      "next_call_refused": true,
+      "reads_answer_as_the_files_say": true,
+      "rollback_counters_a_restart_accepts": [
+        1
+      ],
+      "storage_failure": "outcome_unknown",
+      "store_refuses_operations": true,
+      "takes_calls_after_restart": true
+    },
+    {
+      "backend": "oram",
+      "bytes_cut_on_open": 7820,
+      "call": "outcome_unknown",
+      "entrypoint": "mint(address,uint256)",
+      "fault": {
+        "entry": "commit",
+        "failure": "write_stops_in_payload",
+        "operation": "append"
+      },
+      "files_hold": "the_state_before_the_call",
+      "files_hold_the_state_before_or_after_the_call": true,
+      "holds": true,
+      "next_call_refused": true,
+      "reads_answer_as_the_files_say": true,
+      "rollback_counters_a_restart_accepts": [
+        1
+      ],
+      "storage_failure": "outcome_unknown",
+      "store_refuses_operations": true,
+      "takes_calls_after_restart": true
+    },
+    {
+      "backend": "oram",
+      "bytes_cut_on_open": 15660,
+      "call": "outcome_unknown",
+      "entrypoint": "mint(address,uint256)",
+      "fault": {
+        "entry": "commit",
+        "failure": "write_stops_in_digest",
+        "operation": "append"
+      },
+      "files_hold": "the_state_before_the_call",
+      "files_hold_the_state_before_or_after_the_call": true,
+      "holds": true,
+      "next_call_refused": true,
+      "reads_answer_as_the_files_say": true,
+      "rollback_counters_a_restart_accepts": [
+        1
+      ],
+      "storage_failure": "outcome_unknown",
+      "store_refuses_operations": true,
+      "takes_calls_after_restart": true
+    },
+    {
+      "backend": "oram",
+      "bytes_cut_on_open": 0,
+      "call": "outcome_unknown",
+      "entrypoint": "mint(address,uint256)",
+      "fault": {
+        "entry": "commit",
+        "failure": "sync_fails",
+        "operation": "append"
+      },
+      "files_hold": "the_call",
+      "files_hold_the_state_before_or_after_the_call": true,
+      "holds": true,
+      "next_call_refused": true,
+      "reads_answer_as_the_files_say": true,
+      "rollback_counters_a_restart_accepts": [
+        2
+      ],
+      "storage_failure": "outcome_unknown",
+      "store_refuses_operations": true,
+      "takes_calls_after_restart": true
+    },
+    {
+      "backend": "oram",
+      "bytes_cut_on_open": 6,
+      "call": "failed",
+      "entrypoint": "approve(address,address,uint256)",
+      "fault": {
+        "entry": "reservation",
+        "failure": "write_stops_in_header",
+        "operation": "append"
+      },
+      "files_hold": "the_state_before_the_call",
+      "files_hold_the_state_before_or_after_the_call": true,
+      "holds": true,
+      "next_call_refused": true,
+      "reads_answer_as_the_files_say": true,
+      "rollback_counters_a_restart_accepts": [
+        1
+      ],
+      "storage_failure": null,
+      "store_refuses_operations": true,
+      "takes_calls_after_restart": true
+    },
+    {
+      "backend": "oram",
+      "bytes_cut_on_open": 22,
+      "call": "failed",
+      "entrypoint": "approve(address,address,uint256)",
+      "fault": {
+        "entry": "reservation",
+        "failure": "write_stops_in_payload",
+        "operation": "append"
+      },
+      "files_hold": "the_state_before_the_call",
+      "files_hold_the_state_before_or_after_the_call": true,
+      "holds": true,
+      "next_call_refused": true,
+      "reads_answer_as_the_files_say": true,
+      "rollback_counters_a_restart_accepts": [
+        1
+      ],
+      "storage_failure": null,
+      "store_refuses_operations": true,
+      "takes_calls_after_restart": true
+    },
+    {
+      "backend": "oram",
+      "bytes_cut_on_open": 64,
+      "call": "failed",
+      "entrypoint": "approve(address,address,uint256)",
+      "fault": {
+        "entry": "reservation",
+        "failure": "write_stops_in_digest",
+        "operation": "append"
+      },
+      "files_hold": "the_state_before_the_call",
+      "files_hold_the_state_before_or_after_the_call": true,
+      "holds": true,
+      "next_call_refused": true,
+      "reads_answer_as_the_files_say": true,
+      "rollback_counters_a_restart_accepts": [
+        1
+      ],
+      "storage_failure": null,
+      "store_refuses_operations": true,
+      "takes_calls_after_restart": true
+    },
+    {
+      "backend": "oram",
+      "bytes_cut_on_open": 0,
+      "call": "failed",
+      "entrypoint": "approve(address,address,uint256)",
+      "fault": {
+        "entry": "reservation",
+        "failure": "sync_fails",
+        "operation": "append"
+      },
+      "files_hold": "the_state_before_the_call",
+      "files_hold_the_state_before_or_after_the_call": true,
+      "holds": true,
+      "next_call_refused": true,
+      "reads_answer_as_the_files_say": true,
+      "rollback_counters_a_restart_accepts": [
+        1
+      ],
+      "storage_failure": null,
+      "store_refuses_operations": true,
+      "takes_calls_after_restart": true
+    },
+    {
+      "backend": "oram",
+      "bytes_cut_on_open": 0,
+      "call": "returned",
+      "entrypoint": "mint(address,uint256)",
+      "fault": {
+        "operation": "checkpoint",
+        "step": "snapshot_write"
+      },
+      "files_hold": "the_call",
+      "files_hold_the_state_before_or_after_the_call": true,
+      "holds": true,
+      "next_call_refused": true,
+      "reads_answer_as_the_files_say": true,
+      "rollback_counters_a_restart_accepts": [
+        2
+      ],
+      "storage_failure": null,
+      "store_refuses_operations": true,
+      "takes_calls_after_restart": true
+    },
+    {
+      "backend": "oram",
+      "bytes_cut_on_open": 0,
+      "call": "returned",
+      "entrypoint": "mint(address,uint256)",
+      "fault": {
+        "operation": "checkpoint",
+        "step": "snapshot_rename"
+      },
+      "files_hold": "the_call",
+      "files_hold_the_state_before_or_after_the_call": true,
+      "holds": true,
+      "next_call_refused": true,
+      "reads_answer_as_the_files_say": true,
+      "rollback_counters_a_restart_accepts": [
+        2
+      ],
+      "storage_failure": null,
+      "store_refuses_operations": true,
+      "takes_calls_after_restart": true
+    },
+    {
+      "backend": "oram",
+      "bytes_cut_on_open": 0,
+      "call": "returned",
+      "entrypoint": "mint(address,uint256)",
+      "fault": {
+        "operation": "checkpoint",
+        "step": "journal_truncation"
+      },
+      "files_hold": "the_call",
+      "files_hold_the_state_before_or_after_the_call": true,
+      "holds": true,
+      "next_call_refused": true,
+      "reads_answer_as_the_files_say": true,
+      "rollback_counters_a_restart_accepts": [
+        2
+      ],
+      "storage_failure": null,
+      "store_refuses_operations": true,
+      "takes_calls_after_restart": true
+    },
+    {
+      "backend": "oram_private_posmap",
+      "bytes_cut_on_open": 6,
+      "call": "outcome_unknown",
+      "entrypoint": "mint(address,uint256)",
+      "fault": {
+        "entry": "commit",
+        "failure": "write_stops_in_header",
+        "operation": "append"
+      },
+      "files_hold": "the_state_before_the_call",
+      "files_hold_the_state_before_or_after_the_call": true,
+      "holds": true,
+      "next_call_refused": true,
+      "reads_answer_as_the_files_say": true,
+      "rollback_counters_a_restart_accepts": [
+        1
+      ],
+      "storage_failure": "outcome_unknown",
+      "store_refuses_operations": true,
+      "takes_calls_after_restart": true
+    },
+    {
+      "backend": "oram_private_posmap",
+      "bytes_cut_on_open": 65078,
+      "call": "outcome_unknown",
+      "entrypoint": "mint(address,uint256)",
+      "fault": {
+        "entry": "commit",
+        "failure": "write_stops_in_payload",
+        "operation": "append"
+      },
+      "files_hold": "the_state_before_the_call",
+      "files_hold_the_state_before_or_after_the_call": true,
+      "holds": true,
+      "next_call_refused": true,
+      "reads_answer_as_the_files_say": true,
+      "rollback_counters_a_restart_accepts": [
+        1
+      ],
+      "storage_failure": "outcome_unknown",
+      "store_refuses_operations": true,
+      "takes_calls_after_restart": true
+    },
+    {
+      "backend": "oram_private_posmap",
+      "bytes_cut_on_open": 130176,
+      "call": "outcome_unknown",
+      "entrypoint": "mint(address,uint256)",
+      "fault": {
+        "entry": "commit",
+        "failure": "write_stops_in_digest",
+        "operation": "append"
+      },
+      "files_hold": "the_state_before_the_call",
+      "files_hold_the_state_before_or_after_the_call": true,
+      "holds": true,
+      "next_call_refused": true,
+      "reads_answer_as_the_files_say": true,
+      "rollback_counters_a_restart_accepts": [
+        1
+      ],
+      "storage_failure": "outcome_unknown",
+      "store_refuses_operations": true,
+      "takes_calls_after_restart": true
+    },
+    {
+      "backend": "oram_private_posmap",
+      "bytes_cut_on_open": 0,
+      "call": "outcome_unknown",
+      "entrypoint": "mint(address,uint256)",
+      "fault": {
+        "entry": "commit",
+        "failure": "sync_fails",
+        "operation": "append"
+      },
+      "files_hold": "the_call",
+      "files_hold_the_state_before_or_after_the_call": true,
+      "holds": true,
+      "next_call_refused": true,
+      "reads_answer_as_the_files_say": true,
+      "rollback_counters_a_restart_accepts": [
+        2
+      ],
+      "storage_failure": "outcome_unknown",
+      "store_refuses_operations": true,
+      "takes_calls_after_restart": true
+    },
+    {
+      "backend": "oram_private_posmap",
+      "bytes_cut_on_open": 6,
+      "call": "failed",
+      "entrypoint": "approve(address,address,uint256)",
+      "fault": {
+        "entry": "reservation",
+        "failure": "write_stops_in_header",
+        "operation": "append"
+      },
+      "files_hold": "the_state_before_the_call",
+      "files_hold_the_state_before_or_after_the_call": true,
+      "holds": true,
+      "next_call_refused": true,
+      "reads_answer_as_the_files_say": true,
+      "rollback_counters_a_restart_accepts": [
+        1
+      ],
+      "storage_failure": null,
+      "store_refuses_operations": true,
+      "takes_calls_after_restart": true
+    },
+    {
+      "backend": "oram_private_posmap",
+      "bytes_cut_on_open": 22,
+      "call": "failed",
+      "entrypoint": "approve(address,address,uint256)",
+      "fault": {
+        "entry": "reservation",
+        "failure": "write_stops_in_payload",
+        "operation": "append"
+      },
+      "files_hold": "the_state_before_the_call",
+      "files_hold_the_state_before_or_after_the_call": true,
+      "holds": true,
+      "next_call_refused": true,
+      "reads_answer_as_the_files_say": true,
+      "rollback_counters_a_restart_accepts": [
+        1
+      ],
+      "storage_failure": null,
+      "store_refuses_operations": true,
+      "takes_calls_after_restart": true
+    },
+    {
+      "backend": "oram_private_posmap",
+      "bytes_cut_on_open": 64,
+      "call": "failed",
+      "entrypoint": "approve(address,address,uint256)",
+      "fault": {
+        "entry": "reservation",
+        "failure": "write_stops_in_digest",
+        "operation": "append"
+      },
+      "files_hold": "the_state_before_the_call",
+      "files_hold_the_state_before_or_after_the_call": true,
+      "holds": true,
+      "next_call_refused": true,
+      "reads_answer_as_the_files_say": true,
+      "rollback_counters_a_restart_accepts": [
+        1
+      ],
+      "storage_failure": null,
+      "store_refuses_operations": true,
+      "takes_calls_after_restart": true
+    },
+    {
+      "backend": "oram_private_posmap",
+      "bytes_cut_on_open": 0,
+      "call": "failed",
+      "entrypoint": "approve(address,address,uint256)",
+      "fault": {
+        "entry": "reservation",
+        "failure": "sync_fails",
+        "operation": "append"
+      },
+      "files_hold": "the_state_before_the_call",
+      "files_hold_the_state_before_or_after_the_call": true,
+      "holds": true,
+      "next_call_refused": true,
+      "reads_answer_as_the_files_say": true,
+      "rollback_counters_a_restart_accepts": [
+        1
+      ],
+      "storage_failure": null,
+      "store_refuses_operations": true,
+      "takes_calls_after_restart": true
+    },
+    {
+      "backend": "oram_private_posmap",
+      "bytes_cut_on_open": 0,
+      "call": "returned",
+      "entrypoint": "mint(address,uint256)",
+      "fault": {
+        "operation": "checkpoint",
+        "step": "snapshot_write"
+      },
+      "files_hold": "the_call",
+      "files_hold_the_state_before_or_after_the_call": true,
+      "holds": true,
+      "next_call_refused": true,
+      "reads_answer_as_the_files_say": true,
+      "rollback_counters_a_restart_accepts": [
+        2
+      ],
+      "storage_failure": null,
+      "store_refuses_operations": true,
+      "takes_calls_after_restart": true
+    },
+    {
+      "backend": "oram_private_posmap",
+      "bytes_cut_on_open": 0,
+      "call": "returned",
+      "entrypoint": "mint(address,uint256)",
+      "fault": {
+        "operation": "checkpoint",
+        "step": "snapshot_rename"
+      },
+      "files_hold": "the_call",
+      "files_hold_the_state_before_or_after_the_call": true,
+      "holds": true,
+      "next_call_refused": true,
+      "reads_answer_as_the_files_say": true,
+      "rollback_counters_a_restart_accepts": [
+        2
+      ],
+      "storage_failure": null,
+      "store_refuses_operations": true,
+      "takes_calls_after_restart": true
+    },
+    {
+      "backend": "oram_private_posmap",
+      "bytes_cut_on_open": 0,
+      "call": "returned",
+      "entrypoint": "mint(address,uint256)",
+      "fault": {
+        "operation": "checkpoint",
+        "step": "journal_truncation"
+      },
+      "files_hold": "the_call",
+      "files_hold_the_state_before_or_after_the_call": true,
+      "holds": true,
+      "next_call_refused": true,
+      "reads_answer_as_the_files_say": true,
+      "rollback_counters_a_restart_accepts": [
+        2
+      ],
+      "storage_failure": null,
+      "store_refuses_operations": true,
+      "takes_calls_after_restart": true
+    }
+  ],
   "nonce_reservation": {
     "a_deployment_reserves_before_it_hands_over_a_record": true,
     "holds": true,
@@ -1241,7 +1961,7 @@
   "oram_reads": "a call reads the counter and the metadata pages of an ORAM map once, where it loads the map, and holds them through the call; each access reads its buckets; the trace names each of those reads where the call makes it",
   "provenance": {
     "restart": "a seeded deployment restarts from a store in files; the sync policy is off, so the report times no device",
-    "toolchain_manifest_sha256": "63284fda53c059fd0d445049aa4612f02cebcfea840834bba2db4fe8cee0a5ee"
+    "toolchain_manifest_sha256": "caef044aca36b3395a5a3dc873b9236465d128486dfd03ea8f7cd0296487c97a"
   },
   "restarts": [
     {
@@ -1549,7 +2269,7 @@
       "stale_attested_counter_refused": true
     }
   ],
-  "schema": "uo-storage-boundary-v2",
+  "schema": "uo-storage-boundary-v3",
   "totals": {
     "store_reads": 3862,
     "store_writes": 4395,

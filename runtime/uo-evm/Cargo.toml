@@ -7,7 +7,7 @@ license.workspace = true
 [features]
 # A diagnostics build returns a call's private evidence with its receipt and
 # can write it out for the Lean checkers. The production policy rejects it.
-diagnostics = ["uo-core/diagnostics"]
+diagnostics = ["uo-core/diagnostics", "uo-store/fault-injection"]
 insecure-eval-raw = []
 
 [dependencies]
@@ -34,3 +34,5 @@ serde_yaml.workspace = true
 # The unit tests read a call's whole trace and write it out.
 uo-core = { path = "../../crates/uo-core", features = ["diagnostics"] }
 uo-solc = { path = "../../compiler/uo-solc" }
+# The tests make the store fail, in the production build too.
+uo-store = { path = "../uo-store", features = ["fault-injection"] }

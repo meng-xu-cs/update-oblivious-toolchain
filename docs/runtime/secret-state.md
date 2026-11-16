@@ -207,6 +207,24 @@ and the ownership boundaries that keep them auditable.
     takes the call's state. A call that fails, or is dropped after it was
     staged, abandons them: the store puts back what they replaced.
 
+    A store in files fails closed. An append to its journal can fail
+    because its write stopped part way or because its sync failed after a
+    whole write. Either way the files hold the entry whole or not at all,
+    and only opening them again shows which. Opening cuts off a last entry
+    that is not whole and refuses a journal in which a whole entry follows
+    a damaged one. The store's error says that the outcome is unknown
+    (`StorageFailure::OutcomeUnknown`), and the store then refuses every
+    operation until its directory is opened again. So nothing lands behind
+    the failed entry, and the runtime refuses every call. A call whose
+    commit met that error returns it and no receipt, and a deployment
+    restarted from the files has as its last receipt the call's or the one
+    before it. A checkpoint that fails leaves every commit in the files,
+    since the snapshot replaces the one in place before the journal is
+    emptied, and it too makes the store refuse every operation. Only a test
+    or a diagnostics build can make the store fail so
+    (`FileStorage::inject_fault`, under the store's `fault-injection`
+    feature).
+
     The store takes a sealed record only if the seal count in the record's
     nonce is below the count it has reserved for the record's object, and
     the cipher reserves the counts of the seals made so far before it hands
@@ -290,7 +308,7 @@ write/read evidence, direct store cipher calls outside the codec layer, and
 reintroduction of host-visible hidden-state errors that should be modeled
 confidential aborts.
 
-Invariants 9 to 19 have fourteen bits in `runtime_boundary_validation.json`:
+Invariants 9 to 19 have fifteen bits in `runtime_boundary_validation.json`:
 `deployment_seed_stays_out_of_call_traces`,
 `production_errors_carry_no_runtime_freshness_value`,
 `contract_instance_debug_is_opaque`,
@@ -303,8 +321,10 @@ Invariants 9 to 19 have fourteen bits in `runtime_boundary_validation.json`:
 `evidence_builds_audit_the_kept_position_map_witness`,
 `a_call_copies_no_committed_object`,
 `trace_runs_stand_for_recorded_events`,
-`sealed_records_cross_the_storage_boundary` and
-`dropped_calls_leave_fixed_seal_counts`. Each is a check of source text,
+`sealed_records_cross_the_storage_boundary`,
+`dropped_calls_leave_fixed_seal_counts` and
+`store_failures_are_injected_only_in_test_and_diagnostics_builds`. Each is a
+check of source text,
 and a probe unit test shows that it rejects the drifts it guards against.
 
 A source check reads the production part of a file: the file without the

@@ -24,6 +24,21 @@
 //! from the files alone. The restarted runtime must answer the workload's
 //! reads as the first one did and seal no record under a nonce the files
 //! already hold.
+//!
+//! Last, it makes the store fail (`fault_matrix`): every failure a file
+//! store can be made to meet (`StorageFault::ALL`), on each sealed backend
+//! of ERC20Lite. The store must refuse every operation after it, so that the
+//! runtime refuses the next call. A call whose commit's append failed must
+//! not return, and its error must say that its outcome is unknown. The files
+//! must hold every call that returned, and the failed call whole or not at
+//! all: whole when its sync failed after a whole write or a checkpoint
+//! failed after the commit, not at all when its write stopped part way or
+//! it was dropped. A restart from the files takes the rollback counter of
+//! the state they hold, and only that one, and answers reads as that state
+//! says. The production build runs the same failures through the production
+//! runtime, whose receipts say which state the files hold
+//! (`every_storage_failure_fails_closed_and_a_restart_resolves_the_call` in
+//! `runtime/uo-evm/tests/production_boundary.rs`).
 
 use crate::capacity_sweep::WitnessAuditOff;
 use crate::{
@@ -37,11 +52,11 @@ use std::path::PathBuf;
 use uo_core::ir::BackendKind;
 use uo_core::{CompiledArtifact, PublicReceipt, Value, WriteClass};
 use uo_evm::{
-    ContractInstance, FileStorage, MemoryStorage, SharedStorage, StorageAdapter, StorageIo,
-    SyncPolicy,
+    storage_failure, ContractInstance, FileStorage, JournalEntry, MemoryStorage, SharedStorage,
+    StorageAdapter, StorageFailure, StorageFault, StorageIo, SyncPolicy,
 };
 
-pub(crate) const STORAGE_BOUNDARY_SCHEMA: &str = "uo-storage-boundary-v2";
+pub(crate) const STORAGE_BOUNDARY_SCHEMA: &str = "uo-storage-boundary-v3";
 
 /// The sealed objects of an artifact.
 fn sealed_objects(artifact: &CompiledArtifact) -> BTreeSet<String> {
@@ -515,6 +530,185 @@ fn dropped_call(
     }))
 }
 
+/// A deployment of `artifact` on a store in files meets `fault` in a call
+/// after one call that returned (`fault_matrix` in the module's comment).
+/// `setup` returns; `target` is the call that meets the fault, unless the
+/// fault is a reservation's: then `dropped`, an entrypoint whose commit
+/// budget is zero, is called, and its keys' seal counts are reserved as it
+/// is dropped. `read` is a read of what `setup` and `target` wrote.
+fn storage_fault(
+    artifact: &CompiledArtifact,
+    backend: &str,
+    fault: StorageFault,
+    calls: [&CallSpec; 4],
+) -> Result<JsonValue> {
+    let [setup, target, dropped, read] = calls;
+    let reservation = matches!(
+        fault,
+        StorageFault::Append {
+            entry: JournalEntry::Reservation,
+            ..
+        }
+    );
+    let mut artifact = artifact.clone();
+    let call = if reservation {
+        artifact
+            .contract
+            .manifest
+            .entrypoints
+            .get_mut(dropped.entrypoint)
+            .ok_or_else(|| anyhow!("manifest entry missing for {}", dropped.entrypoint))?
+            .max_commit_ops = 0;
+        dropped
+    } else {
+        target
+    };
+    // The state the files may hold after the call: the one before it, and
+    // the one a twin that meets no fault reaches with it.
+    let mut twin = ContractInstance::deploy_with_seed(artifact.clone(), PROBE_DEPLOY_SEED)?;
+    twin.keep_decoded_position_map_witness()?;
+    twin.call(setup.entrypoint, setup.args.clone())?;
+    let state = |instance: &ContractInstance| -> Result<(String, String)> {
+        Ok((
+            instance.public_state_digest()?,
+            instance.ciphertext_store_digest()?,
+        ))
+    };
+    let before = state(&twin)?;
+    let after = match twin.call(call.entrypoint, call.args.clone()) {
+        Ok(_) => Some(state(&twin)?),
+        Err(_) => None,
+    };
+
+    let label = format!("{backend}-{}", serde_json::to_string(&fault)?);
+    let directory = scratch_directory(&format!("fault-{label}"));
+    let _ = std::fs::remove_dir_all(&directory);
+    let outcome = (|| -> Result<JsonValue> {
+        let mut store = FileStorage::create(&directory, SyncPolicy::Never)?;
+        if let StorageFault::Checkpoint { .. } = fault {
+            store = store.with_checkpoint_bytes(0);
+        }
+        let storage = SharedStorage::new(store);
+        let mut instance = ContractInstance::deploy_with_seed_and_storage(
+            artifact.clone(),
+            PROBE_DEPLOY_SEED,
+            storage.clone(),
+        )?;
+        instance.keep_decoded_position_map_witness()?;
+        let setup_result = instance.call(setup.entrypoint, setup.args.clone())?;
+        let counter_before = u64::from(!setup_result.aborted);
+
+        storage.inject_fault(fault)?;
+        let result = instance.call(call.entrypoint, call.args.clone());
+        let (call_result, failure) = match &result {
+            Ok(_) => ("returned", None),
+            Err(error) => match storage_failure(error) {
+                Some(StorageFailure::OutcomeUnknown) => {
+                    ("outcome_unknown", Some(StorageFailure::OutcomeUnknown))
+                }
+                other => ("failed", other),
+            },
+        };
+        let call_as_expected = match fault {
+            StorageFault::Append {
+                entry: JournalEntry::Commit,
+                ..
+            } => call_result == "outcome_unknown",
+            StorageFault::Append { .. } => call_result == "failed",
+            StorageFault::Checkpoint { .. } => call_result == "returned",
+        };
+        let store_refuses_operations = storage.poisoned().is_some();
+        let next_call_refused = instance
+            .call(read.entrypoint, read.args.clone())
+            .err()
+            .is_some_and(|error| error.to_string().contains("refuses every operation"));
+        drop(instance);
+        drop(storage);
+
+        let opened = FileStorage::open(&directory, SyncPolicy::Never)?;
+        let bytes_cut_on_open = opened.bytes_cut_on_open();
+        drop(opened);
+        let reopen = || -> Result<SharedStorage> {
+            Ok(SharedStorage::new(FileStorage::open(
+                &directory,
+                SyncPolicy::Never,
+            )?))
+        };
+        let mut accepted = Vec::new();
+        let mut restarted = None;
+        for counter in [counter_before, counter_before + 1] {
+            if let Ok(instance) = ContractInstance::restart_with_seed(
+                artifact.clone(),
+                PROBE_DEPLOY_SEED,
+                reopen()?,
+                counter,
+            ) {
+                accepted.push(counter);
+                restarted = Some(instance);
+            }
+        }
+        let mut restarted =
+            restarted.ok_or_else(|| anyhow!("no rollback counter restarts {label}"))?;
+        restarted.keep_decoded_position_map_witness()?;
+        let files = state(&restarted)?;
+        let files_hold_the_call = Some(&files) == after.as_ref();
+        let files_hold_a_state_of_the_call = files == before || files_hold_the_call;
+        let expected_whole = fault.leaves_the_entry_whole() && !reservation;
+        // Reads answer as the state the files hold says: as the twin, if
+        // they hold the call, and as before it otherwise.
+        let expected_read = if files_hold_the_call {
+            twin.call(read.entrypoint, read.args.clone())?.return_value
+        } else {
+            let mut before_twin =
+                ContractInstance::deploy_with_seed(artifact.clone(), PROBE_DEPLOY_SEED)?;
+            before_twin.keep_decoded_position_map_witness()?;
+            before_twin.call(setup.entrypoint, setup.args.clone())?;
+            before_twin
+                .call(read.entrypoint, read.args.clone())?
+                .return_value
+        };
+        let reads_answer_as_the_files_say = restarted
+            .call(read.entrypoint, read.args.clone())?
+            .return_value
+            == expected_read;
+        let takes_calls_after_restart =
+            restarted.call(setup.entrypoint, setup.args.clone()).is_ok();
+        let holds = call_as_expected
+            && store_refuses_operations
+            && next_call_refused
+            && accepted.len() == 1
+            && files_hold_a_state_of_the_call
+            && files_hold_the_call == expected_whole
+            && (bytes_cut_on_open > 0) != fault.leaves_the_entry_whole()
+            && reads_answer_as_the_files_say
+            && takes_calls_after_restart;
+        Ok(json!({
+            "backend": backend,
+            "fault": fault,
+            "entrypoint": call.entrypoint,
+            "call": call_result,
+            "storage_failure": failure,
+            "store_refuses_operations": store_refuses_operations,
+            "next_call_refused": next_call_refused,
+            "bytes_cut_on_open": bytes_cut_on_open,
+            "rollback_counters_a_restart_accepts": accepted,
+            // Which state, as a name and not a flag: a false flag would be
+            // a false leaf that the acceptance gate does not classify.
+            "files_hold": if files_hold_the_call {
+                "the_call"
+            } else {
+                "the_state_before_the_call"
+            },
+            "files_hold_the_state_before_or_after_the_call": files_hold_a_state_of_the_call,
+            "reads_answer_as_the_files_say": reads_answer_as_the_files_say,
+            "takes_calls_after_restart": takes_calls_after_restart,
+            "holds": holds,
+        }))
+    })();
+    let _ = std::fs::remove_dir_all(&directory);
+    outcome
+}
+
 /// A store takes a sealed record only when the record's nonce is below the
 /// count it has reserved for the record's object. The record is one a
 /// deployment sealed.
@@ -641,6 +835,38 @@ pub(crate) fn run_storage_boundary(
     let nonce_reservation = nonce_reservation(&erc20.uo).context("nonce reservation")?;
     let nonce_reservation_holds = nonce_reservation["holds"] == json!(true);
 
+    let second_mint = CallSpec {
+        entrypoint: "mint(address,uint256)",
+        args: vec![Value::Address([0x22; 20]), Value::uint(20)],
+    };
+    let approve = CallSpec {
+        entrypoint: "approve(address,address,uint256)",
+        args: vec![
+            Value::Address([0x11; 20]),
+            Value::Address([0x22; 20]),
+            Value::uint(5),
+        ],
+    };
+    let second_balance = CallSpec {
+        entrypoint: "balanceOf(address)",
+        args: vec![Value::Address([0x22; 20])],
+    };
+    let mut fault_matrix = Vec::new();
+    let mut every_storage_fault_fails_closed = true;
+    for (backend, artifact) in sealed_variants(erc20) {
+        for fault in StorageFault::ALL {
+            let row = storage_fault(
+                artifact,
+                &backend,
+                fault,
+                [&mint, &second_mint, &approve, &second_balance],
+            )
+            .with_context(|| format!("storage fault {fault:?} on ERC20Lite/{backend}"))?;
+            every_storage_fault_fails_closed &= row["holds"] == json!(true);
+            fault_matrix.push(row);
+        }
+    }
+
     let checks = json!({
         "store_log_agrees_with_trace_in_every_call": every_log_agrees,
         "store_reads_are_the_traced_reads": totals.store_reads == totals.traced_reads,
@@ -648,6 +874,7 @@ pub(crate) fn run_storage_boundary(
         "every_restart_continues_its_deployment": every_restart_holds,
         "a_dropped_call_leaves_the_store_as_it_was": every_dropped_call_holds,
         "a_record_reaches_the_store_only_under_a_reserved_nonce": nonce_reservation_holds,
+        "every_storage_fault_fails_closed": every_storage_fault_fails_closed,
     });
     let accepted = checks
         .as_object()
@@ -670,6 +897,7 @@ pub(crate) fn run_storage_boundary(
         "restarts": restarts,
         "dropped_calls": dropped_calls,
         "nonce_reservation": nonce_reservation,
+        "fault_matrix": fault_matrix,
         "checks": checks,
         "provenance": {
             "toolchain_manifest_sha256": toolchain,

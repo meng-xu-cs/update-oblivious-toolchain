@@ -1316,6 +1316,7 @@
           "store_cipher_surface_stays_in_codec": "true",
           "store_cipher_uses_exact_size_nonzero_buffers": "true",
           "store_codec_path": "string",
+          "store_failures_are_injected_only_in_test_and_diagnostics_builds": "true",
           "store_slots_use_generated_boxed_helpers": "true",
           "store_store_path": "string",
           "store_wipe_helper_surface_checks": "array 7",
@@ -4094,6 +4095,7 @@
         "store_cipher_surface_stays_in_codec": "true",
         "store_cipher_uses_exact_size_nonzero_buffers": "true",
         "store_codec_path": "string",
+        "store_failures_are_injected_only_in_test_and_diagnostics_builds": "true",
         "store_slots_use_generated_boxed_helpers": "true",
         "store_store_path": "string",
         "store_wipe_helper_surface_checks": "array 7",
@@ -5006,7 +5008,7 @@
       }
     },
     "storage_boundary": {
-      "declared_schema": "uo-storage-boundary-v2",
+      "declared_schema": "uo-storage-boundary-v3",
       "fields": {
         "accepted": "true",
         "benchmarks": "array 14",
@@ -5014,6 +5016,7 @@
           "a_dropped_call_leaves_the_store_as_it_was": "true",
           "a_record_reaches_the_store_only_under_a_reserved_nonce": "true",
           "every_restart_continues_its_deployment": "true",
+          "every_storage_fault_fails_closed": "true",
           "store_log_agrees_with_trace_in_every_call": "true",
           "store_reads_are_the_traced_reads": "true",
           "store_writes_are_the_traced_writes": "true"
@@ -5023,6 +5026,7 @@
           "calls": "count 47"
         },
         "dropped_calls": "array 3",
+        "fault_matrix": "array 33",
         "nonce_reservation": {
           "a_deployment_reserves_before_it_hands_over_a_record": "true",
           "holds": "true",

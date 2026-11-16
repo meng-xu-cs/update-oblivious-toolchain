@@ -559,6 +559,89 @@ and the matrix tests both outcomes.
 - A commit of unknown outcome resolves at the restart to exactly one of its
   two states, and the restarted receipt identifies it.
 
+**As built.** `FileStorage` (`runtime/uo-store/src/storage.rs`) fails
+closed. An append that fails, whether its write or its sync, poisons the
+store, and the error is a `StorageError` whose failure is
+`StorageFailure::OutcomeUnknown`. From then on the store refuses every
+operation until its directory is opened again: `begin`, `commit`,
+`reserve_seals`, `create`, `write`, `put_public`, `read` and `checkpoint`.
+Each refusal is a `Definite` error that names why, and nothing is appended
+after the failed entry.
+
+A checkpoint that fails at any step also poisons the store, and the commit
+that ran it stands and returns. The snapshot replaces the one in place
+before the journal is emptied, so the files hold every commit. Errors before
+an append are `Definite`, and `storage_failure` reads the class from an
+error's chain.
+
+`open` cuts off a damaged last entry and reports the bytes it cut
+(`bytes_cut_on_open`). It refuses a journal in which a whole entry follows a
+damaged one.
+
+The engine's commit path is as it was, and its pinned lines are unchanged.
+`StagedStore::make_durable` adds that the call's outcome is unknown, and the
+staged call is abandoned. The poisoned store refuses the next call at its
+`begin`. The production runtime also refuses `authenticated_last_receipt`
+while its store is poisoned, since its last receipt may no longer be the
+last in the files.
+
+`resolve_production_call_outcome` compares three receipts: the one the
+caller held, the evidence it sent, and the restarted deployment's last
+receipt. It answers `Committed` or `NotCommitted`, and fails if the last
+receipt is neither. The restart itself is as it was: the maintainer kept its
+rollback check strict. The tests restart with the counter of the state the
+files hold, and of the counters before and after the call exactly one is
+accepted. Issue 67 has a new step on how the platform's counter catches up.
+
+The fault hook is `FileStorage::inject_fault(StorageFault)`, also on the
+adapter trait and on `SharedStorage`. It is compiled under the store's
+`fault-injection` feature, which only the runtime's tests (a dev-dependency)
+and its diagnostics feature turn on.
+`store_failures_are_injected_only_in_test_and_diagnostics_builds` in
+`runtime_boundary_validation.json` pins the gating, and a unit test of three
+drifts backs it. `StorageFault::ALL` lists 11 failures:
+
+- an append of a commit or of a reservation whose write stops in its
+  header, in its payload or in its digest, or whose sync fails after a
+  whole write;
+- a checkpoint that fails at its snapshot's write, its rename, or the
+  journal's truncation.
+
+Tests:
+
+- The store's unit tests cover the 8 append failures, the 3 checkpoint
+  steps, and a whole entry after a damaged one. For each append failure
+  they check the error, 8 refused operations, nothing appended after, and
+  what a reopen finds. A store that is not poisoned fails them, as does an
+  `open` that drops a later whole entry.
+- The production build runs all 11 through `ProductionContractInstance`
+  with `SyncPolicy::Always`
+  (`every_storage_failure_fails_closed_and_a_restart_resolves_the_call` in
+  `runtime/uo-evm/tests/production_boundary.rs`). A store that is not
+  poisoned fails it, as does an instance that tags its last receipt while
+  the store is poisoned.
+- `storage_boundary.json`, schema `uo-storage-boundary-v3`, adds
+  `fault_matrix`: the 11 failures on each of ERC20Lite's 3 sealed backends,
+  33 cases, with the verdict `every_storage_fault_fails_closed`. For example,
+  a `mint` on the local Path ORAM scheme whose commit's write stops in its
+  payload returns an outcome-unknown error. The next open cuts off the 7,820
+  bytes it wrote, and the restart accepts the counter 1 and not 2.
+
+The description asked for the report to run the matrix through the
+production runtime. That runtime refuses a diagnostics build, the build the
+probe is, so the report runs it through `ContractInstance` and resolves each
+case against a twin deployed from the same seed. The production build's test
+runs it through the production runtime. In both, the reservation that fails
+is the one a dropped call makes: a read or an `approve` with no commit
+budget. A call reserves seal counts only every 2^20 seals until Issue 66
+moves the dropped call's reservation before the call.
+
+The claim boundary's Storage Boundary states the contract, the restart's
+resolution and the matrix, with that example. Invariant 18 of
+`docs/runtime/secret-state.md` and its list of bits, the engine's comment
+on the production call, the evaluation index and the claim manifest's
+storage-boundary entry also describe them.
+
 ### Issue 66 — Make a dropped call's restart point durable before the call runs, and bound a call's seals
 
 Source: R1 (§2). Size: M. Depends on: Issue 65.
@@ -630,7 +713,16 @@ the non-claim names only a rollback together with the attested counter.
    restart from a copy of the files taken before the aborting call, with
    the generation after it, is refused; the right pair is accepted; and the
    converse.
-5. Documents: the claim boundary's restart paragraph and its non-claim,
+5. After a call whose outcome is unknown (Issue 65) the files may hold a
+   generation one past the platform's counter, which followed only the
+   results the runtime returned, and a strict restart refuses them. Settle
+   how the counter catches up, without letting a restart accept a store
+   behind it: for instance, the runtime advances the platform's counter
+   before it returns a call's result, and a restart accepts the files at
+   the attested generation or one past it, says which, and has the counter
+   advanced. Test it with a commit of unknown outcome that reached the
+   files and one that did not.
+6. Documents: the claim boundary's restart paragraph and its non-claim,
    `docs/runtime/tee-observer.md`, and Issue 58's as-built text, which says
    what the restart refused.
 

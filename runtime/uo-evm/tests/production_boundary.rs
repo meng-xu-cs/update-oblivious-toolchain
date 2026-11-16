@@ -798,3 +798,230 @@ fn a_production_deployment_restarts_from_its_files_on_its_platform() {
     std::fs::remove_dir_all(&directory).unwrap();
     std::fs::remove_dir_all(&changed).unwrap();
 }
+
+/// What a production call meets when its store fails, for every failure a
+/// file store can be made to meet (`StorageFault::ALL`), in the build a
+/// production runtime uses. Two calls return their receipts first. Then the
+/// store is made to fail:
+///
+/// - the append of the next call's commit: the call returns an error that
+///   says its outcome is unknown, and no receipt;
+/// - the append of the next reservation, which a read whose commit budget is
+///   zero makes as it is dropped: the read fails;
+/// - the next checkpoint, which the next call's commit runs: the call
+///   returns its receipt, since its commit is in the journal.
+///
+/// In every case the store refuses every operation, so the instance refuses
+/// the next call and to vouch for its last receipt. The deployment then
+/// restarts from its files with the rollback counter of the state they hold:
+/// of the counter before the last call and the one after it, exactly one is
+/// accepted. Its last receipt resolves the call: the call's when its commit
+/// is in the files whole (its sync failed after a whole write, or a
+/// checkpoint failed), the one the caller held when it is not (its write
+/// stopped part way, or the call was dropped). Every receipt a call returned
+/// is in the files, the map holds what those calls wrote, and the deployment
+/// takes calls again.
+#[test]
+fn every_storage_failure_fails_closed_and_a_restart_resolves_the_call() {
+    use uo_evm::{
+        resolve_production_call_outcome, storage_failure, AppendFailure, JournalEntry,
+        PlatformSealingKey, ProductionCallOutcome, StorageFailure, StorageFault,
+    };
+    use uo_store::{FileStorage, SharedStorage, SyncPolicy};
+    let policy = policy();
+    let session = session();
+    let environment = PublicEnvironment::default();
+    let platform = || PlatformSealingKey::from_platform([0x5A; 32]);
+    let read = |key: u8| vec![Value::Bytes32([key; 32])];
+    let mut checked = 0;
+    for (index, fault) in StorageFault::ALL.into_iter().enumerate() {
+        let directory = std::env::temp_dir().join(format!(
+            "uo-production-fault-{}-{index}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&directory);
+        let reservation = matches!(
+            fault,
+            StorageFault::Append {
+                entry: JournalEntry::Reservation,
+                ..
+            }
+        );
+        // A read with no commit budget is dropped after it ran, and its
+        // keys' seal counts are reserved past what it reached: the
+        // reservation the store fails.
+        let mut artifact = single_access_map();
+        if reservation {
+            artifact
+                .contract
+                .manifest
+                .entrypoints
+                .get_mut("read(bytes32)")
+                .unwrap()
+                .max_commit_ops = 0;
+        }
+        let mut store = FileStorage::create(&directory, SyncPolicy::Always).unwrap();
+        if let StorageFault::Checkpoint { .. } = fault {
+            store = store.with_checkpoint_bytes(0);
+        }
+        let storage = SharedStorage::new(store);
+        let (mut production, sealed) = ProductionContractInstance::deploy_with_storage(
+            artifact.clone(),
+            policy.clone(),
+            storage.clone(),
+            &platform(),
+        )
+        .unwrap();
+        for (key, value) in [(1, 10), (2, 20)] {
+            let evidence = public_evidence(
+                &artifact,
+                &policy,
+                &session,
+                &environment,
+                production.last_receipt(),
+            );
+            production
+                .call_authorized("put(bytes32,uint256)", put(key, value), &session, &evidence)
+                .unwrap();
+        }
+
+        storage.inject_fault(fault).unwrap();
+        let held = production.last_receipt().clone();
+        let evidence = public_evidence(&artifact, &policy, &session, &environment, &held);
+        let (entrypoint, args) = if reservation {
+            ("read(bytes32)", read(1))
+        } else {
+            ("put(bytes32,uint256)", put(3, 30))
+        };
+        let result = production.call_authorized(entrypoint, args, &session, &evidence);
+        let returned = match fault {
+            StorageFault::Append {
+                entry: JournalEntry::Commit,
+                ..
+            } => {
+                let error = result.unwrap_err();
+                assert_eq!(
+                    storage_failure(&error),
+                    Some(StorageFailure::OutcomeUnknown),
+                    "{fault:?}: {error:#}"
+                );
+                assert!(
+                    error.to_string().contains("outcome is unknown"),
+                    "{fault:?}: {error:#}"
+                );
+                held.clone()
+            }
+            StorageFault::Append { .. } => {
+                assert!(result.is_err(), "{fault:?}");
+                held.clone()
+            }
+            StorageFault::Checkpoint { .. } => {
+                let receipt = result.unwrap().receipt;
+                receipt.follows(&held).unwrap();
+                receipt
+            }
+        };
+        assert!(storage.poisoned().is_some(), "{fault:?}");
+        let next = public_evidence(
+            &artifact,
+            &policy,
+            &session,
+            &environment,
+            production.last_receipt(),
+        );
+        let refused = production
+            .call_authorized("put(bytes32,uint256)", put(4, 40), &session, &next)
+            .unwrap_err();
+        assert!(
+            refused.to_string().contains("refuses every operation"),
+            "{fault:?}: {refused:#}"
+        );
+        assert!(production.authenticated_last_receipt(&session).is_err());
+        drop(production);
+        drop(storage);
+
+        // The first open cuts off an append that stopped part way.
+        let opened = FileStorage::open(&directory, SyncPolicy::Always).unwrap();
+        let stopped_part_way = matches!(
+            fault,
+            StorageFault::Append { failure, .. } if failure != AppendFailure::SyncFails
+        );
+        assert_eq!(
+            opened.bytes_cut_on_open() > 0,
+            stopped_part_way,
+            "{fault:?}"
+        );
+        drop(opened);
+        let reopen =
+            || SharedStorage::new(FileStorage::open(&directory, SyncPolicy::Always).unwrap());
+        let mut restarts: Vec<ProductionContractInstance> =
+            [held.rollback_counter, held.rollback_counter + 1]
+                .into_iter()
+                .filter_map(|counter| {
+                    ProductionContractInstance::restart(
+                        artifact.clone(),
+                        policy.clone(),
+                        reopen(),
+                        &sealed,
+                        &platform(),
+                        counter,
+                    )
+                    .ok()
+                })
+                .collect();
+        assert_eq!(restarts.len(), 1, "{fault:?}");
+        let mut restarted = restarts.pop().unwrap();
+        let outcome =
+            resolve_production_call_outcome(&held, &evidence, restarted.last_receipt()).unwrap();
+        let committed = fault.leaves_the_entry_whole() && !reservation;
+        let expected = if committed {
+            ProductionCallOutcome::Committed
+        } else {
+            ProductionCallOutcome::NotCommitted
+        };
+        assert_eq!(outcome, expected, "{fault:?}");
+        // Every receipt a call returned is in the files.
+        let last = restarted.last_receipt().clone();
+        assert!(
+            last == returned || last.follows(&returned).is_ok(),
+            "{fault:?}"
+        );
+        // The map holds what the calls that committed wrote, and the
+        // deployment takes calls again.
+        if !reservation {
+            for (key, value) in [(1, 10), (2, 20), (3, if committed { 30 } else { 0 })] {
+                let evidence = public_evidence(
+                    &artifact,
+                    &policy,
+                    &session,
+                    &environment,
+                    restarted.last_receipt(),
+                );
+                let result = restarted
+                    .call_authorized("read(bytes32)", read(key), &session, &evidence)
+                    .unwrap();
+                assert_eq!(
+                    result.call.return_value,
+                    Some(Value::uint(value)),
+                    "{fault:?}: key {key}"
+                );
+            }
+        }
+        let evidence = public_evidence(
+            &artifact,
+            &policy,
+            &session,
+            &environment,
+            restarted.last_receipt(),
+        );
+        let previous = restarted.last_receipt().clone();
+        let result = restarted
+            .call_authorized("put(bytes32,uint256)", put(5, 50), &session, &evidence)
+            .unwrap();
+        result.receipt.follows(&previous).unwrap();
+        drop(restarted);
+        std::fs::remove_dir_all(&directory).unwrap();
+        checked += 1;
+    }
+    assert_eq!(checked, StorageFault::ALL.len());
+}

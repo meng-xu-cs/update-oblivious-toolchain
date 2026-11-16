@@ -335,6 +335,44 @@ pub fn verify_production_receipt(
         .map_err(|_| anyhow!("production receipt tag mismatch"))
 }
 
+/// What a deployment restarted from its files says of a call whose outcome
+/// was unknown.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProductionCallOutcome {
+    /// The files hold the call's commit: the restarted deployment's last
+    /// receipt is the call's, which follows the receipt the caller held and
+    /// names the evidence it sent.
+    Committed,
+    /// The files do not hold it: the restarted deployment's last receipt is
+    /// the one the caller held.
+    NotCommitted,
+}
+
+/// Whether a call whose outcome was unknown committed, from the receipt the
+/// caller held when it made the call (`held`), the evidence it sent, and the
+/// receipt the deployment restarted from its files issued last
+/// (`restarted`, `ProductionContractInstance::last_receipt`). Fails if that
+/// receipt is neither the held one nor the call's: the files are then not
+/// the ones the call was made on.
+pub fn resolve_production_call_outcome(
+    held: &ProductionReceipt,
+    evidence: &ProductionCallEvidence,
+    restarted: &ProductionReceipt,
+) -> Result<ProductionCallOutcome> {
+    if restarted == held {
+        return Ok(ProductionCallOutcome::NotCommitted);
+    }
+    restarted.follows(held).map_err(|error| {
+        anyhow!("the restarted deployment's last receipt is neither the held receipt nor one that follows it: {error}")
+    })?;
+    require_receipt_field(
+        "request_sha256",
+        restarted.request_sha256 == production_call_evidence_sha256(evidence)?,
+    )?;
+    Ok(ProductionCallOutcome::Committed)
+}
+
 /// The hash a receipt carries for the evidence its call was accepted on.
 pub fn production_call_evidence_sha256(evidence: &ProductionCallEvidence) -> Result<String> {
     Ok(sha256_hex(&serde_json::to_vec(evidence)?))

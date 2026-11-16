@@ -4,6 +4,12 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 
+[features]
+# A test or a diagnostics build can make a file store fail an operation as a
+# device or a file system could (`FileStorage::inject_fault`). A production
+# build has no such hook.
+fault-injection = []
+
 [dependencies]
 anyhow.workspace = true
 chacha20poly1305.workspace = true

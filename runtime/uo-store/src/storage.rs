@@ -18,6 +18,15 @@
 //! reservation is durable before `reserve_seals` returns. A runtime that
 //! restarts from the adapter's files resumes each key's count at its
 //! reservation, so no nonce that reached the adapter is used again.
+//!
+//! A file store fails closed. An append to its journal that fails, whether
+//! its write stopped part way or its sync failed after a whole write, may or
+//! may not have left the entry in the files: its error says the outcome is
+//! unknown (`StorageFailure::OutcomeUnknown`), and the store refuses every
+//! operation until its directory is opened again, which finds the entry
+//! whole or not at all. A checkpoint that fails leaves every commit in the
+//! files and also makes the store refuse every operation. Any other error
+//! comes before a file is touched (`StorageFailure::Definite`).
 
 use crate::codec::sealed_record_seal_count;
 use anyhow::{anyhow, bail, Context, Result};
@@ -53,6 +62,53 @@ pub enum StorageIo {
         len: usize,
         class: WriteClass,
     },
+}
+
+/// How a failed storage operation left the store's files.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StorageFailure {
+    /// Nothing reached the files: they hold what they held before the
+    /// operation.
+    Definite,
+    /// An append to the journal failed after it began: the files hold its
+    /// entry whole or not at all, and only opening them again shows which.
+    /// The store refuses every operation until then.
+    OutcomeUnknown,
+}
+
+/// The error of a storage operation, with how it left the files.
+#[derive(Debug, thiserror::Error)]
+#[error("{message}")]
+pub struct StorageError {
+    pub failure: StorageFailure,
+    message: String,
+}
+
+impl StorageError {
+    fn definite(message: impl Into<String>) -> anyhow::Error {
+        anyhow::Error::new(Self {
+            failure: StorageFailure::Definite,
+            message: message.into(),
+        })
+    }
+
+    fn outcome_unknown(message: impl Into<String>) -> anyhow::Error {
+        anyhow::Error::new(Self {
+            failure: StorageFailure::OutcomeUnknown,
+            message: message.into(),
+        })
+    }
+}
+
+/// How the storage error in `error`'s chain left the store's files, if the
+/// chain holds one: what a runtime tells the caller of a call whose commit
+/// failed.
+pub fn storage_failure(error: &anyhow::Error) -> Option<StorageFailure> {
+    error
+        .chain()
+        .find_map(|cause| cause.downcast_ref::<StorageError>())
+        .map(|error| error.failure)
 }
 
 /// Counts an adapter keeps of its work since it was made.
@@ -149,6 +205,20 @@ pub trait StorageAdapter: Send + fmt::Debug {
     fn meta(&self) -> &[u8];
 
     fn stats(&self) -> StorageStats;
+
+    /// Why the adapter refuses every operation, if it does: an append or a
+    /// checkpoint failed, and what its files hold is known again only once
+    /// they are opened again.
+    fn poisoned(&self) -> Option<String> {
+        None
+    }
+
+    /// Arm `fault` for the next operation it names. Only a test or a
+    /// diagnostics build can; an adapter that keeps no files takes none.
+    #[cfg(any(test, feature = "fault-injection"))]
+    fn inject_fault(&mut self, fault: StorageFault) -> Result<()> {
+        bail!("this store keeps no files and takes no injected fault ({fault:?})")
+    }
 }
 
 #[derive(Debug)]
@@ -642,6 +712,154 @@ const FRAME_DIGEST_BYTES: usize = 32;
 const ENTRY_COMMIT: u8 = 1;
 const ENTRY_RESERVATION: u8 = 2;
 
+/// The kind of a journal entry.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum JournalEntry {
+    /// A commit: a call's records with the runtime's metadata.
+    Commit,
+    /// A reservation of seal counts for a key.
+    Reservation,
+}
+
+impl JournalEntry {
+    fn of(payload: &[u8]) -> Option<Self> {
+        match payload.first() {
+            Some(&ENTRY_COMMIT) => Some(Self::Commit),
+            Some(&ENTRY_RESERVATION) => Some(Self::Reservation),
+            _ => None,
+        }
+    }
+
+    fn name(self) -> &'static str {
+        match self {
+            Self::Commit => "commit",
+            Self::Reservation => "reservation",
+        }
+    }
+}
+
+/// How an append to the journal fails: its write stops part way, in the
+/// entry's header, in its payload or in its digest, or its sync fails after
+/// a whole write.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AppendFailure {
+    WriteStopsInHeader,
+    WriteStopsInPayload,
+    WriteStopsInDigest,
+    SyncFails,
+}
+
+impl AppendFailure {
+    /// The bytes of an entry of `len` bytes that the write leaves before it
+    /// stops, if it stops part way.
+    fn written(self, len: usize) -> Option<usize> {
+        match self {
+            Self::WriteStopsInHeader => Some(FRAME_HEADER_BYTES / 2),
+            Self::WriteStopsInPayload => {
+                Some(FRAME_HEADER_BYTES + (len - FRAME_HEADER_BYTES - FRAME_DIGEST_BYTES) / 2)
+            }
+            Self::WriteStopsInDigest => Some(len - 1),
+            Self::SyncFails => None,
+        }
+    }
+}
+
+/// A step of a checkpoint.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CheckpointStep {
+    /// Writing the snapshot to a file beside the one in place.
+    SnapshotWrite,
+    /// Renaming that file over the one in place.
+    SnapshotRename,
+    /// Emptying the journal.
+    JournalTruncation,
+}
+
+/// A failure a test or a diagnostics build makes a file store meet at the
+/// next operation it names (`FileStorage::inject_fault`), as a device or a
+/// file system could fail it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(tag = "operation", rename_all = "snake_case")]
+pub enum StorageFault {
+    /// The next append of an entry of this kind fails so.
+    Append {
+        entry: JournalEntry,
+        failure: AppendFailure,
+    },
+    /// The next checkpoint fails at this step.
+    Checkpoint { step: CheckpointStep },
+}
+
+impl StorageFault {
+    /// Every failure a file store can be made to meet: each way an append of
+    /// a commit or of a reservation fails, and each step of a checkpoint.
+    pub const ALL: [StorageFault; 11] = {
+        use AppendFailure::*;
+        use JournalEntry::*;
+        [
+            StorageFault::Append {
+                entry: Commit,
+                failure: WriteStopsInHeader,
+            },
+            StorageFault::Append {
+                entry: Commit,
+                failure: WriteStopsInPayload,
+            },
+            StorageFault::Append {
+                entry: Commit,
+                failure: WriteStopsInDigest,
+            },
+            StorageFault::Append {
+                entry: Commit,
+                failure: SyncFails,
+            },
+            StorageFault::Append {
+                entry: Reservation,
+                failure: WriteStopsInHeader,
+            },
+            StorageFault::Append {
+                entry: Reservation,
+                failure: WriteStopsInPayload,
+            },
+            StorageFault::Append {
+                entry: Reservation,
+                failure: WriteStopsInDigest,
+            },
+            StorageFault::Append {
+                entry: Reservation,
+                failure: SyncFails,
+            },
+            StorageFault::Checkpoint {
+                step: CheckpointStep::SnapshotWrite,
+            },
+            StorageFault::Checkpoint {
+                step: CheckpointStep::SnapshotRename,
+            },
+            StorageFault::Checkpoint {
+                step: CheckpointStep::JournalTruncation,
+            },
+        ]
+    };
+
+    /// Whether an append that meets this failure leaves its entry whole in
+    /// the files: only one whose sync failed after a whole write does. A
+    /// checkpoint's failure leaves every commit in the files.
+    pub fn leaves_the_entry_whole(self) -> bool {
+        match self {
+            Self::Append { failure, .. } => failure == AppendFailure::SyncFails,
+            Self::Checkpoint { .. } => true,
+        }
+    }
+}
+
+/// An I/O error a test injected.
+fn injected(what: &str) -> std::io::Error {
+    std::io::Error::other(format!("injected fault: {what}"))
+}
+
 /// An adapter that keeps its records in two files of a directory: a
 /// snapshot of every record, and a journal of the commits and reservations
 /// since. It serves reads from the image of them it holds in memory.
@@ -659,6 +877,14 @@ pub struct FileStorage {
     /// empties the journal.
     checkpoint_bytes: Option<u64>,
     sync: SyncPolicy,
+    /// Why the store refuses every operation, once an append or a
+    /// checkpoint failed.
+    poisoned: Option<String>,
+    /// The bytes after the journal's last whole entry that `open` cut.
+    cut_on_open: u64,
+    /// The failure a test armed for a later operation.
+    #[cfg(any(test, feature = "fault-injection"))]
+    fault: Option<StorageFault>,
 }
 
 fn put_u32(out: &mut Vec<u8>, value: u32) {
@@ -773,7 +999,7 @@ impl FileStorage {
             bail!("{} already holds a store", directory.display());
         }
         let image = MemoryStorage::new();
-        write_snapshot(&directory, &image, sync)?;
+        write_snapshot(&directory, &image, sync, None)?;
         let journal = journal_file(&directory, true)
             .with_context(|| format!("creating the journal in {}", directory.display()))?;
         Ok(Self {
@@ -783,6 +1009,10 @@ impl FileStorage {
             journal_bytes: 0,
             checkpoint_bytes: None,
             sync,
+            poisoned: None,
+            cut_on_open: 0,
+            #[cfg(any(test, feature = "fault-injection"))]
+            fault: None,
         })
     }
 
@@ -794,8 +1024,11 @@ impl FileStorage {
         self
     }
 
-    /// The store in `directory`, as its last commit left it. A journal entry
-    /// that was cut short is dropped.
+    /// The store in `directory`, as its last commit left it. The journal's
+    /// last entry, if an append left it cut short or damaged, is cut off
+    /// (`bytes_cut_on_open`). A journal in which a whole entry follows a
+    /// damaged one is refused: that entry was appended after one that
+    /// failed, and dropping it could drop a commit that was acknowledged.
     pub fn open(directory: impl AsRef<Path>, sync: SyncPolicy) -> Result<Self> {
         let directory = directory.as_ref().to_path_buf();
         let snapshot = fs::read(directory.join(SNAPSHOT_FILE))
@@ -817,8 +1050,16 @@ impl FileStorage {
             offset += len;
         }
         if offset != entries.len() {
-            // What follows the last whole entry is a commit that did not
-            // finish. Later entries must follow a whole one.
+            // What follows the last whole entry is the last append, which
+            // did not finish. No whole entry may follow it.
+            if let Some(later) = (offset + 1..entries.len())
+                .find(|&at| read_frame(JOURNAL_MAGIC, &entries[at..]).is_some())
+            {
+                bail!(
+                    "the journal in {} holds a whole entry at byte {later} after a damaged one at byte {offset}: it was appended after an append that failed, and the journal is refused",
+                    directory.display()
+                );
+            }
             journal.set_len(offset as u64)?;
             journal.seek(SeekFrom::End(0))?;
             journal.sync_data()?;
@@ -830,15 +1071,43 @@ impl FileStorage {
             journal_bytes: offset as u64,
             checkpoint_bytes: None,
             sync,
+            poisoned: None,
+            cut_on_open: (entries.len() - offset) as u64,
+            #[cfg(any(test, feature = "fault-injection"))]
+            fault: None,
         })
     }
 
-    /// Write a snapshot of every record and empty the journal.
+    /// Write a snapshot of every record and empty the journal. The snapshot
+    /// replaces the one in place before the journal is emptied, so a
+    /// checkpoint that fails at any step leaves every commit in the files,
+    /// in the snapshot or in the journal. It then makes the store refuse
+    /// every operation, as a failed append does.
     pub fn checkpoint(&mut self) -> Result<()> {
+        self.refuse_if_poisoned()?;
         if !self.image.pending.is_empty() {
-            bail!("the store holds records that were neither committed nor abandoned");
+            return Err(StorageError::definite(
+                "the store holds records that were neither committed nor abandoned",
+            ));
         }
-        write_snapshot(&self.directory, &self.image, self.sync)?;
+        let fail_at = self.take_checkpoint_fault();
+        if let Err(error) = self.write_checkpoint(fail_at) {
+            let reason = format!("a checkpoint failed ({error:#})");
+            let message = format!(
+                "{reason}: the files of {} hold every commit, in the snapshot or the journal, and the store refuses every operation until they are opened again",
+                self.directory.display()
+            );
+            self.poisoned = Some(reason);
+            return Err(StorageError::definite(message));
+        }
+        Ok(())
+    }
+
+    fn write_checkpoint(&mut self, fail_at: Option<CheckpointStep>) -> Result<()> {
+        write_snapshot(&self.directory, &self.image, self.sync, fail_at)?;
+        if fail_at == Some(CheckpointStep::JournalTruncation) {
+            return Err(injected("the journal's truncation failed").into());
+        }
         self.journal.set_len(0)?;
         self.journal.seek(SeekFrom::End(0))?;
         self.journal_bytes = 0;
@@ -847,6 +1116,69 @@ impl FileStorage {
             self.image.stats.syncs += 1;
         }
         Ok(())
+    }
+
+    /// The bytes after the journal's last whole entry that `open` cut off:
+    /// an append that never finished.
+    pub fn bytes_cut_on_open(&self) -> u64 {
+        self.cut_on_open
+    }
+
+    /// Arm `fault` for the next operation it names. Only a test or a
+    /// diagnostics build can.
+    #[cfg(any(test, feature = "fault-injection"))]
+    pub fn inject_fault(&mut self, fault: StorageFault) {
+        self.fault = Some(fault);
+    }
+
+    /// The failure armed for the next append of the entry `payload` makes.
+    #[cfg(any(test, feature = "fault-injection"))]
+    fn take_append_fault(&mut self, payload: &[u8]) -> Option<AppendFailure> {
+        let entry = JournalEntry::of(payload)?;
+        match self.fault {
+            Some(StorageFault::Append {
+                entry: armed,
+                failure,
+            }) if armed == entry => {
+                self.fault = None;
+                Some(failure)
+            }
+            _ => None,
+        }
+    }
+
+    #[cfg(not(any(test, feature = "fault-injection")))]
+    fn take_append_fault(&mut self, _payload: &[u8]) -> Option<AppendFailure> {
+        None
+    }
+
+    /// The step at which the next checkpoint is armed to fail.
+    #[cfg(any(test, feature = "fault-injection"))]
+    fn take_checkpoint_fault(&mut self) -> Option<CheckpointStep> {
+        match self.fault {
+            Some(StorageFault::Checkpoint { step }) => {
+                self.fault = None;
+                Some(step)
+            }
+            _ => None,
+        }
+    }
+
+    #[cfg(not(any(test, feature = "fault-injection")))]
+    fn take_checkpoint_fault(&mut self) -> Option<CheckpointStep> {
+        None
+    }
+
+    /// Fail, naming why, once an append or a checkpoint failed. The error
+    /// is definite: the refused operation touched no file.
+    fn refuse_if_poisoned(&self) -> Result<()> {
+        match &self.poisoned {
+            Some(reason) => Err(StorageError::definite(format!(
+                "the store in {} refuses every operation since {reason}; open its directory again",
+                self.directory.display()
+            ))),
+            None => Ok(()),
+        }
     }
 
     pub fn directory(&self) -> &Path {
@@ -864,18 +1196,47 @@ impl FileStorage {
             .is_some_and(|limit| self.journal_bytes > limit)
     }
 
+    /// Append an entry to the journal and sync it as the policy says. If
+    /// either fails, the entry may be in the files whole or not at all: the
+    /// error says the outcome is unknown, and the store refuses every later
+    /// operation, so that nothing is appended after the failed entry.
     fn append(&mut self, payload: &[u8]) -> Result<()> {
+        self.refuse_if_poisoned()?;
         let started = Instant::now();
         let entry = frame(JOURNAL_MAGIC, payload);
-        self.journal.write_all(&entry)?;
-        if self.sync == SyncPolicy::Always {
-            self.journal.sync_data()?;
-            self.image.stats.syncs += 1;
+        let fault = self.take_append_fault(payload);
+        if let Err(error) = self.write_entry(&entry, fault) {
+            let what = JournalEntry::of(payload).map_or("entry", JournalEntry::name);
+            let reason = format!("the append of a {what} to its journal failed ({error})");
+            let message = format!(
+                "{reason}: the files of {} hold the {what} whole or not at all, which opening them again shows, and the store refuses every operation until then",
+                self.directory.display()
+            );
+            self.poisoned = Some(reason);
+            return Err(StorageError::outcome_unknown(message));
         }
         self.journal_bytes += entry.len() as u64;
         self.image.stats.persisted_bytes += entry.len() as u64;
         self.image.stats.persist_ns +=
             u64::try_from(started.elapsed().as_nanos()).unwrap_or(u64::MAX);
+        Ok(())
+    }
+
+    /// Write `entry` at the end of the journal and sync it as the policy
+    /// says, or fail as `fault` says.
+    fn write_entry(&mut self, entry: &[u8], fault: Option<AppendFailure>) -> std::io::Result<()> {
+        if let Some(written) = fault.and_then(|fault| fault.written(entry.len())) {
+            self.journal.write_all(&entry[..written])?;
+            return Err(injected("the write stopped part way"));
+        }
+        self.journal.write_all(entry)?;
+        if fault == Some(AppendFailure::SyncFails) {
+            return Err(injected("the sync after a whole write failed"));
+        }
+        if self.sync == SyncPolicy::Always {
+            self.journal.sync_data()?;
+            self.image.stats.syncs += 1;
+        }
         Ok(())
     }
 }
@@ -901,7 +1262,14 @@ fn count(len: usize) -> Result<u32> {
     u32::try_from(len).map_err(|_| anyhow!("the store holds too many records"))
 }
 
-fn write_snapshot(directory: &Path, image: &MemoryStorage, sync: SyncPolicy) -> Result<()> {
+/// Write a snapshot of `image` beside the one in place and rename it over
+/// that one, or fail at `fail_at`.
+fn write_snapshot(
+    directory: &Path,
+    image: &MemoryStorage,
+    sync: SyncPolicy,
+    fail_at: Option<CheckpointStep>,
+) -> Result<()> {
     let mut payload = Vec::new();
     put_bytes(&mut payload, &image.meta)?;
     put_u32(&mut payload, count(image.objects.len())?);
@@ -925,11 +1293,19 @@ fn write_snapshot(directory: &Path, image: &MemoryStorage, sync: SyncPolicy) -> 
     }
     let temp = directory.join(SNAPSHOT_TEMP_FILE);
     let mut file = File::create(&temp).with_context(|| format!("creating {}", temp.display()))?;
-    file.write_all(&frame(SNAPSHOT_MAGIC, &payload))?;
+    let snapshot = frame(SNAPSHOT_MAGIC, &payload);
+    if fail_at == Some(CheckpointStep::SnapshotWrite) {
+        file.write_all(&snapshot[..snapshot.len() / 2])?;
+        return Err(injected("the snapshot's write stopped part way").into());
+    }
+    file.write_all(&snapshot)?;
     if sync == SyncPolicy::Always {
         file.sync_data()?;
     }
     drop(file);
+    if fail_at == Some(CheckpointStep::SnapshotRename) {
+        return Err(injected("the snapshot's rename failed").into());
+    }
     fs::rename(&temp, directory.join(SNAPSHOT_FILE))?;
     if sync == SyncPolicy::Always {
         // The rename is durable once the directory is.
@@ -986,29 +1362,35 @@ fn load_journal_entry(image: &mut MemoryStorage, payload: &[u8]) -> Result<()> {
 
 impl StorageAdapter for FileStorage {
     fn create(&mut self, object: &str, location: &str, record: &[u8]) -> Result<()> {
+        self.refuse_if_poisoned()?;
         self.image.create(object, location, record)
     }
 
     fn read(&mut self, location: &str, len: usize) -> Result<Box<[u8]>> {
+        self.refuse_if_poisoned()?;
         self.image.read(location, len)
     }
 
     fn write(&mut self, location: &str, record: &[u8]) -> Result<WriteClass> {
+        self.refuse_if_poisoned()?;
         self.image.write(location, record)
     }
 
     fn put_public(&mut self, object: &str, location: &str, value: &[u8]) -> Result<()> {
+        self.refuse_if_poisoned()?;
         self.image.put_public(object, location, value)
     }
 
     fn reserve_seals(&mut self, object: &str, below: u64) -> Result<()> {
+        self.refuse_if_poisoned()?;
         if below <= self.image.reserved_seals(object) {
             return Ok(());
         }
         // The reservation is in the journal before a record that needs it
         // can be handed over.
         let mut payload = vec![ENTRY_RESERVATION];
-        put_bytes(&mut payload, object.as_bytes())?;
+        put_bytes(&mut payload, object.as_bytes())
+            .map_err(|error| StorageError::definite(format!("{error:#}")))?;
         put_u64(&mut payload, below);
         self.append(&payload)?;
         self.image.reserve_seals(object, below)
@@ -1019,35 +1401,21 @@ impl StorageAdapter for FileStorage {
     }
 
     fn begin(&mut self) -> Result<()> {
+        self.refuse_if_poisoned()?;
         self.image.begin()
     }
 
     fn commit(&mut self, meta: &[u8]) -> Result<()> {
-        let mut payload = vec![ENTRY_COMMIT];
-        put_bytes(&mut payload, meta)?;
-        let (records, public) = self.image.pending_changes();
-        put_u32(&mut payload, count(records.len())?);
-        for id in records {
-            let record = self
-                .image
-                .records
-                .get(id as usize)
-                .ok_or_else(|| anyhow!("the store's index names a record it does not hold"))?;
-            put_record(&mut payload, &self.image, record)?;
-        }
-        put_u32(&mut payload, count(public.len())?);
-        for location in public {
-            let record = self.image.public.get(location).ok_or_else(|| {
-                anyhow!("the store's index names a public value it does not hold")
-            })?;
-            put_public_record(&mut payload, &self.image, location, record)?;
-        }
+        self.refuse_if_poisoned()?;
+        let payload = self
+            .commit_payload(meta)
+            .map_err(|error| StorageError::definite(format!("{error:#}")))?;
         self.append(&payload)?;
         self.image.finish_commit(meta);
         if self.journal_passed_its_checkpoint() {
-            // The commit is in the journal already. A snapshot that cannot
-            // be written leaves the journal as it is, for the next commit
-            // to try again, and the commit stands.
+            // The commit is in the journal, so it stands. A checkpoint that
+            // fails leaves every commit in the files and makes the store
+            // refuse every later operation.
             let started = Instant::now();
             let _ = self.checkpoint();
             self.image.stats.persist_ns +=
@@ -1091,6 +1459,42 @@ impl StorageAdapter for FileStorage {
     fn stats(&self) -> StorageStats {
         self.image.stats()
     }
+
+    fn poisoned(&self) -> Option<String> {
+        self.poisoned.clone()
+    }
+
+    #[cfg(any(test, feature = "fault-injection"))]
+    fn inject_fault(&mut self, fault: StorageFault) -> Result<()> {
+        FileStorage::inject_fault(self, fault);
+        Ok(())
+    }
+}
+
+impl FileStorage {
+    /// The journal entry of a commit of the pending records, with `meta`.
+    fn commit_payload(&self, meta: &[u8]) -> Result<Vec<u8>> {
+        let mut payload = vec![ENTRY_COMMIT];
+        put_bytes(&mut payload, meta)?;
+        let (records, public) = self.image.pending_changes();
+        put_u32(&mut payload, count(records.len())?);
+        for id in records {
+            let record = self
+                .image
+                .records
+                .get(id as usize)
+                .ok_or_else(|| anyhow!("the store's index names a record it does not hold"))?;
+            put_record(&mut payload, &self.image, record)?;
+        }
+        put_u32(&mut payload, count(public.len())?);
+        for location in public {
+            let record = self.image.public.get(location).ok_or_else(|| {
+                anyhow!("the store's index names a public value it does not hold")
+            })?;
+            put_public_record(&mut payload, &self.image, location, record)?;
+        }
+        Ok(payload)
+    }
 }
 
 /// The store of one deployed contract, shared by the objects whose records
@@ -1124,6 +1528,18 @@ impl SharedStorage {
     }
 
     /// The part of the store that keeps the records of `object`.
+    /// Why the store refuses every operation, if it does.
+    pub fn poisoned(&self) -> Option<String> {
+        self.with(|adapter| adapter.poisoned())
+    }
+
+    /// Arm `fault` for the next operation it names. Only a test or a
+    /// diagnostics build can.
+    #[cfg(any(test, feature = "fault-injection"))]
+    pub fn inject_fault(&self, fault: StorageFault) -> Result<()> {
+        self.with(|adapter| adapter.inject_fault(fault))
+    }
+
     pub fn handle(&self, object: &str) -> StorageHandle {
         StorageHandle {
             storage: self.clone(),
@@ -1534,6 +1950,7 @@ mod tests {
             assert_eq!(store.record("map#0"), Some(&*second), "cut at {cut}");
             assert_eq!(store.meta(), b"first");
             assert_eq!(store.journal_bytes().unwrap(), whole);
+            assert_eq!(store.bytes_cut_on_open(), cut - whole);
             drop(store);
             fs::write(&journal, &bytes).unwrap();
         }
@@ -1544,6 +1961,230 @@ mod tests {
         fs::write(&journal, &bytes).unwrap();
         let store = FileStorage::open(&directory, SyncPolicy::Never).unwrap();
         assert_eq!(store.record("map#0"), Some(&*second));
+        fs::remove_dir_all(&directory).unwrap();
+    }
+
+    /// Every operation a poisoned store refuses, each with an error that
+    /// says nothing reached the files and names why it refuses.
+    fn assert_refuses_everything(store: &mut FileStorage, record: &[u8]) {
+        let journal = store.journal_bytes().unwrap();
+        let refusals: Vec<(&str, anyhow::Error)> = vec![
+            ("begin", store.begin().unwrap_err()),
+            ("commit", store.commit(b"refused").unwrap_err()),
+            ("reserve", store.reserve_seals("map", 1 << 40).unwrap_err()),
+            ("create", store.create("map", "map#9", record).unwrap_err()),
+            ("write", store.write("map#0", record).unwrap_err()),
+            (
+                "public",
+                store.put_public("owner", "owner", b"\"c\"").unwrap_err(),
+            ),
+            ("read", store.read("map#0", record.len()).unwrap_err()),
+            ("checkpoint", store.checkpoint().unwrap_err()),
+        ];
+        for (operation, error) in refusals {
+            assert_eq!(
+                storage_failure(&error),
+                Some(StorageFailure::Definite),
+                "{operation}: {error}"
+            );
+            assert!(
+                error.to_string().contains("refuses every operation since"),
+                "{operation}: {error}"
+            );
+        }
+        // Nothing was appended after the entry that failed.
+        assert_eq!(store.journal_bytes().unwrap(), journal);
+    }
+
+    /// Each way an append of a commit or of a reservation fails: the error
+    /// says the outcome is unknown, the store refuses every later operation
+    /// and appends nothing more, and the reopened store holds every commit
+    /// that returned, with the failed entry whole if its sync failed after a
+    /// whole write and not at all, cut off, if its write stopped part way.
+    #[test]
+    fn a_failed_append_poisons_the_store_and_its_entry_is_whole_or_absent() {
+        let cipher = StoreCipher::random();
+        let first = sealed(&cipher, &[1u8; 48]);
+        let other = sealed(&cipher, &[5u8; 48]);
+        let second = resealed(&cipher, &first, &[2u8; 48]);
+        let third = resealed(&cipher, &other, &[3u8; 48]);
+        let appends = StorageFault::ALL
+            .into_iter()
+            .filter(|fault| matches!(fault, StorageFault::Append { .. }));
+        let mut checked = 0;
+        for fault in appends {
+            let StorageFault::Append { entry, failure } = fault else {
+                unreachable!()
+            };
+            let directory = scratch_directory("append-fault");
+            let mut store = FileStorage::create(&directory, SyncPolicy::Always).unwrap();
+            store.reserve_seals("map", 8).unwrap();
+            store.create("map", "map#0", &first).unwrap();
+            store.create("map", "map#1", &other).unwrap();
+            store.commit(b"deployed").unwrap();
+            // A commit that returned: it must survive whatever follows.
+            store.begin().unwrap();
+            store.write("map#0", &second).unwrap();
+            store.commit(b"acknowledged").unwrap();
+            let before = store.journal_bytes().unwrap();
+
+            store.inject_fault(fault);
+            let error = match entry {
+                JournalEntry::Commit => {
+                    store.begin().unwrap();
+                    store.write("map#1", &third).unwrap();
+                    let error = store.commit(b"unknown").unwrap_err();
+                    store.abandon();
+                    error
+                }
+                JournalEntry::Reservation => store.reserve_seals("map", 16).unwrap_err(),
+            };
+            assert_eq!(
+                storage_failure(&error),
+                Some(StorageFailure::OutcomeUnknown),
+                "{fault:?}: {error}"
+            );
+            assert!(store.poisoned().is_some(), "{fault:?}");
+            assert_refuses_everything(&mut store, &third);
+            let written = store.journal_bytes().unwrap() - before;
+            drop(store);
+
+            let store = FileStorage::open(&directory, SyncPolicy::Always).unwrap();
+            assert!(store.poisoned().is_none());
+            // The commit that returned is there.
+            assert_eq!(store.record("map#0"), Some(&*second), "{fault:?}");
+            let whole = fault.leaves_the_entry_whole();
+            assert_eq!(whole, failure == AppendFailure::SyncFails);
+            match entry {
+                JournalEntry::Commit => {
+                    let (record, meta): (&[u8], &[u8]) = if whole {
+                        (&third, b"unknown")
+                    } else {
+                        (&other, b"acknowledged")
+                    };
+                    assert_eq!(store.record("map#1"), Some(record), "{fault:?}");
+                    assert_eq!(store.meta(), meta, "{fault:?}");
+                }
+                JournalEntry::Reservation => {
+                    let reserved = if whole { 16 } else { 8 };
+                    assert_eq!(store.reserved_seals("map"), reserved, "{fault:?}");
+                    assert_eq!(store.meta(), b"acknowledged");
+                }
+            }
+            // A write that stopped part way is cut off, whole; an entry
+            // whose sync failed is kept.
+            let cut = if whole { 0 } else { written };
+            assert_eq!(store.bytes_cut_on_open(), cut, "{fault:?}");
+            assert!(whole || written > 0, "{fault:?}");
+            drop(store);
+            // The reopened store takes commits again.
+            let mut store = FileStorage::open(&directory, SyncPolicy::Always).unwrap();
+            store.begin().unwrap();
+            store.commit(b"after").unwrap();
+            drop(store);
+            fs::remove_dir_all(&directory).unwrap();
+            checked += 1;
+        }
+        assert_eq!(checked, 8);
+    }
+
+    /// A checkpoint that fails at any step leaves every commit in the files,
+    /// the one whose commit ran it among them, which returns: its entry was
+    /// in the journal before the checkpoint began. The store then refuses
+    /// every operation until its directory is opened again.
+    #[test]
+    fn a_failed_checkpoint_keeps_every_commit_and_poisons_the_store() {
+        let cipher = StoreCipher::random();
+        let first = sealed(&cipher, &[1u8; 48]);
+        let second = resealed(&cipher, &first, &[2u8; 48]);
+        let third = resealed(&cipher, &second, &[3u8; 48]);
+        for step in [
+            CheckpointStep::SnapshotWrite,
+            CheckpointStep::SnapshotRename,
+            CheckpointStep::JournalTruncation,
+        ] {
+            let directory = scratch_directory("checkpoint-fault");
+            let mut store = FileStorage::create(&directory, SyncPolicy::Always)
+                .unwrap()
+                .with_checkpoint_bytes(1 << 20);
+            store.reserve_seals("map", 8).unwrap();
+            store.create("map", "map#0", &first).unwrap();
+            store.commit(b"deployed").unwrap();
+            store.begin().unwrap();
+            store.write("map#0", &second).unwrap();
+            store.commit(b"acknowledged").unwrap();
+            // The next commit passes the checkpoint, which fails.
+            store.checkpoint_bytes = Some(0);
+            store.inject_fault(StorageFault::Checkpoint { step });
+            store.begin().unwrap();
+            store.write("map#0", &third).unwrap();
+            store.commit(b"checkpointed").unwrap();
+            let reason = store.poisoned().unwrap();
+            assert!(reason.contains("checkpoint failed"), "{step:?}: {reason}");
+            assert_refuses_everything(&mut store, &third);
+            drop(store);
+            let store = FileStorage::open(&directory, SyncPolicy::Always).unwrap();
+            assert_eq!(store.record("map#0"), Some(&*third), "{step:?}");
+            assert_eq!(store.meta(), b"checkpointed", "{step:?}");
+            assert_eq!(store.reserved_seals("map"), 8, "{step:?}");
+            assert_eq!(store.bytes_cut_on_open(), 0, "{step:?}");
+            drop(store);
+            fs::remove_dir_all(&directory).unwrap();
+        }
+    }
+
+    /// The journal's last entry, damaged or cut short, is cut off; a whole
+    /// entry after a damaged one is not, and the journal is refused: it was
+    /// appended after an append that failed, as an adapter that went on
+    /// after a failure would append it.
+    #[test]
+    fn a_whole_entry_after_a_damaged_one_is_refused() {
+        let directory = scratch_directory("damaged");
+        let cipher = StoreCipher::random();
+        let first = sealed(&cipher, &[1u8; 48]);
+        let second = resealed(&cipher, &first, &[2u8; 48]);
+        let third = resealed(&cipher, &second, &[3u8; 48]);
+        let (deployed, middle) = {
+            let mut store = FileStorage::create(&directory, SyncPolicy::Never).unwrap();
+            store.reserve_seals("map", 8).unwrap();
+            store.create("map", "map#0", &first).unwrap();
+            store.commit(b"deployed").unwrap();
+            let deployed = store.journal_bytes().unwrap();
+            store.begin().unwrap();
+            store.write("map#0", &second).unwrap();
+            store.commit(b"middle").unwrap();
+            let middle = store.journal_bytes().unwrap();
+            store.begin().unwrap();
+            store.write("map#0", &third).unwrap();
+            store.commit(b"last").unwrap();
+            (deployed, middle)
+        };
+        let journal = directory.join(JOURNAL_FILE);
+        let bytes = fs::read(&journal).unwrap();
+        // A byte flipped in the middle entry, which a whole one follows.
+        let mut damaged = bytes.clone();
+        damaged[((deployed + middle) / 2) as usize] ^= 1;
+        fs::write(&journal, &damaged).unwrap();
+        let error = FileStorage::open(&directory, SyncPolicy::Never).unwrap_err();
+        assert!(
+            error.to_string().contains(&format!(
+                "whole entry at byte {middle} after a damaged one at byte {deployed}"
+            )),
+            "{error}"
+        );
+        // The middle entry cut short and the last appended after it, as an
+        // adapter that went on after a failed write would leave them.
+        let mut torn = bytes[..(deployed + 20) as usize].to_vec();
+        torn.extend_from_slice(&bytes[middle as usize..]);
+        fs::write(&journal, &torn).unwrap();
+        assert!(FileStorage::open(&directory, SyncPolicy::Never).is_err());
+        // The same bytes with nothing after the torn entry: cut off.
+        fs::write(&journal, &bytes[..(deployed + 20) as usize]).unwrap();
+        let store = FileStorage::open(&directory, SyncPolicy::Never).unwrap();
+        assert_eq!(store.record("map#0"), Some(&*first));
+        assert_eq!(store.meta(), b"deployed");
+        assert_eq!(store.bytes_cut_on_open(), 20);
+        drop(store);
         fs::remove_dir_all(&directory).unwrap();
     }
 }

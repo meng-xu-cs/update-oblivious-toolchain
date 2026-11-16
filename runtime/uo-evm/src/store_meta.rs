@@ -15,7 +15,7 @@ use crate::freshness::RuntimeFreshnessSnapshot;
 use crate::secret::StoreMetaKey;
 use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
-use uo_store::{SharedStorage, StoreCipher};
+use uo_store::{storage_failure, SharedStorage, StorageFailure, StoreCipher};
 
 const STORE_META_SCHEMA: &str = "uo-runtime-store-meta-v1";
 const STORE_META_TAG_BYTES: usize = 32;
@@ -120,9 +120,20 @@ impl StagedStore {
 
     /// Commit the call's records in the store, with the commit metadata. If
     /// the store cannot, the records stay pending and are put back when this
-    /// is dropped.
+    /// is dropped, and the error says whether the commit may still be in
+    /// the store's files (`uo_store::storage_failure`). If it may, the
+    /// call's outcome is unknown: the store refuses every later operation,
+    /// so the instance refuses every later call, and the deployment's files
+    /// show whether the call committed once it restarts from them.
     pub(crate) fn make_durable(mut self, meta: &[u8]) -> Result<()> {
-        self.storage.with(|adapter| adapter.commit(meta))?;
+        self.storage
+            .with(|adapter| adapter.commit(meta))
+            .map_err(|error| match storage_failure(&error) {
+                Some(StorageFailure::OutcomeUnknown) => error.context(
+                    "the call's outcome is unknown: its commit may or may not be in the store's files, and the instance refuses every call until the deployment restarts from them, whose last commit says whether the call committed",
+                ),
+                _ => error,
+            })?;
         self.pending = false;
         Ok(())
     }

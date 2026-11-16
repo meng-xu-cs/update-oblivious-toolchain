@@ -548,6 +548,56 @@ digest of every sealed record. Its next receipt follows that one
 (`production_deployments_restart_from_a_sealed_secret`). A seeded deployment,
 which exists in test and diagnostics builds, restarts from its seed.
 
+A store in files fails closed. An append to its journal can fail because its
+write stopped part way or because its sync failed after a whole write. Either
+way the files hold the entry whole or not at all, and only opening them again
+shows which. The adapter's error then says that the outcome is unknown
+(`StorageFailure::OutcomeUnknown` in `runtime/uo-store/src/storage.rs`), and
+the adapter refuses every operation, naming why, until its directory is
+opened again. Nothing lands behind the failed entry, and the runtime refuses
+every call, and a production runtime refuses to tag its last receipt. A call
+whose commit met that error returns it and no receipt. A checkpoint that
+fails at any step (the snapshot's write, its rename, or the journal's
+truncation) leaves every commit in the files, because the snapshot replaces
+the one in place before the journal is emptied. The call whose commit ran the
+checkpoint has committed and returns its receipt, and the adapter then
+refuses every operation as well. Opening the files cuts off a last entry that
+an append left cut short, and reports how many bytes it cut. It refuses a
+journal in which a whole entry follows a damaged one, which only an append
+after a failed one leaves.
+
+A restart from the files resolves a call whose outcome is unknown. Its last
+receipt is either the call's, which follows the receipt the caller held and
+names the evidence it sent, or the receipt the caller held
+(`resolve_production_call_outcome`). The restart takes the rollback counter
+of the state the files hold. After a call whose outcome is unknown the
+platform may attest the counter of the other state; how its counter catches
+up is settled with the commit generation of Issue 67 of the review of 16
+November 2026.
+
+Both runtimes are made to meet every failure a file store can meet: each way
+an append of a commit or of a reservation fails, and each step of a
+checkpoint (`StorageFault::ALL`, 11 failures). `fault_matrix` in
+`storage_boundary.json` runs them on each sealed backend of ERC20Lite, 33
+cases. The commit is a `mint`; the reservation is the one a dropped call
+makes, an `approve` with no commit budget. The production build runs them
+through the production runtime, which resolves each call by its receipts
+(`every_storage_failure_fails_closed_and_a_restart_resolves_the_call` in
+`runtime/uo-evm/tests/production_boundary.rs`). In every case:
+
+- no call returns after a failed append;
+- every call that returned is in the files;
+- the failed call is in them whole or not at all;
+- a restart accepts the rollback counter of that state alone, and answers
+  reads as that state says.
+
+For example, a `mint` on the local Path ORAM scheme whose commit's write
+stops in its payload returns an error whose outcome is unknown. The next open
+cuts off the 7,820 bytes it wrote, and the restart accepts the counter from
+before the call, 1, and not 2. Only a test or a diagnostics build can make
+the store fail (`store_failures_are_injected_only_in_test_and_diagnostics_builds`
+in `runtime_boundary_validation.json`).
+
 ### The Kernel's Operators
 
 The observer has no timing component, and CPU-time obliviousness is a

@@ -28607,7 +28607,8 @@ fn check_private_evidence_stays_inside_the_runtime(
         // evidence's serialization.
         && core_manifest.contains("\ndiagnostics = []\n")
         && !core_manifest.contains("default =")
-        && runtime_manifest.contains("\ndiagnostics = [\"uo-core/diagnostics\"]\n")
+        && runtime_manifest
+            .contains("\ndiagnostics = [\"uo-core/diagnostics\", \"uo-store/fault-injection\"]\n")
         && !runtime_manifest.contains("default =")
         && runtime_dependencies.contains("\nuo-core = { path = \"../../crates/uo-core\" }\n")
         && !runtime_dependencies.contains("diagnostics")
@@ -28674,6 +28675,66 @@ fn check_production_calls_issue_chained_receipts(
             .matches("commit_staged_with_receipt(staged, ")
             .count()
             == 2
+}
+
+/// Whether only a test or a diagnostics build can make a file store fail
+/// (Issue 65 of the review of 16 November 2026). The store's hook, the
+/// field that holds an armed failure and every method that arms one, is
+/// compiled under its `fault-injection` feature, whose absence leaves a
+/// store that takes no armed failure. The feature is off by default; the
+/// runtime's dependency on the store does not turn it on, and only the
+/// runtime's diagnostics feature and its tests do.
+fn check_store_failures_are_injected_only_in_test_and_diagnostics_builds(
+    storage_source: &str,
+    store_manifest: &str,
+    runtime_manifest: &str,
+) -> bool {
+    let gate = "#[cfg(any(test, feature = \"fault-injection\"))]";
+    let lines: Vec<&str> = storage_source.lines().collect();
+    // Every line that holds `needle` follows the gate, and there are `count`.
+    let gated = |needle: &str, count: usize| {
+        let at: Vec<usize> = lines
+            .iter()
+            .enumerate()
+            .filter(|(_, line)| line.contains(needle))
+            .map(|(index, _)| index)
+            .collect();
+        at.len() == count
+            && at
+                .iter()
+                .all(|&index| index > 0 && lines[index - 1].trim() == gate)
+    };
+    let section = |name: &str| {
+        runtime_manifest
+            .split_once(name)
+            .map(|(_, rest)| rest.split("\n[").next().unwrap_or_default())
+            .unwrap_or_default()
+    };
+    gated("    fault: Option<StorageFault>,", 1)
+        && gated("            fault: None,", 2)
+        && gated("fn inject_fault(", 4)
+        && gated("fn take_append_fault(&mut self, payload: &[u8]) -> Option<AppendFailure> {", 1)
+        && storage_source.contains(
+            "    #[cfg(any(test, feature = \"fault-injection\"))]\n    fn take_checkpoint_fault(&mut self) -> Option<CheckpointStep> {\n        match self.fault {",
+        )
+        && storage_source.matches("self.fault").count() == 5
+        && storage_source.contains(
+            "    #[cfg(not(any(test, feature = \"fault-injection\")))]\n    fn take_append_fault(&mut self, _payload: &[u8]) -> Option<AppendFailure> {\n        None\n    }",
+        )
+        && storage_source.contains(
+            "    #[cfg(not(any(test, feature = \"fault-injection\")))]\n    fn take_checkpoint_fault(&mut self) -> Option<CheckpointStep> {\n        None\n    }",
+        )
+        && storage_source.matches("fn take_checkpoint_fault(").count() == 2
+        && storage_source.matches("fn take_append_fault(").count() == 2
+        && store_manifest.contains("[features]\n")
+        && store_manifest.contains("\nfault-injection = []\n")
+        && !store_manifest.contains("default =")
+        && section("[dependencies]").contains("\nuo-store = { path = \"../uo-store\" }\n")
+        && section("[dev-dependencies]")
+            .contains("\nuo-store = { path = \"../uo-store\", features = [\"fault-injection\"] }\n")
+        && runtime_manifest.matches("uo-store/fault-injection").count() == 1
+        && runtime_manifest
+            .contains("\ndiagnostics = [\"uo-core/diagnostics\", \"uo-store/fault-injection\"]\n")
 }
 
 /// Whether every production receipt the runtime hands out carries a tag
@@ -46778,7 +46839,8 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let execution_trace_struct_literal_surface_restricted =
         execution_trace_struct_literal_files.is_empty();
     let runtime_diagnostics_feature_declared = runtime_evm_cargo_source.contains("[features]")
-        && runtime_evm_cargo_source.contains("diagnostics = [\"uo-core/diagnostics\"]");
+        && runtime_evm_cargo_source
+            .contains("diagnostics = [\"uo-core/diagnostics\", \"uo-store/fault-injection\"]");
     let probe_enables_runtime_diagnostics_feature = probe_cargo_source
         .contains("uo-evm = { path = \"../../runtime/uo-evm\", features = [\"diagnostics\"] }");
     let default_call_result_omits_runtime_telemetry = engine_source
@@ -46910,6 +46972,12 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     );
     let production_calls_issue_chained_receipts =
         check_production_calls_issue_chained_receipts(&deployment_source, &engine_impl_source);
+    let store_failures_are_injected_only_in_test_and_diagnostics_builds =
+        check_store_failures_are_injected_only_in_test_and_diagnostics_builds(
+            &fs::read_to_string(root.join("runtime/uo-store/src/storage.rs"))?,
+            &fs::read_to_string(root.join("runtime/uo-store/Cargo.toml"))?,
+            &runtime_evm_cargo_source,
+        );
     let production_receipts_carry_session_tags = check_production_receipts_carry_session_tags(
         &production_source_slice(&deployment_source),
         &engine_impl_source,
@@ -48381,6 +48449,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "trace_runs_stand_for_recorded_events": trace_runs_stand_for_recorded_events,
         "production_calls_issue_chained_receipts": production_calls_issue_chained_receipts,
         "production_receipts_carry_session_tags": production_receipts_carry_session_tags,
+        "store_failures_are_injected_only_in_test_and_diagnostics_builds": store_failures_are_injected_only_in_test_and_diagnostics_builds,
         "production_deployments_restart_from_a_sealed_secret": production_deployments_restart_from_a_sealed_secret,
         "theorem_certificate_constructor_checks":
             theorem_certificate_constructor_checks,
@@ -49337,6 +49406,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && trace_runs_stand_for_recorded_events
             && production_calls_issue_chained_receipts
             && production_receipts_carry_session_tags
+            && store_failures_are_injected_only_in_test_and_diagnostics_builds
             && production_deployments_restart_from_a_sealed_secret
             && theorem_certificate_constructor_surface_restricted
             && runtime_public_call_trace_bundle_surface_restricted
@@ -57926,6 +57996,43 @@ mod tests {
             "",
         );
         assert!(!ok(&secret, &engine, &receiptless, &deployment));
+    }
+
+    #[test]
+    fn the_store_fault_hook_check_rejects_the_drifts_it_guards() {
+        use super::{
+            check_store_failures_are_injected_only_in_test_and_diagnostics_builds, repo_root,
+        };
+        let read = |path: &str| std::fs::read_to_string(repo_root().join(path)).unwrap();
+        let storage = read("runtime/uo-store/src/storage.rs");
+        let store = read("runtime/uo-store/Cargo.toml");
+        let runtime = read("runtime/uo-evm/Cargo.toml");
+        let check = check_store_failures_are_injected_only_in_test_and_diagnostics_builds;
+        assert!(check(&storage, &store, &runtime));
+        // The field compiled in every build.
+        let ungated = storage.replacen(
+            "    #[cfg(any(test, feature = \"fault-injection\"))]\n    fault: Option<StorageFault>,",
+            "    fault: Option<StorageFault>,",
+            1,
+        );
+        assert_ne!(ungated, storage);
+        assert!(!check(&ungated, &store, &runtime));
+        // The feature on by default.
+        let by_default = store.replacen(
+            "[features]\n",
+            "[features]\ndefault = [\"fault-injection\"]\n",
+            1,
+        );
+        assert_ne!(by_default, store);
+        assert!(!check(&storage, &by_default, &runtime));
+        // The runtime's dependency turning it on in every build.
+        let always = runtime.replacen(
+            "\nuo-store = { path = \"../uo-store\" }\n",
+            "\nuo-store = { path = \"../uo-store\", features = [\"fault-injection\"] }\n",
+            1,
+        );
+        assert_ne!(always, runtime);
+        assert!(!check(&storage, &store, &always));
     }
 
     #[test]
