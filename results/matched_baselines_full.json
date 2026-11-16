@@ -638,6 +638,155 @@
       }
     ]
   },
+  "budget_rejections": [
+    {
+      "capacity": 16,
+      "diagnostic": "planning the backend of map records: no backend holds a map of 16 entries within an enclave memory budget of 3615 bytes",
+      "enclave_memory_budget_bytes": 3615,
+      "rejected_as_predicted": true,
+      "width": "bytes32_to_uint256"
+    },
+    {
+      "capacity": 128,
+      "diagnostic": "planning the backend of map records: no backend holds a map of 128 entries within an enclave memory budget of 28927 bytes",
+      "enclave_memory_budget_bytes": 28927,
+      "rejected_as_predicted": true,
+      "width": "bytes32_to_uint256"
+    },
+    {
+      "capacity": 1024,
+      "diagnostic": "planning the backend of map records: no backend holds a map of 1024 entries within an enclave memory budget of 61997 bytes",
+      "enclave_memory_budget_bytes": 61997,
+      "rejected_as_predicted": true,
+      "width": "bytes32_to_uint256"
+    },
+    {
+      "capacity": 2048,
+      "diagnostic": "planning the backend of map records: no backend holds a map of 2048 entries within an enclave memory budget of 63589 bytes",
+      "enclave_memory_budget_bytes": 63589,
+      "rejected_as_predicted": true,
+      "width": "bytes32_to_uint256"
+    },
+    {
+      "capacity": 4096,
+      "diagnostic": "planning the backend of map records: no backend holds a map of 4096 entries within an enclave memory budget of 66173 bytes",
+      "enclave_memory_budget_bytes": 66173,
+      "rejected_as_predicted": true,
+      "width": "bytes32_to_uint256"
+    },
+    {
+      "capacity": 8192,
+      "diagnostic": "planning the backend of map records: no backend holds a map of 8192 entries within an enclave memory budget of 68110 bytes",
+      "enclave_memory_budget_bytes": 68110,
+      "rejected_as_predicted": true,
+      "width": "bytes32_to_uint256"
+    },
+    {
+      "capacity": 16384,
+      "diagnostic": "planning the backend of map records: no backend holds a map of 16384 entries within an enclave memory budget of 70694 bytes",
+      "enclave_memory_budget_bytes": 70694,
+      "rejected_as_predicted": true,
+      "width": "bytes32_to_uint256"
+    },
+    {
+      "capacity": 16,
+      "diagnostic": "planning the backend of map records: no backend holds a map of 16 entries within an enclave memory budget of 3231 bytes",
+      "enclave_memory_budget_bytes": 3231,
+      "rejected_as_predicted": true,
+      "width": "address_to_uint256"
+    },
+    {
+      "capacity": 128,
+      "diagnostic": "planning the backend of map records: no backend holds a map of 128 entries within an enclave memory budget of 25855 bytes",
+      "enclave_memory_budget_bytes": 25855,
+      "rejected_as_predicted": true,
+      "width": "address_to_uint256"
+    },
+    {
+      "capacity": 1024,
+      "diagnostic": "planning the backend of map records: no backend holds a map of 1024 entries within an enclave memory budget of 55797 bytes",
+      "enclave_memory_budget_bytes": 55797,
+      "rejected_as_predicted": true,
+      "width": "address_to_uint256"
+    },
+    {
+      "capacity": 2048,
+      "diagnostic": "planning the backend of map records: no backend holds a map of 2048 entries within an enclave memory budget of 57229 bytes",
+      "enclave_memory_budget_bytes": 57229,
+      "rejected_as_predicted": true,
+      "width": "address_to_uint256"
+    },
+    {
+      "capacity": 4096,
+      "diagnostic": "planning the backend of map records: no backend holds a map of 4096 entries within an enclave memory budget of 59557 bytes",
+      "enclave_memory_budget_bytes": 59557,
+      "rejected_as_predicted": true,
+      "width": "address_to_uint256"
+    },
+    {
+      "capacity": 8192,
+      "diagnostic": "planning the backend of map records: no backend holds a map of 8192 entries within an enclave memory budget of 61298 bytes",
+      "enclave_memory_budget_bytes": 61298,
+      "rejected_as_predicted": true,
+      "width": "address_to_uint256"
+    },
+    {
+      "capacity": 16384,
+      "diagnostic": "planning the backend of map records: no backend holds a map of 16384 entries within an enclave memory budget of 63626 bytes",
+      "enclave_memory_budget_bytes": 63626,
+      "rejected_as_predicted": true,
+      "width": "address_to_uint256"
+    },
+    {
+      "capacity": 16,
+      "diagnostic": "planning the backend of map records: no backend holds a map of 16 entries within an enclave memory budget of 2111 bytes",
+      "enclave_memory_budget_bytes": 2111,
+      "rejected_as_predicted": true,
+      "width": "bytes32_to_bool"
+    },
+    {
+      "capacity": 128,
+      "diagnostic": "planning the backend of map records: no backend holds a map of 128 entries within an enclave memory budget of 16895 bytes",
+      "enclave_memory_budget_bytes": 16895,
+      "rejected_as_predicted": true,
+      "width": "bytes32_to_bool"
+    },
+    {
+      "capacity": 1024,
+      "diagnostic": "planning the backend of map records: no backend holds a map of 1024 entries within an enclave memory budget of 45831 bytes",
+      "enclave_memory_budget_bytes": 45831,
+      "rejected_as_predicted": true,
+      "width": "bytes32_to_bool"
+    },
+    {
+      "capacity": 2048,
+      "diagnostic": "planning the backend of map records: no backend holds a map of 2048 entries within an enclave memory budget of 47015 bytes",
+      "enclave_memory_budget_bytes": 47015,
+      "rejected_as_predicted": true,
+      "width": "bytes32_to_bool"
+    },
+    {
+      "capacity": 4096,
+      "diagnostic": "planning the backend of map records: no backend holds a map of 4096 entries within an enclave memory budget of 48935 bytes",
+      "enclave_memory_budget_bytes": 48935,
+      "rejected_as_predicted": true,
+      "width": "bytes32_to_bool"
+    },
+    {
+      "capacity": 8192,
+      "diagnostic": "planning the backend of map records: no backend holds a map of 8192 entries within an enclave memory budget of 50371 bytes",
+      "enclave_memory_budget_bytes": 50371,
+      "rejected_as_predicted": true,
+      "width": "bytes32_to_bool"
+    },
+    {
+      "capacity": 16384,
+      "diagnostic": "planning the backend of map records: no backend holds a map of 16384 entries within an enclave memory budget of 52291 bytes",
+      "enclave_memory_budget_bytes": 52291,
+      "rejected_as_predicted": true,
+      "width": "bytes32_to_bool"
+    }
+  ],
   "capacities": [
     16,
     128,
@@ -663,6 +812,7 @@
         "read": 1536,
         "written": 0
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 32,
       "width": "bytes32_to_uint256",
@@ -686,6 +836,7 @@
         "read": 5280,
         "written": 5280
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 32,
       "width": "bytes32_to_uint256",
@@ -709,6 +860,7 @@
         "read": 19840,
         "written": 20096
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 32,
       "width": "bytes32_to_uint256",
@@ -732,6 +884,7 @@
         "read": 12288,
         "written": 0
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 32,
       "width": "bytes32_to_uint256",
@@ -755,6 +908,7 @@
         "read": 26432,
         "written": 26432
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 32,
       "width": "bytes32_to_uint256",
@@ -778,6 +932,7 @@
         "read": 65312,
         "written": 65824
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 32,
       "width": "bytes32_to_uint256",
@@ -801,6 +956,7 @@
         "read": 98304,
         "written": 0
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 32,
       "width": "bytes32_to_uint256",
@@ -813,6 +969,8 @@
       "backend": "path_oram_local_posmap_v1",
       "capacity": 1024,
       "error": "path_oram_local_posmap_v1 supports capacities up to 128 in the current proof-grade route; use path_oram_private_posmap_v1 before admitting capacity 1024",
+      "predicted_diagnostic": "supports capacities up to 128",
+      "rule": "inadmissible: the local scheme holds at most 128 entries",
       "status": "rejected",
       "width": "bytes32_to_uint256"
     },
@@ -831,6 +989,7 @@
         "read": 129344,
         "written": 130176
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 32,
       "width": "bytes32_to_uint256",
@@ -854,6 +1013,7 @@
         "read": 196608,
         "written": 0
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 32,
       "width": "bytes32_to_uint256",
@@ -866,6 +1026,8 @@
       "backend": "path_oram_local_posmap_v1",
       "capacity": 2048,
       "error": "path_oram_local_posmap_v1 supports capacities up to 128 in the current proof-grade route; use path_oram_private_posmap_v1 before admitting capacity 2048",
+      "predicted_diagnostic": "supports capacities up to 128",
+      "rule": "inadmissible: the local scheme holds at most 128 entries",
       "status": "rejected",
       "width": "bytes32_to_uint256"
     },
@@ -884,6 +1046,7 @@
         "read": 146816,
         "written": 147712
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 32,
       "width": "bytes32_to_uint256",
@@ -907,6 +1070,7 @@
         "read": 393216,
         "written": 0
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 32,
       "width": "bytes32_to_uint256",
@@ -919,6 +1083,8 @@
       "backend": "path_oram_local_posmap_v1",
       "capacity": 4096,
       "error": "path_oram_local_posmap_v1 supports capacities up to 128 in the current proof-grade route; use path_oram_private_posmap_v1 before admitting capacity 4096",
+      "predicted_diagnostic": "supports capacities up to 128",
+      "rule": "inadmissible: the local scheme holds at most 128 entries",
       "status": "rejected",
       "width": "bytes32_to_uint256"
     },
@@ -937,6 +1103,7 @@
         "read": 166624,
         "written": 167584
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 32,
       "width": "bytes32_to_uint256",
@@ -960,6 +1127,7 @@
         "read": 786432,
         "written": 0
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 32,
       "width": "bytes32_to_uint256",
@@ -972,6 +1140,8 @@
       "backend": "path_oram_local_posmap_v1",
       "capacity": 8192,
       "error": "path_oram_local_posmap_v1 supports capacities up to 128 in the current proof-grade route; use path_oram_private_posmap_v1 before admitting capacity 8192",
+      "predicted_diagnostic": "supports capacities up to 128",
+      "rule": "inadmissible: the local scheme holds at most 128 entries",
       "status": "rejected",
       "width": "bytes32_to_uint256"
     },
@@ -990,6 +1160,7 @@
         "read": 196192,
         "written": 197280
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 32,
       "width": "bytes32_to_uint256",
@@ -1013,6 +1184,7 @@
         "read": 1572864,
         "written": 0
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 32,
       "width": "bytes32_to_uint256",
@@ -1025,6 +1197,8 @@
       "backend": "path_oram_local_posmap_v1",
       "capacity": 16384,
       "error": "path_oram_local_posmap_v1 supports capacities up to 128 in the current proof-grade route; use path_oram_private_posmap_v1 before admitting capacity 16384",
+      "predicted_diagnostic": "supports capacities up to 128",
+      "rule": "inadmissible: the local scheme holds at most 128 entries",
       "status": "rejected",
       "width": "bytes32_to_uint256"
     },
@@ -1043,6 +1217,7 @@
         "read": 219360,
         "written": 220512
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 32,
       "width": "bytes32_to_uint256",
@@ -1066,6 +1241,7 @@
         "read": 1536,
         "written": 0
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 32,
       "width": "address_to_uint256",
@@ -1089,6 +1265,7 @@
         "read": 4576,
         "written": 4576
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 32,
       "width": "address_to_uint256",
@@ -1112,6 +1289,7 @@
         "read": 17952,
         "written": 18208
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 32,
       "width": "address_to_uint256",
@@ -1135,6 +1313,7 @@
         "read": 12288,
         "written": 0
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 32,
       "width": "address_to_uint256",
@@ -1158,6 +1337,7 @@
         "read": 22848,
         "written": 22848
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 32,
       "width": "address_to_uint256",
@@ -1181,6 +1361,7 @@
         "read": 59072,
         "written": 59584
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 32,
       "width": "address_to_uint256",
@@ -1204,6 +1385,7 @@
         "read": 98304,
         "written": 0
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 32,
       "width": "address_to_uint256",
@@ -1216,6 +1398,8 @@
       "backend": "path_oram_local_posmap_v1",
       "capacity": 1024,
       "error": "path_oram_local_posmap_v1 supports capacities up to 128 in the current proof-grade route; use path_oram_private_posmap_v1 before admitting capacity 1024",
+      "predicted_diagnostic": "supports capacities up to 128",
+      "rule": "inadmissible: the local scheme holds at most 128 entries",
       "status": "rejected",
       "width": "address_to_uint256"
     },
@@ -1234,6 +1418,7 @@
         "read": 116992,
         "written": 117824
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 32,
       "width": "address_to_uint256",
@@ -1257,6 +1442,7 @@
         "read": 196608,
         "written": 0
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 32,
       "width": "address_to_uint256",
@@ -1269,6 +1455,8 @@
       "backend": "path_oram_local_posmap_v1",
       "capacity": 2048,
       "error": "path_oram_local_posmap_v1 supports capacities up to 128 in the current proof-grade route; use path_oram_private_posmap_v1 before admitting capacity 2048",
+      "predicted_diagnostic": "supports capacities up to 128",
+      "rule": "inadmissible: the local scheme holds at most 128 entries",
       "status": "rejected",
       "width": "address_to_uint256"
     },
@@ -1287,6 +1475,7 @@
         "read": 132800,
         "written": 133696
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 32,
       "width": "address_to_uint256",
@@ -1310,6 +1499,7 @@
         "read": 393216,
         "written": 0
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 32,
       "width": "address_to_uint256",
@@ -1322,6 +1512,8 @@
       "backend": "path_oram_local_posmap_v1",
       "capacity": 4096,
       "error": "path_oram_local_posmap_v1 supports capacities up to 128 in the current proof-grade route; use path_oram_private_posmap_v1 before admitting capacity 4096",
+      "predicted_diagnostic": "supports capacities up to 128",
+      "rule": "inadmissible: the local scheme holds at most 128 entries",
       "status": "rejected",
       "width": "address_to_uint256"
     },
@@ -1340,6 +1532,7 @@
         "read": 150720,
         "written": 151680
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 32,
       "width": "address_to_uint256",
@@ -1363,6 +1556,7 @@
         "read": 786432,
         "written": 0
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 32,
       "width": "address_to_uint256",
@@ -1375,6 +1569,8 @@
       "backend": "path_oram_local_posmap_v1",
       "capacity": 8192,
       "error": "path_oram_local_posmap_v1 supports capacities up to 128 in the current proof-grade route; use path_oram_private_posmap_v1 before admitting capacity 8192",
+      "predicted_diagnostic": "supports capacities up to 128",
+      "rule": "inadmissible: the local scheme holds at most 128 entries",
       "status": "rejected",
       "width": "address_to_uint256"
     },
@@ -1393,6 +1589,7 @@
         "read": 177472,
         "written": 178560
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 32,
       "width": "address_to_uint256",
@@ -1416,6 +1613,7 @@
         "read": 1572864,
         "written": 0
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 32,
       "width": "address_to_uint256",
@@ -1428,6 +1626,8 @@
       "backend": "path_oram_local_posmap_v1",
       "capacity": 16384,
       "error": "path_oram_local_posmap_v1 supports capacities up to 128 in the current proof-grade route; use path_oram_private_posmap_v1 before admitting capacity 16384",
+      "predicted_diagnostic": "supports capacities up to 128",
+      "rule": "inadmissible: the local scheme holds at most 128 entries",
       "status": "rejected",
       "width": "address_to_uint256"
     },
@@ -1446,6 +1646,7 @@
         "read": 198432,
         "written": 199584
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 32,
       "width": "address_to_uint256",
@@ -1469,6 +1670,7 @@
         "read": 1024,
         "written": 0
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 1,
       "width": "bytes32_to_bool",
@@ -1492,6 +1694,7 @@
         "read": 3456,
         "written": 3456
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 1,
       "width": "bytes32_to_bool",
@@ -1515,6 +1718,7 @@
         "read": 15072,
         "written": 15328
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 1,
       "width": "bytes32_to_bool",
@@ -1538,6 +1742,7 @@
         "read": 8192,
         "written": 0
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 1,
       "width": "bytes32_to_bool",
@@ -1561,6 +1766,7 @@
         "read": 16960,
         "written": 16960
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 1,
       "width": "bytes32_to_bool",
@@ -1584,6 +1790,7 @@
         "read": 49440,
         "written": 49952
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 1,
       "width": "bytes32_to_bool",
@@ -1607,6 +1814,7 @@
         "read": 65536,
         "written": 0
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 1,
       "width": "bytes32_to_bool",
@@ -1619,6 +1827,8 @@
       "backend": "path_oram_local_posmap_v1",
       "capacity": 1024,
       "error": "path_oram_local_posmap_v1 supports capacities up to 128 in the current proof-grade route; use path_oram_private_posmap_v1 before admitting capacity 1024",
+      "predicted_diagnostic": "supports capacities up to 128",
+      "rule": "inadmissible: the local scheme holds at most 128 entries",
       "status": "rejected",
       "width": "bytes32_to_bool"
     },
@@ -1637,6 +1847,7 @@
         "read": 98048,
         "written": 98880
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 1,
       "width": "bytes32_to_bool",
@@ -1660,6 +1871,7 @@
         "read": 131072,
         "written": 0
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 1,
       "width": "bytes32_to_bool",
@@ -1672,6 +1884,8 @@
       "backend": "path_oram_local_posmap_v1",
       "capacity": 2048,
       "error": "path_oram_local_posmap_v1 supports capacities up to 128 in the current proof-grade route; use path_oram_private_posmap_v1 before admitting capacity 2048",
+      "predicted_diagnostic": "supports capacities up to 128",
+      "rule": "inadmissible: the local scheme holds at most 128 entries",
       "status": "rejected",
       "width": "bytes32_to_bool"
     },
@@ -1690,6 +1904,7 @@
         "read": 111360,
         "written": 112256
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 1,
       "width": "bytes32_to_bool",
@@ -1713,6 +1928,7 @@
         "read": 262144,
         "written": 0
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 1,
       "width": "bytes32_to_bool",
@@ -1725,6 +1941,8 @@
       "backend": "path_oram_local_posmap_v1",
       "capacity": 4096,
       "error": "path_oram_local_posmap_v1 supports capacities up to 128 in the current proof-grade route; use path_oram_private_posmap_v1 before admitting capacity 4096",
+      "predicted_diagnostic": "supports capacities up to 128",
+      "rule": "inadmissible: the local scheme holds at most 128 entries",
       "status": "rejected",
       "width": "bytes32_to_bool"
     },
@@ -1743,6 +1961,7 @@
         "read": 126432,
         "written": 127392
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 1,
       "width": "bytes32_to_bool",
@@ -1766,6 +1985,7 @@
         "read": 524288,
         "written": 0
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 1,
       "width": "bytes32_to_bool",
@@ -1778,6 +1998,8 @@
       "backend": "path_oram_local_posmap_v1",
       "capacity": 8192,
       "error": "path_oram_local_posmap_v1 supports capacities up to 128 in the current proof-grade route; use path_oram_private_posmap_v1 before admitting capacity 8192",
+      "predicted_diagnostic": "supports capacities up to 128",
+      "rule": "inadmissible: the local scheme holds at most 128 entries",
       "status": "rejected",
       "width": "bytes32_to_bool"
     },
@@ -1796,6 +2018,7 @@
         "read": 148960,
         "written": 150048
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 1,
       "width": "bytes32_to_bool",
@@ -1819,6 +2042,7 @@
         "read": 1048576,
         "written": 0
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 1,
       "width": "bytes32_to_bool",
@@ -1831,6 +2055,8 @@
       "backend": "path_oram_local_posmap_v1",
       "capacity": 16384,
       "error": "path_oram_local_posmap_v1 supports capacities up to 128 in the current proof-grade route; use path_oram_private_posmap_v1 before admitting capacity 16384",
+      "predicted_diagnostic": "supports capacities up to 128",
+      "rule": "inadmissible: the local scheme holds at most 128 entries",
       "status": "rejected",
       "width": "bytes32_to_bool"
     },
@@ -1849,6 +2075,7 @@
         "read": 166592,
         "written": 167744
       },
+      "rule": "admissible",
       "status": "ok",
       "value_bytes": 1,
       "width": "bytes32_to_bool",
@@ -1858,7 +2085,29 @@
       }
     }
   ],
+  "counts": {
+    "budget_rejections": 21,
+    "calls": 528,
+    "cells": 63,
+    "measured_cells": 48,
+    "planned_maps": 63,
+    "planner_checks": 126,
+    "rejected_cells": 15
+  },
+  "counts_are_the_grids": true,
+  "every_admissible_cell_measured": true,
   "every_call_matches_model": true,
+  "every_inadmissible_cell_rejected_as_predicted": true,
+  "expected_counts": {
+    "budget_rejections": 21,
+    "calls": 528,
+    "cells": 63,
+    "measured_cells": 48,
+    "planned_maps": 63,
+    "planner_checks": 126,
+    "rejected_cells": 15
+  },
+  "impossible_budgets_rejected": true,
   "occupancy_capacity_limit": 16384,
   "occupancy_percents": [
     50,
@@ -1906,6 +2155,33 @@
       }
     },
     {
+      "capacity": 16,
+      "chosen_modeled_enclave_bytes": 3616,
+      "compiled_backend": "full_scan",
+      "enclave_memory_budget_bytes": 7365,
+      "manifest_records_the_plan": true,
+      "moves_the_modeled_bytes": true,
+      "on_the_chosen_backend": true,
+      "over_budget": [
+        "path_oram_local_posmap_v1",
+        "path_oram_private_posmap_v1"
+      ],
+      "planner_chooses": "full_scan",
+      "read_call": {
+        "read": 1536,
+        "written": 0
+      },
+      "read_percent": 50,
+      "read_percent_from": "default",
+      "reads_back_what_it_wrote": true,
+      "width": "bytes32_to_uint256",
+      "within_budget": true,
+      "write_call": {
+        "read": 1536,
+        "written": 1536
+      }
+    },
+    {
       "capacity": 128,
       "compiled_backend": "full_scan",
       "manifest_records_the_plan": true,
@@ -1940,6 +2216,33 @@
       "read_percent_from": "metadata",
       "reads_back_what_it_wrote": true,
       "width": "bytes32_to_uint256",
+      "write_call": {
+        "read": 12288,
+        "written": 12288
+      }
+    },
+    {
+      "capacity": 128,
+      "chosen_modeled_enclave_bytes": 28928,
+      "compiled_backend": "full_scan",
+      "enclave_memory_budget_bytes": 35276,
+      "manifest_records_the_plan": true,
+      "moves_the_modeled_bytes": true,
+      "on_the_chosen_backend": true,
+      "over_budget": [
+        "path_oram_local_posmap_v1",
+        "path_oram_private_posmap_v1"
+      ],
+      "planner_chooses": "full_scan",
+      "read_call": {
+        "read": 12288,
+        "written": 0
+      },
+      "read_percent": 50,
+      "read_percent_from": "default",
+      "reads_back_what_it_wrote": true,
+      "width": "bytes32_to_uint256",
+      "within_budget": true,
       "write_call": {
         "read": 12288,
         "written": 12288
@@ -1986,6 +2289,32 @@
       }
     },
     {
+      "capacity": 1024,
+      "chosen_modeled_enclave_bytes": 61998,
+      "compiled_backend": "path_oram_private_posmap_v1",
+      "enclave_memory_budget_bytes": 146711,
+      "manifest_records_the_plan": true,
+      "moves_the_modeled_bytes": true,
+      "on_the_chosen_backend": true,
+      "over_budget": [
+        "full_scan"
+      ],
+      "planner_chooses": "path_oram_private_posmap_v1",
+      "read_call": {
+        "read": 129344,
+        "written": 130176
+      },
+      "read_percent": 50,
+      "read_percent_from": "default",
+      "reads_back_what_it_wrote": true,
+      "width": "bytes32_to_uint256",
+      "within_budget": true,
+      "write_call": {
+        "read": 447200,
+        "written": 476576
+      }
+    },
+    {
       "capacity": 2048,
       "compiled_backend": "full_scan",
       "manifest_records_the_plan": true,
@@ -2023,6 +2352,32 @@
       "write_call": {
         "read": 196608,
         "written": 196608
+      }
+    },
+    {
+      "capacity": 2048,
+      "chosen_modeled_enclave_bytes": 63590,
+      "compiled_backend": "path_oram_private_posmap_v1",
+      "enclave_memory_budget_bytes": 263219,
+      "manifest_records_the_plan": true,
+      "moves_the_modeled_bytes": true,
+      "on_the_chosen_backend": true,
+      "over_budget": [
+        "full_scan"
+      ],
+      "planner_chooses": "path_oram_private_posmap_v1",
+      "read_call": {
+        "read": 146816,
+        "written": 147712
+      },
+      "read_percent": 50,
+      "read_percent_from": "default",
+      "reads_back_what_it_wrote": true,
+      "width": "bytes32_to_uint256",
+      "within_budget": true,
+      "write_call": {
+        "read": 517760,
+        "written": 547392
       }
     },
     {
@@ -2060,6 +2415,32 @@
       "read_percent_from": "metadata",
       "reads_back_what_it_wrote": true,
       "width": "bytes32_to_uint256",
+      "write_call": {
+        "read": 594688,
+        "written": 625568
+      }
+    },
+    {
+      "capacity": 4096,
+      "chosen_modeled_enclave_bytes": 66174,
+      "compiled_backend": "path_oram_private_posmap_v1",
+      "enclave_memory_budget_bytes": 495935,
+      "manifest_records_the_plan": true,
+      "moves_the_modeled_bytes": true,
+      "on_the_chosen_backend": true,
+      "over_budget": [
+        "full_scan"
+      ],
+      "planner_chooses": "path_oram_private_posmap_v1",
+      "read_call": {
+        "read": 166624,
+        "written": 167584
+      },
+      "read_percent": 50,
+      "read_percent_from": "default",
+      "reads_back_what_it_wrote": true,
+      "width": "bytes32_to_uint256",
+      "within_budget": true,
       "write_call": {
         "read": 594688,
         "written": 625568
@@ -2106,6 +2487,32 @@
       }
     },
     {
+      "capacity": 8192,
+      "chosen_modeled_enclave_bytes": 68111,
+      "compiled_backend": "path_oram_private_posmap_v1",
+      "enclave_memory_budget_bytes": 959751,
+      "manifest_records_the_plan": true,
+      "moves_the_modeled_bytes": true,
+      "on_the_chosen_backend": true,
+      "over_budget": [
+        "full_scan"
+      ],
+      "planner_chooses": "path_oram_private_posmap_v1",
+      "read_call": {
+        "read": 196192,
+        "written": 197280
+      },
+      "read_percent": 50,
+      "read_percent_from": "default",
+      "reads_back_what_it_wrote": true,
+      "width": "bytes32_to_uint256",
+      "within_budget": true,
+      "write_call": {
+        "read": 713632,
+        "written": 745024
+      }
+    },
+    {
       "capacity": 16384,
       "compiled_backend": "path_oram_private_posmap_v1",
       "manifest_records_the_plan": true,
@@ -2140,6 +2547,32 @@
       "read_percent_from": "metadata",
       "reads_back_what_it_wrote": true,
       "width": "bytes32_to_uint256",
+      "write_call": {
+        "read": 804000,
+        "written": 836640
+      }
+    },
+    {
+      "capacity": 16384,
+      "chosen_modeled_enclave_bytes": 70695,
+      "compiled_backend": "path_oram_private_posmap_v1",
+      "enclave_memory_budget_bytes": 1886739,
+      "manifest_records_the_plan": true,
+      "moves_the_modeled_bytes": true,
+      "on_the_chosen_backend": true,
+      "over_budget": [
+        "full_scan"
+      ],
+      "planner_chooses": "path_oram_private_posmap_v1",
+      "read_call": {
+        "read": 219360,
+        "written": 220512
+      },
+      "read_percent": 50,
+      "read_percent_from": "default",
+      "reads_back_what_it_wrote": true,
+      "width": "bytes32_to_uint256",
+      "within_budget": true,
       "write_call": {
         "read": 804000,
         "written": 836640
@@ -2186,6 +2619,33 @@
       }
     },
     {
+      "capacity": 16,
+      "chosen_modeled_enclave_bytes": 3232,
+      "compiled_backend": "full_scan",
+      "enclave_memory_budget_bytes": 6623,
+      "manifest_records_the_plan": true,
+      "moves_the_modeled_bytes": true,
+      "on_the_chosen_backend": true,
+      "over_budget": [
+        "path_oram_local_posmap_v1",
+        "path_oram_private_posmap_v1"
+      ],
+      "planner_chooses": "full_scan",
+      "read_call": {
+        "read": 1536,
+        "written": 0
+      },
+      "read_percent": 50,
+      "read_percent_from": "default",
+      "reads_back_what_it_wrote": true,
+      "width": "address_to_uint256",
+      "within_budget": true,
+      "write_call": {
+        "read": 1536,
+        "written": 1536
+      }
+    },
+    {
       "capacity": 128,
       "compiled_backend": "full_scan",
       "manifest_records_the_plan": true,
@@ -2220,6 +2680,33 @@
       "read_percent_from": "metadata",
       "reads_back_what_it_wrote": true,
       "width": "address_to_uint256",
+      "write_call": {
+        "read": 12288,
+        "written": 12288
+      }
+    },
+    {
+      "capacity": 128,
+      "chosen_modeled_enclave_bytes": 25856,
+      "compiled_backend": "full_scan",
+      "enclave_memory_budget_bytes": 31660,
+      "manifest_records_the_plan": true,
+      "moves_the_modeled_bytes": true,
+      "on_the_chosen_backend": true,
+      "over_budget": [
+        "path_oram_local_posmap_v1",
+        "path_oram_private_posmap_v1"
+      ],
+      "planner_chooses": "full_scan",
+      "read_call": {
+        "read": 12288,
+        "written": 0
+      },
+      "read_percent": 50,
+      "read_percent_from": "default",
+      "reads_back_what_it_wrote": true,
+      "width": "address_to_uint256",
+      "within_budget": true,
       "write_call": {
         "read": 12288,
         "written": 12288
@@ -2266,6 +2753,32 @@
       }
     },
     {
+      "capacity": 1024,
+      "chosen_modeled_enclave_bytes": 55798,
+      "compiled_backend": "path_oram_private_posmap_v1",
+      "enclave_memory_budget_bytes": 131323,
+      "manifest_records_the_plan": true,
+      "moves_the_modeled_bytes": true,
+      "on_the_chosen_backend": true,
+      "over_budget": [
+        "full_scan"
+      ],
+      "planner_chooses": "path_oram_private_posmap_v1",
+      "read_call": {
+        "read": 116992,
+        "written": 117824
+      },
+      "read_percent": 50,
+      "read_percent_from": "default",
+      "reads_back_what_it_wrote": true,
+      "width": "address_to_uint256",
+      "within_budget": true,
+      "write_call": {
+        "read": 404576,
+        "written": 431456
+      }
+    },
+    {
       "capacity": 2048,
       "compiled_backend": "full_scan",
       "manifest_records_the_plan": true,
@@ -2303,6 +2816,32 @@
       "write_call": {
         "read": 196608,
         "written": 196608
+      }
+    },
+    {
+      "capacity": 2048,
+      "chosen_modeled_enclave_bytes": 57230,
+      "compiled_backend": "path_oram_private_posmap_v1",
+      "enclave_memory_budget_bytes": 235463,
+      "manifest_records_the_plan": true,
+      "moves_the_modeled_bytes": true,
+      "on_the_chosen_backend": true,
+      "over_budget": [
+        "full_scan"
+      ],
+      "planner_chooses": "path_oram_private_posmap_v1",
+      "read_call": {
+        "read": 132800,
+        "written": 133696
+      },
+      "read_percent": 50,
+      "read_percent_from": "default",
+      "reads_back_what_it_wrote": true,
+      "width": "address_to_uint256",
+      "within_budget": true,
+      "write_call": {
+        "read": 468416,
+        "written": 495552
       }
     },
     {
@@ -2340,6 +2879,32 @@
       "read_percent_from": "metadata",
       "reads_back_what_it_wrote": true,
       "width": "address_to_uint256",
+      "write_call": {
+        "read": 538016,
+        "written": 566304
+      }
+    },
+    {
+      "capacity": 4096,
+      "chosen_modeled_enclave_bytes": 59558,
+      "compiled_backend": "path_oram_private_posmap_v1",
+      "enclave_memory_budget_bytes": 443475,
+      "manifest_records_the_plan": true,
+      "moves_the_modeled_bytes": true,
+      "on_the_chosen_backend": true,
+      "over_budget": [
+        "full_scan"
+      ],
+      "planner_chooses": "path_oram_private_posmap_v1",
+      "read_call": {
+        "read": 150720,
+        "written": 151680
+      },
+      "read_percent": 50,
+      "read_percent_from": "default",
+      "reads_back_what_it_wrote": true,
+      "width": "address_to_uint256",
+      "within_budget": true,
       "write_call": {
         "read": 538016,
         "written": 566304
@@ -2386,6 +2951,32 @@
       }
     },
     {
+      "capacity": 8192,
+      "chosen_modeled_enclave_bytes": 61299,
+      "compiled_backend": "path_oram_private_posmap_v1",
+      "enclave_memory_budget_bytes": 858041,
+      "manifest_records_the_plan": true,
+      "moves_the_modeled_bytes": true,
+      "on_the_chosen_backend": true,
+      "over_budget": [
+        "full_scan"
+      ],
+      "planner_chooses": "path_oram_private_posmap_v1",
+      "read_call": {
+        "read": 177472,
+        "written": 178560
+      },
+      "read_percent": 50,
+      "read_percent_from": "default",
+      "reads_back_what_it_wrote": true,
+      "width": "address_to_uint256",
+      "within_budget": true,
+      "write_call": {
+        "read": 645632,
+        "written": 674432
+      }
+    },
+    {
       "capacity": 16384,
       "compiled_backend": "path_oram_private_posmap_v1",
       "manifest_records_the_plan": true,
@@ -2420,6 +3011,32 @@
       "read_percent_from": "metadata",
       "reads_back_what_it_wrote": true,
       "width": "address_to_uint256",
+      "write_call": {
+        "read": 727392,
+        "written": 757344
+      }
+    },
+    {
+      "capacity": 16384,
+      "chosen_modeled_enclave_bytes": 63627,
+      "compiled_backend": "path_oram_private_posmap_v1",
+      "enclave_memory_budget_bytes": 1686597,
+      "manifest_records_the_plan": true,
+      "moves_the_modeled_bytes": true,
+      "on_the_chosen_backend": true,
+      "over_budget": [
+        "full_scan"
+      ],
+      "planner_chooses": "path_oram_private_posmap_v1",
+      "read_call": {
+        "read": 198432,
+        "written": 199584
+      },
+      "read_percent": 50,
+      "read_percent_from": "default",
+      "reads_back_what_it_wrote": true,
+      "width": "address_to_uint256",
+      "within_budget": true,
       "write_call": {
         "read": 727392,
         "written": 757344
@@ -2466,6 +3083,33 @@
       }
     },
     {
+      "capacity": 16,
+      "chosen_modeled_enclave_bytes": 2112,
+      "compiled_backend": "full_scan",
+      "enclave_memory_budget_bytes": 5194,
+      "manifest_records_the_plan": true,
+      "moves_the_modeled_bytes": true,
+      "on_the_chosen_backend": true,
+      "over_budget": [
+        "path_oram_local_posmap_v1",
+        "path_oram_private_posmap_v1"
+      ],
+      "planner_chooses": "full_scan",
+      "read_call": {
+        "read": 1024,
+        "written": 0
+      },
+      "read_percent": 50,
+      "read_percent_from": "default",
+      "reads_back_what_it_wrote": true,
+      "width": "bytes32_to_bool",
+      "within_budget": true,
+      "write_call": {
+        "read": 1024,
+        "written": 1024
+      }
+    },
+    {
       "capacity": 128,
       "compiled_backend": "full_scan",
       "manifest_records_the_plan": true,
@@ -2500,6 +3144,33 @@
       "read_percent_from": "metadata",
       "reads_back_what_it_wrote": true,
       "width": "bytes32_to_bool",
+      "write_call": {
+        "read": 8192,
+        "written": 8192
+      }
+    },
+    {
+      "capacity": 128,
+      "chosen_modeled_enclave_bytes": 16896,
+      "compiled_backend": "full_scan",
+      "enclave_memory_budget_bytes": 23840,
+      "manifest_records_the_plan": true,
+      "moves_the_modeled_bytes": true,
+      "on_the_chosen_backend": true,
+      "over_budget": [
+        "path_oram_local_posmap_v1",
+        "path_oram_private_posmap_v1"
+      ],
+      "planner_chooses": "full_scan",
+      "read_call": {
+        "read": 8192,
+        "written": 0
+      },
+      "read_percent": 50,
+      "read_percent_from": "default",
+      "reads_back_what_it_wrote": true,
+      "width": "bytes32_to_bool",
+      "within_budget": true,
       "write_call": {
         "read": 8192,
         "written": 8192
@@ -2546,6 +3217,32 @@
       }
     },
     {
+      "capacity": 1024,
+      "chosen_modeled_enclave_bytes": 45832,
+      "compiled_backend": "path_oram_private_posmap_v1",
+      "enclave_memory_budget_bytes": 90500,
+      "manifest_records_the_plan": true,
+      "moves_the_modeled_bytes": true,
+      "on_the_chosen_backend": true,
+      "over_budget": [
+        "full_scan"
+      ],
+      "planner_chooses": "path_oram_private_posmap_v1",
+      "read_call": {
+        "read": 98048,
+        "written": 98880
+      },
+      "read_percent": 50,
+      "read_percent_from": "default",
+      "reads_back_what_it_wrote": true,
+      "width": "bytes32_to_bool",
+      "within_budget": true,
+      "write_call": {
+        "read": 340224,
+        "written": 362944
+      }
+    },
+    {
       "capacity": 2048,
       "compiled_backend": "full_scan",
       "manifest_records_the_plan": true,
@@ -2586,6 +3283,32 @@
       }
     },
     {
+      "capacity": 2048,
+      "chosen_modeled_enclave_bytes": 47016,
+      "compiled_backend": "path_oram_private_posmap_v1",
+      "enclave_memory_budget_bytes": 158676,
+      "manifest_records_the_plan": true,
+      "moves_the_modeled_bytes": true,
+      "on_the_chosen_backend": true,
+      "over_budget": [
+        "full_scan"
+      ],
+      "planner_chooses": "path_oram_private_posmap_v1",
+      "read_call": {
+        "read": 111360,
+        "written": 112256
+      },
+      "read_percent": 50,
+      "read_percent_from": "default",
+      "reads_back_what_it_wrote": true,
+      "width": "bytes32_to_bool",
+      "within_budget": true,
+      "write_call": {
+        "read": 393984,
+        "written": 416960
+      }
+    },
+    {
       "capacity": 4096,
       "compiled_backend": "full_scan",
       "manifest_records_the_plan": true,
@@ -2623,6 +3346,32 @@
       "write_call": {
         "read": 262144,
         "written": 262144
+      }
+    },
+    {
+      "capacity": 4096,
+      "chosen_modeled_enclave_bytes": 48936,
+      "compiled_backend": "path_oram_private_posmap_v1",
+      "enclave_memory_budget_bytes": 294804,
+      "manifest_records_the_plan": true,
+      "moves_the_modeled_bytes": true,
+      "on_the_chosen_backend": true,
+      "over_budget": [
+        "full_scan"
+      ],
+      "planner_chooses": "path_oram_private_posmap_v1",
+      "read_call": {
+        "read": 126432,
+        "written": 127392
+      },
+      "read_percent": 50,
+      "read_percent_from": "default",
+      "reads_back_what_it_wrote": true,
+      "width": "bytes32_to_bool",
+      "within_budget": true,
+      "write_call": {
+        "read": 452576,
+        "written": 476544
       }
     },
     {
@@ -2660,6 +3409,32 @@
       "read_percent_from": "metadata",
       "reads_back_what_it_wrote": true,
       "width": "bytes32_to_bool",
+      "write_call": {
+        "read": 543200,
+        "written": 567680
+      }
+    },
+    {
+      "capacity": 8192,
+      "chosen_modeled_enclave_bytes": 50372,
+      "compiled_backend": "path_oram_private_posmap_v1",
+      "enclave_memory_budget_bytes": 565858,
+      "manifest_records_the_plan": true,
+      "moves_the_modeled_bytes": true,
+      "on_the_chosen_backend": true,
+      "over_budget": [
+        "full_scan"
+      ],
+      "planner_chooses": "path_oram_private_posmap_v1",
+      "read_call": {
+        "read": 148960,
+        "written": 150048
+      },
+      "read_percent": 50,
+      "read_percent_from": "default",
+      "reads_back_what_it_wrote": true,
+      "width": "bytes32_to_bool",
+      "within_budget": true,
       "write_call": {
         "read": 543200,
         "written": 567680
@@ -2700,6 +3475,32 @@
       "read_percent_from": "metadata",
       "reads_back_what_it_wrote": true,
       "width": "bytes32_to_bool",
+      "write_call": {
+        "read": 612032,
+        "written": 637504
+      }
+    },
+    {
+      "capacity": 16384,
+      "chosen_modeled_enclave_bytes": 52292,
+      "compiled_backend": "path_oram_private_posmap_v1",
+      "enclave_memory_budget_bytes": 1107490,
+      "manifest_records_the_plan": true,
+      "moves_the_modeled_bytes": true,
+      "on_the_chosen_backend": true,
+      "over_budget": [
+        "full_scan"
+      ],
+      "planner_chooses": "path_oram_private_posmap_v1",
+      "read_call": {
+        "read": 166592,
+        "written": 167744
+      },
+      "read_percent": 50,
+      "read_percent_from": "default",
+      "reads_back_what_it_wrote": true,
+      "width": "bytes32_to_bool",
+      "within_budget": true,
       "write_call": {
         "read": 612032,
         "written": 637504
@@ -2711,8 +3512,14 @@
     {
       "agrees": true,
       "capacity": 16,
+      "competitors": [
+        "full_scan",
+        "path_oram_local_posmap_v1",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 3072.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.0,
       "width": "bytes32_to_uint256"
@@ -2720,8 +3527,14 @@
     {
       "agrees": true,
       "capacity": 16,
+      "competitors": [
+        "full_scan",
+        "path_oram_local_posmap_v1",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 2688.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.25,
       "width": "bytes32_to_uint256"
@@ -2729,8 +3542,14 @@
     {
       "agrees": true,
       "capacity": 16,
+      "competitors": [
+        "full_scan",
+        "path_oram_local_posmap_v1",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 2304.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.5,
       "width": "bytes32_to_uint256"
@@ -2738,8 +3557,14 @@
     {
       "agrees": true,
       "capacity": 16,
+      "competitors": [
+        "full_scan",
+        "path_oram_local_posmap_v1",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 1920.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.75,
       "width": "bytes32_to_uint256"
@@ -2747,8 +3572,14 @@
     {
       "agrees": true,
       "capacity": 16,
+      "competitors": [
+        "full_scan",
+        "path_oram_local_posmap_v1",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 1689.6,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.9,
       "width": "bytes32_to_uint256"
@@ -2756,8 +3587,14 @@
     {
       "agrees": true,
       "capacity": 16,
+      "competitors": [
+        "full_scan",
+        "path_oram_local_posmap_v1",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 1536.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 1.0,
       "width": "bytes32_to_uint256"
@@ -2765,8 +3602,14 @@
     {
       "agrees": true,
       "capacity": 128,
+      "competitors": [
+        "full_scan",
+        "path_oram_local_posmap_v1",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 24576.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.0,
       "width": "bytes32_to_uint256"
@@ -2774,8 +3617,14 @@
     {
       "agrees": true,
       "capacity": 128,
+      "competitors": [
+        "full_scan",
+        "path_oram_local_posmap_v1",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 21504.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.25,
       "width": "bytes32_to_uint256"
@@ -2783,8 +3632,14 @@
     {
       "agrees": true,
       "capacity": 128,
+      "competitors": [
+        "full_scan",
+        "path_oram_local_posmap_v1",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 18432.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.5,
       "width": "bytes32_to_uint256"
@@ -2792,8 +3647,14 @@
     {
       "agrees": true,
       "capacity": 128,
+      "competitors": [
+        "full_scan",
+        "path_oram_local_posmap_v1",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 15360.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.75,
       "width": "bytes32_to_uint256"
@@ -2801,8 +3662,14 @@
     {
       "agrees": true,
       "capacity": 128,
+      "competitors": [
+        "full_scan",
+        "path_oram_local_posmap_v1",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 13516.8,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.9,
       "width": "bytes32_to_uint256"
@@ -2810,8 +3677,14 @@
     {
       "agrees": true,
       "capacity": 128,
+      "competitors": [
+        "full_scan",
+        "path_oram_local_posmap_v1",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 12288.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 1.0,
       "width": "bytes32_to_uint256"
@@ -2819,8 +3692,13 @@
     {
       "agrees": true,
       "capacity": 1024,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 196608.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.0,
       "width": "bytes32_to_uint256"
@@ -2828,8 +3706,13 @@
     {
       "agrees": true,
       "capacity": 1024,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 172032.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.25,
       "width": "bytes32_to_uint256"
@@ -2837,8 +3720,13 @@
     {
       "agrees": true,
       "capacity": 1024,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 147456.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.5,
       "width": "bytes32_to_uint256"
@@ -2846,8 +3734,13 @@
     {
       "agrees": true,
       "capacity": 1024,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 122880.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.75,
       "width": "bytes32_to_uint256"
@@ -2855,8 +3748,13 @@
     {
       "agrees": true,
       "capacity": 1024,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 108134.4,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.9,
       "width": "bytes32_to_uint256"
@@ -2864,8 +3762,13 @@
     {
       "agrees": true,
       "capacity": 1024,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 98304.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 1.0,
       "width": "bytes32_to_uint256"
@@ -2873,8 +3776,13 @@
     {
       "agrees": true,
       "capacity": 2048,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 393216.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.0,
       "width": "bytes32_to_uint256"
@@ -2882,8 +3790,13 @@
     {
       "agrees": true,
       "capacity": 2048,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 344064.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.25,
       "width": "bytes32_to_uint256"
@@ -2891,8 +3804,13 @@
     {
       "agrees": true,
       "capacity": 2048,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 294912.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.5,
       "width": "bytes32_to_uint256"
@@ -2900,8 +3818,13 @@
     {
       "agrees": true,
       "capacity": 2048,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 245760.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.75,
       "width": "bytes32_to_uint256"
@@ -2909,8 +3832,13 @@
     {
       "agrees": true,
       "capacity": 2048,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 216268.8,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.9,
       "width": "bytes32_to_uint256"
@@ -2918,8 +3846,13 @@
     {
       "agrees": true,
       "capacity": 2048,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 196608.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 1.0,
       "width": "bytes32_to_uint256"
@@ -2927,8 +3860,13 @@
     {
       "agrees": true,
       "capacity": 4096,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 786432.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.0,
       "width": "bytes32_to_uint256"
@@ -2936,8 +3874,13 @@
     {
       "agrees": true,
       "capacity": 4096,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 688128.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.25,
       "width": "bytes32_to_uint256"
@@ -2945,8 +3888,13 @@
     {
       "agrees": true,
       "capacity": 4096,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 589824.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.5,
       "width": "bytes32_to_uint256"
@@ -2954,8 +3902,13 @@
     {
       "agrees": true,
       "capacity": 4096,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 491520.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.75,
       "width": "bytes32_to_uint256"
@@ -2963,8 +3916,13 @@
     {
       "agrees": true,
       "capacity": 4096,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "path_oram_private_posmap_v1",
       "measured_bytes_per_call": 422812.8,
+      "missing_competitors": [],
       "planner_chooses": "path_oram_private_posmap_v1",
       "read_fraction": 0.9,
       "width": "bytes32_to_uint256"
@@ -2972,8 +3930,13 @@
     {
       "agrees": true,
       "capacity": 4096,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "path_oram_private_posmap_v1",
       "measured_bytes_per_call": 334208.0,
+      "missing_competitors": [],
       "planner_chooses": "path_oram_private_posmap_v1",
       "read_fraction": 1.0,
       "width": "bytes32_to_uint256"
@@ -2981,8 +3944,13 @@
     {
       "agrees": true,
       "capacity": 8192,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "path_oram_private_posmap_v1",
       "measured_bytes_per_call": 1458656.0,
+      "missing_competitors": [],
       "planner_chooses": "path_oram_private_posmap_v1",
       "read_fraction": 0.0,
       "width": "bytes32_to_uint256"
@@ -2990,8 +3958,13 @@
     {
       "agrees": true,
       "capacity": 8192,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "path_oram_private_posmap_v1",
       "measured_bytes_per_call": 1192360.0,
+      "missing_competitors": [],
       "planner_chooses": "path_oram_private_posmap_v1",
       "read_fraction": 0.25,
       "width": "bytes32_to_uint256"
@@ -2999,8 +3972,13 @@
     {
       "agrees": true,
       "capacity": 8192,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "path_oram_private_posmap_v1",
       "measured_bytes_per_call": 926064.0,
+      "missing_competitors": [],
       "planner_chooses": "path_oram_private_posmap_v1",
       "read_fraction": 0.5,
       "width": "bytes32_to_uint256"
@@ -3008,8 +3986,13 @@
     {
       "agrees": true,
       "capacity": 8192,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "path_oram_private_posmap_v1",
       "measured_bytes_per_call": 659768.0,
+      "missing_competitors": [],
       "planner_chooses": "path_oram_private_posmap_v1",
       "read_fraction": 0.75,
       "width": "bytes32_to_uint256"
@@ -3017,8 +4000,13 @@
     {
       "agrees": true,
       "capacity": 8192,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "path_oram_private_posmap_v1",
       "measured_bytes_per_call": 499990.4,
+      "missing_competitors": [],
       "planner_chooses": "path_oram_private_posmap_v1",
       "read_fraction": 0.9,
       "width": "bytes32_to_uint256"
@@ -3026,8 +4014,13 @@
     {
       "agrees": true,
       "capacity": 8192,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "path_oram_private_posmap_v1",
       "measured_bytes_per_call": 393472.0,
+      "missing_competitors": [],
       "planner_chooses": "path_oram_private_posmap_v1",
       "read_fraction": 1.0,
       "width": "bytes32_to_uint256"
@@ -3035,8 +4028,13 @@
     {
       "agrees": true,
       "capacity": 16384,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "path_oram_private_posmap_v1",
       "measured_bytes_per_call": 1640640.0,
+      "missing_competitors": [],
       "planner_chooses": "path_oram_private_posmap_v1",
       "read_fraction": 0.0,
       "width": "bytes32_to_uint256"
@@ -3044,8 +4042,13 @@
     {
       "agrees": true,
       "capacity": 16384,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "path_oram_private_posmap_v1",
       "measured_bytes_per_call": 1340448.0,
+      "missing_competitors": [],
       "planner_chooses": "path_oram_private_posmap_v1",
       "read_fraction": 0.25,
       "width": "bytes32_to_uint256"
@@ -3053,8 +4056,13 @@
     {
       "agrees": true,
       "capacity": 16384,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "path_oram_private_posmap_v1",
       "measured_bytes_per_call": 1040256.0,
+      "missing_competitors": [],
       "planner_chooses": "path_oram_private_posmap_v1",
       "read_fraction": 0.5,
       "width": "bytes32_to_uint256"
@@ -3062,8 +4070,13 @@
     {
       "agrees": true,
       "capacity": 16384,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "path_oram_private_posmap_v1",
       "measured_bytes_per_call": 740064.0,
+      "missing_competitors": [],
       "planner_chooses": "path_oram_private_posmap_v1",
       "read_fraction": 0.75,
       "width": "bytes32_to_uint256"
@@ -3071,8 +4084,13 @@
     {
       "agrees": true,
       "capacity": 16384,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "path_oram_private_posmap_v1",
       "measured_bytes_per_call": 559948.8,
+      "missing_competitors": [],
       "planner_chooses": "path_oram_private_posmap_v1",
       "read_fraction": 0.9,
       "width": "bytes32_to_uint256"
@@ -3080,8 +4098,13 @@
     {
       "agrees": true,
       "capacity": 16384,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "path_oram_private_posmap_v1",
       "measured_bytes_per_call": 439872.0,
+      "missing_competitors": [],
       "planner_chooses": "path_oram_private_posmap_v1",
       "read_fraction": 1.0,
       "width": "bytes32_to_uint256"
@@ -3089,8 +4112,14 @@
     {
       "agrees": true,
       "capacity": 16,
+      "competitors": [
+        "full_scan",
+        "path_oram_local_posmap_v1",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 3072.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.0,
       "width": "address_to_uint256"
@@ -3098,8 +4127,14 @@
     {
       "agrees": true,
       "capacity": 16,
+      "competitors": [
+        "full_scan",
+        "path_oram_local_posmap_v1",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 2688.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.25,
       "width": "address_to_uint256"
@@ -3107,8 +4142,14 @@
     {
       "agrees": true,
       "capacity": 16,
+      "competitors": [
+        "full_scan",
+        "path_oram_local_posmap_v1",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 2304.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.5,
       "width": "address_to_uint256"
@@ -3116,8 +4157,14 @@
     {
       "agrees": true,
       "capacity": 16,
+      "competitors": [
+        "full_scan",
+        "path_oram_local_posmap_v1",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 1920.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.75,
       "width": "address_to_uint256"
@@ -3125,8 +4172,14 @@
     {
       "agrees": true,
       "capacity": 16,
+      "competitors": [
+        "full_scan",
+        "path_oram_local_posmap_v1",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 1689.6,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.9,
       "width": "address_to_uint256"
@@ -3134,8 +4187,14 @@
     {
       "agrees": true,
       "capacity": 16,
+      "competitors": [
+        "full_scan",
+        "path_oram_local_posmap_v1",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 1536.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 1.0,
       "width": "address_to_uint256"
@@ -3143,8 +4202,14 @@
     {
       "agrees": true,
       "capacity": 128,
+      "competitors": [
+        "full_scan",
+        "path_oram_local_posmap_v1",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 24576.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.0,
       "width": "address_to_uint256"
@@ -3152,8 +4217,14 @@
     {
       "agrees": true,
       "capacity": 128,
+      "competitors": [
+        "full_scan",
+        "path_oram_local_posmap_v1",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 21504.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.25,
       "width": "address_to_uint256"
@@ -3161,8 +4232,14 @@
     {
       "agrees": true,
       "capacity": 128,
+      "competitors": [
+        "full_scan",
+        "path_oram_local_posmap_v1",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 18432.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.5,
       "width": "address_to_uint256"
@@ -3170,8 +4247,14 @@
     {
       "agrees": true,
       "capacity": 128,
+      "competitors": [
+        "full_scan",
+        "path_oram_local_posmap_v1",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 15360.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.75,
       "width": "address_to_uint256"
@@ -3179,8 +4262,14 @@
     {
       "agrees": true,
       "capacity": 128,
+      "competitors": [
+        "full_scan",
+        "path_oram_local_posmap_v1",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 13516.8,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.9,
       "width": "address_to_uint256"
@@ -3188,8 +4277,14 @@
     {
       "agrees": true,
       "capacity": 128,
+      "competitors": [
+        "full_scan",
+        "path_oram_local_posmap_v1",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 12288.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 1.0,
       "width": "address_to_uint256"
@@ -3197,8 +4292,13 @@
     {
       "agrees": true,
       "capacity": 1024,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 196608.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.0,
       "width": "address_to_uint256"
@@ -3206,8 +4306,13 @@
     {
       "agrees": true,
       "capacity": 1024,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 172032.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.25,
       "width": "address_to_uint256"
@@ -3215,8 +4320,13 @@
     {
       "agrees": true,
       "capacity": 1024,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 147456.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.5,
       "width": "address_to_uint256"
@@ -3224,8 +4334,13 @@
     {
       "agrees": true,
       "capacity": 1024,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 122880.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.75,
       "width": "address_to_uint256"
@@ -3233,8 +4348,13 @@
     {
       "agrees": true,
       "capacity": 1024,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 108134.4,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.9,
       "width": "address_to_uint256"
@@ -3242,8 +4362,13 @@
     {
       "agrees": true,
       "capacity": 1024,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 98304.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 1.0,
       "width": "address_to_uint256"
@@ -3251,8 +4376,13 @@
     {
       "agrees": true,
       "capacity": 2048,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 393216.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.0,
       "width": "address_to_uint256"
@@ -3260,8 +4390,13 @@
     {
       "agrees": true,
       "capacity": 2048,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 344064.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.25,
       "width": "address_to_uint256"
@@ -3269,8 +4404,13 @@
     {
       "agrees": true,
       "capacity": 2048,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 294912.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.5,
       "width": "address_to_uint256"
@@ -3278,8 +4418,13 @@
     {
       "agrees": true,
       "capacity": 2048,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 245760.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.75,
       "width": "address_to_uint256"
@@ -3287,8 +4432,13 @@
     {
       "agrees": true,
       "capacity": 2048,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 216268.8,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.9,
       "width": "address_to_uint256"
@@ -3296,8 +4446,13 @@
     {
       "agrees": true,
       "capacity": 2048,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 196608.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 1.0,
       "width": "address_to_uint256"
@@ -3305,8 +4460,13 @@
     {
       "agrees": true,
       "capacity": 4096,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 786432.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.0,
       "width": "address_to_uint256"
@@ -3314,8 +4474,13 @@
     {
       "agrees": true,
       "capacity": 4096,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 688128.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.25,
       "width": "address_to_uint256"
@@ -3323,8 +4488,13 @@
     {
       "agrees": true,
       "capacity": 4096,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 589824.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.5,
       "width": "address_to_uint256"
@@ -3332,8 +4502,13 @@
     {
       "agrees": true,
       "capacity": 4096,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 491520.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.75,
       "width": "address_to_uint256"
@@ -3341,8 +4516,13 @@
     {
       "agrees": true,
       "capacity": 4096,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "path_oram_private_posmap_v1",
       "measured_bytes_per_call": 382592.0,
+      "missing_competitors": [],
       "planner_chooses": "path_oram_private_posmap_v1",
       "read_fraction": 0.9,
       "width": "address_to_uint256"
@@ -3350,8 +4530,13 @@
     {
       "agrees": true,
       "capacity": 4096,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "path_oram_private_posmap_v1",
       "measured_bytes_per_call": 302400.0,
+      "missing_competitors": [],
       "planner_chooses": "path_oram_private_posmap_v1",
       "read_fraction": 1.0,
       "width": "address_to_uint256"
@@ -3359,8 +4544,13 @@
     {
       "agrees": true,
       "capacity": 8192,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "path_oram_private_posmap_v1",
       "measured_bytes_per_call": 1320064.0,
+      "missing_competitors": [],
       "planner_chooses": "path_oram_private_posmap_v1",
       "read_fraction": 0.0,
       "width": "address_to_uint256"
@@ -3368,8 +4558,13 @@
     {
       "agrees": true,
       "capacity": 8192,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "path_oram_private_posmap_v1",
       "measured_bytes_per_call": 1079056.0,
+      "missing_competitors": [],
       "planner_chooses": "path_oram_private_posmap_v1",
       "read_fraction": 0.25,
       "width": "address_to_uint256"
@@ -3377,8 +4572,13 @@
     {
       "agrees": true,
       "capacity": 8192,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "path_oram_private_posmap_v1",
       "measured_bytes_per_call": 838048.0,
+      "missing_competitors": [],
       "planner_chooses": "path_oram_private_posmap_v1",
       "read_fraction": 0.5,
       "width": "address_to_uint256"
@@ -3386,8 +4586,13 @@
     {
       "agrees": true,
       "capacity": 8192,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "path_oram_private_posmap_v1",
       "measured_bytes_per_call": 597040.0,
+      "missing_competitors": [],
       "planner_chooses": "path_oram_private_posmap_v1",
       "read_fraction": 0.75,
       "width": "address_to_uint256"
@@ -3395,8 +4600,13 @@
     {
       "agrees": true,
       "capacity": 8192,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "path_oram_private_posmap_v1",
       "measured_bytes_per_call": 452435.2,
+      "missing_competitors": [],
       "planner_chooses": "path_oram_private_posmap_v1",
       "read_fraction": 0.9,
       "width": "address_to_uint256"
@@ -3404,8 +4614,13 @@
     {
       "agrees": true,
       "capacity": 8192,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "path_oram_private_posmap_v1",
       "measured_bytes_per_call": 356032.0,
+      "missing_competitors": [],
       "planner_chooses": "path_oram_private_posmap_v1",
       "read_fraction": 1.0,
       "width": "address_to_uint256"
@@ -3413,8 +4628,13 @@
     {
       "agrees": true,
       "capacity": 16384,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "path_oram_private_posmap_v1",
       "measured_bytes_per_call": 1484736.0,
+      "missing_competitors": [],
       "planner_chooses": "path_oram_private_posmap_v1",
       "read_fraction": 0.0,
       "width": "address_to_uint256"
@@ -3422,8 +4642,13 @@
     {
       "agrees": true,
       "capacity": 16384,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "path_oram_private_posmap_v1",
       "measured_bytes_per_call": 1213056.0,
+      "missing_competitors": [],
       "planner_chooses": "path_oram_private_posmap_v1",
       "read_fraction": 0.25,
       "width": "address_to_uint256"
@@ -3431,8 +4656,13 @@
     {
       "agrees": true,
       "capacity": 16384,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "path_oram_private_posmap_v1",
       "measured_bytes_per_call": 941376.0,
+      "missing_competitors": [],
       "planner_chooses": "path_oram_private_posmap_v1",
       "read_fraction": 0.5,
       "width": "address_to_uint256"
@@ -3440,8 +4670,13 @@
     {
       "agrees": true,
       "capacity": 16384,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "path_oram_private_posmap_v1",
       "measured_bytes_per_call": 669696.0,
+      "missing_competitors": [],
       "planner_chooses": "path_oram_private_posmap_v1",
       "read_fraction": 0.75,
       "width": "address_to_uint256"
@@ -3449,8 +4684,13 @@
     {
       "agrees": true,
       "capacity": 16384,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "path_oram_private_posmap_v1",
       "measured_bytes_per_call": 506688.0,
+      "missing_competitors": [],
       "planner_chooses": "path_oram_private_posmap_v1",
       "read_fraction": 0.9,
       "width": "address_to_uint256"
@@ -3458,8 +4698,13 @@
     {
       "agrees": true,
       "capacity": 16384,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "path_oram_private_posmap_v1",
       "measured_bytes_per_call": 398016.0,
+      "missing_competitors": [],
       "planner_chooses": "path_oram_private_posmap_v1",
       "read_fraction": 1.0,
       "width": "address_to_uint256"
@@ -3467,8 +4712,14 @@
     {
       "agrees": true,
       "capacity": 16,
+      "competitors": [
+        "full_scan",
+        "path_oram_local_posmap_v1",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 2048.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.0,
       "width": "bytes32_to_bool"
@@ -3476,8 +4727,14 @@
     {
       "agrees": true,
       "capacity": 16,
+      "competitors": [
+        "full_scan",
+        "path_oram_local_posmap_v1",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 1792.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.25,
       "width": "bytes32_to_bool"
@@ -3485,8 +4742,14 @@
     {
       "agrees": true,
       "capacity": 16,
+      "competitors": [
+        "full_scan",
+        "path_oram_local_posmap_v1",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 1536.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.5,
       "width": "bytes32_to_bool"
@@ -3494,8 +4757,14 @@
     {
       "agrees": true,
       "capacity": 16,
+      "competitors": [
+        "full_scan",
+        "path_oram_local_posmap_v1",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 1280.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.75,
       "width": "bytes32_to_bool"
@@ -3503,8 +4772,14 @@
     {
       "agrees": true,
       "capacity": 16,
+      "competitors": [
+        "full_scan",
+        "path_oram_local_posmap_v1",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 1126.4,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.9,
       "width": "bytes32_to_bool"
@@ -3512,8 +4787,14 @@
     {
       "agrees": true,
       "capacity": 16,
+      "competitors": [
+        "full_scan",
+        "path_oram_local_posmap_v1",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 1024.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 1.0,
       "width": "bytes32_to_bool"
@@ -3521,8 +4802,14 @@
     {
       "agrees": true,
       "capacity": 128,
+      "competitors": [
+        "full_scan",
+        "path_oram_local_posmap_v1",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 16384.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.0,
       "width": "bytes32_to_bool"
@@ -3530,8 +4817,14 @@
     {
       "agrees": true,
       "capacity": 128,
+      "competitors": [
+        "full_scan",
+        "path_oram_local_posmap_v1",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 14336.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.25,
       "width": "bytes32_to_bool"
@@ -3539,8 +4832,14 @@
     {
       "agrees": true,
       "capacity": 128,
+      "competitors": [
+        "full_scan",
+        "path_oram_local_posmap_v1",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 12288.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.5,
       "width": "bytes32_to_bool"
@@ -3548,8 +4847,14 @@
     {
       "agrees": true,
       "capacity": 128,
+      "competitors": [
+        "full_scan",
+        "path_oram_local_posmap_v1",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 10240.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.75,
       "width": "bytes32_to_bool"
@@ -3557,8 +4862,14 @@
     {
       "agrees": true,
       "capacity": 128,
+      "competitors": [
+        "full_scan",
+        "path_oram_local_posmap_v1",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 9011.2,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.9,
       "width": "bytes32_to_bool"
@@ -3566,8 +4877,14 @@
     {
       "agrees": true,
       "capacity": 128,
+      "competitors": [
+        "full_scan",
+        "path_oram_local_posmap_v1",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 8192.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 1.0,
       "width": "bytes32_to_bool"
@@ -3575,8 +4892,13 @@
     {
       "agrees": true,
       "capacity": 1024,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 131072.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.0,
       "width": "bytes32_to_bool"
@@ -3584,8 +4906,13 @@
     {
       "agrees": true,
       "capacity": 1024,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 114688.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.25,
       "width": "bytes32_to_bool"
@@ -3593,8 +4920,13 @@
     {
       "agrees": true,
       "capacity": 1024,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 98304.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.5,
       "width": "bytes32_to_bool"
@@ -3602,8 +4934,13 @@
     {
       "agrees": true,
       "capacity": 1024,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 81920.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.75,
       "width": "bytes32_to_bool"
@@ -3611,8 +4948,13 @@
     {
       "agrees": true,
       "capacity": 1024,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 72089.6,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.9,
       "width": "bytes32_to_bool"
@@ -3620,8 +4962,13 @@
     {
       "agrees": true,
       "capacity": 1024,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 65536.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 1.0,
       "width": "bytes32_to_bool"
@@ -3629,8 +4976,13 @@
     {
       "agrees": true,
       "capacity": 2048,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 262144.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.0,
       "width": "bytes32_to_bool"
@@ -3638,8 +4990,13 @@
     {
       "agrees": true,
       "capacity": 2048,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 229376.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.25,
       "width": "bytes32_to_bool"
@@ -3647,8 +5004,13 @@
     {
       "agrees": true,
       "capacity": 2048,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 196608.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.5,
       "width": "bytes32_to_bool"
@@ -3656,8 +5018,13 @@
     {
       "agrees": true,
       "capacity": 2048,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 163840.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.75,
       "width": "bytes32_to_bool"
@@ -3665,8 +5032,13 @@
     {
       "agrees": true,
       "capacity": 2048,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 144179.2,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.9,
       "width": "bytes32_to_bool"
@@ -3674,8 +5046,13 @@
     {
       "agrees": true,
       "capacity": 2048,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 131072.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 1.0,
       "width": "bytes32_to_bool"
@@ -3683,8 +5060,13 @@
     {
       "agrees": true,
       "capacity": 4096,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 524288.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.0,
       "width": "bytes32_to_bool"
@@ -3692,8 +5074,13 @@
     {
       "agrees": true,
       "capacity": 4096,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 458752.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.25,
       "width": "bytes32_to_bool"
@@ -3701,8 +5088,13 @@
     {
       "agrees": true,
       "capacity": 4096,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 393216.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.5,
       "width": "bytes32_to_bool"
@@ -3710,8 +5102,13 @@
     {
       "agrees": true,
       "capacity": 4096,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 327680.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.75,
       "width": "bytes32_to_bool"
@@ -3719,8 +5116,13 @@
     {
       "agrees": true,
       "capacity": 4096,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 288358.4,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.9,
       "width": "bytes32_to_bool"
@@ -3728,8 +5130,13 @@
     {
       "agrees": true,
       "capacity": 4096,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "path_oram_private_posmap_v1",
       "measured_bytes_per_call": 253824.0,
+      "missing_competitors": [],
       "planner_chooses": "path_oram_private_posmap_v1",
       "read_fraction": 1.0,
       "width": "bytes32_to_bool"
@@ -3737,8 +5144,13 @@
     {
       "agrees": true,
       "capacity": 8192,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "full_scan",
       "measured_bytes_per_call": 1048576.0,
+      "missing_competitors": [],
       "planner_chooses": "full_scan",
       "read_fraction": 0.0,
       "width": "bytes32_to_bool"
@@ -3746,8 +5158,13 @@
     {
       "agrees": true,
       "capacity": 8192,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "path_oram_private_posmap_v1",
       "measured_bytes_per_call": 907912.0,
+      "missing_competitors": [],
       "planner_chooses": "path_oram_private_posmap_v1",
       "read_fraction": 0.25,
       "width": "bytes32_to_bool"
@@ -3755,8 +5172,13 @@
     {
       "agrees": true,
       "capacity": 8192,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "path_oram_private_posmap_v1",
       "measured_bytes_per_call": 704944.0,
+      "missing_competitors": [],
       "planner_chooses": "path_oram_private_posmap_v1",
       "read_fraction": 0.5,
       "width": "bytes32_to_bool"
@@ -3764,8 +5186,13 @@
     {
       "agrees": true,
       "capacity": 8192,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "path_oram_private_posmap_v1",
       "measured_bytes_per_call": 501976.0,
+      "missing_competitors": [],
       "planner_chooses": "path_oram_private_posmap_v1",
       "read_fraction": 0.75,
       "width": "bytes32_to_bool"
@@ -3773,8 +5200,13 @@
     {
       "agrees": true,
       "capacity": 8192,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "path_oram_private_posmap_v1",
       "measured_bytes_per_call": 380195.2,
+      "missing_competitors": [],
       "planner_chooses": "path_oram_private_posmap_v1",
       "read_fraction": 0.9,
       "width": "bytes32_to_bool"
@@ -3782,8 +5214,13 @@
     {
       "agrees": true,
       "capacity": 8192,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "path_oram_private_posmap_v1",
       "measured_bytes_per_call": 299008.0,
+      "missing_competitors": [],
       "planner_chooses": "path_oram_private_posmap_v1",
       "read_fraction": 1.0,
       "width": "bytes32_to_bool"
@@ -3791,8 +5228,13 @@
     {
       "agrees": true,
       "capacity": 16384,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "path_oram_private_posmap_v1",
       "measured_bytes_per_call": 1249536.0,
+      "missing_competitors": [],
       "planner_chooses": "path_oram_private_posmap_v1",
       "read_fraction": 0.0,
       "width": "bytes32_to_bool"
@@ -3800,8 +5242,13 @@
     {
       "agrees": true,
       "capacity": 16384,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "path_oram_private_posmap_v1",
       "measured_bytes_per_call": 1020736.0,
+      "missing_competitors": [],
       "planner_chooses": "path_oram_private_posmap_v1",
       "read_fraction": 0.25,
       "width": "bytes32_to_bool"
@@ -3809,8 +5256,13 @@
     {
       "agrees": true,
       "capacity": 16384,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "path_oram_private_posmap_v1",
       "measured_bytes_per_call": 791936.0,
+      "missing_competitors": [],
       "planner_chooses": "path_oram_private_posmap_v1",
       "read_fraction": 0.5,
       "width": "bytes32_to_bool"
@@ -3818,8 +5270,13 @@
     {
       "agrees": true,
       "capacity": 16384,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "path_oram_private_posmap_v1",
       "measured_bytes_per_call": 563136.0,
+      "missing_competitors": [],
       "planner_chooses": "path_oram_private_posmap_v1",
       "read_fraction": 0.75,
       "width": "bytes32_to_bool"
@@ -3827,8 +5284,13 @@
     {
       "agrees": true,
       "capacity": 16384,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "path_oram_private_posmap_v1",
       "measured_bytes_per_call": 425856.0,
+      "missing_competitors": [],
       "planner_chooses": "path_oram_private_posmap_v1",
       "read_fraction": 0.9,
       "width": "bytes32_to_bool"
@@ -3836,14 +5298,20 @@
     {
       "agrees": true,
       "capacity": 16384,
+      "competitors": [
+        "full_scan",
+        "path_oram_private_posmap_v1"
+      ],
       "fewest_measured_bytes": "path_oram_private_posmap_v1",
       "measured_bytes_per_call": 334336.0,
+      "missing_competitors": [],
       "planner_chooses": "path_oram_private_posmap_v1",
       "read_fraction": 1.0,
       "width": "bytes32_to_bool"
     }
   ],
   "planner_chooses_fewest_measured_bytes": true,
+  "planner_excludes_the_inadmissible_cells": true,
   "planner_model": "uo-backend-plan-v1",
   "rows": [
     {
@@ -11767,7 +13235,7 @@
       "width": "bytes32_to_bool"
     }
   ],
-  "schema": "uo-matched-baselines-v1",
+  "schema": "uo-matched-baselines-v2",
   "widths": [
     {
       "label": "bytes32_to_uint256",

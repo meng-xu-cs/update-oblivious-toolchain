@@ -3135,7 +3135,7 @@
       }
     },
     "matched_baselines": {
-      "declared_schema": "uo-matched-baselines-v1",
+      "declared_schema": "uo-matched-baselines-v2",
       "fields": {
         "accepted": "true",
         "break_even": {
@@ -3143,15 +3143,39 @@
           "bytes32_to_bool": "array 18",
           "bytes32_to_uint256": "array 18"
         },
+        "budget_rejections": "array 21",
         "capacities": "array 7",
         "cells": "array 63",
+        "counts": {
+          "budget_rejections": "number",
+          "calls": "number",
+          "cells": "number",
+          "measured_cells": "number",
+          "planned_maps": "number",
+          "planner_checks": "number",
+          "rejected_cells": "number"
+        },
+        "counts_are_the_grids": "true",
+        "every_admissible_cell_measured": "true",
         "every_call_matches_model": "true",
+        "every_inadmissible_cell_rejected_as_predicted": "true",
+        "expected_counts": {
+          "budget_rejections": "number",
+          "calls": "number",
+          "cells": "number",
+          "measured_cells": "number",
+          "planned_maps": "number",
+          "planner_checks": "number",
+          "rejected_cells": "number"
+        },
+        "impossible_budgets_rejected": "true",
         "occupancy_capacity_limit": "number",
         "occupancy_percents": "array 2",
-        "planned_maps": "array 42",
+        "planned_maps": "array 63",
         "planned_maps_follow_their_plans": "true",
         "planner_checks": "array 126",
         "planner_chooses_fewest_measured_bytes": "true",
+        "planner_excludes_the_inadmissible_cells": "true",
         "planner_model": "string",
         "rows": "array 360",
         "schema": "string",
@@ -3159,7 +3183,7 @@
       }
     },
     "matched_baselines_full": {
-      "declared_schema": "uo-matched-baselines-v1",
+      "declared_schema": "uo-matched-baselines-v2",
       "fields": {
         "accepted": "true",
         "break_even": {
@@ -3167,15 +3191,39 @@
           "bytes32_to_bool": "array 18",
           "bytes32_to_uint256": "array 18"
         },
+        "budget_rejections": "array 21",
         "capacities": "array 7",
         "cells": "array 63",
+        "counts": {
+          "budget_rejections": "number",
+          "calls": "number",
+          "cells": "number",
+          "measured_cells": "number",
+          "planned_maps": "number",
+          "planner_checks": "number",
+          "rejected_cells": "number"
+        },
+        "counts_are_the_grids": "true",
+        "every_admissible_cell_measured": "true",
         "every_call_matches_model": "true",
+        "every_inadmissible_cell_rejected_as_predicted": "true",
+        "expected_counts": {
+          "budget_rejections": "number",
+          "calls": "number",
+          "cells": "number",
+          "measured_cells": "number",
+          "planned_maps": "number",
+          "planner_checks": "number",
+          "rejected_cells": "number"
+        },
+        "impossible_budgets_rejected": "true",
         "occupancy_capacity_limit": "number",
         "occupancy_percents": "array 2",
-        "planned_maps": "array 42",
+        "planned_maps": "array 63",
         "planned_maps_follow_their_plans": "true",
         "planner_checks": "array 126",
         "planner_chooses_fewest_measured_bytes": "true",
+        "planner_excludes_the_inadmissible_cells": "true",
         "planner_model": "string",
         "rows": "array 528",
         "schema": "string",

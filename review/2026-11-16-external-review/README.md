@@ -97,8 +97,8 @@ baseline of Issue 69. Issue 50 stays deferred.
 | --- | --- | --- | --- | --- | --- | --- |
 | 60 | Decide the storage-error contract, the recovery mechanism and the receipt proof's route | 9 | S | maintainer | done | `8f30524` |
 | 61 | Make the false-path snapshot see false leaves, and classify them as the acceptance gate does | 10 | S | | done | `710a58d` |
-| 62 | Give the acceptance gate an evidence contract | 10 | M | 61 | done | |
-| 63 | Make the matched baselines' coverage fail closed, and test the planner under a budget | 10 | S | | todo | |
+| 62 | Give the acceptance gate an evidence contract | 10 | M | 61 | done | `fbe1080` |
+| 63 | Make the matched baselines' coverage fail closed, and test the planner under a budget | 10 | S | | done | |
 | 64 | State the receipt MAC assumption over what an adversary can produce, with a non-vacuity model | 11 | S to M | 60 (D10) | todo | |
 | 65 | Fail closed on storage errors, and test every failure | 11 | M to L | 60 (D8) | todo | |
 | 66 | Make a dropped call's restart point durable before the call runs, and bound a call's seals | 11 | M | 65 | todo | |

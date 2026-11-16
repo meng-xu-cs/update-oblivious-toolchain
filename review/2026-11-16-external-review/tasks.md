@@ -296,6 +296,93 @@ do not say that the planner's model call reads or writes the map once.
 - The negative control fails the verdict.
 - The documents state the planner's two model limits.
 
+**As built.** `admissibility` in `probe/mplus-probe/src/matched_baselines.rs`
+gives each cell a rule from the grid alone. The full scan holds every map, a
+Path ORAM scheme only scalar keys and values, and the local scheme at most
+`PATH_ORAM_LOCAL_POSMAP_MAX_CAPACITY` (128) entries. Each cell records its
+rule and, if it is inadmissible, the diagnostic the rule predicts. Before
+anything compiles, the report counts what the grid requires
+(`expected_counts`), and it compares that with what ran (`counts`). Five
+verdicts are new, and `accepted` is the conjunction of all nine:
+
+- `every_admissible_cell_measured`: every admissible cell compiled and ran,
+  and every read of a cell moved the same bytes, as did every write;
+- `every_inadmissible_cell_rejected_as_predicted`: the description's
+  `only_inadmissible_cells_rejected`, renamed because a rejection must also
+  carry the predicted diagnostic;
+- `planner_excludes_the_inadmissible_cells`: the planner's candidates
+  exclude exactly the inadmissible cells;
+- `impossible_budgets_rejected`, below;
+- `counts_are_the_grids`.
+
+Each planner check lists its `competitors`, the admissible backends, and its
+`missing_competitors`. It agrees only when none is missing and the planner
+chooses the backend with the fewest measured bytes, which the check names
+(`fewest_measured_bytes`).
+
+The budgeted maps are compiled at every width and capacity, not only from
+4,096 entries as the description asked. Each budget is halfway between the
+full scan's modeled memory and the private scheme's. From 1,024 entries the
+full scan's is the larger, and the budget excludes the full scan. Up to 128
+entries the private scheme's is the larger, and the budget excludes both
+Path ORAM schemes. Every capacity therefore tests a budget in both
+directions. It also covers
+1,024 and 2,048 entries, where the budget changes the planner's choice. At
+the default share of reads, from 1,024 to 4,096 entries and at all three
+widths, the planner puts the map on the full scan without a budget and on
+the private scheme with one. Those 9 maps are on the private scheme, move
+its modeled bytes and read back what they wrote. A budgeted map records:
+
+- its budget;
+- the chosen backend's modeled memory;
+- the admissible backends over the budget;
+- `within_budget`: the chosen backend's model fits the budget, and the
+  budget excludes at least one admissible backend.
+
+A map whose budget is one byte below the least modeled memory of an
+admissible backend must fail to compile with the planner's diagnostic, and
+all 21 do (`budget_rejections`).
+
+Both profiles have:
+
+- 63 cells: 48 measured and 15 rejected, the local scheme from 1,024
+  entries at each width;
+- 126 planner checks;
+- 63 planned maps;
+- 21 budget rejections.
+
+They make 360 calls in the quick profile and 528 in the full. No map of the
+grid has a non-scalar key or value, so the rule on scalars rejects no cell
+here.
+
+Two tests check the report:
+
+- `a_small_grid_meets_every_verdict`, the positive control, on maps of 16
+  and 256 entries: the local scheme's 3 cells at 256 entries are rejected by
+  rule, and the 6 budgeted maps are within their budgets.
+- `a_supported_backend_that_fails_to_compile_fails_the_report`, the
+  negative control. It makes the local scheme fail to compile for SweepMap's
+  width at 16 entries, by naming a backend that does not exist. `accepted`,
+  `every_admissible_cell_measured`, `planner_chooses_fewest_measured_bytes`
+  and `counts_are_the_grids` turn false. That width's planner checks name
+  the scheme as missing, though there it moves more bytes than the full scan
+  and would not have won.
+
+The report's schema is `uo-matched-baselines-v2`, and the evidence contract
+holds its new fields and populations.
+
+The claim boundary's Backend Planner now states the rules, the budgets and
+the two limits of the model:
+
+- its call reads or writes the map once, so it claims nothing of which
+  backend moves the fewest bytes for an entrypoint that accesses a map
+  several times;
+- its memory is modeled, not measured, so a budget bounds the model and not
+  the enclave's heap.
+
+The claim boundary's related work and the claim manifest's
+`backend-planner-bytes-model` now call the memory modeled too.
+
 ---
 
 ## Wave 11: the guarantees

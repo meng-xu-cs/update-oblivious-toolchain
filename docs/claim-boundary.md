@@ -676,28 +676,47 @@ on Path ORAM has the Path ORAM route's claim, not exact UO.
 The model is tested, not proved (`results/matched_baselines.json`). Three
 maps, with 32-byte keys and values, with 20-byte keys, and with 1-byte
 values, are compiled on each backend at seven capacities from 16 to 16,384
-entries, filled to two keys and, up to 1,024 entries, to half and all of
-their capacity, and called: a read of a stored key and of an absent one, an
-overwrite and an insert. Every call moves the bytes the model gives its
-backend, whatever the occupancy and whether its key is stored. At six
-shares of reads the planner chooses the backend whose measured calls moved
-the fewest bytes. Each map compiled with `backend: auto`, at the default
-share and at nine reads in ten, records the plan the planner makes, is on
-the backend it chose, moves the bytes of its model and reads back what it
-wrote. The model also gives the bytes of each of the 1,141 calls the
-capacity sweep's full profile measured for SweepMap, on every backend and
-at every capacity from 1 to 16,384 entries and every occupancy, deletes and
-aborted writes among them
+entries. Which backends can hold a map follows from the grid: a Path ORAM
+scheme holds scalar keys and values, and the local scheme at most 128
+entries. Every cell that can must compile and run, and every other one
+must be rejected with the compiler's diagnostic for its rule; the planner
+must exclude exactly those. A measured cell is filled to two keys and, up
+to 1,024 entries, to half and all of its capacity, and called: a read of a
+stored key and of an absent one, an overwrite and an insert. Every call
+moves the bytes the model gives its backend, whatever the occupancy and
+whether its key is stored. At six shares of reads the planner chooses the
+backend whose measured calls moved the fewest bytes, and every backend
+that can hold the map is measured before they are compared, so a
+competitor that went missing fails the report even if it would have lost.
+Each map compiled with `backend: auto` records the plan the planner makes,
+is on the backend it chose, moves the bytes of its model and reads back
+what it wrote: at the default share, at nine reads in ten, and within a
+budget halfway between the full scan's modeled memory and the private
+scheme's, which excludes the larger of the two. That is both Path ORAM
+schemes up to 128 entries and the full scan from 1,024, so from 1,024 to
+4,096 entries, where the planner puts a map on the full scan at the default
+share, the budget puts it on the private scheme. With a budget that no
+backend fits, the map does not compile. The report's counts of cells,
+calls, planner checks and planned maps are the grid's. Two tests check the
+report itself: on a small grid it meets every verdict, and when a backend
+that can hold the map is made to fail to compile, the report fails. The
+model also gives the bytes of each of the 1,141 calls the capacity sweep's
+full profile measured for SweepMap, on every backend and at every capacity
+from 1 to 16,384 entries and every occupancy, deletes and aborted writes
+among them
 (`the_model_gives_every_call_the_full_sweep_measured`), and the planner
 chooses there what the sweep measured to move the fewest
 (`the_planner_chooses_what_the_full_sweep_measured_least`).
 
 What the planner does not do: it minimizes bytes, a model of the traffic
 between the enclave and its storage, and not time, which the capacity
-sweep measures. Its enclave memory is a model of the sealed records and the
-plaintext a call holds for the map, at their canonical widths, and not a
-measurement; it leaves out the runtime's other buffers. And the share of
-reads is the one the metadata declares: the planner does not derive it
+sweep measures. Its enclave memory is modeled from the sealed records and
+the plaintext a call holds for the map, at their canonical widths, and not
+measured; it leaves out the runtime's other buffers, so a budget bounds
+that model and not the enclave's heap. Its model call reads the map once
+or writes it once, so for an entrypoint that accesses a map several times
+it makes no claim of which backend moves the fewest bytes. And the share
+of reads is the one the metadata declares: the planner does not derive it
 from the program, whose entrypoints say what a call may do and not how
 often it is made.
 
@@ -824,8 +843,9 @@ sections above state.
   enclaves built for maps larger than enclave memory, whose cost is the
   pages it moves in and out. The maps here are smaller, and their baselines
   are this repository's own backends, compared at the same key and value
-  widths, capacities and occupancy, with the enclave memory each holds (The
-  Backend Planner); no external system was run.
+  widths, capacities and occupancy, with the enclave memory the planner's
+  model gives each, which is not measured (The Backend Planner); no external
+  system was run.
 - Leakage as a structured trace. Stating what a run may leak as a trace,
   and proving that compilation keeps it, is the approach of structured
   leakage (Barthe, Grégoire, Laporte and Priya, CCS 2021). The observer, its

@@ -59,8 +59,8 @@
     },
     {
       "path": "claim_artifact_manifest.json",
-      "bytes": 99242,
-      "sha256": "7604ab85645ede6c14ce72e6c5a34c74932bd58bd24303ad9ba42a600f42131b"
+      "bytes": 99466,
+      "sha256": "b2e02778399f3ed1c391a5798fe0cf64267dec0858160c5762f8e8cf430d5af1"
     },
     {
       "path": "claim_consistency.json",
@@ -69,13 +69,13 @@
     },
     {
       "path": "claim_status.json",
-      "bytes": 83533,
-      "sha256": "89c0e2d3b7857b514e30ccab8fdded58d14c0a7fc871c75b6eb1fe75f3bc0ead"
+      "bytes": 83757,
+      "sha256": "b4292f051ffcb79b8029e9dc43aee4f601583f424f27232ed7fcb08fbae1a1c4"
     },
     {
       "path": "claim_status.md",
-      "bytes": 14015,
-      "sha256": "f069fb4233dedeaaa0576b1a79ff69cd8139534e51ec1c50505b18bf0e557e8f"
+      "bytes": 14239,
+      "sha256": "43cbd2bc12bba2168b8d859a2b59868dfcc850c9c8d21481f435bad42f73a447"
     },
     {
       "path": "confidential_core_kernel_finish_slot_validation.json",
@@ -259,13 +259,13 @@
     },
     {
       "path": "matched_baselines.json",
-      "bytes": 242382,
-      "sha256": "41910ab4970baca7cb714a1933159cefc2f2d975316e2dd45bc528c1af0cc0bd"
+      "bytes": 285161,
+      "sha256": "598239b50aaea29462ad50f0d8f315029fefe311bf2f45f72782b5aa7b12e7f2"
     },
     {
       "path": "matched_baselines_full.json",
-      "bytes": 311314,
-      "sha256": "d38165e284f607ce543652f7798e507f4f98c382fefe9a03edd8f2a4375f488c"
+      "bytes": 354093,
+      "sha256": "66266b90c930d4606f40139acce73b8b8b7cd4c4559b64efa040b30dc0017214"
     },
     {
       "path": "mutual_information.json",
