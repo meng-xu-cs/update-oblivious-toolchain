@@ -434,6 +434,73 @@ outside Lean.
   `UOToolchain.ProofGradeRoot`.
 - The documents and the claim manifest name what replaced it.
 
+**As built.** The section on authenticated receipts in
+`proof/lean/UOToolchain/DeploymentAcceptance.lean` states both assumptions
+over what an adversary of the session can output: `produced` holds the
+receipts and tags it can output. The description has pairs of a hash and a
+tag; the maintainer chose receipts and tags, so that the hash's assumption
+speaks of the adversary too:
+
+- `UnforgeableAgainst` replaces `Unforgeable`: a receipt and a tag the
+  adversary outputs, whose tag verifies under the session's key, have the
+  hash of a receipt the runtime issued.
+- `HashBindsIssued` replaces `HashInjective`: a receipt the adversary
+  outputs with the hash of an issued receipt is an issued receipt.
+  `HashInjective` spoke of every two receipts, which SHA-256 cannot satisfy
+  literally; `HashBindsIssued` speaks only of receipts the adversary
+  outputs.
+- `SeesIssued`: the adversary can output the receipts the runtime issued
+  with their tags. The model uses it.
+
+The verifier's three theorems keep their names and take the candidate the
+adversary output as a premise (`hProduced`):
+
+- `deployment_receipt_tag_verifies_issued`;
+- `deployment_receipt_not_issued_tag_rejected`;
+- `deployment_receipt_tag_verifies_issued_in_a_state`. It now takes any
+  set of issued receipts, with the premise that each was issued in a state,
+  in place of that set itself.
+
+None of the three depends on an axiom.
+
+The model, `DeploymentReceiptTagModel`, has:
+
+- two receipts: one the runtime issued, and a forged one, which is the
+  issued receipt with another digest of the ciphertext store after its
+  call;
+- a hash that tells the issued receipt from every other, and a tag that
+  tells its hash from every other;
+- an adversary that outputs the issued receipt with its tag, and any
+  receipt with the tag `"wrong"`.
+
+`deployment_receipt_tag_assumptions_not_vacuous` proves that in this model:
+
+- both assumptions and `SeesIssued` hold;
+- the issued receipt's tag verifies;
+- the forged receipt was not issued;
+- the adversary outputs the forged receipt with a tag, and no tag it
+  outputs with it verifies.
+
+So the premises of the verifier's theorem and of the rejection theorem can
+hold. The theorem is in `DeploymentAcceptance.lean`, which
+`UOToolchain.ProofGradeRoot` imports, and the root builds. It depends on
+Lean's three standard axioms.
+
+Controls, in a scratch file outside the repository, prove two things of the
+model:
+
+- The old `Unforgeable` and the old `HashInjective` are both false in it.
+  The forged receipt's hash has a tag that no issued receipt's hash shares,
+  and two receipts that were not issued share a hash. So restoring either
+  statement would break the non-vacuity theorem.
+- The adversary cannot output the forged receipt with its true tag. The old
+  vacuity argument started from that pair.
+
+No static check named the theorems. Outside the claim boundary, the claim
+manifest's `assumption-production-receipt-mac` was the only citation. It now
+names the two assumptions and the non-vacuity theorem, as do the claim
+boundary's paragraph on receipt tags and its row "Production receipt MAC".
+
 ### Issue 65 — Fail closed on storage errors, and test every failure
 
 Source: R1 (§2). Size: M to L. Depends on: Issue 60 (D8).

@@ -425,11 +425,25 @@ answers: a MAC over the receipt's hash, under a key derived from the
 session's key (`verify_production_receipt` in
 `runtime/uo-evm/src/deployment.rs`). A caller holding the session checks the
 tag of a receipt it holds, the last one included, and makes no call. Tags
-and hashes are opaque here. What a verifier may conclude rests on two
-assumptions, which this module states as hypotheses and does not prove: two
-receipts with one hash are one receipt, and a tag that verifies under a
-session's key is one the runtime made, which it does only for the receipts
-it issues. -/
+and hashes are opaque here.
+
+A receipt and its tag reach their verifier from outside the enclave, so an
+adversary of the session may have made both. `produced` holds the receipts
+and tags such an adversary can output, the receipts the runtime issued with
+their tags among them, since it sees those. What a verifier may conclude
+rests on two assumptions about that adversary, which this module states as
+hypotheses and does not prove:
+
+- the MAC's (`UnforgeableAgainst`): a receipt and a tag it can output, whose
+  tag verifies under the session's key, have the hash of a receipt the
+  runtime issued;
+- the hash's (`HashBindsIssued`): a receipt it can output with the hash of
+  an issued receipt is an issued receipt.
+
+Neither speaks of every receipt or every tag, so neither makes every receipt
+issued. In the model at the end of this section both hold, and the runtime
+did not issue one of its two receipts
+(`deployment_receipt_tag_assumptions_not_vacuous`). -/
 
 /-- A deployment's hash of a receipt, and the tag of a receipt's hash under
 a session key. -/
@@ -443,59 +457,175 @@ def DeploymentReceiptTags.Verifies
     (receipt : DeploymentCallReceipt) (tag : String) : Prop :=
   tag = tags.tag sessionKey (tags.receiptHash receipt)
 
-/-- The hash's assumption: two receipts with one hash are one receipt. -/
-def DeploymentReceiptTags.HashInjective (tags : DeploymentReceiptTags) : Prop :=
-  ∀ lhs rhs, tags.receiptHash lhs = tags.receiptHash rhs → lhs = rhs
-
-/-- The MAC's assumption for one session: a tag that verifies under its key
-is the tag of the hash of a receipt the runtime issued, `issued` being the
-receipts the runtime issued in the deployment. -/
-def DeploymentReceiptTags.Unforgeable
+/-- The MAC's assumption for one session, against an adversary of the
+session that can output the receipts and tags `produced` holds: a receipt
+and a tag it can output, whose tag verifies under the session's key, have
+the hash of a receipt the runtime issued, `issued` being the receipts the
+runtime issued in the deployment. It says nothing of a tag the adversary
+cannot output. -/
+def DeploymentReceiptTags.UnforgeableAgainst
     (tags : DeploymentReceiptTags) (sessionKey : String)
+    (produced : DeploymentCallReceipt → String → Prop)
     (issued : DeploymentCallReceipt → Prop) : Prop :=
-  ∀ receiptHash tag, tag = tags.tag sessionKey receiptHash →
-    ∃ receipt, issued receipt ∧ tags.receiptHash receipt = receiptHash
+  ∀ receipt tag, produced receipt tag → tags.Verifies sessionKey receipt tag →
+    ∃ issuedReceipt, issued issuedReceipt ∧
+      tags.receiptHash issuedReceipt = tags.receiptHash receipt
+
+/-- The hash's assumption, against the same adversary: a receipt it can
+output with the hash of an issued receipt is an issued receipt. It says
+nothing of two receipts the adversary cannot output. -/
+def DeploymentReceiptTags.HashBindsIssued
+    (tags : DeploymentReceiptTags)
+    (produced : DeploymentCallReceipt → String → Prop)
+    (issued : DeploymentCallReceipt → Prop) : Prop :=
+  ∀ issuedReceipt receipt tag, issued issuedReceipt → produced receipt tag →
+    tags.receiptHash receipt = tags.receiptHash issuedReceipt → issued receipt
+
+/-- The adversary sees the receipts the runtime issued with their tags, and
+can output them again. -/
+def DeploymentReceiptTags.SeesIssued
+    (tags : DeploymentReceiptTags) (sessionKey : String)
+    (produced : DeploymentCallReceipt → String → Prop)
+    (issued : DeploymentCallReceipt → Prop) : Prop :=
+  ∀ receipt, issued receipt → produced receipt (tags.tag sessionKey (tags.receiptHash receipt))
 
 /-- **What a verifier of a receipt's tag may conclude.** Under the two
-assumptions, a receipt whose tag verifies under a session's key is a receipt
-the runtime issued, with every field as it was issued. A receipt changed in
-any field after it was issued, the digest of the ciphertext store after its
-call among them, is rejected by its holder's own check, and the holder needs
-no call to run it. -/
+assumptions, a receipt and a tag that an adversary of the session output,
+whose tag verifies under the session's key, is a receipt the runtime issued,
+with every field as it was issued. A receipt changed in any field after it
+was issued, the digest of the ciphertext store after its call among them, is
+rejected by its holder's own check, and the holder needs no call to run
+it. -/
 theorem deployment_receipt_tag_verifies_issued
     {tags : DeploymentReceiptTags} {sessionKey tag : String}
+    {produced : DeploymentCallReceipt → String → Prop}
     {issued : DeploymentCallReceipt → Prop} {receipt : DeploymentCallReceipt}
-    (hHash : tags.HashInjective)
-    (hUnforgeable : tags.Unforgeable sessionKey issued)
+    (hHash : tags.HashBindsIssued produced issued)
+    (hUnforgeable : tags.UnforgeableAgainst sessionKey produced issued)
+    (hProduced : produced receipt tag)
     (hVerifies : tags.Verifies sessionKey receipt tag) :
     issued receipt := by
-  obtain ⟨issuedReceipt, hIssued, hSameHash⟩ := hUnforgeable _ tag hVerifies
-  exact hHash _ _ hSameHash ▸ hIssued
+  obtain ⟨issuedReceipt, hIssued, hSameHash⟩ := hUnforgeable receipt tag hProduced hVerifies
+  exact hHash issuedReceipt receipt tag hIssued hProduced hSameHash.symm
 
-/-- A receipt the runtime did not issue has no tag that verifies. -/
+/-- A receipt the runtime did not issue has no tag that verifies among those
+an adversary of the session can output with it. -/
 theorem deployment_receipt_not_issued_tag_rejected
     {tags : DeploymentReceiptTags} {sessionKey tag : String}
+    {produced : DeploymentCallReceipt → String → Prop}
     {issued : DeploymentCallReceipt → Prop} {receipt : DeploymentCallReceipt}
-    (hHash : tags.HashInjective)
-    (hUnforgeable : tags.Unforgeable sessionKey issued)
-    (hNotIssued : ¬ issued receipt) :
+    (hHash : tags.HashBindsIssued produced issued)
+    (hUnforgeable : tags.UnforgeableAgainst sessionKey produced issued)
+    (hNotIssued : ¬ issued receipt)
+    (hProduced : produced receipt tag) :
     ¬ tags.Verifies sessionKey receipt tag :=
   fun hVerifies =>
-    hNotIssued (deployment_receipt_tag_verifies_issued hHash hUnforgeable hVerifies)
+    hNotIssued (deployment_receipt_tag_verifies_issued hHash hUnforgeable hProduced hVerifies)
 
-/-- With the receipts of calls as the runtime issues them
-(`DeploymentReceiptIssued`), a receipt whose tag verifies names its request
-and the receipt before it, starts from the commitments of a state the
-runtime was in, keeps that state's epoch, and moves its counters on by one
-call. -/
+/-- With the receipts the runtime issues as the receipts of calls
+(`DeploymentReceiptIssued`), a receipt whose tag verifies, output with it by
+an adversary of the session, names its request and the receipt before it,
+starts from the commitments of a state the runtime was in, keeps that
+state's epoch, and moves its counters on by one call. -/
 theorem deployment_receipt_tag_verifies_issued_in_a_state
     {tags : DeploymentReceiptTags} {sessionKey tag : String}
-    {receipt : DeploymentCallReceipt}
-    (hHash : tags.HashInjective)
-    (hUnforgeable : tags.Unforgeable sessionKey
-      (fun issued => ∃ state evidenceHash, DeploymentReceiptIssued state evidenceHash issued))
+    {produced : DeploymentCallReceipt → String → Prop}
+    {issued : DeploymentCallReceipt → Prop} {receipt : DeploymentCallReceipt}
+    (hIssuedInAState : ∀ issuedReceipt, issued issuedReceipt →
+      ∃ state evidenceHash, DeploymentReceiptIssued state evidenceHash issuedReceipt)
+    (hHash : tags.HashBindsIssued produced issued)
+    (hUnforgeable : tags.UnforgeableAgainst sessionKey produced issued)
+    (hProduced : produced receipt tag)
     (hVerifies : tags.Verifies sessionKey receipt tag) :
     ∃ state evidenceHash, DeploymentReceiptIssued state evidenceHash receipt :=
-  deployment_receipt_tag_verifies_issued hHash hUnforgeable hVerifies
+  hIssuedInAState receipt
+    (deployment_receipt_tag_verifies_issued hHash hUnforgeable hProduced hVerifies)
+
+/-! ### A model of the two assumptions
+
+The runtime issued one receipt and not a second, which is the first with
+another digest of the ciphertext store after its call. The hash tells the
+issued receipt from every other, and the tag tells the issued receipt's hash
+from every other. The adversary can output the issued receipt with its tag,
+which it saw, and any receipt with a tag that is wrong. -/
+
+namespace DeploymentReceiptTagModel
+
+/-- The receipt the runtime issued. -/
+def issuedReceipt : DeploymentCallReceipt :=
+  { requestHash := "request"
+    previousReceiptHash := "deployment-receipt"
+    publicStateBeforeHash := "public-state-before"
+    publicStateAfterHash := "public-state-after"
+    ciphertextStoreBeforeHash := "store-before"
+    ciphertextStoreAfterHash := "store-after"
+    publicReceiptHash := "public-receipt"
+    freshnessEpoch := 0
+    rollbackCounter := 0
+    nextCallCounter := 1 }
+
+/-- A receipt the runtime did not issue: the issued one with another digest
+of the ciphertext store after its call. -/
+def forgedReceipt : DeploymentCallReceipt :=
+  { issuedReceipt with ciphertextStoreAfterHash := "store-forged" }
+
+/-- The receipts the runtime issued: one. -/
+def issued (receipt : DeploymentCallReceipt) : Prop :=
+  receipt = issuedReceipt
+
+/-- A hash that tells the issued receipt from every other, and a tag that
+tells its hash from every other. -/
+def tags : DeploymentReceiptTags where
+  receiptHash receipt := if receipt = issuedReceipt then "hash-issued" else "hash-other"
+  tag _ receiptHash := if receiptHash = "hash-issued" then "tag-issued" else "tag-other"
+
+/-- The session's key. -/
+def sessionKey : String := "session-key"
+
+/-- What the adversary can output: the issued receipt with its tag, and any
+receipt with the tag `"wrong"`. -/
+def produced (receipt : DeploymentCallReceipt) (tag : String) : Prop :=
+  (receipt = issuedReceipt ∧ tag = "tag-issued") ∨ tag = "wrong"
+
+end DeploymentReceiptTagModel
+
+open DeploymentReceiptTagModel in
+/-- **The receipt tags' assumptions are not vacuous.** In the model, both
+assumptions hold and the adversary sees the issued receipt's tag. The issued
+receipt's tag verifies. The runtime did not issue the forged receipt, the
+adversary can output it with a tag, and no tag it can output with it
+verifies. So the premises of `deployment_receipt_tag_verifies_issued` and of
+`deployment_receipt_not_issued_tag_rejected` can hold, and a statement of
+the assumptions that made every receipt issued would not build here. -/
+theorem deployment_receipt_tag_assumptions_not_vacuous :
+    tags.UnforgeableAgainst sessionKey produced issued ∧
+      tags.HashBindsIssued produced issued ∧
+      tags.SeesIssued sessionKey produced issued ∧
+      issued issuedReceipt ∧
+      produced issuedReceipt "tag-issued" ∧
+      tags.Verifies sessionKey issuedReceipt "tag-issued" ∧
+      ¬ issued forgedReceipt ∧
+      produced forgedReceipt "wrong" ∧
+      ∀ tag, produced forgedReceipt tag → ¬ tags.Verifies sessionKey forgedReceipt tag := by
+  have hForged : forgedReceipt ≠ issuedReceipt := by decide
+  refine ⟨?_, ?_, ?_, rfl, Or.inl ⟨rfl, rfl⟩, ?_, hForged, Or.inr rfl, ?_⟩
+  · intro receipt tag hProduced hVerifies
+    rcases hProduced with ⟨rfl, _⟩ | rfl
+    · exact ⟨issuedReceipt, rfl, rfl⟩
+    · by_cases hReceipt : receipt = issuedReceipt <;>
+        simp [DeploymentReceiptTags.Verifies, tags, hReceipt] at hVerifies
+  · intro issuedReceipt' receipt _ hIssued _ hSameHash
+    subst hIssued
+    by_cases hReceipt : receipt = issuedReceipt
+    · exact hReceipt
+    · simp [tags, hReceipt] at hSameHash
+  · intro receipt hIssued
+    subst hIssued
+    exact Or.inl ⟨rfl, by simp [tags]⟩
+  · simp [DeploymentReceiptTags.Verifies, tags]
+  · intro tag hProduced hVerifies
+    rcases hProduced with ⟨hReceipt, _⟩ | rfl
+    · exact hForged hReceipt
+    · simp [DeploymentReceiptTags.Verifies, tags, hForged] at hVerifies
 
 end UOToolchain

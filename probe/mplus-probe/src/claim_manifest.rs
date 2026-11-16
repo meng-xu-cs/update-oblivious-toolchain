@@ -396,7 +396,7 @@ const CLAIM_ENTRIES: &[ClaimEntry] = &[
     ClaimEntry {
         id: "assumption-production-receipt-mac",
         category: "assumption",
-        text: "Production receipt MAC: a receipt's tag is HMAC-SHA256 under a key that HKDF-SHA256 derives from the session key and id; that a tag which verifies is one the runtime made, and that two receipts with one SHA-256 hash are one receipt, are the hypotheses of deployment_receipt_tag_verifies_issued, trusted and not proved, and the session key comes from an attested key exchange the repository does not implement.",
+        text: "Production receipt MAC: a receipt's tag is HMAC-SHA256 under a key that HKDF-SHA256 derives from the session key and id; that a receipt and a tag an adversary of the session outputs, whose tag verifies, have the hash of a receipt the runtime issued (UnforgeableAgainst), and that the adversary outputs no receipt but an issued one with the SHA-256 hash of an issued receipt (HashBindsIssued), are the hypotheses of deployment_receipt_tag_verifies_issued, trusted and not proved; both hold in a model in which the runtime did not issue a receipt the adversary outputs (deployment_receipt_tag_assumptions_not_vacuous); and the session key comes from an attested key exchange the repository does not implement.",
         status: STATUS_TRUSTED,
         doc_anchor: "Production receipt MAC",
         source_files: &["runtime/uo-evm/src/return_channel.rs"],
