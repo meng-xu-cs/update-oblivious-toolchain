@@ -19,8 +19,8 @@
     },
     {
       "path": "acceptance.json",
-      "bytes": 187956,
-      "sha256": "07a008b8f22ac2d006e7c91109d41a8b8fa2f420d4ca4cdde708e3740d499dd5"
+      "bytes": 188151,
+      "sha256": "22f80377cb8e93bb0a9bb506f083b5fd0258760a3482ac2cffe5507de29f62f2"
     },
     {
       "path": "admission_matrix.json",
@@ -40,7 +40,7 @@
     {
       "path": "bridge_validation.json",
       "bytes": 8575040,
-      "sha256": "1825d8046ac5cf4ebd058888a65cf73637020f2a6076d7f8699d8c622700275e"
+      "sha256": "28d74a4b012fda76c1f88a37c5c675fc5b09c5adfb5f1f91abb26278243eca5a"
     },
     {
       "path": "canonical_pathoram_pair_validation.json",
@@ -49,8 +49,8 @@
     },
     {
       "path": "capacity_sweep.json",
-      "bytes": 2035433,
-      "sha256": "fa6b5f3dafc14d3228a377a2355620b565d1e2a56a7fa4125fecfe95759e2f75"
+      "bytes": 2034408,
+      "sha256": "b4ba53369c268490c2f86baf1c87272c2f2cf46d6b26551c29aefd14a0a341a0"
     },
     {
       "path": "capacity_sweep_full.json",
@@ -59,8 +59,8 @@
     },
     {
       "path": "claim_artifact_manifest.json",
-      "bytes": 89395,
-      "sha256": "672d2c82851c22fc250188f17d9572da8d7cef8faaf92fdf34916d2e27469886"
+      "bytes": 99242,
+      "sha256": "7604ab85645ede6c14ce72e6c5a34c74932bd58bd24303ad9ba42a600f42131b"
     },
     {
       "path": "claim_consistency.json",
@@ -69,8 +69,8 @@
     },
     {
       "path": "claim_status.json",
-      "bytes": 73686,
-      "sha256": "7f32019cac42c95ba5152de05390334f20a950b9d26f9bc6ce97026d961f590c"
+      "bytes": 83533,
+      "sha256": "89c0e2d3b7857b514e30ccab8fdded58d14c0a7fc871c75b6eb1fe75f3bc0ead"
     },
     {
       "path": "claim_status.md",
@@ -309,18 +309,18 @@
     },
     {
       "path": "public_state.json",
-      "bytes": 8336,
-      "sha256": "0f32e08786ecff7282de324179237f9c2254862f2da8a1bf674d09ace43eea11"
+      "bytes": 8332,
+      "sha256": "ef0dbeae58be74a58626d28f85d670e639a7ebf29476c4f66f678818507ac704"
     },
     {
       "path": "reviewer_summary.json",
-      "bytes": 136394,
-      "sha256": "cb46c09e95a542fd23a736fd56b75f4f915a33d44e4375c3e25871c0ef25d5e6"
+      "bytes": 136396,
+      "sha256": "36c7aac93e7ac1b7d206216d8c17755291e98043e78b920c8a259bc880630990"
     },
     {
       "path": "reviewer_summary.md",
-      "bytes": 29442,
-      "sha256": "d20f8fe0c7d33793ad24083a1caf7cd6d83ac6542669ef2785168445b593528f"
+      "bytes": 29444,
+      "sha256": "5daef8ab2216a66c8726f775562c871a1e6dd05aa77f80a2814fc9ee2995bfde"
     },
     {
       "path": "runtime_boundary_validation.json",
@@ -345,7 +345,7 @@
     {
       "path": "runtime_implementation_interface_validation.json",
       "bytes": 3863,
-      "sha256": "2bfcbcb6a62380e8661f6c2aa4f5276e90cdebd92a612077b795f92c8dbf1637"
+      "sha256": "e5023628a2c87f0a2a6339269148bd867e57243bb1f4581fdabda443484690bb"
     },
     {
       "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.json",

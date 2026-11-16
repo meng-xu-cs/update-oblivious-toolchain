@@ -87,6 +87,10 @@ Before declaring success:
 - probe commands exit with status `0`
 - positive reports contain top-level `"accepted": true`
 - `tamper_validation.json` scenarios are rejected as expected
+- the bundle satisfies the evidence contract (`--only acceptance-check`); a
+  change that adds a report or a field, or moves a population, regenerates
+  `probe/mplus-probe/evidence_contract.json` with
+  `mplus-probe --only evidence-contract-draft` and reviews its diff
 - `git diff --check` is clean
 
 ## Generated Artifacts

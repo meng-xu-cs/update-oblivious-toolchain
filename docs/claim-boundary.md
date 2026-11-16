@@ -865,4 +865,5 @@ non-claim, and TCB component mapped to its source, Lean, runtime/compiler, and
 benchmark/result artifacts plus a validation command). The report fails closed
 and CI rejects the change if any assumption-table row, TCB-table row, or
 non-claim bullet here is missing from the manifest, or if a referenced artifact
-does not exist. `scripts/run_validation.sh` regenerates it.
+does not exist: a source, Lean or runtime file, or a result file that a claim
+cites. `scripts/run_validation.sh` regenerates it.

@@ -1185,6 +1185,221 @@
       "detail": "artifact probe/mplus-probe/src/lib.rs referenced by tcb-mplus-probe exists",
       "name": "file-exists:tcb-mplus-probe:probe/mplus-probe/src/lib.rs",
       "ok": true
+    },
+    {
+      "detail": "result results/bridge_validation.json cited by paper-update-obliviousness-theorem exists",
+      "name": "result-exists:paper-update-obliviousness-theorem:results/bridge_validation.json",
+      "ok": true
+    },
+    {
+      "detail": "result results/trace_equivalence.json cited by paper-update-obliviousness-theorem exists",
+      "name": "result-exists:paper-update-obliviousness-theorem:results/trace_equivalence.json",
+      "ok": true
+    },
+    {
+      "detail": "result results/static_checks.json cited by paper-update-obliviousness-theorem exists",
+      "name": "result-exists:paper-update-obliviousness-theorem:results/static_checks.json",
+      "ok": true
+    },
+    {
+      "detail": "result results/bridge_validation.json cited by deployment-acceptance-theorem exists",
+      "name": "result-exists:deployment-acceptance-theorem:results/bridge_validation.json",
+      "ok": true
+    },
+    {
+      "detail": "result results/trace_equivalence.json cited by exact-uo-backends exists",
+      "name": "result-exists:exact-uo-backends:results/trace_equivalence.json",
+      "ok": true
+    },
+    {
+      "detail": "result results/correctness.json cited by exact-uo-backends exists",
+      "name": "result-exists:exact-uo-backends:results/correctness.json",
+      "ok": true
+    },
+    {
+      "detail": "result results/bridge_validation.json cited by computational-uo-path-oram-local exists",
+      "name": "result-exists:computational-uo-path-oram-local:results/bridge_validation.json",
+      "ok": true
+    },
+    {
+      "detail": "result results/capacity_sweep.json cited by computational-uo-path-oram-local exists",
+      "name": "result-exists:computational-uo-path-oram-local:results/capacity_sweep.json",
+      "ok": true
+    },
+    {
+      "detail": "result results/bridge_validation.json cited by computational-uo-path-oram-private exists",
+      "name": "result-exists:computational-uo-path-oram-private:results/bridge_validation.json",
+      "ok": true
+    },
+    {
+      "detail": "result results/capacity_sweep.json cited by computational-uo-path-oram-private exists",
+      "name": "result-exists:computational-uo-path-oram-private:results/capacity_sweep.json",
+      "ok": true
+    },
+    {
+      "detail": "result results/trace_equivalence.json cited by path-oram-kernel-premises exists",
+      "name": "result-exists:path-oram-kernel-premises:results/trace_equivalence.json",
+      "ok": true
+    },
+    {
+      "detail": "result results/static_checks.json cited by path-oram-kernel-premises exists",
+      "name": "result-exists:path-oram-kernel-premises:results/static_checks.json",
+      "ok": true
+    },
+    {
+      "detail": "result results/path_oram_avl_map_replay.json cited by path-oram-private-avl-map-semantics exists",
+      "name": "result-exists:path-oram-private-avl-map-semantics:results/path_oram_avl_map_replay.json",
+      "ok": true
+    },
+    {
+      "detail": "result results/path_oram_avl_map_replay_full.json cited by path-oram-private-avl-map-semantics exists",
+      "name": "result-exists:path-oram-private-avl-map-semantics:results/path_oram_avl_map_replay_full.json",
+      "ok": true
+    },
+    {
+      "detail": "result results/tamper_validation.json cited by path-oram-fact-reuse-plan exists",
+      "name": "result-exists:path-oram-fact-reuse-plan:results/tamper_validation.json",
+      "ok": true
+    },
+    {
+      "detail": "result results/tape_substitution.json cited by path-oram-tape-substitution-tested exists",
+      "name": "result-exists:path-oram-tape-substitution-tested:results/tape_substitution.json",
+      "ok": true
+    },
+    {
+      "detail": "result results/tape_substitution_full.json cited by path-oram-tape-substitution-tested exists",
+      "name": "result-exists:path-oram-tape-substitution-tested:results/tape_substitution_full.json",
+      "ok": true
+    },
+    {
+      "detail": "result results/matched_baselines.json cited by backend-planner-bytes-model exists",
+      "name": "result-exists:backend-planner-bytes-model:results/matched_baselines.json",
+      "ok": true
+    },
+    {
+      "detail": "result results/matched_baselines_full.json cited by backend-planner-bytes-model exists",
+      "name": "result-exists:backend-planner-bytes-model:results/matched_baselines_full.json",
+      "ok": true
+    },
+    {
+      "detail": "result results/bridge_validation.json cited by admitted-package-identity-hash exists",
+      "name": "result-exists:admitted-package-identity-hash:results/bridge_validation.json",
+      "ok": true
+    },
+    {
+      "detail": "result results/bridge_validation.json cited by executable-semantics-profile exists",
+      "name": "result-exists:executable-semantics-profile:results/bridge_validation.json",
+      "ok": true
+    },
+    {
+      "detail": "result results/runtime_boundary_validation.json cited by source-backed-runtime-boundaries exists",
+      "name": "result-exists:source-backed-runtime-boundaries:results/runtime_boundary_validation.json",
+      "ok": true
+    },
+    {
+      "detail": "result results/storage_boundary.json cited by storage-boundary-log exists",
+      "name": "result-exists:storage-boundary-log:results/storage_boundary.json",
+      "ok": true
+    },
+    {
+      "detail": "result results/runtime_boundary_validation.json cited by storage-boundary-log exists",
+      "name": "result-exists:storage-boundary-log:results/runtime_boundary_validation.json",
+      "ok": true
+    },
+    {
+      "detail": "result results/admission_matrix.json cited by dsl-admission-subset exists",
+      "name": "result-exists:dsl-admission-subset:results/admission_matrix.json",
+      "ok": true
+    },
+    {
+      "detail": "result results/overheads.json cited by insecure-evaluation-baselines exists",
+      "name": "result-exists:insecure-evaluation-baselines:results/overheads.json",
+      "ok": true
+    },
+    {
+      "detail": "result results/leakage_auc.json cited by insecure-evaluation-baselines exists",
+      "name": "result-exists:insecure-evaluation-baselines:results/leakage_auc.json",
+      "ok": true
+    },
+    {
+      "detail": "result results/lean_assumption_budget.json cited by assumption-bucket-encryption-indcpa exists",
+      "name": "result-exists:assumption-bucket-encryption-indcpa:results/lean_assumption_budget.json",
+      "ok": true
+    },
+    {
+      "detail": "result results/lean_assumption_budget.json cited by assumption-metadata-encryption-indcpa exists",
+      "name": "result-exists:assumption-metadata-encryption-indcpa:results/lean_assumption_budget.json",
+      "ok": true
+    },
+    {
+      "detail": "result results/lean_assumption_budget.json cited by assumption-stash-overflow-bounded exists",
+      "name": "result-exists:assumption-stash-overflow-bounded:results/lean_assumption_budget.json",
+      "ok": true
+    },
+    {
+      "detail": "result results/runtime_boundary_validation.json cited by assumption-runtime-key-derivation exists",
+      "name": "result-exists:assumption-runtime-key-derivation:results/runtime_boundary_validation.json",
+      "ok": true
+    },
+    {
+      "detail": "result results/trace_equivalence.json cited by assumption-return-channel-aead exists",
+      "name": "result-exists:assumption-return-channel-aead:results/trace_equivalence.json",
+      "ok": true
+    },
+    {
+      "detail": "result results/runtime_boundary_validation.json cited by assumption-production-receipt-mac exists",
+      "name": "result-exists:assumption-production-receipt-mac:results/runtime_boundary_validation.json",
+      "ok": true
+    },
+    {
+      "detail": "result results/lean_assumption_budget.json cited by assumption-tee-deployment exists",
+      "name": "result-exists:assumption-tee-deployment:results/lean_assumption_budget.json",
+      "ok": true
+    },
+    {
+      "detail": "result results/lean_assumption_budget.json cited by assumption-parser-preprocessing-equivalence exists",
+      "name": "result-exists:assumption-parser-preprocessing-equivalence:results/lean_assumption_budget.json",
+      "ok": true
+    },
+    {
+      "detail": "result results/lean_assumption_budget.json cited by assumption-real-keccak-equivalence exists",
+      "name": "result-exists:assumption-real-keccak-equivalence:results/lean_assumption_budget.json",
+      "ok": true
+    },
+    {
+      "detail": "result results/storage_boundary.json cited by nonclaim-production-restart-and-store-rollback exists",
+      "name": "result-exists:nonclaim-production-restart-and-store-rollback:results/storage_boundary.json",
+      "ok": true
+    },
+    {
+      "detail": "result results/kernel_validation.json cited by tcb-rust-runtime-kernel exists",
+      "name": "result-exists:tcb-rust-runtime-kernel:results/kernel_validation.json",
+      "ok": true
+    },
+    {
+      "detail": "result results/runtime_boundary_validation.json cited by tcb-source-backed-boundaries exists",
+      "name": "result-exists:tcb-source-backed-boundaries:results/runtime_boundary_validation.json",
+      "ok": true
+    },
+    {
+      "detail": "result results/lean_assumption_budget.json cited by tcb-trusted-assumptions exists",
+      "name": "result-exists:tcb-trusted-assumptions:results/lean_assumption_budget.json",
+      "ok": true
+    },
+    {
+      "detail": "result results/runtime_boundary_validation.json cited by tcb-rust-outside-kernel exists",
+      "name": "result-exists:tcb-rust-outside-kernel:results/runtime_boundary_validation.json",
+      "ok": true
+    },
+    {
+      "detail": "result results/admission_matrix.json cited by tcb-uo-solc-front-end exists",
+      "name": "result-exists:tcb-uo-solc-front-end:results/admission_matrix.json",
+      "ok": true
+    },
+    {
+      "detail": "result results/acceptance.json cited by tcb-mplus-probe exists",
+      "name": "result-exists:tcb-mplus-probe:results/acceptance.json",
+      "ok": true
     }
   ],
   "entries": [

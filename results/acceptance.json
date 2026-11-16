@@ -16,6 +16,14 @@
     "deprecated_report",
     "unclassified"
   ],
+  "evidence_contract": {
+    "enforced": true,
+    "reports_in_contract": 95,
+    "reports_present": 95,
+    "satisfied": true,
+    "schema": "uo.evidence_contract.v1",
+    "violations": []
+  },
   "mode": "proof_grade",
   "report": "acceptance",
   "reports": [

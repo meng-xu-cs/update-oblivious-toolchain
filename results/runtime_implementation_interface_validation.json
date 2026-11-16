@@ -19,7 +19,7 @@
     "pinned_bytes_cut_as_test_items": 630278,
     "pinned_files": 31,
     "slicer": "a lexer that knows strings, raw strings, characters and comments: probe/mplus-probe/src/rust_source.rs and proof/lean/UOToolchain/RustSourceSlice.lean",
-    "workspace_rust_files_scanned": 76
+    "workspace_rust_files_scanned": 77
   },
   "public_shell_canonical_hashing_guarded_by_public_entry_theorem_checked": true,
   "public_shell_rejects_confidential_expression_evaluation_theorem_checked": true,

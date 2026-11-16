@@ -37,6 +37,14 @@ Focused validation:
 ./scripts/run_heavy_artifact.sh
 ```
 
+The evidence contract that the final acceptance check holds the results bundle
+to, regenerated after a change that adds a report or a field or moves a
+population (review the diff):
+
+```bash
+cargo run -q -p mplus-probe -- --only evidence-contract-draft --out-dir results > probe/mplus-probe/evidence_contract.json
+```
+
 Reproducibility check:
 
 ```bash

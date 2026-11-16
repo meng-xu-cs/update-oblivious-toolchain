@@ -833,6 +833,19 @@ fn run_checks(root: &Path, claim_boundary: &str) -> (Vec<Check>, bool) {
         }
     }
 
+    // 7. Every result file a claim cites must exist too (Issue 62 of the
+    //    review of 16 November 2026), so that no claim rests on a report the
+    //    bundle has lost.
+    for entry in CLAIM_ENTRIES {
+        for file in entry.benchmark_result_files {
+            checks.push(check(
+                format!("result-exists:{}:{file}", entry.id),
+                root.join(file).exists(),
+                format!("result {file} cited by {} exists", entry.id),
+            ));
+        }
+    }
+
     let all_ok = checks.iter().all(|c| c.ok);
     (checks, all_ok)
 }

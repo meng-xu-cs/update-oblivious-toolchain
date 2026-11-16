@@ -114,6 +114,7 @@ enum ReportKind {
     FreshCoinValidation,
     ReviewerSummary,
     AcceptanceCheck,
+    EvidenceContractDraft,
     BridgeVerdict,
     ClaimConsistency,
     ClaimStatus,
@@ -1018,21 +1019,62 @@ fn main() -> Result<()> {
         }
         Some(ReportKind::AcceptanceCheck) => {
             // Aggregate the already-generated results/*.json into a fail-closed
-            // acceptance verdict. Always write acceptance.json (so it can be
-            // inspected) and then fail when it is not accepted.
-            let report = mplus_probe::run_acceptance_check_report(&cli.out_dir)?;
+            // acceptance verdict, and hold the bundle to the evidence contract
+            // (Issue 62 of the review of 16 November 2026): every report it
+            // names, with its schema, fields, true checks and populations. The
+            // contract describes the compact bundle that is committed, so a
+            // heavy bundle is not held to it. Always write acceptance.json (so
+            // it can be inspected), and the reproducibility manifest that
+            // hashes it, and then fail when it is not accepted.
+            let mut report = mplus_probe::run_acceptance_check_report(&cli.out_dir)?;
+            let contract = match cli.artifact_mode {
+                ArtifactModeArg::Compact => mplus_probe::check_evidence_contract(
+                    Path::new(&cli.out_dir),
+                    &mplus_probe::committed_evidence_contract()?,
+                )?,
+                ArtifactModeArg::Heavy => json!({
+                    "schema": mplus_probe::EVIDENCE_CONTRACT_SCHEMA,
+                    "enforced": false,
+                    "reason": "the contract describes the compact bundle that is committed; a heavy bundle is not held to it",
+                }),
+            };
+            let contract_holds = contract["enforced"] == json!(false)
+                || contract["satisfied"] == json!(true);
+            let violations = contract["violations"]
+                .as_array()
+                .map(Vec::len)
+                .unwrap_or(0);
+            report["evidence_contract"] = contract;
+            if !contract_holds {
+                report["accepted"] = json!(false);
+            }
             fs::create_dir_all(&cli.out_dir)?;
             fs::write(
                 Path::new(&cli.out_dir).join("acceptance.json"),
                 serde_json::to_vec_pretty(&report)?,
             )?;
+            mplus_probe::write_reproducibility_manifest(&cli.out_dir)?;
             println!("{}", serde_json::to_string_pretty(&report)?);
+            if !contract_holds {
+                anyhow::bail!(
+                    "acceptance gate failed: the bundle breaks the evidence contract in {violations} place(s); see evidence_contract.violations in {}/acceptance.json",
+                    cli.out_dir
+                );
+            }
             if report["accepted"].as_bool() != Some(true) {
                 anyhow::bail!(
                     "acceptance gate failed; see {}/acceptance.json",
                     cli.out_dir
                 );
             }
+        }
+        Some(ReportKind::EvidenceContractDraft) => {
+            // The evidence contract that the bundle in the output directory
+            // satisfies as it is, on standard output: what
+            // probe/mplus-probe/evidence_contract.json is regenerated from, and
+            // reviewed, when a report or a population changes.
+            let draft = mplus_probe::draft_evidence_contract(Path::new(&cli.out_dir))?;
+            println!("{}", serde_json::to_string_pretty(&draft)?);
         }
         Some(ReportKind::BridgeVerdict) => {
             // Stamp the proof-grade verdict onto an already-generated

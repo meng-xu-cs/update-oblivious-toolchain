@@ -97,12 +97,14 @@ jobs:
         run: cargo run -q -p mplus-probe -- --only tape-substitution --out-dir results
       - name: storage boundary (store log against traces, restart from files)
         run: cargo run -q -p mplus-probe -- --only storage-boundary --out-dir results
-      - name: fail-closed acceptance aggregate
-        run: cargo run -q -p mplus-probe -- --only acceptance-check --out-dir results
       - name: Path ORAM claim-consistency
         run: cargo run -q -p mplus-probe -- --only claim-consistency --out-dir results
       - name: Claim artifact manifest coverage
         run: cargo run -q -p mplus-probe -- --only claim-status --out-dir results
+      # Last, over every report: each false leaf classified, and the bundle
+      # held to the evidence contract (probe/mplus-probe/evidence_contract.json).
+      - name: fail-closed acceptance aggregate and evidence contract
+        run: cargo run -q -p mplus-probe -- --only acceptance-check --out-dir results
       # The false leaves of the gated reports, each with the class the
       # acceptance gate gives it (review/validation_false_paths.json), and the
       # controls: an expected negative passes and a required false leaf fails.

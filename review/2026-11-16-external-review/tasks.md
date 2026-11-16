@@ -205,6 +205,52 @@ exist, not its result files.
 - Each negative control fails, naming its reason.
 - CI's acceptance step enforces the contract.
 
+**As built.** The contract is `probe/mplus-probe/evidence_contract.json`,
+compiled into the probe (`probe/mplus-probe/src/evidence_contract.rs`). It
+names the 95 reports of the bundle and the schema each declares, null for
+the 76 that declare none. It gives each field, at the top level and one
+level down, a descriptor of what it must be. `true` is a check that must be
+true. `boolean`, `null`, `string`, `number` or `object` is a value of that
+type. `array N` is an array of exactly `N` items, and `count N` a count of
+exactly `N`; a count is a field named `count` or `..._count`, or one of the
+storage boundary's `coverage.calls` and `coverage.benchmark_backend_pairs`.
+
+`--only evidence-contract-draft` writes the contract a bundle satisfies, and
+the committed one is that draft of the committed bundle, reviewed. Its 5,229
+lines include, among the populations, the 428 tamper scenarios, the 47
+storage-boundary calls over 14 pairs, the 63 matched-baseline cells, the 14
+admitted and 25 rejected admission features, the 280 claim checks, and the
+99 files of the reproducibility manifest. A change that adds a report or a
+field, or moves a population, regenerates it in the same commit, and the
+contract's diff shows what moved.
+
+`--only acceptance-check` holds the compact bundle to the contract after it
+classifies the false leaves, records the outcome in `acceptance.json`
+(`evidence_contract`: whether it held, and each violation with its report,
+kind, path, expected and found value), and fails unless both pass. A heavy
+bundle is not held to it, and the section says so. The check also writes the
+reproducibility manifest, since `acceptance.json` changes, and it now runs
+last in the validation script and in CI, after the claim reports, so that it
+reads every report as committed.
+
+The claim manifest checks that every result file a claim cites exists: 43
+`result-exists` checks beside the 126 `file-exists` checks, all of which
+hold.
+
+The negative controls are unit tests on a small bundle and the contract
+drafted from it: a report removed, a report emptied, a check field deleted
+one level down, two populations moved, a check turned false, a field of
+another type, an unknown field, a changed schema and an unknown report. Each
+fails with its report, kind and path, and the committed bundle satisfying
+the committed contract is the positive control. Run through the CLI on a
+copy of the committed bundle with one tamper scenario taken out and
+`public_state.json` deleted, the gate fails and names both (428 scenarios
+expected, 427 found), where the classification alone accepted the bundle.
+
+`docs/evaluation.md`, `docs/coding-agent-conventions.md`, `runbook.md` and
+the claim boundary's Generated Manifest describe the contract and how to
+regenerate it.
+
 ### Issue 63 — Make the matched baselines' coverage fail closed, and test the planner under a budget
 
 Source: R4, Q2 (§5, §8). Size: S. Depends on: nothing; Issue 62 holds its

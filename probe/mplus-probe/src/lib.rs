@@ -51,6 +51,11 @@ pub use acceptance::{
 };
 
 mod capacity_sweep;
+mod evidence_contract;
+pub use evidence_contract::{
+    check_evidence_contract, committed_evidence_contract, draft_evidence_contract,
+    EVIDENCE_CONTRACT_SCHEMA,
+};
 mod matched_baselines;
 mod public_state;
 mod rust_source;

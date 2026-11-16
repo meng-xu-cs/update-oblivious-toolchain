@@ -19,7 +19,20 @@ establish and what they do not).
 - `acceptance.json` gives every false leaf of every report one class
   (`probe/mplus-probe/src/acceptance.rs`) and lists the leaves of each report
   by class (`false_paths_by_class`); the bundle is accepted when none is a
-  required failure or unclassified.
+  required failure or unclassified, and when it satisfies the evidence
+  contract. The contract, `probe/mplus-probe/evidence_contract.json`, names
+  every report of the bundle and the schema it declares. It gives each field,
+  at the top level and one level down, what it must be: a check that must be
+  true, a type, an array of so many items, or a count of so much
+  (`probe/mplus-probe/src/evidence_contract.rs`). The final acceptance check
+  (`--only acceptance-check`, the last probe step of the validation script
+  and of CI) fails, naming each violation, on a report missing or unknown, a
+  schema changed, a field missing, unknown or of another type, a check that
+  is not true, or a population that moved. It applies to the compact bundle
+  that is committed, not to a heavy one. A change that adds a report or a
+  field, or moves a population, regenerates the contract
+  (`mplus-probe --only evidence-contract-draft > probe/mplus-probe/evidence_contract.json`)
+  in the same commit, and its diff shows what moved.
   `scripts/rebuild_review_validation_false_paths.sh` finds the false leaves of
   four gated reports itself, takes their classes from `acceptance.json`, and
   keeps them in `review/validation_false_paths.json` and `.txt`; it fails when

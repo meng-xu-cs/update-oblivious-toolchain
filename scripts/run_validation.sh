@@ -113,14 +113,19 @@ cargo run -q -p mplus-probe -- --only abort-rollback "${PROBE_ARGS[@]}"
 # feature and reject every unsupported one with a diagnostic that names the
 # feature. Generated on the strict default build; fail-closed via acceptance.
 cargo run -q -p mplus-probe -- --only admission-matrix "${PROBE_ARGS[@]}"
-# Fail-closed proof-grade acceptance aggregate over the generated reports.
-cargo run -q -p mplus-probe -- --only acceptance-check "${PROBE_ARGS[@]}"
 # Fail-closed Path ORAM claim-consistency check (README/docs/proof/code agree).
 cargo run -q -p mplus-probe -- --only claim-consistency "${PROBE_ARGS[@]}"
 # Generated claim/evaluation artifact manifests (Issue 21). Fails closed if
 # docs/claim-boundary.md names a claim/assumption/non-claim/TCB row that the
-# manifest does not carry, or if a referenced artifact is missing.
+# manifest does not carry, or if a file or result a claim cites is missing.
 cargo run -q -p mplus-probe -- --only claim-status "${PROBE_ARGS[@]}"
+# Fail-closed proof-grade acceptance aggregate over the generated reports:
+# every false leaf classified, and the bundle held to the evidence contract
+# (probe/mplus-probe/evidence_contract.json: every report, its schema, its
+# fields and their types, the checks that must be true, and its populations).
+# It runs after every report it reads is written, and writes the
+# reproducibility manifest after acceptance.json.
+cargo run -q -p mplus-probe -- --only acceptance-check "${PROBE_ARGS[@]}"
 # The false leaves of the gated reports, each with the class acceptance.json
 # gives it, in review/validation_false_paths.json; none may be a required
 # failure or unclassified. The controls check that an expected negative passes
