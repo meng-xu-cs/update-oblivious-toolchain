@@ -8,6 +8,12 @@
 //! `required_failure` drives `accepted: false`. Expected tamper rejections and
 //! computational-ORAM differences count as success only via explicit
 //! classification metadata, never by default.
+//!
+//! Each report's entry lists its false paths under their class
+//! (`false_paths_by_class`), so that a reader of `acceptance.json`, and
+//! `scripts/rebuild_review_validation_false_paths.sh`, which lists the false
+//! leaves of the gated reports, take every class from these rules and from no
+//! other.
 
 use anyhow::{anyhow, Result};
 use serde_json::{json, Value as JsonValue};
@@ -287,35 +293,32 @@ struct ReportVerdict {
 
 fn classify_report(report: &str, root: &JsonValue) -> ReportVerdict {
     let mut class_counts = empty_class_counts();
-    let mut unclassified = Vec::new();
-    let mut required_failures = Vec::new();
-    let mut expected_false_paths = Vec::new();
-    let mut advisory_false_paths = Vec::new();
+    // Every false path under its class, each class listed even when empty.
+    let mut paths_by_class: BTreeMap<String, Vec<String>> = ALL_CLASSES
+        .iter()
+        .map(|class| ((*class).to_string(), Vec::new()))
+        .collect();
     let mut false_total = 0usize;
     {
         let mut path_buf = Vec::new();
         walk(root, &mut path_buf, None, &mut |segments, parent| {
             let class = classify(report, segments, parent);
-            let joined = segments.join(".");
             false_total += 1;
             *class_counts.get_mut(class).expect("known class") += 1;
-            match class {
-                CLASS_UNCLASSIFIED => unclassified.push(joined),
-                CLASS_REQUIRED_FAILURE => required_failures.push(joined),
-                CLASS_ADVISORY_NONCLAIM => advisory_false_paths.push(joined),
-                CLASS_EXPECTED_NEGATIVE
-                | CLASS_EXPECTED_COMPUTATIONAL_DIFFERENCE
-                | CLASS_DEPRECATED_REPORT => expected_false_paths.push(joined),
-                _ => {}
-            }
+            paths_by_class
+                .get_mut(class)
+                .expect("known class")
+                .push(segments.join("."));
         });
     }
+    let unclassified = paths_by_class[CLASS_UNCLASSIFIED].clone();
+    let required_failures = paths_by_class[CLASS_REQUIRED_FAILURE].clone();
     let mode = report_mode(report);
     let required = mode == "proof_grade";
     let accepted = unclassified.is_empty() && required_failures.is_empty();
     let declared_accepted = root.get("accepted").and_then(JsonValue::as_bool);
     let entry = json!({
-        "schema": "uo.acceptance.report.v1",
+        "schema": "uo.acceptance.report.v2",
         "report": report,
         "mode": mode,
         "required": required,
@@ -323,9 +326,7 @@ fn classify_report(report: &str, root: &JsonValue) -> ReportVerdict {
         "accepted": accepted,
         "false_count": false_total,
         "class_counts": class_counts.clone(),
-        "false_paths": false_total,
-        "expected_false_paths": expected_false_paths,
-        "advisory_false_paths": advisory_false_paths,
+        "false_paths_by_class": paths_by_class,
         "required_failures": required_failures.clone(),
         "unclassified_false_paths": unclassified.clone(),
     });
@@ -507,6 +508,45 @@ mod tests {
         assert_eq!(report["accepted"], json!(false));
         assert_eq!(report["required_failures"].as_array().unwrap().len(), 1);
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// A report's entry lists each false path under the class it was given,
+    /// and every class, so that a reader takes the classes from this module
+    /// (Issue 61 of the review of 16 November 2026).
+    #[test]
+    fn entries_list_every_false_path_under_its_class() {
+        let report = json!({
+            "accepted": true,
+            "tamper": [{"mutation": "flip", "accepted": false, "rejected": true}],
+            "trace": {"backend": "oram", "physical_write_shape_uniform": false},
+            "executable": false,
+            "check": {"ok": false},
+        });
+        let entry = report_verdict("bridge_validation", &report);
+        assert_eq!(entry["schema"], json!("uo.acceptance.report.v2"));
+        let by_class = entry["false_paths_by_class"].as_object().unwrap();
+        assert_eq!(by_class.keys().map(String::as_str).collect::<Vec<_>>(), {
+            let mut classes = ALL_CLASSES.to_vec();
+            classes.sort_unstable();
+            classes
+        });
+        assert_eq!(
+            by_class[CLASS_EXPECTED_NEGATIVE],
+            json!(["tamper.0.accepted"])
+        );
+        assert_eq!(
+            by_class[CLASS_EXPECTED_COMPUTATIONAL_DIFFERENCE],
+            json!(["trace.physical_write_shape_uniform"])
+        );
+        assert_eq!(by_class[CLASS_ADVISORY_NONCLAIM], json!(["executable"]));
+        assert_eq!(by_class[CLASS_UNCLASSIFIED], json!(["check.ok"]));
+        assert_eq!(entry["unclassified_false_paths"], json!(["check.ok"]));
+        let listed: usize = by_class
+            .values()
+            .map(|paths| paths.as_array().unwrap().len())
+            .sum();
+        assert_eq!(listed, entry["false_count"].as_u64().unwrap() as usize);
+        assert_eq!(entry["accepted"], json!(false));
     }
 
     #[test]

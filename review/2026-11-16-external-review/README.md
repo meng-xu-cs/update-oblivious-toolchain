@@ -95,8 +95,8 @@ baseline of Issue 69. Issue 50 stays deferred.
 
 | Issue | Title | Wave | Size | Depends on | Status | Commit |
 | --- | --- | --- | --- | --- | --- | --- |
-| 60 | Decide the storage-error contract, the recovery mechanism and the receipt proof's route | 9 | S | maintainer | done | |
-| 61 | Make the false-path snapshot see false leaves, and classify them as the acceptance gate does | 10 | S | | todo | |
+| 60 | Decide the storage-error contract, the recovery mechanism and the receipt proof's route | 9 | S | maintainer | done | `8f30524` |
+| 61 | Make the false-path snapshot see false leaves, and classify them as the acceptance gate does | 10 | S | | done | |
 | 62 | Give the acceptance gate an evidence contract | 10 | M | 61 | todo | |
 | 63 | Make the matched baselines' coverage fail closed, and test the planner under a budget | 10 | S | | todo | |
 | 64 | State the receipt MAC assumption over what an adversary can produce, with a non-vacuity model | 11 | S to M | 60 (D10) | todo | |

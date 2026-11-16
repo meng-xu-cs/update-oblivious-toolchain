@@ -132,6 +132,42 @@ would reject legitimate content.
 - The positive control passes and the negative control fails.
 - `run_validation.sh` and CI run the new check.
 
+**As built.** The acceptance gate's entry for a report lists its false paths
+under each class (`false_paths_by_class`, schema `uo.acceptance.report.v2`).
+It replaces the two lists that put the expected classes together, so a
+reader takes every class from `acceptance.rs` alone. A unit test checks that
+each false path is listed under the class it was given.
+
+`scripts/rebuild_review_validation_false_paths.sh` finds the false leaves of
+the four gated reports with `paths(type == "boolean")` and takes each one's
+class from `results/acceptance.json`. It fails when the two lists of leaves
+differ, which an `acceptance.json` that is stale or a traversal that drops
+leaves would cause. It also fails when a leaf is `required_failure` or
+`unclassified`, and, with `--check`, when the committed snapshot differs.
+
+The snapshot lists the 875 false leaves with their classes, and none fails:
+
+- `bridge_validation.json`: 752 (537 expected negatives, 48 expected
+  computational differences of the Path ORAM route, 167 advisory or
+  non-claim bits);
+- `kernel_model_alignment_validation.json`: 6 advisory bits;
+- `runtime_boundary_validation.json`: 35 advisory bits;
+- `static_checks.json`: 82 (5 expected negatives, 77 advisory bits).
+
+`--self-test` builds two results directories in which every gated report
+accepts but one, and classifies them with the probe's own acceptance check.
+In the first, the exception holds a rejected tamper mutation
+(`accepted: false` beside `rejected: true`), which must be listed as an
+expected negative and pass. In the second, it holds a top-level `accepted: false`,
+which must be listed as a required failure and fail. The old traversal fails
+the controls and the check, and a check that accepts every class fails the
+second control.
+
+The validation script, `scripts/baseline.sh` and CI's probe-validation job
+run the check and the controls. CI used to run the check only in the nightly
+job, through `baseline.sh`, and not on every push as the description above
+says. `docs/evaluation.md` describes the gate's classes and the snapshot.
+
 ### Issue 62 — Give the acceptance gate an evidence contract
 
 Source: R5 (§6). Size: M. Depends on: Issue 61.

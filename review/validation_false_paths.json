@@ -1,12 +1,3062 @@
 {
   "results/bridge_validation.json": {
-    "false_count": 0,
-    "false_paths": [],
+    "class_counts": {
+      "advisory_nonclaim": 167,
+      "deprecated_report": 0,
+      "expected_computational_difference": 48,
+      "expected_negative": 537,
+      "required_failure": 0,
+      "unclassified": 0
+    },
+    "false_count": 752,
+    "false_paths": [
+      {
+        "class": "advisory_nonclaim",
+        "path": "kernel_model_alignment_validation.lean_confidential_kernel_slot_statement_runtime_normal_form_flags.2"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "kernel_model_alignment_validation.lean_confidential_kernel_statement_runtime_normal_form_flags.2"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "kernel_model_alignment_validation.rust_confidential_kernel_slot_statement_profiles.2.runtime_normal_form"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "kernel_model_alignment_validation.rust_confidential_kernel_slot_statement_runtime_normal_form_flags.2"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "kernel_model_alignment_validation.rust_confidential_kernel_statement_profiles.2.runtime_normal_form"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "kernel_model_alignment_validation.rust_confidential_kernel_statement_runtime_normal_form_flags.2"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "paper_main_family_boundary_validation.scenarios.0.canonical_leaf_seed_space_matches"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "paper_main_family_boundary_validation.scenarios.0.canonical_leaf_values_match_runtime_seed"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "paper_main_family_boundary_validation.scenarios.0.physical_read_shape_uniform"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "paper_main_family_boundary_validation.scenarios.0.physical_write_shape_uniform"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "paper_main_family_boundary_validation.scenarios.1.canonical_leaf_seed_space_matches"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "paper_main_family_boundary_validation.scenarios.1.canonical_leaf_values_match_runtime_seed"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "paper_main_family_boundary_validation.scenarios.1.physical_read_shape_uniform"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "paper_main_family_boundary_validation.scenarios.1.physical_write_shape_uniform"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "paper_main_family_boundary_validation.scenarios.2.canonical_leaf_seed_space_matches"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "paper_main_family_boundary_validation.scenarios.2.canonical_leaf_values_match_runtime_seed"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "paper_main_family_boundary_validation.scenarios.2.physical_read_shape_uniform"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "paper_main_family_boundary_validation.scenarios.2.physical_write_shape_uniform"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "paper_main_family_boundary_validation.scenarios.3.canonical_leaf_seed_space_matches"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "paper_main_family_boundary_validation.scenarios.3.canonical_leaf_values_match_runtime_seed"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "paper_main_family_boundary_validation.scenarios.3.physical_read_shape_uniform"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "paper_main_family_boundary_validation.scenarios.3.physical_write_shape_uniform"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "paper_main_slot_boundary_validation.scenarios.0.canonical_leaf_seed_space_matches"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "paper_main_slot_boundary_validation.scenarios.0.canonical_leaf_values_match_runtime_seed"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "paper_main_slot_boundary_validation.scenarios.0.physical_read_shape_uniform"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "paper_main_slot_boundary_validation.scenarios.0.physical_write_shape_uniform"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "paper_main_slot_boundary_validation.scenarios.1.canonical_leaf_seed_space_matches"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "paper_main_slot_boundary_validation.scenarios.1.canonical_leaf_values_match_runtime_seed"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "paper_main_slot_boundary_validation.scenarios.1.physical_read_shape_uniform"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "paper_main_slot_boundary_validation.scenarios.1.physical_write_shape_uniform"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "paper_main_slot_boundary_validation.scenarios.2.canonical_leaf_seed_space_matches"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "paper_main_slot_boundary_validation.scenarios.2.canonical_leaf_values_match_runtime_seed"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "paper_main_slot_boundary_validation.scenarios.2.physical_read_shape_uniform"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "paper_main_slot_boundary_validation.scenarios.2.physical_write_shape_uniform"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "paper_main_slot_boundary_validation.scenarios.3.canonical_leaf_seed_space_matches"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "paper_main_slot_boundary_validation.scenarios.3.canonical_leaf_values_match_runtime_seed"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "paper_main_slot_boundary_validation.scenarios.3.physical_read_shape_uniform"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "paper_main_slot_boundary_validation.scenarios.3.physical_write_shape_uniform"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_boundary_validation.engine_assembles_execution_trace_directly"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_boundary_validation.engine_clones_call_args_directly"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_boundary_validation.engine_constructs_runtime_phase_events_directly"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_boundary_validation.engine_constructs_theorem_certificates_directly"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_boundary_validation.engine_defines_fresh_coin_plan_directly"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_boundary_validation.engine_imports_raw_runtime_kernel"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_boundary_validation.engine_imports_runtime_object_directly"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_boundary_validation.engine_owns_raw_runtime_object_map"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_boundary_validation.engine_peeks_into_fresh_coin_map"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_boundary_validation.forbidden_engine_helper_checks.0.present_in_engine_impl"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_boundary_validation.forbidden_engine_helper_checks.1.present_in_engine_impl"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_boundary_validation.forbidden_engine_helper_checks.2.present_in_engine_impl"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_boundary_validation.forbidden_engine_helper_checks.3.present_in_engine_impl"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_boundary_validation.forbidden_engine_helper_checks.4.present_in_engine_impl"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_boundary_validation.forbidden_engine_helper_checks.5.present_in_engine_impl"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_boundary_validation.forbidden_engine_helper_checks.6.present_in_engine_impl"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_boundary_validation.forbidden_engine_helper_checks.7.present_in_engine_impl"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_boundary_validation.forbidden_engine_helper_checks.8.present_in_engine_impl"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_boundary_validation.forbidden_engine_helper_checks.9.present_in_engine_impl"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_boundary_validation.forbidden_engine_helper_checks.10.present_in_engine_impl"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_boundary_validation.forbidden_engine_helper_checks.11.present_in_engine_impl"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_boundary_validation.forbidden_engine_helper_checks.12.present_in_engine_impl"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_boundary_validation.forbidden_engine_helper_checks.13.present_in_engine_impl"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_boundary_validation.forbidden_engine_helper_checks.14.present_in_engine_impl"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_boundary_validation.forbidden_engine_helper_checks.15.present_in_engine_impl"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_boundary_validation.forbidden_engine_helper_checks.16.present_in_engine_impl"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_boundary_validation.forbidden_engine_helper_checks.17.present_in_engine_impl"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_boundary_validation.forbidden_engine_helper_checks.18.present_in_engine_impl"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_boundary_validation.forbidden_engine_helper_checks.19.present_in_engine_impl"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_boundary_validation.forbidden_engine_helper_checks.20.present_in_engine_impl"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_boundary_validation.theorem_private_surface_checks.0.forbidden_present"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_boundary_validation.theorem_private_surface_checks.1.forbidden_present"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_boundary_validation.theorem_private_surface_checks.2.forbidden_present"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_boundary_validation.theorem_private_surface_checks.3.forbidden_present"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_boundary_validation.theorem_private_surface_checks.4.forbidden_present"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_interface_validation.rust_semantic_refinement_claimed"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.0.machine_confinement_boundary.runtime_witness_authority_eliminated"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.0.machine_confinement_boundary.rust_semantic_refinement_claimed"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.0.machine_confinement_boundary.separate_finish_slot_meeting_artifact_required"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.1.machine_confinement_boundary.runtime_witness_authority_eliminated"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.1.machine_confinement_boundary.rust_semantic_refinement_claimed"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.1.machine_confinement_boundary.separate_finish_slot_meeting_artifact_required"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.2.machine_confinement_boundary.runtime_witness_authority_eliminated"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.2.machine_confinement_boundary.rust_semantic_refinement_claimed"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.2.machine_confinement_boundary.separate_finish_slot_meeting_artifact_required"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.3.machine_confinement_boundary.runtime_witness_authority_eliminated"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.3.machine_confinement_boundary.rust_semantic_refinement_claimed"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.3.machine_confinement_boundary.separate_finish_slot_meeting_artifact_required"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.4.machine_confinement_boundary.runtime_witness_authority_eliminated"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.4.machine_confinement_boundary.rust_semantic_refinement_claimed"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.4.machine_confinement_boundary.separate_finish_slot_meeting_artifact_required"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.5.machine_confinement_boundary.runtime_witness_authority_eliminated"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.5.machine_confinement_boundary.rust_semantic_refinement_claimed"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.5.machine_confinement_boundary.separate_finish_slot_meeting_artifact_required"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.6.machine_confinement_boundary.runtime_witness_authority_eliminated"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.6.machine_confinement_boundary.rust_semantic_refinement_claimed"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.6.machine_confinement_boundary.separate_finish_slot_meeting_artifact_required"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.7.machine_confinement_boundary.runtime_witness_authority_eliminated"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.7.machine_confinement_boundary.rust_semantic_refinement_claimed"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.7.machine_confinement_boundary.separate_finish_slot_meeting_artifact_required"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.8.machine_confinement_boundary.runtime_witness_authority_eliminated"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.8.machine_confinement_boundary.rust_semantic_refinement_claimed"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.8.machine_confinement_boundary.separate_finish_slot_meeting_artifact_required"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.9.machine_confinement_boundary.runtime_witness_authority_eliminated"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.9.machine_confinement_boundary.rust_semantic_refinement_claimed"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.9.machine_confinement_boundary.separate_finish_slot_meeting_artifact_required"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.10.machine_confinement_boundary.runtime_witness_authority_eliminated"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.10.machine_confinement_boundary.rust_semantic_refinement_claimed"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.10.machine_confinement_boundary.separate_finish_slot_meeting_artifact_required"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.11.machine_confinement_boundary.runtime_witness_authority_eliminated"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.11.machine_confinement_boundary.rust_semantic_refinement_claimed"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.11.machine_confinement_boundary.separate_finish_slot_meeting_artifact_required"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.12.machine_confinement_boundary.runtime_witness_authority_eliminated"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.12.machine_confinement_boundary.rust_semantic_refinement_claimed"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.12.machine_confinement_boundary.separate_finish_slot_meeting_artifact_required"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.13.machine_confinement_boundary.runtime_witness_authority_eliminated"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.13.machine_confinement_boundary.rust_semantic_refinement_claimed"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.13.machine_confinement_boundary.separate_finish_slot_meeting_artifact_required"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.14.machine_confinement_boundary.runtime_witness_authority_eliminated"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.14.machine_confinement_boundary.rust_semantic_refinement_claimed"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.14.machine_confinement_boundary.separate_finish_slot_meeting_artifact_required"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.15.machine_confinement_boundary.runtime_witness_authority_eliminated"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.15.machine_confinement_boundary.rust_semantic_refinement_claimed"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "runtime_implementation_kernel_machine_confinement_boundary_validation.scenarios.15.machine_confinement_boundary.separate_finish_slot_meeting_artifact_required"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "seeded_witness_validation.scenarios.0.canonical_leaf_seed_space_matches"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "seeded_witness_validation.scenarios.0.canonical_leaf_values_match_runtime_seed"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "seeded_witness_validation.scenarios.0.physical_read_shape_uniform"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "seeded_witness_validation.scenarios.0.physical_write_shape_uniform"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "seeded_witness_validation.scenarios.1.canonical_leaf_seed_space_matches"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "seeded_witness_validation.scenarios.1.canonical_leaf_values_match_runtime_seed"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "seeded_witness_validation.scenarios.1.physical_read_shape_uniform"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "seeded_witness_validation.scenarios.1.physical_write_shape_uniform"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "seeded_witness_validation.scenarios.2.canonical_leaf_seed_space_matches"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "seeded_witness_validation.scenarios.2.canonical_leaf_values_match_runtime_seed"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "seeded_witness_validation.scenarios.2.physical_read_shape_uniform"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "seeded_witness_validation.scenarios.2.physical_write_shape_uniform"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "seeded_witness_validation.scenarios.3.canonical_leaf_seed_space_matches"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "seeded_witness_validation.scenarios.3.canonical_leaf_values_match_runtime_seed"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "seeded_witness_validation.scenarios.3.physical_read_shape_uniform"
+      },
+      {
+        "class": "expected_computational_difference",
+        "path": "seeded_witness_validation.scenarios.3.physical_write_shape_uniform"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.0.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.1.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.2.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.3.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.4.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.5.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.6.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.7.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.8.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.9.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.10.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.11.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.12.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.13.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.14.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.15.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.16.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.17.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.18.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.19.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.20.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.21.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.22.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.23.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.24.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.25.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.26.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.27.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.28.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.29.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.30.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.31.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.32.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.33.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.34.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.35.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.36.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.37.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.38.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.39.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.40.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.41.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.42.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.43.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.44.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.45.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.46.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.47.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.48.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.49.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.50.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.51.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.52.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.53.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.54.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.55.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.56.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.57.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.58.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.59.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.60.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.61.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.62.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.63.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.64.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.65.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.66.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.67.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.68.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.69.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.70.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.71.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.72.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.73.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.74.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.75.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "static_checks.proofgrade_checker_import_surface_checks.76.uses_legacy_umbrella"
+      },
+      {
+        "class": "expected_negative",
+        "path": "static_checks.reports.0.raw_artifact.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "static_checks.reports.1.raw_artifact.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "static_checks.reports.2.raw_artifact.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "static_checks.reports.3.raw_artifact.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "static_checks.reports.4.raw_artifact.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.0.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.1.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.2.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.3.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.4.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.5.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.6.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.7.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.8.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.9.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.10.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.11.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.12.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.13.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.14.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.15.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.16.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.17.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.17.field_checks.0.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.17.field_checks.1.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.17.field_checks.2.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.17.field_checks.3.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.17.field_checks.4.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.17.field_checks.5.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.17.field_checks.6.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.17.field_checks.7.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.17.field_checks.8.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.17.field_checks.9.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.17.field_checks.10.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.17.field_checks.11.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.17.field_checks.12.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.17.field_checks.13.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.17.field_checks.14.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.17.field_checks.15.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.18.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.19.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.20.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.20.field_checks.0.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.20.field_checks.1.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.20.field_checks.2.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.20.field_checks.3.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.20.field_checks.4.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.20.field_checks.5.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.20.field_checks.6.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.21.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.22.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.23.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.24.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.25.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.25.field_checks.0.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.25.field_checks.1.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.25.field_checks.2.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.25.field_checks.3.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.25.field_checks.4.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.25.field_checks.5.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.25.field_checks.6.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.25.field_checks.7.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.25.field_checks.8.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.25.field_checks.9.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.25.field_checks.10.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.25.field_checks.11.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.25.field_checks.12.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.25.field_checks.13.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.25.field_checks.14.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.25.field_checks.15.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.25.field_checks.16.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.25.field_checks.17.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.25.field_checks.18.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.26.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.27.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.28.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.29.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.30.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.31.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.32.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.33.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.34.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.35.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.36.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.37.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.38.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.39.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.40.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.41.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.42.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.43.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.44.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.44.field_checks.0.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.44.field_checks.1.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.44.field_checks.2.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.44.field_checks.3.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.44.field_checks.4.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.44.field_checks.5.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.44.field_checks.6.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.44.field_checks.7.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.44.field_checks.8.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.44.field_checks.9.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.44.field_checks.10.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.44.field_checks.11.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.44.field_checks.12.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.44.field_checks.13.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.44.field_checks.14.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.44.field_checks.15.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.44.field_checks.16.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.44.field_checks.17.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.44.field_checks.18.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.44.field_checks.19.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.44.field_checks.20.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.44.field_checks.21.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.44.field_checks.22.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.45.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.46.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.47.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.48.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.49.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.50.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.51.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.52.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.53.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.54.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.55.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.56.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.57.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.58.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.59.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.60.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.61.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.62.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.63.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.64.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.65.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.66.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.67.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.68.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.69.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.70.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.71.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.72.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.73.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.74.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.75.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.76.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.77.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.78.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.79.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.80.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.81.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.82.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.83.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.84.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.85.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.86.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.87.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.88.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.89.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.90.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.91.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.92.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.93.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.94.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.95.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.96.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.97.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.98.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.99.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.100.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.101.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.102.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.103.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.104.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.105.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.106.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.107.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.108.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.109.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.110.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.111.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.112.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.113.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.114.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.115.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.116.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.117.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.118.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.119.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.120.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.121.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.122.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.123.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.124.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.125.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.126.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.127.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.128.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.129.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.130.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.131.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.132.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.133.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.134.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.135.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.136.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.137.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.138.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.139.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.140.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.141.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.142.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.143.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.144.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.145.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.146.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.147.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.148.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.149.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.150.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.151.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.152.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.153.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.154.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.155.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.156.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.157.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.158.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.159.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.160.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.161.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.162.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.163.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.164.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.165.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.166.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.167.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.168.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.169.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.170.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.171.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.172.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.173.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.174.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.175.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.176.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.177.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.178.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.179.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.180.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.181.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.182.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.183.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.184.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.185.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.186.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.187.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.188.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.189.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.190.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.191.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.192.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.193.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.194.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.195.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.196.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.197.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.198.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.199.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.200.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.201.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.202.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.203.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.204.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.205.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.206.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.207.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.208.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.209.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.210.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.211.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.212.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.213.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.214.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.215.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.216.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.217.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.218.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.219.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.220.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.221.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.222.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.223.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.224.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.225.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.226.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.227.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.228.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.229.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.230.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.231.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.232.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.233.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.234.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.235.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.236.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.237.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.238.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.239.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.240.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.241.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.242.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.243.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.244.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.245.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.246.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.247.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.248.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.249.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.250.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.251.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.252.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.253.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.254.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.255.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.256.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.257.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.258.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.259.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.260.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.261.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.262.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.263.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.264.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.265.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.266.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.267.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.268.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.269.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.270.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.271.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.272.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.273.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.274.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.275.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.276.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.277.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.278.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.279.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.280.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.281.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.282.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.283.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.284.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.285.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.286.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.287.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.288.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.289.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.290.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.291.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.292.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.293.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.294.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.295.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.296.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.297.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.298.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.299.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.300.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.301.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.302.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.303.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.304.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.305.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.306.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.307.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.308.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.309.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.310.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.311.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.312.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.313.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.314.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.315.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.316.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.317.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.318.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.319.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.320.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.321.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.322.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.323.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.324.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.325.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.326.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.327.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.328.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.329.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.330.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.331.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.332.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.333.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.334.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.335.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.336.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.337.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.338.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.339.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.340.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.341.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.342.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.343.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.344.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.345.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.346.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.347.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.348.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.349.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.350.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.351.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.352.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.353.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.354.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.355.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.356.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.357.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.358.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.359.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.360.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.361.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.362.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.363.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.364.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.365.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.366.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.367.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.368.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.369.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.370.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.371.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.372.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.373.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.374.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.375.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.376.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.377.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.378.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.379.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.380.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.381.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.382.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.383.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.384.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.385.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.386.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.387.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.388.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.389.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.390.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.391.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.392.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.393.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.394.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.395.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.396.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.397.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.398.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.399.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.400.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.401.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.402.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.403.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.403.field_checks.0.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.403.field_checks.1.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.403.field_checks.2.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.403.field_checks.3.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.403.field_checks.4.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.403.field_checks.5.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.403.field_checks.6.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.403.field_checks.7.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.403.field_checks.8.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.403.field_checks.9.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.403.field_checks.10.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.403.field_checks.11.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.403.field_checks.12.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.403.field_checks.13.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.403.field_checks.14.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.403.field_checks.15.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.403.field_checks.16.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.403.field_checks.17.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.403.field_checks.18.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.403.field_checks.19.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.404.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.405.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.406.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.407.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.408.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.409.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.409.field_checks.0.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.409.field_checks.1.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.409.field_checks.2.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.409.field_checks.3.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.409.field_checks.4.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.409.field_checks.5.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.409.field_checks.6.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.409.field_checks.7.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.409.field_checks.8.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.409.field_checks.9.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.409.field_checks.10.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.409.field_checks.11.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.409.field_checks.12.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.409.field_checks.13.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.410.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.411.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.412.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.413.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.414.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.415.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.415.field_checks.0.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.415.field_checks.1.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.415.field_checks.2.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.415.field_checks.3.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.415.field_checks.4.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.416.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.417.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.418.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.419.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.420.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.421.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.422.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.423.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.424.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.425.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.426.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "tamper_validation.scenarios.427.accepted"
+      }
+    ],
     "top_level_booleans": {}
   },
   "results/kernel_model_alignment_validation.json": {
-    "false_count": 0,
-    "false_paths": [],
+    "class_counts": {
+      "advisory_nonclaim": 6,
+      "deprecated_report": 0,
+      "expected_computational_difference": 0,
+      "expected_negative": 0,
+      "required_failure": 0,
+      "unclassified": 0
+    },
+    "false_count": 6,
+    "false_paths": [
+      {
+        "class": "advisory_nonclaim",
+        "path": "lean_confidential_kernel_slot_statement_runtime_normal_form_flags.2"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "lean_confidential_kernel_statement_runtime_normal_form_flags.2"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "rust_confidential_kernel_slot_statement_profiles.2.runtime_normal_form"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "rust_confidential_kernel_slot_statement_runtime_normal_form_flags.2"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "rust_confidential_kernel_statement_profiles.2.runtime_normal_form"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "rust_confidential_kernel_statement_runtime_normal_form_flags.2"
+      }
+    ],
     "top_level_booleans": {
       "accepted": true,
       "adaptive_history_semantics_theorems_present": true,
@@ -364,8 +3414,157 @@
     }
   },
   "results/runtime_boundary_validation.json": {
-    "false_count": 0,
-    "false_paths": [],
+    "class_counts": {
+      "advisory_nonclaim": 35,
+      "deprecated_report": 0,
+      "expected_computational_difference": 0,
+      "expected_negative": 0,
+      "required_failure": 0,
+      "unclassified": 0
+    },
+    "false_count": 35,
+    "false_paths": [
+      {
+        "class": "advisory_nonclaim",
+        "path": "engine_assembles_execution_trace_directly"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "engine_clones_call_args_directly"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "engine_constructs_runtime_phase_events_directly"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "engine_constructs_theorem_certificates_directly"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "engine_defines_fresh_coin_plan_directly"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "engine_imports_raw_runtime_kernel"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "engine_imports_runtime_object_directly"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "engine_owns_raw_runtime_object_map"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "engine_peeks_into_fresh_coin_map"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "forbidden_engine_helper_checks.0.present_in_engine_impl"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "forbidden_engine_helper_checks.1.present_in_engine_impl"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "forbidden_engine_helper_checks.2.present_in_engine_impl"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "forbidden_engine_helper_checks.3.present_in_engine_impl"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "forbidden_engine_helper_checks.4.present_in_engine_impl"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "forbidden_engine_helper_checks.5.present_in_engine_impl"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "forbidden_engine_helper_checks.6.present_in_engine_impl"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "forbidden_engine_helper_checks.7.present_in_engine_impl"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "forbidden_engine_helper_checks.8.present_in_engine_impl"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "forbidden_engine_helper_checks.9.present_in_engine_impl"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "forbidden_engine_helper_checks.10.present_in_engine_impl"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "forbidden_engine_helper_checks.11.present_in_engine_impl"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "forbidden_engine_helper_checks.12.present_in_engine_impl"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "forbidden_engine_helper_checks.13.present_in_engine_impl"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "forbidden_engine_helper_checks.14.present_in_engine_impl"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "forbidden_engine_helper_checks.15.present_in_engine_impl"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "forbidden_engine_helper_checks.16.present_in_engine_impl"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "forbidden_engine_helper_checks.17.present_in_engine_impl"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "forbidden_engine_helper_checks.18.present_in_engine_impl"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "forbidden_engine_helper_checks.19.present_in_engine_impl"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "forbidden_engine_helper_checks.20.present_in_engine_impl"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "theorem_private_surface_checks.0.forbidden_present"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "theorem_private_surface_checks.1.forbidden_present"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "theorem_private_surface_checks.2.forbidden_present"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "theorem_private_surface_checks.3.forbidden_present"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "theorem_private_surface_checks.4.forbidden_present"
+      }
+    ],
     "top_level_booleans": {
       "a_call_copies_no_committed_object": true,
       "accepted": true,
@@ -840,8 +4039,345 @@
     }
   },
   "results/static_checks.json": {
-    "false_count": 0,
-    "false_paths": [],
+    "class_counts": {
+      "advisory_nonclaim": 77,
+      "deprecated_report": 0,
+      "expected_computational_difference": 0,
+      "expected_negative": 5,
+      "required_failure": 0,
+      "unclassified": 0
+    },
+    "false_count": 82,
+    "false_paths": [
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.0.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.1.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.2.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.3.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.4.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.5.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.6.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.7.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.8.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.9.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.10.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.11.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.12.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.13.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.14.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.15.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.16.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.17.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.18.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.19.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.20.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.21.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.22.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.23.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.24.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.25.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.26.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.27.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.28.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.29.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.30.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.31.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.32.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.33.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.34.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.35.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.36.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.37.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.38.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.39.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.40.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.41.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.42.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.43.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.44.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.45.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.46.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.47.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.48.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.49.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.50.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.51.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.52.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.53.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.54.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.55.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.56.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.57.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.58.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.59.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.60.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.61.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.62.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.63.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.64.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.65.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.66.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.67.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.68.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.69.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.70.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.71.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.72.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.73.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.74.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.75.uses_legacy_umbrella"
+      },
+      {
+        "class": "advisory_nonclaim",
+        "path": "proofgrade_checker_import_surface_checks.76.uses_legacy_umbrella"
+      },
+      {
+        "class": "expected_negative",
+        "path": "reports.0.raw_artifact.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "reports.1.raw_artifact.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "reports.2.raw_artifact.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "reports.3.raw_artifact.accepted"
+      },
+      {
+        "class": "expected_negative",
+        "path": "reports.4.raw_artifact.accepted"
+      }
+    ],
     "top_level_booleans": {
       "kernel_admission_all_admitted": true,
       "legacy_axiom_definition_surface_restricted": true,

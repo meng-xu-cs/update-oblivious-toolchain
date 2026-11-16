@@ -16,6 +16,18 @@ establish and what they do not).
   rollback, the quick profiles of the AVL map replay and of the tape
   substitution, the storage boundary, acceptance, claim consistency and
   claim status) and fails if any differs from the committed one.
+- `acceptance.json` gives every false leaf of every report one class
+  (`probe/mplus-probe/src/acceptance.rs`) and lists the leaves of each report
+  by class (`false_paths_by_class`); the bundle is accepted when none is a
+  required failure or unclassified.
+  `scripts/rebuild_review_validation_false_paths.sh` finds the false leaves of
+  four gated reports itself, takes their classes from `acceptance.json`, and
+  keeps them in `review/validation_false_paths.json` and `.txt`; it fails when
+  its leaves and the gate's differ, when one is a required failure or
+  unclassified, or when the committed list is stale. Its `--self-test` runs
+  two controls, a report whose false leaf is an expected negative, which must
+  pass, and one with a required false leaf, which must fail. The validation
+  script and CI run both.
 - The two reports that test the runtime against a model have a quick and a
   full profile each, with one schema per report
   (`uo-path-oram-avl-map-replay-v2`, `uo-tape-substitution-v1`). The quick
@@ -115,7 +127,7 @@ establish and what they do not).
 | Verification and TCB cost | `reviewer_summary.json` (proof-checking time per report, proof-artifact size budget, trusted line counts), `tamper_validation.json`, `lean_assumption_budget.json`, `static_checks.json` (including the kernel admission of every confidential entrypoint) |
 | Theorem instances and runtime-to-theorem bridges | `bridge_validation.json`, `pathoram_pair_validation.json`, `canonical_pathoram_pair_validation.json`, `fresh_coin_validation.json`, `pathoram_hidden_validation.json`, and the `*_boundary_validation.json` and `*_refinement*_validation.json` reports |
 | Language surface and porting effort | `admission_matrix.json` (accepted and rejected source features); the benchmark sources and sidecars under `benches/raw/` |
-| Claims | `claim_status.json` and `claim_status.md`, `claim_consistency.json`, `claim_artifact_manifest.json`, `acceptance.json` |
+| Claims | `claim_status.json` and `claim_status.md`, `claim_consistency.json`, `claim_artifact_manifest.json`, `acceptance.json` (every false leaf of every report, by class), and `review/validation_false_paths.json` (the false leaves of the four gated reports with their classes) |
 | Bundle identity | `reproducibility_manifest.json`, `artifact_configuration.json` |
 
 ## Not in This Repository

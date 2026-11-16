@@ -167,7 +167,10 @@ step_test_all_features() { cargo test --workspace --all-features; }
 step_probe_check() { cargo check -p mplus-probe; }
 step_lean_root() { (cd "$ROOT/proof/lean" && "$LAKE_BIN" build UOToolchain.ProofGradeRoot); }
 step_full_validation() { ./scripts/run_validation.sh; }
-step_review_snapshot() { ./scripts/rebuild_review_validation_false_paths.sh --check; }
+step_review_snapshot() {
+  ./scripts/rebuild_review_validation_false_paths.sh --check \
+    && ./scripts/rebuild_review_validation_false_paths.sh --self-test
+}
 step_git_diff() { git diff --check; }
 
 if ! command -v jq >/dev/null 2>&1; then
@@ -184,7 +187,7 @@ run_step "cargo test -p uo-evm" step_test_production_runtime
 if [[ "$MODE" == "full" ]]; then
   run_step "cargo test --workspace --all-features" step_test_all_features
   run_step "scripts/run_validation.sh" step_full_validation
-  run_step "rebuild_review_validation_false_paths.sh --check" step_review_snapshot
+  run_step "rebuild_review_validation_false_paths.sh --check and --self-test" step_review_snapshot
   run_step "git diff --check" step_git_diff
 fi
 

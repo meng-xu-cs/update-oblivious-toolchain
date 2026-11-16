@@ -103,6 +103,13 @@ jobs:
         run: cargo run -q -p mplus-probe -- --only claim-consistency --out-dir results
       - name: Claim artifact manifest coverage
         run: cargo run -q -p mplus-probe -- --only claim-status --out-dir results
+      # The false leaves of the gated reports, each with the class the
+      # acceptance gate gives it (review/validation_false_paths.json), and the
+      # controls: an expected negative passes and a required false leaf fails.
+      - name: False-path snapshot of the gated reports, and its controls
+        run: |
+          ./scripts/rebuild_review_validation_false_paths.sh --check
+          ./scripts/rebuild_review_validation_false_paths.sh --self-test
       # The steps above regenerate their reports into results/. They are
       # deterministic and checkout-independent, so any difference means the
       # committed results are stale (regenerate with scripts/run_validation.sh)

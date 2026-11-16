@@ -121,5 +121,10 @@ cargo run -q -p mplus-probe -- --only claim-consistency "${PROBE_ARGS[@]}"
 # docs/claim-boundary.md names a claim/assumption/non-claim/TCB row that the
 # manifest does not carry, or if a referenced artifact is missing.
 cargo run -q -p mplus-probe -- --only claim-status "${PROBE_ARGS[@]}"
+# The false leaves of the gated reports, each with the class acceptance.json
+# gives it, in review/validation_false_paths.json; none may be a required
+# failure or unclassified. The controls check that an expected negative passes
+# and a required false leaf fails.
 ./scripts/rebuild_review_validation_false_paths.sh --write
 ./scripts/rebuild_review_validation_false_paths.sh --check
+./scripts/rebuild_review_validation_false_paths.sh --self-test
