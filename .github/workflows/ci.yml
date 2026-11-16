@@ -11,8 +11,11 @@ on:
   schedule:
     - cron: "0 6 * * *"
 
+# A run cancels an earlier run of the same event on the same ref: a push
+# cancels the run of an earlier push, and never a nightly or manual run,
+# whose full validation takes hours.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
 env:
