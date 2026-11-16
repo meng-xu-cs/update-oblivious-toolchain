@@ -17,6 +17,13 @@ directory holds the response.
 The review text is not in the repository; `validation.md` restates each
 claim.
 
+A later review, of 16 November 2026, kept most of this response. It
+reopened guarantees of Issues 41, 49, 52, 53 and 58 and qualified Issue 36.
+Issues 60 to 69 in
+[`review/2026-11-16-external-review/`](../2026-11-16-external-review/README.md)
+repair them, and a note at the end of each issue in `tasks.md` says what was
+reopened. The rows below keep `done` for the work those issues built.
+
 ## Using the Tracker
 
 - Work an issue as `tasks.md` describes it, to the definition of done of
