@@ -163,7 +163,7 @@ its engineering part is Wave 4, its certified part is research.
 | 46 | Prove that the runtime's run on every tape is the substituted run | research | R | 42 | todo | |
 | 47 | Try an oblivious routing network for tree eviction | 8 | M | 27 | done | `ba0b958` |
 | 48 | Fuse scans and generalize the reuse analysis | 8 | M | 31, 32 | done | `5dc9380` |
-| 49 | Write the related-work boundary and add matched baselines | 8 | M | 27 | done | |
+| 49 | Write the related-work boundary and add matched baselines | 8 | M | 27 | done | `c5422f9` |
 | 50 | Bridge a scoped subset to Solidity 0.8 semantics | backlog | L | | deferred | |
 | 51 | Remove the generator that a seal no longer reads | 7 | S to M | 24 | done | `48915bb` |
 | 52 | Make the seal count of a dropped call a function of its entrypoint | 7 | M | 24 | done | `b68dfbc` |
