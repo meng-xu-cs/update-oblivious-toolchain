@@ -237,16 +237,21 @@ and the ownership boundaries that keep them auditable.
 
     A restart (`ContractInstance::restart_with_seed`, in test and
     diagnostics builds) takes the commit metadata only with the tag of the
-    deployment's secret, compares its rollback counter with an attested
-    one, builds each object with its key and no record, sealing nothing
-    (`RuntimeObject::instantiate_for_restart`), finds the object's records
-    in the store, and compares the
-    digest of the public state it restored with the one the metadata
-    names. It does not detect a store that was rolled back together with
-    the attested counter, nor a record replaced by an older record of its
-    location: a record carries its location and not its version. The first
-    is the rollback resistance of the deployment assumptions; a digest tree
-    over the records is Issue 44 of the external review. A production
+    deployment's secret, and only if its generation, the count of the
+    commits the store holds, is the attested one or one past it, which it
+    says (`StoreGeneration`); every commit advances the generation, a
+    committed abort's too. It builds each object with its key and no
+    record, sealing nothing (`RuntimeObject::instantiate_for_restart`),
+    finds the object's records in the store, and compares the digest of the
+    public state it restored with the one the metadata names. It does not
+    detect a store that was rolled back together with the attested
+    generation, two stores that one generation names (the commit of a
+    result that was not released, set aside by a restart from the files
+    before it), nor a record replaced by an older record of its location: a
+    record carries its location and not its version. The first is the
+    rollback resistance of the deployment assumptions, whose counter
+    follows the generation; a digest tree over the records is Issue 44 of
+    the external review. A production
     deployment restarts the same way, in a production build
     (`ProductionContractInstance::restart`), from the master secret it
     sealed to its platform when it deployed; it also takes the receipt it
@@ -320,7 +325,7 @@ write/read evidence, direct store cipher calls outside the codec layer, and
 reintroduction of host-visible hidden-state errors that should be modeled
 confidential aborts.
 
-Invariants 9 to 19 have fifteen bits in `runtime_boundary_validation.json`:
+Invariants 9 to 19 have sixteen bits in `runtime_boundary_validation.json`:
 `deployment_seed_stays_out_of_call_traces`,
 `production_errors_carry_no_runtime_freshness_value`,
 `contract_instance_debug_is_opaque`,
@@ -334,8 +339,9 @@ Invariants 9 to 19 have fifteen bits in `runtime_boundary_validation.json`:
 `a_call_copies_no_committed_object`,
 `trace_runs_stand_for_recorded_events`,
 `sealed_records_cross_the_storage_boundary`,
-`dropped_calls_leave_fixed_seal_counts` and
-`store_failures_are_injected_only_in_test_and_diagnostics_builds`. Each is a
+`dropped_calls_leave_fixed_seal_counts`,
+`store_failures_are_injected_only_in_test_and_diagnostics_builds` and
+`restarts_check_the_commit_generation`. Each is a
 check of source text,
 and a probe unit test shows that it rejects the drifts it guards against.
 

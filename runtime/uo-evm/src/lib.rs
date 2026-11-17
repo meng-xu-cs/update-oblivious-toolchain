@@ -49,6 +49,7 @@ pub use return_channel::{open_encrypted_return, ReturnChannelSession, RETURN_CHA
 #[cfg(feature = "diagnostics")]
 pub use runtime::PathOramFreshCoinPlan;
 pub use secret::PlatformSealingKey;
+pub use store_meta::StoreGeneration;
 pub use uo_store::{
     storage_failure, AppendFailure, CheckpointStep, FileStorage, JournalEntry, MemoryStorage,
     SharedStorage, StorageAdapter, StorageError, StorageFailure, StorageFault, StorageIo,

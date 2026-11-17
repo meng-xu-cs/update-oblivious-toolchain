@@ -59,8 +59,8 @@ Issue 60 has the options and the reasoning.
 
 | Decision | Status | Outcome |
 | --- | --- | --- |
-| D8, what a storage error means for a call | decided 2026-11-16 | outcome unknown: a failed journal append poisons the store until the deployment restarts from its files, and the restarted deployment's last receipt says whether the call committed. In Issue 65 the maintainer kept the restart's rollback check strict: how the platform's counter catches up after a call whose outcome is unknown is settled in Issue 67 |
-| D9, what a restart checks of the store's freshness | decided 2026-11-16 | authenticated reservations: each key's reserved count is in the tagged commit metadata, and every commit and every reservation advances a generation that the restart compares with the attested one |
+| D8, what a storage error means for a call | decided 2026-11-16 | outcome unknown: a failed journal append poisons the store until the deployment restarts from its files, and the restarted deployment's last receipt says whether the call committed. In Issue 65 the maintainer kept the restart's rollback check strict: how the platform's counter catches up after a call whose outcome is unknown is settled in Issue 67. In Issue 67 the maintainer chose that a restart accepts the store at the attested generation or one past it and says which, and that the counter advances to a result's generation before the result is released |
+| D9, what a restart checks of the store's freshness | decided 2026-11-16 | authenticated reservations: each key's reserved count is in the tagged commit metadata, and every commit and every reservation advances a generation that the restart compares with the attested one. Issue 67 built the generation for commits; Issue 68 adds the reservations |
 | D10, the route of the receipt proof | decided 2026-11-16 | over an adversary's outputs: the MAC assumption speaks of the hash and tag pairs an adversary of the session can produce, with a non-vacuity model. In Issue 64 the maintainer chose to state both assumptions, the MAC's and the hash's, over the receipts and tags the adversary can output |
 
 ## Order of Work
@@ -101,7 +101,7 @@ baseline of Issue 69. Issue 50 stays deferred.
 | 63 | Make the matched baselines' coverage fail closed, and test the planner under a budget | 10 | S | | done | `d9553e5` |
 | 64 | State the receipt MAC assumption over what an adversary can produce, with a non-vacuity model | 11 | S to M | 60 (D10) | done | `ed5f05d` |
 | 65 | Fail closed on storage errors, and test every failure | 11 | M to L | 60 (D8) | done | `988b876` |
-| 66 | Make a dropped call's restart point durable before the call runs, and bound a call's seals | 11 | M | 65 | done | |
-| 67 | Advance a commit generation with every committed call, and check it at restart | 11 | M | 60 (D9), 65 | todo | |
+| 66 | Make a dropped call's restart point durable before the call runs, and bound a call's seals | 11 | M | 65 | done | `d102318` |
+| 67 | Advance a commit generation with every committed call, and check it at restart | 11 | M | 60 (D9), 65 | done | |
 | 68 | Keep a restart from resuming a key below a count it has used | 11 | M | 66, 67 | todo | |
 | 69 | Measure the repaired baseline | 12 | M | 61 to 68 | todo | |

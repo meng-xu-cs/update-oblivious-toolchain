@@ -1191,12 +1191,54 @@
   "checks": {
     "a_dropped_call_leaves_the_store_as_it_was": true,
     "a_record_reaches_the_store_only_under_a_reserved_nonce": true,
+    "a_restart_refuses_the_files_from_before_a_committed_abort": true,
     "every_restart_continues_its_deployment": true,
     "every_storage_fault_fails_closed": true,
     "store_log_agrees_with_trace_in_every_call": true,
     "store_reads_are_the_traced_reads": true,
     "store_writes_are_the_traced_writes": true
   },
+  "committed_aborts": [
+    {
+      "aborting_call": "transfer(address,address,uint256)",
+      "backend": "full_scan",
+      "call_aborted": true,
+      "files_after_the_abort_at_the_generation_before_it": "one_past",
+      "files_after_the_abort_at_their_generation": "attested",
+      "files_before_the_abort_at_the_generation_after_it": "refused",
+      "files_before_the_abort_at_their_generation": "attested",
+      "generation_after_the_abort": 3,
+      "generation_before_the_abort": 2,
+      "holds": true,
+      "setup": "mint(address,uint256)"
+    },
+    {
+      "aborting_call": "transfer(address,address,uint256)",
+      "backend": "oram",
+      "call_aborted": true,
+      "files_after_the_abort_at_the_generation_before_it": "one_past",
+      "files_after_the_abort_at_their_generation": "attested",
+      "files_before_the_abort_at_the_generation_after_it": "refused",
+      "files_before_the_abort_at_their_generation": "attested",
+      "generation_after_the_abort": 3,
+      "generation_before_the_abort": 2,
+      "holds": true,
+      "setup": "mint(address,uint256)"
+    },
+    {
+      "aborting_call": "transfer(address,address,uint256)",
+      "backend": "oram_private_posmap",
+      "call_aborted": true,
+      "files_after_the_abort_at_the_generation_before_it": "one_past",
+      "files_after_the_abort_at_their_generation": "attested",
+      "files_before_the_abort_at_the_generation_after_it": "refused",
+      "files_before_the_abort_at_their_generation": "attested",
+      "generation_after_the_abort": 3,
+      "generation_before_the_abort": 2,
+      "holds": true,
+      "setup": "mint(address,uint256)"
+    }
+  ],
   "coverage": {
     "benchmark_backend_pairs": 14,
     "calls": 47
@@ -1232,6 +1274,10 @@
   ],
   "fault_matrix": [
     {
+      "attested_generations_a_restart_accepts": [
+        1,
+        2
+      ],
       "backend": "full_scan",
       "bytes_cut_on_open": 6,
       "call": "outcome_unknown",
@@ -1243,19 +1289,22 @@
       },
       "files_hold": "the_state_before_the_call",
       "files_hold_the_state_before_or_after_the_call": true,
+      "generation_of_the_last_call_that_returned": 2,
       "holds": true,
       "next_call_refused": true,
       "reads_answer_as_the_files_say": true,
-      "rollback_counters_a_restart_accepts": [
-        1
-      ],
+      "restart_at_that_generation": "attested",
       "storage_failure": "outcome_unknown",
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
     {
+      "attested_generations_a_restart_accepts": [
+        1,
+        2
+      ],
       "backend": "full_scan",
-      "bytes_cut_on_open": 646,
+      "bytes_cut_on_open": 654,
       "call": "outcome_unknown",
       "entrypoint": "mint(address,uint256)",
       "fault": {
@@ -1265,19 +1314,22 @@
       },
       "files_hold": "the_state_before_the_call",
       "files_hold_the_state_before_or_after_the_call": true,
+      "generation_of_the_last_call_that_returned": 2,
       "holds": true,
       "next_call_refused": true,
       "reads_answer_as_the_files_say": true,
-      "rollback_counters_a_restart_accepts": [
-        1
-      ],
+      "restart_at_that_generation": "attested",
       "storage_failure": "outcome_unknown",
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
     {
+      "attested_generations_a_restart_accepts": [
+        1,
+        2
+      ],
       "backend": "full_scan",
-      "bytes_cut_on_open": 1312,
+      "bytes_cut_on_open": 1327,
       "call": "outcome_unknown",
       "entrypoint": "mint(address,uint256)",
       "fault": {
@@ -1287,17 +1339,20 @@
       },
       "files_hold": "the_state_before_the_call",
       "files_hold_the_state_before_or_after_the_call": true,
+      "generation_of_the_last_call_that_returned": 2,
       "holds": true,
       "next_call_refused": true,
       "reads_answer_as_the_files_say": true,
-      "rollback_counters_a_restart_accepts": [
-        1
-      ],
+      "restart_at_that_generation": "attested",
       "storage_failure": "outcome_unknown",
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
     {
+      "attested_generations_a_restart_accepts": [
+        2,
+        3
+      ],
       "backend": "full_scan",
       "bytes_cut_on_open": 0,
       "call": "outcome_unknown",
@@ -1309,17 +1364,20 @@
       },
       "files_hold": "the_call",
       "files_hold_the_state_before_or_after_the_call": true,
+      "generation_of_the_last_call_that_returned": 2,
       "holds": true,
       "next_call_refused": true,
       "reads_answer_as_the_files_say": true,
-      "rollback_counters_a_restart_accepts": [
-        2
-      ],
+      "restart_at_that_generation": "one_past",
       "storage_failure": "outcome_unknown",
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
     {
+      "attested_generations_a_restart_accepts": [
+        1,
+        2
+      ],
       "backend": "full_scan",
       "bytes_cut_on_open": 6,
       "call": "outcome_unknown",
@@ -1331,17 +1389,20 @@
       },
       "files_hold": "the_state_before_the_call",
       "files_hold_the_state_before_or_after_the_call": true,
+      "generation_of_the_last_call_that_returned": 2,
       "holds": true,
       "next_call_refused": true,
       "reads_answer_as_the_files_say": true,
-      "rollback_counters_a_restart_accepts": [
-        1
-      ],
+      "restart_at_that_generation": "attested",
       "storage_failure": "outcome_unknown",
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
     {
+      "attested_generations_a_restart_accepts": [
+        1,
+        2
+      ],
       "backend": "full_scan",
       "bytes_cut_on_open": 35,
       "call": "outcome_unknown",
@@ -1353,17 +1414,20 @@
       },
       "files_hold": "the_state_before_the_call",
       "files_hold_the_state_before_or_after_the_call": true,
+      "generation_of_the_last_call_that_returned": 2,
       "holds": true,
       "next_call_refused": true,
       "reads_answer_as_the_files_say": true,
-      "rollback_counters_a_restart_accepts": [
-        1
-      ],
+      "restart_at_that_generation": "attested",
       "storage_failure": "outcome_unknown",
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
     {
+      "attested_generations_a_restart_accepts": [
+        1,
+        2
+      ],
       "backend": "full_scan",
       "bytes_cut_on_open": 90,
       "call": "outcome_unknown",
@@ -1375,17 +1439,20 @@
       },
       "files_hold": "the_state_before_the_call",
       "files_hold_the_state_before_or_after_the_call": true,
+      "generation_of_the_last_call_that_returned": 2,
       "holds": true,
       "next_call_refused": true,
       "reads_answer_as_the_files_say": true,
-      "rollback_counters_a_restart_accepts": [
-        1
-      ],
+      "restart_at_that_generation": "attested",
       "storage_failure": "outcome_unknown",
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
     {
+      "attested_generations_a_restart_accepts": [
+        1,
+        2
+      ],
       "backend": "full_scan",
       "bytes_cut_on_open": 0,
       "call": "outcome_unknown",
@@ -1397,17 +1464,20 @@
       },
       "files_hold": "the_state_before_the_call",
       "files_hold_the_state_before_or_after_the_call": true,
+      "generation_of_the_last_call_that_returned": 2,
       "holds": true,
       "next_call_refused": true,
       "reads_answer_as_the_files_say": true,
-      "rollback_counters_a_restart_accepts": [
-        1
-      ],
+      "restart_at_that_generation": "attested",
       "storage_failure": "outcome_unknown",
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
     {
+      "attested_generations_a_restart_accepts": [
+        2,
+        3
+      ],
       "backend": "full_scan",
       "bytes_cut_on_open": 0,
       "call": "returned",
@@ -1418,17 +1488,20 @@
       },
       "files_hold": "the_call",
       "files_hold_the_state_before_or_after_the_call": true,
+      "generation_of_the_last_call_that_returned": 3,
       "holds": true,
       "next_call_refused": true,
       "reads_answer_as_the_files_say": true,
-      "rollback_counters_a_restart_accepts": [
-        2
-      ],
+      "restart_at_that_generation": "attested",
       "storage_failure": null,
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
     {
+      "attested_generations_a_restart_accepts": [
+        2,
+        3
+      ],
       "backend": "full_scan",
       "bytes_cut_on_open": 0,
       "call": "returned",
@@ -1439,17 +1512,20 @@
       },
       "files_hold": "the_call",
       "files_hold_the_state_before_or_after_the_call": true,
+      "generation_of_the_last_call_that_returned": 3,
       "holds": true,
       "next_call_refused": true,
       "reads_answer_as_the_files_say": true,
-      "rollback_counters_a_restart_accepts": [
-        2
-      ],
+      "restart_at_that_generation": "attested",
       "storage_failure": null,
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
     {
+      "attested_generations_a_restart_accepts": [
+        2,
+        3
+      ],
       "backend": "full_scan",
       "bytes_cut_on_open": 0,
       "call": "returned",
@@ -1460,17 +1536,20 @@
       },
       "files_hold": "the_call",
       "files_hold_the_state_before_or_after_the_call": true,
+      "generation_of_the_last_call_that_returned": 3,
       "holds": true,
       "next_call_refused": true,
       "reads_answer_as_the_files_say": true,
-      "rollback_counters_a_restart_accepts": [
-        2
-      ],
+      "restart_at_that_generation": "attested",
       "storage_failure": null,
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
     {
+      "attested_generations_a_restart_accepts": [
+        1,
+        2
+      ],
       "backend": "oram",
       "bytes_cut_on_open": 6,
       "call": "outcome_unknown",
@@ -1482,19 +1561,22 @@
       },
       "files_hold": "the_state_before_the_call",
       "files_hold_the_state_before_or_after_the_call": true,
+      "generation_of_the_last_call_that_returned": 2,
       "holds": true,
       "next_call_refused": true,
       "reads_answer_as_the_files_say": true,
-      "rollback_counters_a_restart_accepts": [
-        1
-      ],
+      "restart_at_that_generation": "attested",
       "storage_failure": "outcome_unknown",
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
     {
+      "attested_generations_a_restart_accepts": [
+        1,
+        2
+      ],
       "backend": "oram",
-      "bytes_cut_on_open": 7820,
+      "bytes_cut_on_open": 7828,
       "call": "outcome_unknown",
       "entrypoint": "mint(address,uint256)",
       "fault": {
@@ -1504,19 +1586,22 @@
       },
       "files_hold": "the_state_before_the_call",
       "files_hold_the_state_before_or_after_the_call": true,
+      "generation_of_the_last_call_that_returned": 2,
       "holds": true,
       "next_call_refused": true,
       "reads_answer_as_the_files_say": true,
-      "rollback_counters_a_restart_accepts": [
-        1
-      ],
+      "restart_at_that_generation": "attested",
       "storage_failure": "outcome_unknown",
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
     {
+      "attested_generations_a_restart_accepts": [
+        1,
+        2
+      ],
       "backend": "oram",
-      "bytes_cut_on_open": 15660,
+      "bytes_cut_on_open": 15675,
       "call": "outcome_unknown",
       "entrypoint": "mint(address,uint256)",
       "fault": {
@@ -1526,17 +1611,20 @@
       },
       "files_hold": "the_state_before_the_call",
       "files_hold_the_state_before_or_after_the_call": true,
+      "generation_of_the_last_call_that_returned": 2,
       "holds": true,
       "next_call_refused": true,
       "reads_answer_as_the_files_say": true,
-      "rollback_counters_a_restart_accepts": [
-        1
-      ],
+      "restart_at_that_generation": "attested",
       "storage_failure": "outcome_unknown",
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
     {
+      "attested_generations_a_restart_accepts": [
+        2,
+        3
+      ],
       "backend": "oram",
       "bytes_cut_on_open": 0,
       "call": "outcome_unknown",
@@ -1548,17 +1636,20 @@
       },
       "files_hold": "the_call",
       "files_hold_the_state_before_or_after_the_call": true,
+      "generation_of_the_last_call_that_returned": 2,
       "holds": true,
       "next_call_refused": true,
       "reads_answer_as_the_files_say": true,
-      "rollback_counters_a_restart_accepts": [
-        2
-      ],
+      "restart_at_that_generation": "one_past",
       "storage_failure": "outcome_unknown",
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
     {
+      "attested_generations_a_restart_accepts": [
+        1,
+        2
+      ],
       "backend": "oram",
       "bytes_cut_on_open": 6,
       "call": "outcome_unknown",
@@ -1570,17 +1661,20 @@
       },
       "files_hold": "the_state_before_the_call",
       "files_hold_the_state_before_or_after_the_call": true,
+      "generation_of_the_last_call_that_returned": 2,
       "holds": true,
       "next_call_refused": true,
       "reads_answer_as_the_files_say": true,
-      "rollback_counters_a_restart_accepts": [
-        1
-      ],
+      "restart_at_that_generation": "attested",
       "storage_failure": "outcome_unknown",
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
     {
+      "attested_generations_a_restart_accepts": [
+        1,
+        2
+      ],
       "backend": "oram",
       "bytes_cut_on_open": 35,
       "call": "outcome_unknown",
@@ -1592,17 +1686,20 @@
       },
       "files_hold": "the_state_before_the_call",
       "files_hold_the_state_before_or_after_the_call": true,
+      "generation_of_the_last_call_that_returned": 2,
       "holds": true,
       "next_call_refused": true,
       "reads_answer_as_the_files_say": true,
-      "rollback_counters_a_restart_accepts": [
-        1
-      ],
+      "restart_at_that_generation": "attested",
       "storage_failure": "outcome_unknown",
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
     {
+      "attested_generations_a_restart_accepts": [
+        1,
+        2
+      ],
       "backend": "oram",
       "bytes_cut_on_open": 90,
       "call": "outcome_unknown",
@@ -1614,17 +1711,20 @@
       },
       "files_hold": "the_state_before_the_call",
       "files_hold_the_state_before_or_after_the_call": true,
+      "generation_of_the_last_call_that_returned": 2,
       "holds": true,
       "next_call_refused": true,
       "reads_answer_as_the_files_say": true,
-      "rollback_counters_a_restart_accepts": [
-        1
-      ],
+      "restart_at_that_generation": "attested",
       "storage_failure": "outcome_unknown",
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
     {
+      "attested_generations_a_restart_accepts": [
+        1,
+        2
+      ],
       "backend": "oram",
       "bytes_cut_on_open": 0,
       "call": "outcome_unknown",
@@ -1636,17 +1736,20 @@
       },
       "files_hold": "the_state_before_the_call",
       "files_hold_the_state_before_or_after_the_call": true,
+      "generation_of_the_last_call_that_returned": 2,
       "holds": true,
       "next_call_refused": true,
       "reads_answer_as_the_files_say": true,
-      "rollback_counters_a_restart_accepts": [
-        1
-      ],
+      "restart_at_that_generation": "attested",
       "storage_failure": "outcome_unknown",
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
     {
+      "attested_generations_a_restart_accepts": [
+        2,
+        3
+      ],
       "backend": "oram",
       "bytes_cut_on_open": 0,
       "call": "returned",
@@ -1657,17 +1760,20 @@
       },
       "files_hold": "the_call",
       "files_hold_the_state_before_or_after_the_call": true,
+      "generation_of_the_last_call_that_returned": 3,
       "holds": true,
       "next_call_refused": true,
       "reads_answer_as_the_files_say": true,
-      "rollback_counters_a_restart_accepts": [
-        2
-      ],
+      "restart_at_that_generation": "attested",
       "storage_failure": null,
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
     {
+      "attested_generations_a_restart_accepts": [
+        2,
+        3
+      ],
       "backend": "oram",
       "bytes_cut_on_open": 0,
       "call": "returned",
@@ -1678,17 +1784,20 @@
       },
       "files_hold": "the_call",
       "files_hold_the_state_before_or_after_the_call": true,
+      "generation_of_the_last_call_that_returned": 3,
       "holds": true,
       "next_call_refused": true,
       "reads_answer_as_the_files_say": true,
-      "rollback_counters_a_restart_accepts": [
-        2
-      ],
+      "restart_at_that_generation": "attested",
       "storage_failure": null,
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
     {
+      "attested_generations_a_restart_accepts": [
+        2,
+        3
+      ],
       "backend": "oram",
       "bytes_cut_on_open": 0,
       "call": "returned",
@@ -1699,17 +1808,20 @@
       },
       "files_hold": "the_call",
       "files_hold_the_state_before_or_after_the_call": true,
+      "generation_of_the_last_call_that_returned": 3,
       "holds": true,
       "next_call_refused": true,
       "reads_answer_as_the_files_say": true,
-      "rollback_counters_a_restart_accepts": [
-        2
-      ],
+      "restart_at_that_generation": "attested",
       "storage_failure": null,
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
     {
+      "attested_generations_a_restart_accepts": [
+        1,
+        2
+      ],
       "backend": "oram_private_posmap",
       "bytes_cut_on_open": 6,
       "call": "outcome_unknown",
@@ -1721,19 +1833,22 @@
       },
       "files_hold": "the_state_before_the_call",
       "files_hold_the_state_before_or_after_the_call": true,
+      "generation_of_the_last_call_that_returned": 2,
       "holds": true,
       "next_call_refused": true,
       "reads_answer_as_the_files_say": true,
-      "rollback_counters_a_restart_accepts": [
-        1
-      ],
+      "restart_at_that_generation": "attested",
       "storage_failure": "outcome_unknown",
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
     {
+      "attested_generations_a_restart_accepts": [
+        1,
+        2
+      ],
       "backend": "oram_private_posmap",
-      "bytes_cut_on_open": 65078,
+      "bytes_cut_on_open": 65086,
       "call": "outcome_unknown",
       "entrypoint": "mint(address,uint256)",
       "fault": {
@@ -1743,19 +1858,22 @@
       },
       "files_hold": "the_state_before_the_call",
       "files_hold_the_state_before_or_after_the_call": true,
+      "generation_of_the_last_call_that_returned": 2,
       "holds": true,
       "next_call_refused": true,
       "reads_answer_as_the_files_say": true,
-      "rollback_counters_a_restart_accepts": [
-        1
-      ],
+      "restart_at_that_generation": "attested",
       "storage_failure": "outcome_unknown",
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
     {
+      "attested_generations_a_restart_accepts": [
+        1,
+        2
+      ],
       "backend": "oram_private_posmap",
-      "bytes_cut_on_open": 130176,
+      "bytes_cut_on_open": 130191,
       "call": "outcome_unknown",
       "entrypoint": "mint(address,uint256)",
       "fault": {
@@ -1765,17 +1883,20 @@
       },
       "files_hold": "the_state_before_the_call",
       "files_hold_the_state_before_or_after_the_call": true,
+      "generation_of_the_last_call_that_returned": 2,
       "holds": true,
       "next_call_refused": true,
       "reads_answer_as_the_files_say": true,
-      "rollback_counters_a_restart_accepts": [
-        1
-      ],
+      "restart_at_that_generation": "attested",
       "storage_failure": "outcome_unknown",
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
     {
+      "attested_generations_a_restart_accepts": [
+        2,
+        3
+      ],
       "backend": "oram_private_posmap",
       "bytes_cut_on_open": 0,
       "call": "outcome_unknown",
@@ -1787,17 +1908,20 @@
       },
       "files_hold": "the_call",
       "files_hold_the_state_before_or_after_the_call": true,
+      "generation_of_the_last_call_that_returned": 2,
       "holds": true,
       "next_call_refused": true,
       "reads_answer_as_the_files_say": true,
-      "rollback_counters_a_restart_accepts": [
-        2
-      ],
+      "restart_at_that_generation": "one_past",
       "storage_failure": "outcome_unknown",
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
     {
+      "attested_generations_a_restart_accepts": [
+        1,
+        2
+      ],
       "backend": "oram_private_posmap",
       "bytes_cut_on_open": 6,
       "call": "outcome_unknown",
@@ -1809,17 +1933,20 @@
       },
       "files_hold": "the_state_before_the_call",
       "files_hold_the_state_before_or_after_the_call": true,
+      "generation_of_the_last_call_that_returned": 2,
       "holds": true,
       "next_call_refused": true,
       "reads_answer_as_the_files_say": true,
-      "rollback_counters_a_restart_accepts": [
-        1
-      ],
+      "restart_at_that_generation": "attested",
       "storage_failure": "outcome_unknown",
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
     {
+      "attested_generations_a_restart_accepts": [
+        1,
+        2
+      ],
       "backend": "oram_private_posmap",
       "bytes_cut_on_open": 35,
       "call": "outcome_unknown",
@@ -1831,17 +1958,20 @@
       },
       "files_hold": "the_state_before_the_call",
       "files_hold_the_state_before_or_after_the_call": true,
+      "generation_of_the_last_call_that_returned": 2,
       "holds": true,
       "next_call_refused": true,
       "reads_answer_as_the_files_say": true,
-      "rollback_counters_a_restart_accepts": [
-        1
-      ],
+      "restart_at_that_generation": "attested",
       "storage_failure": "outcome_unknown",
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
     {
+      "attested_generations_a_restart_accepts": [
+        1,
+        2
+      ],
       "backend": "oram_private_posmap",
       "bytes_cut_on_open": 90,
       "call": "outcome_unknown",
@@ -1853,17 +1983,20 @@
       },
       "files_hold": "the_state_before_the_call",
       "files_hold_the_state_before_or_after_the_call": true,
+      "generation_of_the_last_call_that_returned": 2,
       "holds": true,
       "next_call_refused": true,
       "reads_answer_as_the_files_say": true,
-      "rollback_counters_a_restart_accepts": [
-        1
-      ],
+      "restart_at_that_generation": "attested",
       "storage_failure": "outcome_unknown",
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
     {
+      "attested_generations_a_restart_accepts": [
+        1,
+        2
+      ],
       "backend": "oram_private_posmap",
       "bytes_cut_on_open": 0,
       "call": "outcome_unknown",
@@ -1875,17 +2008,20 @@
       },
       "files_hold": "the_state_before_the_call",
       "files_hold_the_state_before_or_after_the_call": true,
+      "generation_of_the_last_call_that_returned": 2,
       "holds": true,
       "next_call_refused": true,
       "reads_answer_as_the_files_say": true,
-      "rollback_counters_a_restart_accepts": [
-        1
-      ],
+      "restart_at_that_generation": "attested",
       "storage_failure": "outcome_unknown",
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
     {
+      "attested_generations_a_restart_accepts": [
+        2,
+        3
+      ],
       "backend": "oram_private_posmap",
       "bytes_cut_on_open": 0,
       "call": "returned",
@@ -1896,17 +2032,20 @@
       },
       "files_hold": "the_call",
       "files_hold_the_state_before_or_after_the_call": true,
+      "generation_of_the_last_call_that_returned": 3,
       "holds": true,
       "next_call_refused": true,
       "reads_answer_as_the_files_say": true,
-      "rollback_counters_a_restart_accepts": [
-        2
-      ],
+      "restart_at_that_generation": "attested",
       "storage_failure": null,
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
     {
+      "attested_generations_a_restart_accepts": [
+        2,
+        3
+      ],
       "backend": "oram_private_posmap",
       "bytes_cut_on_open": 0,
       "call": "returned",
@@ -1917,17 +2056,20 @@
       },
       "files_hold": "the_call",
       "files_hold_the_state_before_or_after_the_call": true,
+      "generation_of_the_last_call_that_returned": 3,
       "holds": true,
       "next_call_refused": true,
       "reads_answer_as_the_files_say": true,
-      "rollback_counters_a_restart_accepts": [
-        2
-      ],
+      "restart_at_that_generation": "attested",
       "storage_failure": null,
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
     {
+      "attested_generations_a_restart_accepts": [
+        2,
+        3
+      ],
       "backend": "oram_private_posmap",
       "bytes_cut_on_open": 0,
       "call": "returned",
@@ -1938,12 +2080,11 @@
       },
       "files_hold": "the_call",
       "files_hold_the_state_before_or_after_the_call": true,
+      "generation_of_the_last_call_that_returned": 3,
       "holds": true,
       "next_call_refused": true,
       "reads_answer_as_the_files_say": true,
-      "rollback_counters_a_restart_accepts": [
-        2
-      ],
+      "restart_at_that_generation": "attested",
       "storage_failure": null,
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
@@ -1960,18 +2101,21 @@
   },
   "oram_reads": "a call reads the counter and the metadata pages of an ORAM map once, where it loads the map, and holds them through the call; each access reads its buckets; the trace names each of those reads where the call makes it",
   "provenance": {
-    "restart": "a seeded deployment restarts from a store in files; the sync policy is off, so the report times no device",
-    "toolchain_manifest_sha256": "b30cff82ca0797529873902accca5dc84a972632cc95a28e330fababaee3ab1e"
+    "restart": "a seeded deployment restarts from a store in files, with an attested generation that stands for the platform's monotonic counter; the sync policy is off, so the report times no device",
+    "toolchain_manifest_sha256": "f35c0ef803ab28a517117b70ce6dea8df80b4be701867eb7ef1068b66c901d53"
   },
   "restarts": [
     {
       "backend": "full_scan",
       "benchmark": "FixedSlotClassifier/classify",
-      "deployment_bytes": 450,
+      "deployment_bytes": 465,
+      "files_before_the_last_call_at_its_generation": "refused",
       "files_hold_the_last_commit": true,
+      "generation": 2,
+      "generation_counts_the_commits": true,
       "journal_bytes_by_call": [
         {
-          "bytes": 454,
+          "bytes": 469,
           "entrypoint": "classify(uint256)"
         }
       ],
@@ -1980,24 +2124,44 @@
       "public_state_restored": true,
       "reads_answer_as_before_the_restart": true,
       "records_sealed_after_restart": 0,
-      "stale_attested_counter_refused": true
+      "restart_by_attested_generation": [
+        {
+          "attested_generation": 0,
+          "restart": "refused"
+        },
+        {
+          "attested_generation": 1,
+          "restart": "one_past"
+        },
+        {
+          "attested_generation": 2,
+          "restart": "attested"
+        },
+        {
+          "attested_generation": 3,
+          "restart": "refused"
+        }
+      ]
     },
     {
       "backend": "full_scan",
       "benchmark": "AuthScan/auth",
-      "deployment_bytes": 889,
+      "deployment_bytes": 904,
+      "files_before_the_last_call_at_its_generation": "refused",
       "files_hold_the_last_commit": true,
+      "generation": 4,
+      "generation_counts_the_commits": true,
       "journal_bytes_by_call": [
         {
-          "bytes": 756,
+          "bytes": 771,
           "entrypoint": "seed(uint256,bytes32)"
         },
         {
-          "bytes": 669,
+          "bytes": 684,
           "entrypoint": "seed(uint256,bytes32)"
         },
         {
-          "bytes": 397,
+          "bytes": 412,
           "entrypoint": "auth(bytes32)"
         }
       ],
@@ -2006,16 +2170,36 @@
       "public_state_restored": true,
       "reads_answer_as_before_the_restart": true,
       "records_sealed_after_restart": 0,
-      "stale_attested_counter_refused": true
+      "restart_by_attested_generation": [
+        {
+          "attested_generation": 2,
+          "restart": "refused"
+        },
+        {
+          "attested_generation": 3,
+          "restart": "one_past"
+        },
+        {
+          "attested_generation": 4,
+          "restart": "attested"
+        },
+        {
+          "attested_generation": 5,
+          "restart": "refused"
+        }
+      ]
     },
     {
       "backend": "full_scan",
       "benchmark": "ConfidentialMixer/deposit",
-      "deployment_bytes": 1526,
+      "deployment_bytes": 1541,
+      "files_before_the_last_call_at_its_generation": "refused",
       "files_hold_the_last_commit": true,
+      "generation": 2,
+      "generation_counts_the_commits": true,
       "journal_bytes_by_call": [
         {
-          "bytes": 1485,
+          "bytes": 1500,
           "entrypoint": "deposit(bytes32,uint256)"
         }
       ],
@@ -2024,16 +2208,36 @@
       "public_state_restored": true,
       "reads_answer_as_before_the_restart": true,
       "records_sealed_after_restart": 0,
-      "stale_attested_counter_refused": true
+      "restart_by_attested_generation": [
+        {
+          "attested_generation": 0,
+          "restart": "refused"
+        },
+        {
+          "attested_generation": 1,
+          "restart": "one_past"
+        },
+        {
+          "attested_generation": 2,
+          "restart": "attested"
+        },
+        {
+          "attested_generation": 3,
+          "restart": "refused"
+        }
+      ]
     },
     {
       "backend": "full_scan_64",
       "benchmark": "ConfidentialMixer/deposit",
-      "deployment_bytes": 8636,
+      "deployment_bytes": 8651,
+      "files_before_the_last_call_at_its_generation": "refused",
       "files_hold_the_last_commit": true,
+      "generation": 2,
+      "generation_counts_the_commits": true,
       "journal_bytes_by_call": [
         {
-          "bytes": 8595,
+          "bytes": 8610,
           "entrypoint": "deposit(bytes32,uint256)"
         }
       ],
@@ -2042,16 +2246,36 @@
       "public_state_restored": true,
       "reads_answer_as_before_the_restart": true,
       "records_sealed_after_restart": 0,
-      "stale_attested_counter_refused": true
+      "restart_by_attested_generation": [
+        {
+          "attested_generation": 0,
+          "restart": "refused"
+        },
+        {
+          "attested_generation": 1,
+          "restart": "one_past"
+        },
+        {
+          "attested_generation": 2,
+          "restart": "attested"
+        },
+        {
+          "attested_generation": 3,
+          "restart": "refused"
+        }
+      ]
     },
     {
       "backend": "oram",
       "benchmark": "ConfidentialMixer/deposit",
-      "deployment_bytes": 78108,
+      "deployment_bytes": 78123,
+      "files_before_the_last_call_at_its_generation": "refused",
       "files_hold_the_last_commit": true,
+      "generation": 2,
+      "generation_counts_the_commits": true,
       "journal_bytes_by_call": [
         {
-          "bytes": 18592,
+          "bytes": 18607,
           "entrypoint": "deposit(bytes32,uint256)"
         }
       ],
@@ -2060,16 +2284,36 @@
       "public_state_restored": true,
       "reads_answer_as_before_the_restart": true,
       "records_sealed_after_restart": 0,
-      "stale_attested_counter_refused": true
+      "restart_by_attested_generation": [
+        {
+          "attested_generation": 0,
+          "restart": "refused"
+        },
+        {
+          "attested_generation": 1,
+          "restart": "one_past"
+        },
+        {
+          "attested_generation": 2,
+          "restart": "attested"
+        },
+        {
+          "attested_generation": 3,
+          "restart": "refused"
+        }
+      ]
     },
     {
       "backend": "oram_private_posmap",
       "benchmark": "ConfidentialMixer/deposit",
-      "deployment_bytes": 388983,
+      "deployment_bytes": 388998,
+      "files_before_the_last_call_at_its_generation": "refused",
       "files_hold_the_last_commit": true,
+      "generation": 2,
+      "generation_counts_the_commits": true,
       "journal_bytes_by_call": [
         {
-          "bytes": 148990,
+          "bytes": 149005,
           "entrypoint": "deposit(bytes32,uint256)"
         }
       ],
@@ -2078,20 +2322,40 @@
       "public_state_restored": true,
       "reads_answer_as_before_the_restart": true,
       "records_sealed_after_restart": 0,
-      "stale_attested_counter_refused": true
+      "restart_by_attested_generation": [
+        {
+          "attested_generation": 0,
+          "restart": "refused"
+        },
+        {
+          "attested_generation": 1,
+          "restart": "one_past"
+        },
+        {
+          "attested_generation": 2,
+          "restart": "attested"
+        },
+        {
+          "attested_generation": 3,
+          "restart": "refused"
+        }
+      ]
     },
     {
       "backend": "full_scan",
       "benchmark": "ConfidentialMixer/withdraw",
-      "deployment_bytes": 1526,
+      "deployment_bytes": 1541,
+      "files_before_the_last_call_at_its_generation": "refused",
       "files_hold_the_last_commit": true,
+      "generation": 3,
+      "generation_counts_the_commits": true,
       "journal_bytes_by_call": [
         {
-          "bytes": 1485,
+          "bytes": 1500,
           "entrypoint": "deposit(bytes32,uint256)"
         },
         {
-          "bytes": 1399,
+          "bytes": 1414,
           "entrypoint": "withdraw(bytes32,uint256)"
         }
       ],
@@ -2100,20 +2364,40 @@
       "public_state_restored": true,
       "reads_answer_as_before_the_restart": true,
       "records_sealed_after_restart": 0,
-      "stale_attested_counter_refused": true
+      "restart_by_attested_generation": [
+        {
+          "attested_generation": 1,
+          "restart": "refused"
+        },
+        {
+          "attested_generation": 2,
+          "restart": "one_past"
+        },
+        {
+          "attested_generation": 3,
+          "restart": "attested"
+        },
+        {
+          "attested_generation": 4,
+          "restart": "refused"
+        }
+      ]
     },
     {
       "backend": "full_scan_64",
       "benchmark": "ConfidentialMixer/withdraw",
-      "deployment_bytes": 8636,
+      "deployment_bytes": 8651,
+      "files_before_the_last_call_at_its_generation": "refused",
       "files_hold_the_last_commit": true,
+      "generation": 3,
+      "generation_counts_the_commits": true,
       "journal_bytes_by_call": [
         {
-          "bytes": 8595,
+          "bytes": 8610,
           "entrypoint": "deposit(bytes32,uint256)"
         },
         {
-          "bytes": 8509,
+          "bytes": 8524,
           "entrypoint": "withdraw(bytes32,uint256)"
         }
       ],
@@ -2122,20 +2406,40 @@
       "public_state_restored": true,
       "reads_answer_as_before_the_restart": true,
       "records_sealed_after_restart": 0,
-      "stale_attested_counter_refused": true
+      "restart_by_attested_generation": [
+        {
+          "attested_generation": 1,
+          "restart": "refused"
+        },
+        {
+          "attested_generation": 2,
+          "restart": "one_past"
+        },
+        {
+          "attested_generation": 3,
+          "restart": "attested"
+        },
+        {
+          "attested_generation": 4,
+          "restart": "refused"
+        }
+      ]
     },
     {
       "backend": "oram",
       "benchmark": "ConfidentialMixer/withdraw",
-      "deployment_bytes": 78108,
+      "deployment_bytes": 78123,
+      "files_before_the_last_call_at_its_generation": "refused",
       "files_hold_the_last_commit": true,
+      "generation": 3,
+      "generation_counts_the_commits": true,
       "journal_bytes_by_call": [
         {
-          "bytes": 18592,
+          "bytes": 18607,
           "entrypoint": "deposit(bytes32,uint256)"
         },
         {
-          "bytes": 17987,
+          "bytes": 18002,
           "entrypoint": "withdraw(bytes32,uint256)"
         }
       ],
@@ -2144,20 +2448,40 @@
       "public_state_restored": true,
       "reads_answer_as_before_the_restart": true,
       "records_sealed_after_restart": 24,
-      "stale_attested_counter_refused": true
+      "restart_by_attested_generation": [
+        {
+          "attested_generation": 1,
+          "restart": "refused"
+        },
+        {
+          "attested_generation": 2,
+          "restart": "one_past"
+        },
+        {
+          "attested_generation": 3,
+          "restart": "attested"
+        },
+        {
+          "attested_generation": 4,
+          "restart": "refused"
+        }
+      ]
     },
     {
       "backend": "oram_private_posmap",
       "benchmark": "ConfidentialMixer/withdraw",
-      "deployment_bytes": 388983,
+      "deployment_bytes": 388998,
+      "files_before_the_last_call_at_its_generation": "refused",
       "files_hold_the_last_commit": true,
+      "generation": 3,
+      "generation_counts_the_commits": true,
       "journal_bytes_by_call": [
         {
-          "bytes": 148990,
+          "bytes": 149005,
           "entrypoint": "deposit(bytes32,uint256)"
         },
         {
-          "bytes": 142513,
+          "bytes": 142528,
           "entrypoint": "withdraw(bytes32,uint256)"
         }
       ],
@@ -2166,24 +2490,44 @@
       "public_state_restored": true,
       "reads_answer_as_before_the_restart": true,
       "records_sealed_after_restart": 83,
-      "stale_attested_counter_refused": true
+      "restart_by_attested_generation": [
+        {
+          "attested_generation": 1,
+          "restart": "refused"
+        },
+        {
+          "attested_generation": 2,
+          "restart": "one_past"
+        },
+        {
+          "attested_generation": 3,
+          "restart": "attested"
+        },
+        {
+          "attested_generation": 4,
+          "restart": "refused"
+        }
+      ]
     },
     {
       "backend": "full_scan",
       "benchmark": "ERC20Lite/transferFrom",
-      "deployment_bytes": 3531,
+      "deployment_bytes": 3546,
+      "files_before_the_last_call_at_its_generation": "refused",
       "files_hold_the_last_commit": true,
+      "generation": 4,
+      "generation_counts_the_commits": true,
       "journal_bytes_by_call": [
         {
-          "bytes": 1404,
+          "bytes": 1419,
           "entrypoint": "mint(address,uint256)"
         },
         {
-          "bytes": 2391,
+          "bytes": 2406,
           "entrypoint": "approve(address,address,uint256)"
         },
         {
-          "bytes": 3399,
+          "bytes": 3414,
           "entrypoint": "transferFrom(address,address,address,uint256)"
         }
       ],
@@ -2192,24 +2536,44 @@
       "public_state_restored": true,
       "reads_answer_as_before_the_restart": true,
       "records_sealed_after_restart": 0,
-      "stale_attested_counter_refused": true
+      "restart_by_attested_generation": [
+        {
+          "attested_generation": 2,
+          "restart": "refused"
+        },
+        {
+          "attested_generation": 3,
+          "restart": "one_past"
+        },
+        {
+          "attested_generation": 4,
+          "restart": "attested"
+        },
+        {
+          "attested_generation": 5,
+          "restart": "refused"
+        }
+      ]
     },
     {
       "backend": "oram",
       "benchmark": "ERC20Lite/transferFrom",
-      "deployment_bytes": 225233,
+      "deployment_bytes": 225248,
+      "files_before_the_last_call_at_its_generation": "refused",
       "files_hold_the_last_commit": true,
+      "generation": 4,
+      "generation_counts_the_commits": true,
       "journal_bytes_by_call": [
         {
-          "bytes": 16207,
+          "bytes": 16222,
           "entrypoint": "mint(address,uint256)"
         },
         {
-          "bytes": 28342,
+          "bytes": 28357,
           "entrypoint": "approve(address,address,uint256)"
         },
         {
-          "bytes": 48703,
+          "bytes": 48718,
           "entrypoint": "transferFrom(address,address,address,uint256)"
         }
       ],
@@ -2218,24 +2582,44 @@
       "public_state_restored": true,
       "reads_answer_as_before_the_restart": true,
       "records_sealed_after_restart": 66,
-      "stale_attested_counter_refused": true
+      "restart_by_attested_generation": [
+        {
+          "attested_generation": 2,
+          "restart": "refused"
+        },
+        {
+          "attested_generation": 3,
+          "restart": "one_past"
+        },
+        {
+          "attested_generation": 4,
+          "restart": "attested"
+        },
+        {
+          "attested_generation": 5,
+          "restart": "refused"
+        }
+      ]
     },
     {
       "backend": "oram_private_posmap",
       "benchmark": "ERC20Lite/transferFrom",
-      "deployment_bytes": 510668,
+      "deployment_bytes": 510683,
+      "files_before_the_last_call_at_its_generation": "refused",
       "files_hold_the_last_commit": true,
+      "generation": 4,
+      "generation_counts_the_commits": true,
       "journal_bytes_by_call": [
         {
-          "bytes": 135437,
+          "bytes": 135452,
           "entrypoint": "mint(address,uint256)"
         },
         {
-          "bytes": 28342,
+          "bytes": 28357,
           "entrypoint": "approve(address,address,uint256)"
         },
         {
-          "bytes": 216106,
+          "bytes": 216121,
           "entrypoint": "transferFrom(address,address,address,uint256)"
         }
       ],
@@ -2244,20 +2628,40 @@
       "public_state_restored": true,
       "reads_answer_as_before_the_restart": true,
       "records_sealed_after_restart": 162,
-      "stale_attested_counter_refused": true
+      "restart_by_attested_generation": [
+        {
+          "attested_generation": 2,
+          "restart": "refused"
+        },
+        {
+          "attested_generation": 3,
+          "restart": "one_past"
+        },
+        {
+          "attested_generation": 4,
+          "restart": "attested"
+        },
+        {
+          "attested_generation": 5,
+          "restart": "refused"
+        }
+      ]
     },
     {
       "backend": "full_scan",
       "benchmark": "RegistryCRUD/clearIfMatch",
-      "deployment_bytes": 1361,
+      "deployment_bytes": 1376,
+      "files_before_the_last_call_at_its_generation": "refused",
       "files_hold_the_last_commit": true,
+      "generation": 3,
+      "generation_counts_the_commits": true,
       "journal_bytes_by_call": [
         {
-          "bytes": 1365,
+          "bytes": 1380,
           "entrypoint": "upsert(bytes32,uint256)"
         },
         {
-          "bytes": 1297,
+          "bytes": 1312,
           "entrypoint": "clearIfMatch(bytes32,uint256)"
         }
       ],
@@ -2266,10 +2670,27 @@
       "public_state_restored": true,
       "reads_answer_as_before_the_restart": true,
       "records_sealed_after_restart": 0,
-      "stale_attested_counter_refused": true
+      "restart_by_attested_generation": [
+        {
+          "attested_generation": 1,
+          "restart": "refused"
+        },
+        {
+          "attested_generation": 2,
+          "restart": "one_past"
+        },
+        {
+          "attested_generation": 3,
+          "restart": "attested"
+        },
+        {
+          "attested_generation": 4,
+          "restart": "refused"
+        }
+      ]
     }
   ],
-  "schema": "uo-storage-boundary-v3",
+  "schema": "uo-storage-boundary-v4",
   "totals": {
     "store_reads": 3862,
     "store_writes": 4395,

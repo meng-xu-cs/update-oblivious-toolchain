@@ -1,6 +1,6 @@
 {
   "accepted": true,
-  "artifact_json_bytes": 1842859,
+  "artifact_json_bytes": 1846715,
   "checker": "proof/lean/.lake/build/bin/checkProofGradeRuntimeResidualHelperShellBoundary",
   "generated_object_helpers_match_lean_generator_theorem_checked": true,
   "generated_oram_codecs_match_lean_generator_theorem_checked": true,

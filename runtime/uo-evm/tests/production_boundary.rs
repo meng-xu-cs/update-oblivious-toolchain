@@ -660,12 +660,13 @@ fn copy_directory(from: &std::path::Path, to: &std::path::Path) {
 /// production runtime uses, with the master secret it sealed to its
 /// platform: the restarted instance's last receipt is the one the
 /// deployment issued last, its next receipt follows it, and the map holds
-/// what was written before the restart. The restart is refused with a
-/// stale rollback counter, with the secret on another platform, and with a
-/// store whose records were changed after the last receipt.
+/// what was written before the restart. The restart is refused with an
+/// attested generation the store is behind, with the secret on another
+/// platform, and with a store whose records were changed after the last
+/// receipt.
 #[test]
 fn a_production_deployment_restarts_from_its_files_on_its_platform() {
-    use uo_evm::{PlatformSealingKey, SealedMasterSecret};
+    use uo_evm::{PlatformSealingKey, SealedMasterSecret, StoreGeneration};
     use uo_store::{FileStorage, SharedStorage, SyncPolicy};
     let directory =
         std::env::temp_dir().join(format!("uo-production-restart-{}", std::process::id()));
@@ -692,11 +693,14 @@ fn a_production_deployment_restarts_from_its_files_on_its_platform() {
             &environment,
             production.last_receipt(),
         );
-        production
+        let result = production
             .call_authorized("put(bytes32,uint256)", put(key, value), &session, &evidence)
             .unwrap();
+        assert_eq!(result.generation, production.generation());
     }
     let last = production.last_receipt().clone();
+    // The platform's counter holds the generation of the last result.
+    let generation = production.generation();
     drop(production);
     let reopen = |directory: &std::path::Path| {
         SharedStorage::new(FileStorage::open(directory, SyncPolicy::Always).unwrap())
@@ -704,29 +708,26 @@ fn a_production_deployment_restarts_from_its_files_on_its_platform() {
     let restart = |storage: SharedStorage,
                    sealed: &SealedMasterSecret,
                    platform: &PlatformSealingKey,
-                   rollback_counter: u64| {
+                   attested_generation: u64| {
         ProductionContractInstance::restart(
             artifact.clone(),
             policy.clone(),
             storage,
             sealed,
             platform,
-            rollback_counter,
+            attested_generation,
         )
     };
 
-    // A stale rollback counter.
-    let error = restart(
-        reopen(&directory),
-        &sealed,
-        &platform(),
-        last.rollback_counter + 1,
-    )
-    .unwrap_err();
-    assert!(error.to_string().contains("rollback counter"), "{error}");
+    // An attested generation the store is behind.
+    let error = restart(reopen(&directory), &sealed, &platform(), generation + 1).unwrap_err();
+    assert!(
+        error.to_string().contains("behind the attested generation"),
+        "{error}"
+    );
     // The secret on another platform, or changed.
     let other = PlatformSealingKey::from_platform([0x5B; 32]);
-    let error = restart(reopen(&directory), &sealed, &other, last.rollback_counter).unwrap_err();
+    let error = restart(reopen(&directory), &sealed, &other, generation).unwrap_err();
     assert!(
         error.to_string().contains("does not open on this platform"),
         "{error}"
@@ -735,13 +736,7 @@ fn a_production_deployment_restarts_from_its_files_on_its_platform() {
     let first = u8::from_str_radix(&sealed.ciphertext[..2], 16).unwrap() ^ 1;
     flipped.ciphertext = format!("{first:02x}{}", &sealed.ciphertext[2..]);
     assert_ne!(flipped, sealed);
-    assert!(restart(
-        reopen(&directory),
-        &flipped,
-        &platform(),
-        last.rollback_counter
-    )
-    .is_err());
+    assert!(restart(reopen(&directory), &flipped, &platform(), generation).is_err());
     // A store changed in one record after the last receipt, with the
     // metadata of the last commit kept: a copy of the files in which a byte
     // of a bucket's ciphertext is flipped.
@@ -756,26 +751,17 @@ fn a_production_deployment_restarts_from_its_files_on_its_platform() {
         adapter.commit(&meta).unwrap();
     });
     drop(storage);
-    let error = restart(
-        reopen(&changed),
-        &sealed,
-        &platform(),
-        last.rollback_counter,
-    )
-    .unwrap_err();
+    let error = restart(reopen(&changed), &sealed, &platform(), generation).unwrap_err();
     assert!(
         error.to_string().contains("ciphertext_store_after_sha256"),
         "{error}"
     );
 
     // The restart, and the chain goes on.
-    let mut restarted = restart(
-        reopen(&directory),
-        &sealed,
-        &platform(),
-        last.rollback_counter,
-    )
-    .unwrap();
+    let (mut restarted, found) =
+        restart(reopen(&directory), &sealed, &platform(), generation).unwrap();
+    assert_eq!(found, StoreGeneration::Attested);
+    assert_eq!(restarted.generation(), generation);
     assert_eq!(restarted.last_receipt(), &last);
     let evidence = public_evidence(
         &artifact,
@@ -794,9 +780,136 @@ fn a_production_deployment_restarts_from_its_files_on_its_platform() {
         .unwrap();
     result.receipt.follows(&last).unwrap();
     assert_eq!(result.call.return_value, Some(Value::uint(20)));
+    assert_eq!(result.generation, generation + 1);
     drop(restarted);
     std::fs::remove_dir_all(&directory).unwrap();
     std::fs::remove_dir_all(&changed).unwrap();
+}
+
+/// A committed call that aborts leaves the rollback counter where it was,
+/// and advances the commit generation, which a restart compares with the
+/// attested one. A `mint` commits, then two `transfer`s of more than the
+/// owner has commit aborts. The files from before the first abort pass with
+/// no later generation; the files of each state pass with their own; and the
+/// files after an abort pass with the generation before it only as one past
+/// it, while files two commits past it are refused.
+#[test]
+fn a_restart_refuses_the_files_from_before_a_committed_abort() {
+    use uo_evm::{PlatformSealingKey, StoreGeneration};
+    use uo_store::{FileStorage, SharedStorage, SyncPolicy};
+    let directory =
+        std::env::temp_dir().join(format!("uo-production-abort-{}", std::process::id()));
+    let before_abort = directory.with_extension("before-abort");
+    let after_abort = directory.with_extension("after-abort");
+    for path in [&directory, &before_abort, &after_abort] {
+        let _ = std::fs::remove_dir_all(path);
+    }
+    let artifact = two_scheme_token();
+    let policy = policy();
+    let session = session();
+    let environment = PublicEnvironment::default();
+    let platform = || PlatformSealingKey::from_platform([0x5C; 32]);
+    let (mut production, sealed) = ProductionContractInstance::deploy_with_storage(
+        artifact.clone(),
+        policy.clone(),
+        SharedStorage::new(FileStorage::create(&directory, SyncPolicy::Always).unwrap()),
+        &platform(),
+    )
+    .unwrap();
+    let call = |production: &mut ProductionContractInstance, entrypoint: &str, args: Vec<Value>| {
+        let evidence = public_evidence(
+            &artifact,
+            &policy,
+            &session,
+            &environment,
+            production.last_receipt(),
+        );
+        let result = production
+            .call_authorized(entrypoint, args, &session, &evidence)
+            .unwrap();
+        assert_eq!(result.generation, production.generation());
+        result
+    };
+    let owner = Value::Address([0xA1; 20]);
+    let to = Value::Address([0xC3; 20]);
+    let too_much = vec![owner.clone(), to.clone(), Value::uint(100)];
+
+    let deployed = production.generation();
+    let minted = call(
+        &mut production,
+        "mint(address,uint256)",
+        vec![owner.clone(), Value::uint(10)],
+    );
+    assert!(!minted.call.aborted);
+    assert_eq!(minted.generation, deployed + 1);
+    copy_directory(&directory, &before_abort);
+    let aborted = call(
+        &mut production,
+        "transfer(address,address,uint256)",
+        too_much.clone(),
+    );
+    assert!(aborted.call.aborted);
+    // The abort is committed: the generation moves, and the rollback
+    // counter, which a restart compared before, does not.
+    assert_eq!(aborted.generation, minted.generation + 1);
+    assert_eq!(
+        aborted.receipt.rollback_counter,
+        minted.receipt.rollback_counter
+    );
+    copy_directory(&directory, &after_abort);
+    let again = call(
+        &mut production,
+        "transfer(address,address,uint256)",
+        too_much,
+    );
+    assert!(again.call.aborted);
+    assert_eq!(again.generation, aborted.generation + 1);
+    drop(production);
+
+    let restart = |files: &std::path::Path, attested_generation: u64| {
+        ProductionContractInstance::restart(
+            artifact.clone(),
+            policy.clone(),
+            SharedStorage::new(FileStorage::open(files, SyncPolicy::Always).unwrap()),
+            &sealed,
+            &platform(),
+            attested_generation,
+        )
+    };
+    // The files from before the abort, with the generation after it, or
+    // a later one.
+    for attested in [aborted.generation, again.generation] {
+        let error = restart(&before_abort, attested).unwrap_err();
+        assert!(
+            error.to_string().contains("behind the attested generation"),
+            "{error}"
+        );
+    }
+    // The files of each state, with its generation: the restarted instance
+    // has the state's last receipt.
+    for (files, result) in [
+        (&before_abort, &minted),
+        (&after_abort, &aborted),
+        (&directory, &again),
+    ] {
+        let (restarted, found) = restart(files, result.generation).unwrap();
+        assert_eq!(found, StoreGeneration::Attested);
+        assert_eq!(restarted.generation(), result.generation);
+        assert_eq!(restarted.last_receipt(), &result.receipt);
+    }
+    // The converse: the files after the abort, with the generation before
+    // it, hold a commit the counter has not reached, which a restart takes
+    // only as one past it; files two commits past it are refused.
+    let (restarted, found) = restart(&after_abort, minted.generation).unwrap();
+    assert_eq!(found, StoreGeneration::OnePast);
+    assert_eq!(restarted.generation(), aborted.generation);
+    assert_eq!(restarted.last_receipt(), &aborted.receipt);
+    drop(restarted);
+    let error = restart(&directory, minted.generation).unwrap_err();
+    assert!(error.to_string().contains("more than one past"), "{error}");
+    for path in [&directory, &before_abort, &after_abort] {
+        std::fs::remove_dir_all(path).unwrap();
+    }
 }
 
 /// What a production call meets when its store fails, for every failure a
@@ -814,20 +927,24 @@ fn a_production_deployment_restarts_from_its_files_on_its_platform() {
 ///   returns its receipt, since its commit is in the journal.
 ///
 /// In every case the store refuses every operation, so the instance refuses
-/// the next call and to vouch for its last receipt. The deployment then
-/// restarts from its files with the rollback counter of the state they hold:
-/// of the counter before the last call and the one after it, exactly one is
-/// accepted. Its last receipt resolves the call: the call's when its commit
-/// is in the files whole (its sync failed after a whole write, or a
-/// checkpoint failed), the one the caller held when it is not (its write
-/// stopped part way, or the call was dropped). Every receipt a call returned
-/// is in the files, the map holds what those calls wrote, and the deployment
-/// takes calls again.
+/// the next call and to vouch for its last receipt. The platform's counter
+/// followed the results the runtime returned, and holds the generation of
+/// the last one. The deployment restarts from its files with that
+/// generation attested. The files hold it, or one past it when they hold
+/// the commit of a call that returned no result, and the restart says
+/// which, so that the counter catches up. Of the generations one below the
+/// files' and the files' own, both are accepted; any other is refused. The
+/// restart's last receipt resolves the call: the call's when its commit is
+/// in the files whole (its sync failed after a whole write, or a checkpoint
+/// failed), the one the caller held when it is not (its write stopped part
+/// way, or the call was dropped). Every receipt a call returned is in the
+/// files, the map holds what those calls wrote, and the deployment takes
+/// calls again, each result one generation past the last.
 #[test]
 fn every_storage_failure_fails_closed_and_a_restart_resolves_the_call() {
     use uo_evm::{
         resolve_production_call_outcome, storage_failure, AppendFailure, JournalEntry,
-        PlatformSealingKey, ProductionCallOutcome, StorageFailure, StorageFault,
+        PlatformSealingKey, ProductionCallOutcome, StorageFailure, StorageFault, StoreGeneration,
     };
     use uo_store::{FileStorage, SharedStorage, SyncPolicy};
     let policy = policy();
@@ -913,9 +1030,13 @@ fn every_storage_failure_fails_closed_and_a_restart_resolves_the_call() {
 
         storage.inject_fault(fault).unwrap();
         let held = production.last_receipt().clone();
+        let held_generation = production.generation();
         let evidence = public_evidence(&artifact, &policy, &session, &environment, &held);
         let result =
             production.call_authorized("put(bytes32,uint256)", put(3, 30), &session, &evidence);
+        // The generation of the last result the runtime returned, which the
+        // platform's counter holds.
+        let mut counter = held_generation;
         let returned = match fault {
             StorageFault::Append { .. } => {
                 let error = result.unwrap_err();
@@ -933,9 +1054,11 @@ fn every_storage_failure_fails_closed_and_a_restart_resolves_the_call() {
                 held.clone()
             }
             StorageFault::Checkpoint { .. } => {
-                let receipt = result.unwrap().receipt;
-                receipt.follows(&held).unwrap();
-                receipt
+                let result = result.unwrap();
+                result.receipt.follows(&held).unwrap();
+                assert_eq!(result.generation, held_generation + 1, "{fault:?}");
+                counter = result.generation;
+                result.receipt
             }
         };
         assert!(storage.poisoned().is_some(), "{fault:?}");
@@ -971,26 +1094,41 @@ fn every_storage_failure_fails_closed_and_a_restart_resolves_the_call() {
         drop(opened);
         let reopen =
             || SharedStorage::new(FileStorage::open(&directory, SyncPolicy::Always).unwrap());
-        let mut restarts: Vec<ProductionContractInstance> =
-            [held.rollback_counter, held.rollback_counter + 1]
-                .into_iter()
-                .filter_map(|counter| {
-                    ProductionContractInstance::restart(
-                        artifact.clone(),
-                        policy.clone(),
-                        reopen(),
-                        &sealed,
-                        &platform(),
-                        counter,
-                    )
-                    .ok()
-                })
-                .collect();
-        assert_eq!(restarts.len(), 1, "{fault:?}");
-        let mut restarted = restarts.pop().unwrap();
+        let restart = |attested_generation: u64| {
+            ProductionContractInstance::restart(
+                artifact.clone(),
+                policy.clone(),
+                reopen(),
+                &sealed,
+                &platform(),
+                attested_generation,
+            )
+        };
+        let committed = fault.leaves_the_entry_whole() && !reservation;
+        // A commit is in the files that no returned result carried: the
+        // failed append's, when it reached them whole.
+        let unreleased = committed && matches!(fault, StorageFault::Append { .. });
+        let files_generation = counter + u64::from(unreleased);
+        let accepted: Vec<u64> = [counter - 1, counter, counter + 1]
+            .into_iter()
+            .filter(|attested| restart(*attested).is_ok())
+            .collect();
+        assert_eq!(
+            accepted,
+            vec![files_generation - 1, files_generation],
+            "{fault:?}"
+        );
+        let (mut restarted, found) = restart(counter).unwrap();
+        let expected_found = if unreleased {
+            StoreGeneration::OnePast
+        } else {
+            StoreGeneration::Attested
+        };
+        assert_eq!(found, expected_found, "{fault:?}");
+        // The counter catches up with the restarted instance.
+        assert_eq!(restarted.generation(), files_generation, "{fault:?}");
         let outcome =
             resolve_production_call_outcome(&held, &evidence, restarted.last_receipt()).unwrap();
-        let committed = fault.leaves_the_entry_whole() && !reservation;
         let expected = if committed {
             ProductionCallOutcome::Committed
         } else {
@@ -1032,10 +1170,12 @@ fn every_storage_failure_fails_closed_and_a_restart_resolves_the_call() {
             restarted.last_receipt(),
         );
         let previous = restarted.last_receipt().clone();
+        let previous_generation = restarted.generation();
         let result = restarted
             .call_authorized("put(bytes32,uint256)", put(5, 50), &session, &evidence)
             .unwrap();
         result.receipt.follows(&previous).unwrap();
+        assert_eq!(result.generation, previous_generation + 1, "{fault:?}");
         drop(restarted);
         std::fs::remove_dir_all(&directory).unwrap();
         checked += 1;

@@ -791,6 +791,116 @@ committed aborts passes the check.
   across aborted calls too.
 - The tests pass, and the documents and the non-claim say what is checked.
 
+**As built.** The maintainer chose the catch-up of step 5 that accepts one
+past: the restart takes files at the attested generation or exactly one past
+it, says which, and refuses every other.
+
+The tagged commit metadata (`StoreMeta`, schema
+`uo-runtime-store-meta-v2`) carries `generation`, the count of the commits
+the store holds. Each commit leaves one past the instance's, and the
+instance takes the new value once the commit is durable:
+
+- the deployment's commit, which is 1;
+- a production deployment's second commit, which leaves its receipt;
+- each committed call, aborted or not, whose generation is fixed before
+  the call stages anything (`StagedCall::generation`);
+- each bulk load of a diagnostics build.
+
+`StoreMeta::against_attested` compares it with the generation the platform's
+counter attests. Equal gives `StoreGeneration::Attested`, one past gives
+`StoreGeneration::OnePast`, and behind or further past is an error. The
+restart does this before it restores anything.
+
+`ProductionContractInstance::restart` and
+`ContractInstance::restart_with_seed` take `attested_generation` in place of
+the rollback counter, and return the instance with its `StoreGeneration`.
+`RuntimeFreshnessState::recover` takes the metadata's counters without a
+comparison. The rollback counter keeps its meaning for receipts, return
+nonces and the Lean deployment model.
+
+`ProductionCallResult::generation` is the call's commit generation, and
+`generation()` on both instances is the last commit's. The deployment
+advances the platform's counter to a result's generation before it releases
+the result or makes another call. After a restart it advances the counter
+to the instance's generation before it releases anything the instance
+returns. So the counter is never more than one commit behind the files.
+
+Tests:
+
+- `a_restart_refuses_the_files_from_before_a_committed_abort`, in the
+  production build: a `mint`, then two `transfer`s of more than the owner
+  has, which abort and are committed. The abort leaves the receipt's
+  rollback counter where it was and moves the generation.
+  - The files kept before the first abort are refused with the generation
+    after it, or with a later one.
+  - The files of each state are taken with their own generation, and the
+    restarted instance has that state's last receipt.
+  - The converse: the files after the abort are taken with the generation
+    before it only as `OnePast`, and the files two commits past it are
+    refused.
+- `every_storage_failure_fails_closed_and_a_restart_resolves_the_call` now
+  restarts with the generation of the last result returned. The files hold
+  that generation when the failed commit is not in them (`Attested`). They
+  hold the next one when it is, after a sync that failed after a whole
+  write (`OnePast`). Of the generations around it, exactly the files' own
+  and the one below are accepted. After the restart each call's result is
+  one generation past the last.
+- The engine's restart tests take generations. A restart is refused with
+  one above the files' and two below, and is `OnePast` with one below.
+- `a_restart_takes_the_attested_generation_or_one_past_it` in
+  `store_meta.rs`. Metadata of the old schema is refused under the right
+  tag.
+
+`storage_boundary.json` is now schema `uo-storage-boundary-v4`, with three
+changes:
+
+- Every restart row has the files' generation, which is one past the number
+  of calls. It also has the restart's outcome for the attested generations
+  from two below the files' to one above: refused, one past, attested,
+  refused. The files from before the last call are refused at the files'
+  generation.
+- `committed_aborts` runs the abort on each sealed backend of ERC20Lite. It
+  has the verdict `a_restart_refuses_the_files_from_before_a_committed_abort`.
+- Each `fault_matrix` row has the generation of the last call that
+  returned, what a restart with it found, and the attested generations a
+  restart accepts. The `mint` whose commit's sync fails restarts as one
+  past.
+
+The commit metadata is 15 bytes longer, so the bytes an append cuts are a
+few more: 7,828 where 7,820 were.
+
+`restarts_check_the_commit_generation` in
+`runtime_boundary_validation.json` pins the metadata field, the comparison
+and where the restart makes it, the four places that advance the
+generation, and the production result's field. Its unit test rejects eight
+drifts, among them a restart that compares the rollback counter again.
+
+The documents now say what the restart checks:
+
+- the claim boundary's The Storage Boundary, its production-restart and
+  outcome-unknown paragraphs and its example;
+- the TEE deployment row: the counter follows the generation;
+- the non-claim, and the claim manifest's text for it and for the storage
+  claim and the TEE assumption;
+- invariant 18 of `docs/runtime/secret-state.md`;
+- `docs/runtime/tee-observer.md`;
+- Issue 58's as-built text in the previous tracker.
+
+The non-claim now names what a generation does not do: it counts commits
+and names no store. Two cases give two stores the same generation:
+
+- the files that hold a commit whose result was not released are set aside,
+  and the deployment restarts from the files before it at the attested
+  generation;
+- two instances are restarted from the same files.
+
+In either case a host that kept both stores can restart from either once
+the counter holds their generation, and so roll back a released result. The
+receipt chain shows it to the caller who holds that receipt. A strict
+restart has the same gap. Closing it needs a counter bound to the store's
+content, which is outside this repository. The reservations stay out of the
+generation until Issue 68.
+
 ### Issue 68 — Keep a restart from resuming a key below a count it has used
 
 Source: R2 (§3). Size: M (D9 chose (a); L with (b), S with (c)). Depends

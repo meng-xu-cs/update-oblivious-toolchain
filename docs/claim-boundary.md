@@ -515,10 +515,11 @@ Path ORAM map's reads and the read bound that counts them
 about the adapter.
 
 A call's records are pending in the adapter until the call is committed there,
-with the commit metadata: the freshness counters, whether the contract is
-initialized and the digest of the public state, under a tag whose key derives
-from the master secret. A call that is dropped leaves the adapter as it was,
-and each key's seal count at a value that its count before the call fixes, so
+with the commit metadata: the commit's generation, the freshness counters,
+whether the contract is initialized and the digest of the public state, under
+a tag whose key derives from the master secret. A call that is dropped leaves
+the adapter as it was, and each key's seal count at a value that its count
+before the call fixes, so
 that the next nonce shows nothing of how far the dropped call got (invariant
 19 of [`runtime/secret-state.md`](./runtime/secret-state.md),
 `dropped_calls_leave_fixed_seal_counts`). The adapter has that value reserved
@@ -531,8 +532,45 @@ only under a nonce it has reserved for the record's key, and a reservation is
 durable before it takes effect, so a runtime that restarts from the adapter's
 files, at the counts they reserve, repeats no nonce. The report restarts each
 benchmark from files and checks that its reads answer as before and that no
-nonce repeats. A restart assumes the files are the ones the runtime wrote
-last: the rollback resistance of the TEE deployment assumptions. A sealed
+nonce repeats.
+
+The generation counts the commits the store holds: the deployment's, each
+committed call's, aborted or not, and each bulk load's of a diagnostics
+build. A restart compares it with the generation that the platform's
+monotonic counter attests, before it restores anything. It takes files at
+that generation or one past it, says which (`StoreGeneration::Attested` or
+`StoreGeneration::OnePast`), and refuses all others. The counter follows the
+generation: a production call returns its commit's generation
+(`ProductionCallResult::generation`), and the deployment advances the
+counter to it before it releases the result or makes another call, and to a
+restarted instance's generation before it releases anything that instance
+returns (the TEE deployment assumptions). So files behind the counter are
+older than a commit whose result was released, and the counter is never
+more than one commit behind the files. Files one past it hold a commit whose
+result was not released: a call whose outcome was unknown (below), or a stop
+between the commit and the counter's advance. Until Issue 67 of the review
+of 16 November 2026 a restart compared the rollback counter, which a
+committed abort leaves where it was, so the files from before an abort
+passed for the files after it. The report keeps ERC20Lite's files before a
+`transfer` of more than the owner holds, on each sealed backend
+(`committed_aborts`): the transfer aborts and is committed, the kept files
+are refused with the generation after it, and the files after it are taken
+with their own generation and as one past the one before. Every
+benchmark's restart is refused with a generation two below the files' or one
+above them, and its files from before its last call are refused with the
+generation after it (`restarts_check_the_commit_generation` in
+`runtime_boundary_validation.json` freezes the check).
+
+The generation counts commits; it does not name them. If the files that
+hold a commit whose result was not released are set aside, and the
+deployment restarts from the files before it at the attested generation,
+its next commit has the same generation; so have the commits of two
+instances restarted from the same files. A host that kept two such stores
+can restart from either once the counter holds their generation, and so roll
+back a call whose result was released. The receipt chain shows it to a
+caller who holds that call's receipt: the two stores' last receipts follow
+the same receipt. A dropped call's reservation is a journal entry and not a
+commit, so the generation does not cover it either (Issue 68). A sealed
 record is authenticated with its location, not its version, so a record
 replaced by an older record of its location is not detected (a digest tree
 over the records is Issue 44).
@@ -546,10 +584,10 @@ and only for that deployment (the TEE deployment assumption
 `platformSealing`). Every commit leaves the receipt the deployment issued
 last in the tagged commit metadata. A restart
 (`ProductionContractInstance::restart`) takes the sealed secret and the
-attested rollback counter. It is refused unless the secret opens, the
-metadata carries the secret's tag, the counter is the attested one, and the
-receipt it finds ends in the state the store holds: the public state and the
-digest of every sealed record. Its next receipt follows that one
+attested generation. It is refused unless the secret opens, the metadata
+carries the secret's tag, its generation is the attested one or one past it,
+and the receipt it finds ends in the state the store holds: the public state
+and the digest of every sealed record. Its next receipt follows that one
 (`production_deployments_restart_from_a_sealed_secret`). A seeded deployment,
 which exists in test and diagnostics builds, restarts from its seed.
 
@@ -574,11 +612,15 @@ after a failed one leaves.
 A restart from the files resolves a call whose outcome is unknown. Its last
 receipt is either the call's, which follows the receipt the caller held and
 names the evidence it sent, or the receipt the caller held
-(`resolve_production_call_outcome`). The restart takes the rollback counter
-of the state the files hold. After a call whose outcome is unknown the
-platform may attest the counter of the other state; how its counter catches
-up is settled with the commit generation of Issue 67 of the review of 16
-November 2026.
+(`resolve_production_call_outcome`). The platform's counter holds the
+generation of the last result the runtime returned. The files hold that
+generation when the call's commit is not in them, and the restart says
+`Attested`; they hold the next one when it is, and the restart says
+`OnePast`, and the deployment advances the counter to it before it releases
+the call's resolution or anything else the instance returns. In Issue 67 the
+maintainer chose this catch-up over a restart that takes the attested
+generation alone, which would refuse the files of a call that committed and
+returned no result.
 
 Both runtimes are made to meet every failure a file store can meet: each way
 an append of a commit or of a reservation fails, and each step of a
@@ -594,13 +636,18 @@ through the production runtime, which resolves each call by its receipts
 - no call returns after a failed append;
 - every call that returned is in the files;
 - the failed call is in them whole or not at all;
-- a restart accepts the rollback counter of that state alone, and answers
-  reads as that state says.
+- a restart with the generation of the last call that returned finds the
+  files at it, or one past it when they hold the failed call, and says
+  which; of the generations around it, it accepts the files' own and the one
+  below, and it answers reads as the state the files hold says.
 
 For example, a `mint` on the local Path ORAM scheme whose commit's write
 stops in its payload returns an error whose outcome is unknown. The next open
-cuts off the 7,820 bytes it wrote, and the restart accepts the counter from
-before the call, 1, and not 2. Only a test or a diagnostics build can make
+cuts off the 7,828 bytes it wrote. The generation of the last call that
+returned is 2: the restart with it finds the files at it, and a restart
+with 3 is refused. When the sync fails after a whole write instead, the
+files hold the `mint` at generation 3, and the restart with 2 takes them as
+one past it. Only a test or a diagnostics build can make
 the store fail (`store_failures_are_injected_only_in_test_and_diagnostics_builds`
 in `runtime_boundary_validation.json`).
 
@@ -800,7 +847,7 @@ often it is made.
 | Runtime key derivation | gives each object a storage key, an initial placement and Path ORAM leaf coins that are pseudo-random and independent of the other objects', which the two encryption assumptions and the leaf-coin model take as given | trusted, not modeled in Lean: a 256-bit master secret from the OS, HKDF-SHA256 (RFC 5869) with one label per use, and the ChaCha20 generator. `runtime_secrets_derive_from_the_master_secret` in `runtime_boundary_validation.json` pins the derivation's call sites, and `runtime/uo-evm/src/secret.rs` tests the RFC's first test vector |
 | Return-channel AEAD | hides a value returned under `encrypted_to_client` from the host. The theorems erase the payload's ciphertext and tag as a declared release, so what those bytes show of the value is in no Lean statement | trusted, not named in Lean: `ChaCha20Poly1305` under the session key, with the associated data and the nonce that `runtime/uo-evm/src/return_channel.rs` builds. The nonce is the first 96 bits of a hash of the runtime's freshness epoch, rollback counter and call counter, the session binding and the hash of the associated data, so two calls of a deployment seal under different nonces unless those 96 bits collide. That the session key is fresh and known to the client alone comes from the attested key exchange of the deployment, which the repository does not implement (the TEE deployment row) |
 | Production receipt MAC | lets the holder of a session conclude from a receipt's tag that the runtime issued the receipt as it is | trusted, stated in Lean as the two hypotheses of `deployment_receipt_tag_verifies_issued` in `UOToolchain/DeploymentAcceptance.lean` and not proved, both about what an adversary of the session can output: HMAC-SHA256, under a key that HKDF-SHA256 derives from the session key and id, is unforgeable against it, so a receipt and a tag it outputs whose tag verifies have the hash of an issued receipt (`UnforgeableAgainst`); and it outputs no receipt but an issued one with the SHA-256 hash of an issued receipt (`HashBindsIssued`). Both hold in a model in which the runtime did not issue a receipt the adversary outputs (`deployment_receipt_tag_assumptions_not_vacuous`). The session key comes from the attested key exchange, as in the row above |
-| TEE deployment assumptions | enclave memory confidentiality/integrity, attestation authenticity, rollback resistance, freshness, crash recovery discipline, patch-level trust, platform sealing (the sealing key a production deployment seals its master secret under derives only in the same enclave on the same platform) | explicit Lean bundle `SgxDeploymentAssumptions`, paired with Intel SGX provenance and probe drift checks |
+| TEE deployment assumptions | enclave memory confidentiality/integrity, attestation authenticity, rollback resistance (a monotonic counter that follows the store's commit generation: the deployment advances it to a call's generation before it releases the call's result or makes another call, and to a restarted instance's before it releases anything the instance returns, and a restart takes it as the attested generation), freshness, crash recovery discipline, patch-level trust, platform sealing (the sealing key a production deployment seals its master secret under derives only in the same enclave on the same platform) | explicit Lean bundle `SgxDeploymentAssumptions`, paired with Intel SGX provenance and probe drift checks |
 | Parser/preprocessing equivalence | connects raw Solidity-like source text to the post-resolution AST consumed by Lean | still trusted front-end surface |
 | Real Keccak equivalence | connects runtime `tiny_keccak::Keccak::v256()` to the Lean mock-hash abstraction | not yet proved; Lean preservation uses the shared abstraction |
 
@@ -934,9 +981,11 @@ This repository does not claim:
   electromagnetic, or wall-clock obliviousness
 - value-level equality between the Lean mock hash and real runtime Keccak
   outputs
-- the detection of a store that was rolled back together with the attested
-  rollback counter, or that holds an older record of a location, at a
-  restart (see The Storage Boundary)
+- the detection, at a restart, of a store that was rolled back together
+  with the attested generation, of two stores that a generation names (a
+  commit whose result was not released, set aside by a restart from the
+  files before it, or two instances restarted from the same files), or of a
+  store that holds an older record of a location (see The Storage Boundary)
 - Solidity 0.8 checked-arithmetic, division/modulo-by-zero, ABI, revert, or
   context-variable semantics beyond the admitted public environment fields
   (`msg.sender`, `tx.origin`, `block.number`, `block.timestamp`, and

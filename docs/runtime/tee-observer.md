@@ -116,9 +116,18 @@ call's session, an HMAC that the session's holder checks.
 
 A deployment with its records in files seals its master secret to its
 platform (`ProductionContractInstance::deploy_with_storage`), and restarts
-from the files and the sealed secret with the attested rollback counter
+from the files and the sealed secret with the attested generation
 (`ProductionContractInstance::restart`); its next receipt follows the last
-one it issued before the restart.
+one it issued before the restart. The generation counts the commits the
+store holds, a committed abort's among them. Each accepted call returns its
+commit's generation, and the deployment advances the platform's monotonic
+counter to it before it releases the call's result or makes another call. A
+restart takes files at the attested generation or one past it and says
+which; one past, the deployment advances the counter to the restarted
+instance's generation before it releases anything the instance returns. The
+counter's rollback resistance is a deployment assumption, and a generation
+does not name the store it counts (Non-Claims of
+[`../claim-boundary.md`](../claim-boundary.md)).
 
 ## Non-Claim
 

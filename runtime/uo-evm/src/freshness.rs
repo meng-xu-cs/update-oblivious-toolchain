@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::Result;
 use rand::rngs::OsRng;
 use rand::RngCore;
 use sha2::{Digest, Sha256};
@@ -45,22 +45,15 @@ impl RuntimeFreshnessState {
         }
     }
 
-    pub(crate) fn recover(
-        snapshot: RuntimeFreshnessSnapshot,
-        attested_rollback_counter: u64,
-    ) -> Result<Self> {
-        if snapshot.rollback_counter != attested_rollback_counter {
-            bail!(
-                "runtime freshness rollback counter mismatch: sealed {}, attested {}",
-                snapshot.rollback_counter,
-                attested_rollback_counter
-            );
-        }
-        Ok(Self {
+    /// The counters of the commit a restart takes. Whether that commit is
+    /// the latest is the generation's part, which the restart checks before
+    /// it takes the counters.
+    pub(crate) fn recover(snapshot: RuntimeFreshnessSnapshot) -> Self {
+        Self {
             epoch: snapshot.epoch,
             rollback_counter: snapshot.rollback_counter,
             next_call_counter: snapshot.next_call_counter,
-        })
+        }
     }
 
     pub(crate) fn snapshot(&self) -> RuntimeFreshnessSnapshot {
@@ -189,21 +182,10 @@ mod tests {
         let _ = freshness.begin_call().unwrap();
         freshness.finish_call(false).unwrap();
         let snapshot = freshness.snapshot();
-        let mut recovered =
-            RuntimeFreshnessState::recover(snapshot, snapshot.rollback_counter).unwrap();
+        let mut recovered = RuntimeFreshnessState::recover(snapshot);
+        assert_eq!(recovered.snapshot(), snapshot);
         let call = recovered.begin_call().unwrap();
         assert_eq!(call.call_counter(), snapshot.next_call_counter);
-    }
-
-    #[test]
-    fn rollback_counter_mismatch_is_rejected() {
-        let snapshot = RuntimeFreshnessSnapshot {
-            epoch: 17,
-            rollback_counter: 2,
-            next_call_counter: 5,
-        };
-        let err = RuntimeFreshnessState::recover(snapshot, 1).unwrap_err();
-        assert!(err.to_string().contains("rollback counter mismatch"));
     }
 
     #[test]

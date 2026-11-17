@@ -23,7 +23,11 @@
 //! files, drops the runtime after the workload's calls, and starts another
 //! from the files alone. The restarted runtime must answer the workload's
 //! reads as the first one did and seal no record under a nonce the files
-//! already hold.
+//! already hold. The restart takes the files only with an attested
+//! generation that is theirs or one below it, and says which; the files
+//! from before the last call are refused with the generation after it. On
+//! ERC20Lite a committed abort, which leaves the rollback counter where it
+//! was, moves the generation too (`committed_aborts`).
 //!
 //! Last, it makes the store fail (`fault_matrix`): every failure a file
 //! store can be made to meet (`StorageFault::ALL`), on each sealed backend
@@ -35,9 +39,12 @@
 //! returned, and the failed call whole or not at all: whole when its
 //! commit's sync failed after a whole write or a checkpoint failed after the
 //! commit, not at all when its write stopped part way or its reservation
-//! failed. A restart from the files takes the rollback counter of
-//! the state they hold, and only that one, and answers reads as that state
-//! says. The production build runs the same failures through the production
+//! failed. A restart from the files, with the generation of the last call
+//! that returned attested, takes them, and says that they are one past it
+//! when they hold the failed call; of the attested generations around it, it
+//! accepts the files' own and the one below, and it answers reads as the
+//! state the files hold says. The production build runs the same failures
+//! through the production
 //! runtime, whose receipts say which state the files hold
 //! (`every_storage_failure_fails_closed_and_a_restart_resolves_the_call` in
 //! `runtime/uo-evm/tests/production_boundary.rs`).
@@ -50,15 +57,15 @@ use crate::{
 use anyhow::{anyhow, bail, Context, Result};
 use serde_json::{json, Value as JsonValue};
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use uo_core::ir::BackendKind;
 use uo_core::{CompiledArtifact, PublicReceipt, Value, WriteClass};
 use uo_evm::{
     storage_failure, ContractInstance, FileStorage, JournalEntry, MemoryStorage, SharedStorage,
-    StorageAdapter, StorageFailure, StorageFault, StorageIo, SyncPolicy,
+    StorageAdapter, StorageFailure, StorageFault, StorageIo, StoreGeneration, SyncPolicy,
 };
 
-pub(crate) const STORAGE_BOUNDARY_SCHEMA: &str = "uo-storage-boundary-v3";
+pub(crate) const STORAGE_BOUNDARY_SCHEMA: &str = "uo-storage-boundary-v4";
 
 /// The sealed objects of an artifact.
 fn sealed_objects(artifact: &CompiledArtifact) -> BTreeSet<String> {
@@ -337,6 +344,73 @@ fn scratch_directory(label: &str) -> PathBuf {
     std::env::temp_dir().join(format!("uo-storage-boundary-{}-{name}", std::process::id()))
 }
 
+/// Every file of `from`, copied into a new directory `to`: the files a host
+/// that keeps an older store holds.
+fn copy_directory(from: &Path, to: &Path) -> Result<()> {
+    std::fs::create_dir_all(to)?;
+    for entry in std::fs::read_dir(from)? {
+        let entry = entry?;
+        let target = to.join(entry.file_name());
+        if entry.file_type()?.is_dir() {
+            copy_directory(&entry.path(), &target)?;
+        } else {
+            std::fs::copy(entry.path(), target)?;
+        }
+    }
+    Ok(())
+}
+
+/// How a restart from the files in `directory` with `attested_generation`
+/// ends, as a name: `attested`, `one_past` or `refused`.
+fn restart_outcome(
+    artifact: &CompiledArtifact,
+    directory: &Path,
+    attested_generation: u64,
+) -> Result<&'static str> {
+    let storage = SharedStorage::new(FileStorage::open(directory, SyncPolicy::Never)?);
+    Ok(
+        match ContractInstance::restart_with_seed(
+            artifact.clone(),
+            PROBE_DEPLOY_SEED,
+            storage,
+            attested_generation,
+        ) {
+            Ok((_, StoreGeneration::Attested)) => "attested",
+            Ok((_, StoreGeneration::OnePast)) => "one_past",
+            Err(_) => "refused",
+        },
+    )
+}
+
+/// The outcome of a restart from `directory` with each attested generation
+/// from two below the files' `generation` to one above it. The files are
+/// taken at their own generation, and as one past the generation below it;
+/// they are refused as more than one past the generation two below it, and
+/// as behind the generation above it.
+fn generation_window(
+    artifact: &CompiledArtifact,
+    directory: &Path,
+    generation: u64,
+) -> Result<(JsonValue, bool)> {
+    let expected = [
+        (generation - 2, "refused"),
+        (generation - 1, "one_past"),
+        (generation, "attested"),
+        (generation + 1, "refused"),
+    ];
+    let mut rows = Vec::new();
+    let mut holds = true;
+    for (attested, outcome) in expected {
+        let restart = restart_outcome(artifact, directory, attested)?;
+        holds &= restart == outcome;
+        rows.push(json!({
+            "attested_generation": attested,
+            "restart": restart,
+        }));
+    }
+    Ok((JsonValue::Array(rows), holds))
+}
+
 /// The seal counts the store holds for each sealed object, and the count it
 /// has reserved for the object's key.
 fn nonce_state(
@@ -370,7 +444,9 @@ fn run_restart(
 ) -> Result<(JsonValue, bool)> {
     let _audit_off = WitnessAuditOff::new();
     let directory = scratch_directory(&format!("{}-{backend}", workload.label));
+    let before_last_call = scratch_directory(&format!("{}-{backend}-before", workload.label));
     let _ = std::fs::remove_dir_all(&directory);
+    let _ = std::fs::remove_dir_all(&before_last_call);
     let outcome = (|| -> Result<(JsonValue, bool)> {
         let storage = SharedStorage::new(FileStorage::create(&directory, SyncPolicy::Never)?);
         let mut instance = ContractInstance::deploy_with_seed_and_storage(
@@ -381,22 +457,26 @@ fn run_restart(
         instance.keep_decoded_position_map_witness()?;
         let deployed_bytes = instance.storage_stats().persisted_bytes;
         let mut journal_bytes = Vec::new();
-        let mut rollback_counter = 0u64;
-        for call in workload
+        let calls: Vec<&CallSpec> = workload
             .setup
             .iter()
             .chain(std::iter::once(&workload.target))
-        {
-            let before = instance.storage_stats().persisted_bytes;
-            let result = instance.call(call.entrypoint, call.args.clone())?;
-            if !result.aborted {
-                rollback_counter += 1;
+            .collect();
+        for (index, call) in calls.iter().enumerate() {
+            if index + 1 == calls.len() {
+                // The files a host keeps from before the last call.
+                copy_directory(&directory, &before_last_call)?;
             }
+            let before = instance.storage_stats().persisted_bytes;
+            instance.call(call.entrypoint, call.args.clone())?;
             journal_bytes.push(json!({
                 "entrypoint": call.entrypoint,
                 "bytes": instance.storage_stats().persisted_bytes - before,
             }));
         }
+        // The deployment's commit and one for each call.
+        let generation = instance.generation();
+        let generation_counts_the_commits = generation == 1 + calls.len() as u64;
         let public_state = instance.public_state_digest()?;
         let sealed_records = storage.with(|adapter| adapter.sealed_records_sha256());
         let before = nonce_state(&storage, artifact);
@@ -409,31 +489,29 @@ fn run_restart(
                 SyncPolicy::Never,
             )?))
         };
-        // A stale attested counter and another deployment's secret are
-        // refused before anything is restored.
-        let stale_counter_refused = ContractInstance::restart_with_seed(
-            artifact.clone(),
-            PROBE_DEPLOY_SEED,
-            reopen()?,
-            rollback_counter + 1,
-        )
-        .is_err();
+        // An attested generation the files are not at or one past, the
+        // files from before the last call with the generation after it, and
+        // another deployment's secret are refused before anything is
+        // restored.
+        let (generation_window, generation_window_holds) =
+            generation_window(artifact, &directory, generation)?;
+        let files_before_the_last_call = restart_outcome(artifact, &before_last_call, generation)?;
         let other_secret_refused = ContractInstance::restart_with_seed(
             artifact.clone(),
             PROBE_DEPLOY_SEED ^ 1,
             reopen()?,
-            rollback_counter,
+            generation,
         )
         .is_err();
 
         let storage = reopen()?;
         let files_hold_the_last_commit =
             storage.with(|adapter| adapter.sealed_records_sha256()) == sealed_records;
-        let mut restarted = ContractInstance::restart_with_seed(
+        let (mut restarted, _) = ContractInstance::restart_with_seed(
             artifact.clone(),
             PROBE_DEPLOY_SEED,
             storage.clone(),
-            rollback_counter,
+            generation,
         )?;
         restarted.keep_decoded_position_map_witness()?;
         let public_state_restored = restarted.public_state_digest()? == public_state;
@@ -461,7 +539,9 @@ fn run_restart(
                 }
             }
         }
-        let holds = stale_counter_refused
+        let holds = generation_counts_the_commits
+            && generation_window_holds
+            && files_before_the_last_call == "refused"
             && other_secret_refused
             && files_hold_the_last_commit
             && public_state_restored
@@ -474,7 +554,10 @@ fn run_restart(
                 "deployment_bytes": deployed_bytes,
                 "journal_bytes_by_call": journal_bytes,
                 "records_sealed_after_restart": records_sealed_after_restart,
-                "stale_attested_counter_refused": stale_counter_refused,
+                "generation": generation,
+                "generation_counts_the_commits": generation_counts_the_commits,
+                "restart_by_attested_generation": generation_window,
+                "files_before_the_last_call_at_its_generation": files_before_the_last_call,
                 "other_deployment_secret_refused": other_secret_refused,
                 "files_hold_the_last_commit": files_hold_the_last_commit,
                 "public_state_restored": public_state_restored,
@@ -485,6 +568,68 @@ fn run_restart(
         ))
     })();
     let _ = std::fs::remove_dir_all(&directory);
+    let _ = std::fs::remove_dir_all(&before_last_call);
+    outcome
+}
+
+/// A committed call that aborts, which leaves the rollback counter where it
+/// was, still moves the generation a restart checks. After `setup`, the
+/// files are kept; `aborting` commits an abort. The kept files are refused
+/// with the generation after the abort, the files after it are taken with
+/// their own and as one past the one before it.
+fn committed_abort(
+    artifact: &CompiledArtifact,
+    backend: &str,
+    setup: &CallSpec,
+    aborting: &CallSpec,
+) -> Result<JsonValue> {
+    let directory = scratch_directory(&format!("abort-{backend}"));
+    let before_abort = scratch_directory(&format!("abort-{backend}-before"));
+    let _ = std::fs::remove_dir_all(&directory);
+    let _ = std::fs::remove_dir_all(&before_abort);
+    let outcome = (|| -> Result<JsonValue> {
+        let storage = SharedStorage::new(FileStorage::create(&directory, SyncPolicy::Never)?);
+        let mut instance = ContractInstance::deploy_with_seed_and_storage(
+            artifact.clone(),
+            PROBE_DEPLOY_SEED,
+            storage,
+        )?;
+        instance.keep_decoded_position_map_witness()?;
+        let set_up = instance.call(setup.entrypoint, setup.args.clone())?;
+        let generation_before = instance.generation();
+        copy_directory(&directory, &before_abort)?;
+        let result = instance.call(aborting.entrypoint, aborting.args.clone())?;
+        let generation_after = instance.generation();
+        drop(instance);
+        let before_at_the_generation_after =
+            restart_outcome(artifact, &before_abort, generation_after)?;
+        let before_at_its_generation = restart_outcome(artifact, &before_abort, generation_before)?;
+        let after_at_its_generation = restart_outcome(artifact, &directory, generation_after)?;
+        let after_at_the_generation_before =
+            restart_outcome(artifact, &directory, generation_before)?;
+        let holds = !set_up.aborted
+            && result.aborted
+            && generation_after == generation_before + 1
+            && before_at_the_generation_after == "refused"
+            && before_at_its_generation == "attested"
+            && after_at_its_generation == "attested"
+            && after_at_the_generation_before == "one_past";
+        Ok(json!({
+            "backend": backend,
+            "setup": setup.entrypoint,
+            "aborting_call": aborting.entrypoint,
+            "call_aborted": result.aborted,
+            "generation_before_the_abort": generation_before,
+            "generation_after_the_abort": generation_after,
+            "files_before_the_abort_at_the_generation_after_it": before_at_the_generation_after,
+            "files_before_the_abort_at_their_generation": before_at_its_generation,
+            "files_after_the_abort_at_their_generation": after_at_its_generation,
+            "files_after_the_abort_at_the_generation_before_it": after_at_the_generation_before,
+            "holds": holds,
+        }))
+    })();
+    let _ = std::fs::remove_dir_all(&directory);
+    let _ = std::fs::remove_dir_all(&before_abort);
     outcome
 }
 
@@ -566,8 +711,8 @@ fn storage_fault(
     }
     let call = target;
     // The calls before the one that meets the fault.
-    let prepare = |instance: &mut ContractInstance| -> Result<u64> {
-        let setup_result = instance.call(setup.entrypoint, setup.args.clone())?;
+    let prepare = |instance: &mut ContractInstance| -> Result<()> {
+        instance.call(setup.entrypoint, setup.args.clone())?;
         if reservation
             && instance
                 .call(dropped.entrypoint, dropped.args.clone())
@@ -575,7 +720,7 @@ fn storage_fault(
         {
             bail!("{} was not dropped", dropped.entrypoint);
         }
-        Ok(u64::from(!setup_result.aborted))
+        Ok(())
     };
     // The state the files may hold after the call: the one before it, and
     // the one a twin that meets no fault reaches with it.
@@ -609,10 +754,17 @@ fn storage_fault(
             storage.clone(),
         )?;
         instance.keep_decoded_position_map_witness()?;
-        let counter_before = prepare(&mut instance)?;
+        prepare(&mut instance)?;
+        let generation_before = instance.generation();
 
         storage.inject_fault(fault)?;
         let result = instance.call(call.entrypoint, call.args.clone());
+        // The platform's counter holds the generation of the last call that
+        // returned.
+        let counter = match &result {
+            Ok(_) => instance.generation(),
+            Err(_) => generation_before,
+        };
         let (call_result, failure) = match &result {
             Ok(_) => ("returned", None),
             Err(error) => match storage_failure(error) {
@@ -644,23 +796,33 @@ fn storage_fault(
             )?))
         };
         let mut accepted = Vec::new();
-        let mut restarted = None;
-        for counter in [counter_before, counter_before + 1] {
-            if let Ok(instance) = ContractInstance::restart_with_seed(
-                artifact.clone(),
-                PROBE_DEPLOY_SEED,
-                reopen()?,
-                counter,
-            ) {
-                accepted.push(counter);
-                restarted = Some(instance);
+        for attested in [counter - 1, counter, counter + 1] {
+            if restart_outcome(&artifact, &directory, attested)? != "refused" {
+                accepted.push(attested);
             }
         }
-        let mut restarted =
-            restarted.ok_or_else(|| anyhow!("no rollback counter restarts {label}"))?;
+        let (mut restarted, found) = ContractInstance::restart_with_seed(
+            artifact.clone(),
+            PROBE_DEPLOY_SEED,
+            reopen()?,
+            counter,
+        )
+        .with_context(|| format!("no restart at the counter {label}"))?;
+        let restart_at_the_counter = match found {
+            StoreGeneration::Attested => "attested",
+            StoreGeneration::OnePast => "one_past",
+        };
+        let files_generation = restarted.generation();
         restarted.keep_decoded_position_map_witness()?;
         let files = state(&restarted)?;
         let files_hold_the_call = Some(&files) == after.as_ref();
+        // The files are one past the counter when they hold a commit no
+        // returned call carried: the failed append's.
+        let expected_restart = if files_hold_the_call && result.is_err() {
+            "one_past"
+        } else {
+            "attested"
+        };
         let files_hold_a_state_of_the_call = files == before || files_hold_the_call;
         let expected_whole = fault.leaves_the_entry_whole() && !reservation;
         // Reads answer as the state the files hold says: as the twin, if
@@ -685,7 +847,8 @@ fn storage_fault(
         let holds = call_as_expected
             && store_refuses_operations
             && next_call_refused
-            && accepted.len() == 1
+            && restart_at_the_counter == expected_restart
+            && accepted == [files_generation - 1, files_generation]
             && files_hold_a_state_of_the_call
             && files_hold_the_call == expected_whole
             && (bytes_cut_on_open > 0) != fault.leaves_the_entry_whole()
@@ -700,7 +863,9 @@ fn storage_fault(
             "store_refuses_operations": store_refuses_operations,
             "next_call_refused": next_call_refused,
             "bytes_cut_on_open": bytes_cut_on_open,
-            "rollback_counters_a_restart_accepts": accepted,
+            "generation_of_the_last_call_that_returned": counter,
+            "restart_at_that_generation": restart_at_the_counter,
+            "attested_generations_a_restart_accepts": accepted,
             // Which state, as a name and not a flag: a false flag would be
             // a false leaf that the acceptance gate does not classify.
             "files_hold": if files_hold_the_call {
@@ -844,6 +1009,24 @@ pub(crate) fn run_storage_boundary(
     let nonce_reservation = nonce_reservation(&erc20.uo).context("nonce reservation")?;
     let nonce_reservation_holds = nonce_reservation["holds"] == json!(true);
 
+    // A transfer of more than the owner holds aborts, and is committed.
+    let too_much = CallSpec {
+        entrypoint: "transfer(address,address,uint256)",
+        args: vec![
+            Value::Address([0x11; 20]),
+            Value::Address([0x22; 20]),
+            Value::uint(100),
+        ],
+    };
+    let mut committed_aborts = Vec::new();
+    let mut every_committed_abort_moves_the_generation = true;
+    for (backend, artifact) in sealed_variants(erc20) {
+        let row = committed_abort(artifact, &backend, &mint, &too_much)
+            .with_context(|| format!("committed abort on ERC20Lite/{backend}"))?;
+        every_committed_abort_moves_the_generation &= row["holds"] == json!(true);
+        committed_aborts.push(row);
+    }
+
     let second_mint = CallSpec {
         entrypoint: "mint(address,uint256)",
         args: vec![Value::Address([0x22; 20]), Value::uint(20)],
@@ -881,6 +1064,7 @@ pub(crate) fn run_storage_boundary(
         "store_reads_are_the_traced_reads": totals.store_reads == totals.traced_reads,
         "store_writes_are_the_traced_writes": totals.store_writes == totals.traced_writes,
         "every_restart_continues_its_deployment": every_restart_holds,
+        "a_restart_refuses_the_files_from_before_a_committed_abort": every_committed_abort_moves_the_generation,
         "a_dropped_call_leaves_the_store_as_it_was": every_dropped_call_holds,
         "a_record_reaches_the_store_only_under_a_reserved_nonce": nonce_reservation_holds,
         "every_storage_fault_fails_closed": every_storage_fault_fails_closed,
@@ -904,13 +1088,14 @@ pub(crate) fn run_storage_boundary(
         },
         "benchmarks": benchmarks,
         "restarts": restarts,
+        "committed_aborts": committed_aborts,
         "dropped_calls": dropped_calls,
         "nonce_reservation": nonce_reservation,
         "fault_matrix": fault_matrix,
         "checks": checks,
         "provenance": {
             "toolchain_manifest_sha256": toolchain,
-            "restart": "a seeded deployment restarts from a store in files; the sync policy is off, so the report times no device",
+            "restart": "a seeded deployment restarts from a store in files, with an attested generation that stands for the platform's monotonic counter; the sync policy is off, so the report times no device",
         },
         "accepted": accepted,
     }))

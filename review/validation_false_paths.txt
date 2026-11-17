@@ -1443,6 +1443,7 @@ top_level_booleans:
   raw_map_entry_uses_fixed_cipher_buffer: true
   refinement_trace_public_buffers_boxed: true
   resource_event_constructor_surface_restricted: true
+  restarts_check_the_commit_generation: true
   runtime_call_outcome_api_is_explicit: true
   runtime_call_outcome_constructor_surface_restricted: true
   runtime_call_outcome_fields_private: true

@@ -16,7 +16,9 @@ use crate::runtime::{
     ContractRuntime, PathOramFreshCoinPlan,
 };
 use crate::secret::{PlatformSealingKey, RuntimeMasterSecret, StoreMetaKey};
-use crate::store_meta::{make_deployment_durable, DroppedCallSeals, StagedStore, StoreMeta};
+use crate::store_meta::{
+    make_deployment_durable, DroppedCallSeals, StagedStore, StoreGeneration, StoreMeta,
+};
 use anyhow::{anyhow, bail, Result};
 use uo_core::{
     CompiledArtifact, EncryptedReturnPayload, ExecutionTrace, PublicEnvironment, PublicReceipt,
@@ -36,6 +38,10 @@ pub struct ContractInstance {
     freshness: RuntimeFreshnessState,
     environment: PublicEnvironment,
     initialized: bool,
+    /// The generation of the instance's last commit: how many commits its
+    /// store holds. Each commit leaves it in the commit metadata, one past
+    /// the last, and a restart compares it with the attested one.
+    generation: u64,
     /// The store that keeps the contract's sealed records. Every record a
     /// call opens or seals crosses to it, and a call is committed there,
     /// with the commit metadata, before the runtime takes the call's state.
@@ -121,6 +127,8 @@ struct StagedCall {
     state: ContractRuntime,
     freshness: RuntimeFreshnessState,
     initialized: bool,
+    /// The generation the call's commit leaves, one past the instance's.
+    generation: u64,
     store: StagedStore,
     seals: DroppedCallSeals,
 }
@@ -156,8 +164,9 @@ pub struct ProductionContractInstance {
 }
 
 /// What an accepted production call returns: the call's result, the
-/// runtime's receipt for it, which follows the receipt the call named, and
-/// the receipt's tag under the call's session.
+/// runtime's receipt for it, which follows the receipt the call named, the
+/// receipt's tag under the call's session, and the generation of the
+/// call's commit.
 #[derive(Debug)]
 pub struct ProductionCallResult {
     pub call: CallResult,
@@ -165,6 +174,11 @@ pub struct ProductionCallResult {
     /// The receipt's tag under the call's session, which the caller checks
     /// with `verify_production_receipt`.
     pub receipt_tag: String,
+    /// The generation of the call's commit, aborted or not. The deployment
+    /// advances the platform's monotonic counter to it before it releases
+    /// the result or makes another call, so that a restart refuses every
+    /// store older than this commit (`StoreGeneration`).
+    pub generation: u64,
 }
 
 #[cfg(feature = "diagnostics")]
@@ -211,10 +225,14 @@ impl ProductionContractInstance {
     /// Start again from the store a production deployment of `artifact`
     /// under `policy` left, with the master secret it sealed to its
     /// platform: the instance of its last commit, whose next receipt follows
-    /// the last one it issued. The restart is refused unless the secret
-    /// opens on `platform` for this deployment, the commit metadata carries
-    /// the tag of that secret, its rollback counter is the attested one, and
-    /// the store is the one the last receipt was issued for: its public state
+    /// the last one it issued. The restart says where the store's generation
+    /// stands to the one the platform's monotonic counter attests: at it, or
+    /// one past it, in which case the deployment advances the counter to the
+    /// instance's generation before it releases anything the instance
+    /// returns. It is refused unless the secret opens on `platform` for this
+    /// deployment, the commit metadata carries the tag of that secret, its
+    /// generation is the attested one or one past it, and the store is the
+    /// one the last receipt was issued for: its public state
     /// and every sealed record of it. A restart seals no record.
     pub fn restart(
         artifact: CompiledArtifact,
@@ -222,8 +240,8 @@ impl ProductionContractInstance {
         storage: SharedStorage,
         sealed: &SealedMasterSecret,
         platform: &PlatformSealingKey,
-        attested_rollback_counter: u64,
-    ) -> Result<Self> {
+        attested_generation: u64,
+    ) -> Result<(Self, StoreGeneration)> {
         validate_production_artifact(&artifact)?;
         validate_production_policy(&policy)?;
         let master = RuntimeMasterSecret::unseal_from_platform(
@@ -231,12 +249,12 @@ impl ProductionContractInstance {
             platform,
             &production_deployment_request_sha256(&artifact, &policy)?,
         )?;
-        let (inner, meta) = ContractInstance::restart_internal(
+        let (inner, meta, found) = ContractInstance::restart_internal(
             artifact,
             &master,
             None,
             storage,
-            attested_rollback_counter,
+            attested_generation,
         )?;
         let last_receipt = meta
             .last_receipt
@@ -247,17 +265,20 @@ impl ProductionContractInstance {
             &inner.state.ciphertext_store_digest()?,
         )?;
         let last_receipt_sha256 = last_receipt.sha256()?;
-        Ok(Self {
-            inner,
-            policy,
-            last_receipt,
-            last_receipt_sha256,
-        })
+        Ok((
+            Self {
+                inner,
+                policy,
+                last_receipt,
+                last_receipt_sha256,
+            },
+            found,
+        ))
     }
 
     /// Issue the deployment's receipt, the first of the instance's chain,
-    /// and leave it in the store's commit metadata.
-    fn from_deployed(inner: ContractInstance, policy: ProductionRuntimePolicy) -> Result<Self> {
+    /// and leave it in the store's commit metadata, with a commit of its own.
+    fn from_deployed(mut inner: ContractInstance, policy: ProductionRuntimePolicy) -> Result<Self> {
         let last_receipt = ProductionReceipt::for_deployment(
             &inner.artifact,
             &policy,
@@ -265,13 +286,16 @@ impl ProductionContractInstance {
             inner.state.public_state_digest()?,
             inner.state.ciphertext_store_digest()?,
         )?;
+        let generation = next_generation(inner.generation)?;
         let meta = inner.store_meta(
+            generation,
             &inner.freshness,
             inner.initialized,
             inner.state.public_state_digest()?,
             Some(&last_receipt),
         )?;
         make_deployment_durable(&inner.storage, &meta)?;
+        inner.generation = generation;
         let last_receipt_sha256 = last_receipt.sha256()?;
         Ok(Self {
             inner,
@@ -287,6 +311,14 @@ impl ProductionContractInstance {
     /// its counters.
     pub fn last_receipt(&self) -> &ProductionReceipt {
         &self.last_receipt
+    }
+
+    /// The generation of the instance's last commit. The deployment's
+    /// platform counter holds it before the deployment releases anything
+    /// the instance returned: after the deployment, after each call
+    /// (`ProductionCallResult::generation`) and after a restart.
+    pub fn generation(&self) -> u64 {
+        self.inner.generation
     }
 
     /// The receipt the runtime issued last, with its tag under `session`.
@@ -402,6 +434,7 @@ impl ProductionContractInstance {
             call,
             receipt,
             receipt_tag,
+            generation: self.inner.generation,
         })
     }
 }
@@ -445,49 +478,50 @@ impl ContractInstance {
 
     /// Start again from the store a seeded deployment of `artifact` left:
     /// the instance of its last commit. The commit metadata must carry the
-    /// tag of the deployment's secret, its rollback counter must be the
-    /// attested one, and the public state the store keeps must have the
-    /// digest the metadata names. Each storage key resumes at the seal count
-    /// the store has reserved for it. Only a seeded deployment can restart:
-    /// a deployment from OS randomness keeps its master secret in memory
-    /// alone, and sealing it to a platform is not this runtime's part.
+    /// tag of the deployment's secret, its generation must be the attested
+    /// one or one past it, which the restart says, and the public state the
+    /// store keeps must have the digest the metadata names. Each storage key
+    /// resumes at the seal count the store has reserved for it. Only a
+    /// seeded deployment can restart: a deployment from OS randomness keeps
+    /// its master secret in memory alone, and sealing it to a platform is not
+    /// this runtime's part.
     #[cfg(any(test, feature = "diagnostics"))]
     pub fn restart_with_seed(
         artifact: CompiledArtifact,
         deploy_seed: u64,
         storage: SharedStorage,
-        attested_rollback_counter: u64,
-    ) -> Result<Self> {
+        attested_generation: u64,
+    ) -> Result<(Self, StoreGeneration)> {
         let master = RuntimeMasterSecret::from_diagnostic_seed(deploy_seed);
-        Ok(Self::restart_internal(
+        let (instance, _, found) = Self::restart_internal(
             artifact,
             &master,
             Some(deploy_seed),
             storage,
-            attested_rollback_counter,
-        )?
-        .0)
+            attested_generation,
+        )?;
+        Ok((instance, found))
     }
 
     /// Start again from the store a deployment with `master` left, with the
     /// commit metadata it kept there. The metadata must carry the tag of the
-    /// secret, its rollback counter must be the attested one, and the public
-    /// state the store keeps must have the digest the metadata names. Each
-    /// storage key resumes at the seal count the store has reserved for it,
-    /// and no object seals a record.
+    /// secret, its generation must be the attested one or one past it, and
+    /// the public state the store keeps must have the digest the metadata
+    /// names. Each storage key resumes at the seal count the store has
+    /// reserved for it, and no object seals a record.
     fn restart_internal(
         artifact: CompiledArtifact,
         master: &RuntimeMasterSecret,
         replay_seed: Option<u64>,
         storage: SharedStorage,
-        attested_rollback_counter: u64,
-    ) -> Result<(Self, StoreMeta)> {
+        attested_generation: u64,
+    ) -> Result<(Self, StoreMeta, StoreGeneration)> {
         check_call_seal_bounds(&artifact)?;
         let store_meta_key = master.store_meta_key()?;
         let meta = storage
             .with(|adapter| StoreMeta::from_tagged_bytes(&store_meta_key, adapter.meta()))?;
-        let freshness =
-            RuntimeFreshnessState::recover(meta.freshness(), attested_rollback_counter)?;
+        let found = meta.against_attested(attested_generation)?;
+        let freshness = RuntimeFreshnessState::recover(meta.freshness());
         let state = deploy_contract_runtime(&artifact.contract.state, master, &storage, true)?;
         if state.public_state_digest()? != meta.public_state_sha256 {
             bail!("the public state the store keeps is not the public state of its last commit");
@@ -499,10 +533,11 @@ impl ContractInstance {
             freshness,
             environment: PublicEnvironment::default(),
             initialized: meta.initialized,
+            generation: meta.generation,
             storage,
             store_meta_key,
         };
-        Ok((instance, meta))
+        Ok((instance, meta, found))
     }
 
     fn deploy_internal(
@@ -520,6 +555,7 @@ impl ContractInstance {
             .values()
             .any(|entry| entry.initializer);
         let state = deploy_contract_runtime(&artifact.contract.state, master, &storage, false)?;
+        // The deployment's commit is the store's first.
         let instance = Self {
             state,
             artifact,
@@ -527,11 +563,13 @@ impl ContractInstance {
             freshness,
             environment: PublicEnvironment::default(),
             initialized,
+            generation: 1,
             storage,
             store_meta_key: master.store_meta_key()?,
         };
         // The deployment's records are in the store once this commit returns.
         let meta = instance.store_meta(
+            instance.generation,
             &instance.freshness,
             instance.initialized,
             instance.state.public_state_digest()?,
@@ -541,18 +579,31 @@ impl ContractInstance {
         Ok(instance)
     }
 
-    /// The commit metadata of a state: its freshness counters, whether it is
-    /// initialized and the digest of its public state, with the tag.
+    /// The generation of the instance's last commit: how many commits its
+    /// store holds.
+    pub fn generation(&self) -> u64 {
+        self.generation
+    }
+
+    /// The commit metadata of a state: the commit's generation, the state's
+    /// freshness counters, whether it is initialized and the digest of its
+    /// public state, with the tag.
     fn store_meta(
         &self,
+        generation: u64,
         freshness: &RuntimeFreshnessState,
         initialized: bool,
         public_state_sha256: String,
         last_receipt: Option<&ProductionReceipt>,
     ) -> Result<Vec<u8>> {
-        StoreMeta::new(freshness.snapshot(), initialized, public_state_sha256)
-            .with_last_receipt(last_receipt)
-            .tagged_bytes(&self.store_meta_key)
+        StoreMeta::new(
+            generation,
+            freshness.snapshot(),
+            initialized,
+            public_state_sha256,
+        )
+        .with_last_receipt(last_receipt)
+        .tagged_bytes(&self.store_meta_key)
     }
 
     pub fn call(&mut self, entrypoint: &str, args: Vec<Value>) -> Result<CallResult> {
@@ -641,9 +692,9 @@ impl ContractInstance {
 
     /// Store `entries` in the map named `map` with no call: the map takes
     /// each write as a committed call's write would reach it, and nothing is
-    /// traced, witnessed or proved. The freshness counters do not move. The
-    /// capacity sweep fills its maps this way; a production build has no such
-    /// function.
+    /// traced, witnessed or proved. The freshness counters do not move; the
+    /// load is a commit, so the generation does. The capacity sweep fills
+    /// its maps this way; a production build has no such function.
     #[cfg(any(test, feature = "diagnostics"))]
     pub fn bulk_load_map_for_diagnostics(
         &mut self,
@@ -658,13 +709,17 @@ impl ContractInstance {
         let loaded = bulk_load_contract_map_for_diagnostics(&mut self.state, map, entries);
         self.storage.with(|adapter| adapter.set_logging(true));
         loaded?;
+        let generation = next_generation(self.generation)?;
         let meta = self.store_meta(
+            generation,
             &self.freshness,
             self.initialized,
             self.state.public_state_digest()?,
             None,
         )?;
-        store.make_durable(&meta)
+        store.make_durable(&meta)?;
+        self.generation = generation;
+        Ok(())
     }
 
     /// The reads and writes of sealed records that the store saw since the
@@ -736,6 +791,7 @@ impl ContractInstance {
             None => staged.state.public_state_digest()?,
         };
         let meta = self.store_meta(
+            staged.generation,
             &staged.freshness,
             staged.initialized,
             public_state_sha256,
@@ -746,6 +802,7 @@ impl ContractInstance {
         self.state = staged.state;
         self.freshness = staged.freshness;
         self.initialized = staged.initialized;
+        self.generation = staged.generation;
         Ok((
             CallResult::from_staged(
                 staged.return_value,
@@ -821,6 +878,8 @@ impl ContractInstance {
             runtime_args.push(environment.value_for(*field));
         }
         let args = runtime_args.into_boxed_slice();
+        // The call's commit, aborted or not, is the store's next.
+        let generation = next_generation(self.generation)?;
         let mut staged_freshness = self.freshness.clone();
         let call_freshness = staged_freshness.begin_call()?;
         // From here the call's records are pending in the store. If the call
@@ -851,10 +910,18 @@ impl ContractInstance {
             state: staged_state,
             freshness: staged_freshness,
             initialized,
+            generation,
             store,
             seals,
         })
     }
+}
+
+/// The generation of the commit after one of `generation`.
+fn next_generation(generation: u64) -> Result<u64> {
+    generation
+        .checked_add(1)
+        .ok_or_else(|| anyhow!("the store's commit generation is exhausted"))
 }
 
 /// Refuse an artifact with an entrypoint that could seal
@@ -897,7 +964,7 @@ mod tests {
         };
     }
 
-    use super::{CallResult, ContractInstance, ProductionContractInstance};
+    use super::{CallResult, ContractInstance, ProductionContractInstance, StoreGeneration};
     use crate::deployment::{production_build_profile_sha256, ProductionRuntimePolicy};
     #[cfg(not(feature = "diagnostics"))]
     use crate::deployment::{
@@ -4160,7 +4227,7 @@ bounds:
             instance
                 .call("deposit(bytes32,uint256)", vec![b32(1), Value::uint(5)])
                 .unwrap();
-            let rollback_counter = instance.freshness.snapshot().rollback_counter;
+            let generation = instance.generation();
             let starts = key_counts(&instance);
             let resumes: Vec<(String, u64)> = starts
                 .iter()
@@ -4208,9 +4275,9 @@ bounds:
                     "{ending}: {object}"
                 );
             }
-            let restarted =
-                ContractInstance::restart_with_seed(artifact(), 29, reopened, rollback_counter)
-                    .unwrap();
+            let (restarted, found) =
+                ContractInstance::restart_with_seed(artifact(), 29, reopened, generation).unwrap();
+            assert_eq!(found, StoreGeneration::Attested, "{ending}");
             assert_eq!(key_counts(&restarted), resumes, "{ending}");
             drop(restarted);
             drop(instance);
@@ -4303,7 +4370,7 @@ bounds:
             past(),
             37,
             SharedStorage::new(FileStorage::open(&directory, SyncPolicy::Never).unwrap()),
-            0,
+            1,
         )
         .unwrap_err();
         assert!(error.to_string().contains("could seal"), "{error}");
@@ -4351,25 +4418,46 @@ bounds:
             let theirs = twin.call(entrypoint, args.clone()).unwrap();
             assert_eq!(ours.trace.receipt, theirs.trace.receipt, "{entrypoint}");
         }
-        let rollback_counter = instance.freshness.snapshot().rollback_counter;
+        // The deployment's commit and one for each call.
+        let generation = instance.generation();
+        assert_eq!(generation, 1 + first.len() as u64);
         let counters_before = sealed_counters(&instance.state);
         let ciphertext = instance.state.ciphertext_store_digest().unwrap();
         drop(instance);
 
-        // The attested rollback counter must be the store's, and the
-        // metadata must carry the tag of this deployment's secret.
+        // The store's generation must be the attested one or one past it,
+        // and the metadata must carry the tag of this deployment's secret.
         let refused =
-            ContractInstance::restart_with_seed(artifact(), seed, reopened(), rollback_counter + 1)
+            ContractInstance::restart_with_seed(artifact(), seed, reopened(), generation + 1)
                 .unwrap_err();
-        assert!(refused.to_string().contains("rollback counter mismatch"));
+        assert!(
+            refused
+                .to_string()
+                .contains("behind the attested generation"),
+            "{refused}"
+        );
         let refused =
-            ContractInstance::restart_with_seed(artifact(), seed + 1, reopened(), rollback_counter)
+            ContractInstance::restart_with_seed(artifact(), seed, reopened(), generation - 2)
+                .unwrap_err();
+        assert!(
+            refused.to_string().contains("more than one past"),
+            "{refused}"
+        );
+        let refused =
+            ContractInstance::restart_with_seed(artifact(), seed + 1, reopened(), generation)
                 .unwrap_err();
         assert!(refused.to_string().contains("tag"), "{refused}");
-
-        let mut restarted =
-            ContractInstance::restart_with_seed(artifact(), seed, reopened(), rollback_counter)
+        let (one_past, found) =
+            ContractInstance::restart_with_seed(artifact(), seed, reopened(), generation - 1)
                 .unwrap();
+        assert_eq!(found, StoreGeneration::OnePast);
+        assert_eq!(one_past.generation(), generation);
+        drop(one_past);
+
+        let (mut restarted, found) =
+            ContractInstance::restart_with_seed(artifact(), seed, reopened(), generation).unwrap();
+        assert_eq!(found, StoreGeneration::Attested);
+        assert_eq!(restarted.generation(), generation);
         // The restarted instance holds the records of the last commit, and
         // the freshness and public state of the twin.
         assert_eq!(
@@ -4411,6 +4499,7 @@ bounds:
             assert_eq!(ours.trace.receipt, theirs.trace.receipt, "{entrypoint}");
         }
         assert_eq!(restarted.freshness, twin.freshness);
+        assert_eq!(restarted.generation(), twin.generation());
         // No record sealed after the restart carries a nonce from before
         // it: each is one the restart found, or is at or above the count
         // the store had reserved.
@@ -4518,15 +4607,15 @@ bounds:
         instance
             .call("hide(uint256)", vec![Value::uint(9)])
             .unwrap();
-        let rollback_counter = instance.freshness.snapshot().rollback_counter;
+        let generation = instance.generation();
         let public_state = instance.state.public_state_digest().unwrap();
         drop(instance);
 
-        let mut restarted = ContractInstance::restart_with_seed(
+        let (mut restarted, _) = ContractInstance::restart_with_seed(
             artifact(),
             seed,
             SharedStorage::new(FileStorage::open(&directory, SyncPolicy::Never).unwrap()),
-            rollback_counter,
+            generation,
         )
         .unwrap();
         assert_eq!(restarted.state.public_state_digest().unwrap(), public_state);
@@ -4546,8 +4635,8 @@ bounds:
             read(&mut restarted, "seenOf(address)", vec![alice.clone()]),
             Some(Value::uint(0))
         );
-        // The reads were calls, and moved the counters.
-        let rollback_counter = restarted.freshness.snapshot().rollback_counter;
+        // The reads were calls, and moved the generation.
+        let generation = restarted.generation();
         drop(restarted);
 
         // A public value changed in the files is not the public state of the
@@ -4567,7 +4656,7 @@ bounds:
             artifact(),
             seed,
             SharedStorage::new(FileStorage::open(&directory, SyncPolicy::Never).unwrap()),
-            rollback_counter,
+            generation,
         )
         .unwrap_err();
         assert!(refused.to_string().contains("public state"), "{refused}");

@@ -28028,7 +28028,7 @@ fn check_runtime_secrets_derive_from_the_master_secret(
     ) && engine_impl_source.contains(
         "    #[cfg(any(test, feature = \"diagnostics\"))]\n    pub fn deploy_with_seed_and_storage(\n        artifact: CompiledArtifact,\n        deploy_seed: u64,\n        storage: SharedStorage,\n    ) -> Result<Self> {\n        let master = RuntimeMasterSecret::from_diagnostic_seed(deploy_seed);",
     ) && engine_impl_source.contains(
-        "    #[cfg(any(test, feature = \"diagnostics\"))]\n    pub fn restart_with_seed(\n        artifact: CompiledArtifact,\n        deploy_seed: u64,\n        storage: SharedStorage,\n        attested_rollback_counter: u64,\n    ) -> Result<Self> {\n        let master = RuntimeMasterSecret::from_diagnostic_seed(deploy_seed);",
+        "    #[cfg(any(test, feature = \"diagnostics\"))]\n    pub fn restart_with_seed(\n        artifact: CompiledArtifact,\n        deploy_seed: u64,\n        storage: SharedStorage,\n        attested_generation: u64,\n    ) -> Result<(Self, StoreGeneration)> {\n        let master = RuntimeMasterSecret::from_diagnostic_seed(deploy_seed);",
     ) && engine_impl_source
         .matches("RuntimeMasterSecret::from_diagnostic_seed(")
         .count()
@@ -28698,7 +28698,7 @@ fn check_production_calls_issue_chained_receipts(
             "            self.inner.freshness.snapshot(),\n            &self.last_receipt_sha256,\n        )?;",
         )
         && engine_impl_source.contains(
-            "        let receipt = ProductionReceipt::for_call(\n            evidence,\n            &self.last_receipt,\n            &staged.trace.receipt,\n            staged.freshness.snapshot(),\n            staged.state.public_state_digest()?,\n            staged.state.ciphertext_store_digest()?,\n        )?;\n        let receipt_sha256 = receipt.sha256()?;\n        let receipt_tag = production_receipt_tag(session, &receipt_sha256)?;\n        let call = self\n            .inner\n            .commit_staged_with_receipt(staged, Some(&receipt))?\n            .0;\n        self.last_receipt = receipt.clone();\n        self.last_receipt_sha256 = receipt_sha256;\n        Ok(ProductionCallResult {\n            call,\n            receipt,\n            receipt_tag,\n        })",
+            "        let receipt = ProductionReceipt::for_call(\n            evidence,\n            &self.last_receipt,\n            &staged.trace.receipt,\n            staged.freshness.snapshot(),\n            staged.state.public_state_digest()?,\n            staged.state.ciphertext_store_digest()?,\n        )?;\n        let receipt_sha256 = receipt.sha256()?;\n        let receipt_tag = production_receipt_tag(session, &receipt_sha256)?;\n        let call = self\n            .inner\n            .commit_staged_with_receipt(staged, Some(&receipt))?\n            .0;\n        self.last_receipt = receipt.clone();\n        self.last_receipt_sha256 = receipt_sha256;\n        Ok(ProductionCallResult {\n            call,\n            receipt,\n            receipt_tag,\n            generation: self.inner.generation,\n        })",
         )
         && engine_impl_source.matches("self.last_receipt = ").count() == 1
         && engine_impl_source.matches("self.last_receipt_sha256 = ").count() == 1
@@ -28858,6 +28858,74 @@ fn check_production_deployments_restart_from_a_sealed_secret(
         && deployment_source.contains(
             "            \"ciphertext_store_after_sha256\",\n            self.ciphertext_store_after_sha256 == ciphertext_store_sha256,",
         )
+}
+
+/// Whether a restart checks the commit generation (Issue 67 of the review of
+/// 16 November 2026). Every commit leaves in the tagged metadata the
+/// generation one past the instance's: the deployment's first, a production
+/// deployment's receipt, each committed call, aborted or not, and a bulk
+/// load. A call takes its generation before it stages anything, and the
+/// instance takes it once the commit is durable. A restart takes metadata
+/// whose generation is the attested one or one past it and refuses every
+/// other, before it restores anything; it no longer compares the rollback
+/// counter, which an aborted call leaves where it was. A production call
+/// returns its commit's generation, which the platform's counter follows.
+fn check_restarts_check_the_commit_generation(
+    engine_impl_source: &str,
+    store_meta_source: &str,
+    freshness_source: &str,
+) -> bool {
+    store_meta_source.contains("const STORE_META_SCHEMA: &str = \"uo-runtime-store-meta-v2\";")
+        && store_meta_source.contains(
+            "    schema: String,\n    /// How many commits the store holds, this one among them: a\n    /// deployment's, every committed call's, aborted or not, and every bulk\n    /// load's of a diagnostics build.\n    pub(crate) generation: u64,\n    epoch: u64,",
+        )
+        && store_meta_source.contains(
+            "        if self.generation == attested_generation {\n            return Ok(StoreGeneration::Attested);\n        }\n        if Some(self.generation) == attested_generation.checked_add(1) {\n            return Ok(StoreGeneration::OnePast);\n        }\n        if self.generation < attested_generation {\n            bail!(",
+        )
+        && store_meta_source.matches("return Ok(StoreGeneration::").count() == 2
+        // The restart checks the generation before it restores anything,
+        // and takes the counters with no other comparison.
+        && engine_impl_source.contains(
+            "            .with(|adapter| StoreMeta::from_tagged_bytes(&store_meta_key, adapter.meta()))?;\n        let found = meta.against_attested(attested_generation)?;\n        let freshness = RuntimeFreshnessState::recover(meta.freshness());\n        let state = deploy_contract_runtime(&artifact.contract.state, master, &storage, true)?;",
+        )
+        && engine_impl_source.matches(".against_attested(").count() == 1
+        && engine_impl_source.contains("            generation: meta.generation,\n")
+        && engine_impl_source
+            .matches("        attested_generation: u64,\n    ) -> Result<(Self, StoreGeneration)> {")
+            .count()
+            == 2
+        && !engine_impl_source.contains("rollback_counter")
+        && freshness_source
+            .contains("    pub(crate) fn recover(snapshot: RuntimeFreshnessSnapshot) -> Self {")
+        && !freshness_source.contains("attested")
+        // Every commit leaves the generation one past the instance's.
+        && engine_impl_source.contains("            generation: 1,\n")
+        && engine_impl_source.contains(
+            "        let generation = next_generation(inner.generation)?;\n        let meta = inner.store_meta(\n            generation,",
+        )
+        && engine_impl_source.contains(
+            "        make_deployment_durable(&inner.storage, &meta)?;\n        inner.generation = generation;",
+        )
+        && engine_impl_source.contains(
+            "        // The call's commit, aborted or not, is the store's next.\n        let generation = next_generation(self.generation)?;\n        let mut staged_freshness = self.freshness.clone();",
+        )
+        && engine_impl_source.contains(
+            "        let meta = self.store_meta(\n            staged.generation,\n            &staged.freshness,",
+        )
+        && engine_impl_source.contains(
+            "        self.initialized = staged.initialized;\n        self.generation = staged.generation;",
+        )
+        && engine_impl_source.contains(
+            "        let generation = next_generation(self.generation)?;\n        let meta = self.store_meta(\n            generation,\n            &self.freshness,",
+        )
+        && engine_impl_source.contains("        store.make_durable(&meta)?;\n        self.generation = generation;")
+        && engine_impl_source.matches("next_generation(").count() == 4
+        && engine_impl_source.contains(
+            "fn next_generation(generation: u64) -> Result<u64> {\n    generation\n        .checked_add(1)",
+        )
+        // A production call returns its commit's generation.
+        && engine_impl_source.contains("    pub generation: u64,\n}")
+        && engine_impl_source.contains("            generation: self.inner.generation,\n        })")
 }
 
 /// Whether the production path's freshness errors carry no runtime value. An
@@ -47039,6 +47107,15 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             )?),
             &production_source_slice(&deployment_source),
         );
+    let restarts_check_the_commit_generation = check_restarts_check_the_commit_generation(
+        &engine_impl_source,
+        &production_source_slice(&fs::read_to_string(
+            root.join("runtime/uo-evm/src/store_meta.rs"),
+        )?),
+        &production_source_slice(&fs::read_to_string(
+            root.join("runtime/uo-evm/src/freshness.rs"),
+        )?),
+    );
     let production_calls_record_no_position_map_witness =
         check_production_calls_record_no_position_map_witness(
             &production_source_slice(&state_source),
@@ -48494,6 +48571,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "production_receipts_carry_session_tags": production_receipts_carry_session_tags,
         "store_failures_are_injected_only_in_test_and_diagnostics_builds": store_failures_are_injected_only_in_test_and_diagnostics_builds,
         "production_deployments_restart_from_a_sealed_secret": production_deployments_restart_from_a_sealed_secret,
+        "restarts_check_the_commit_generation": restarts_check_the_commit_generation,
         "theorem_certificate_constructor_checks":
             theorem_certificate_constructor_checks,
         "theorem_certificate_constructor_surface_restricted":
@@ -49451,6 +49529,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && production_receipts_carry_session_tags
             && store_failures_are_injected_only_in_test_and_diagnostics_builds
             && production_deployments_restart_from_a_sealed_secret
+            && restarts_check_the_commit_generation
             && theorem_certificate_constructor_surface_restricted
             && runtime_public_call_trace_bundle_surface_restricted
             && runtime_public_call_trace_bundle_fields_private
@@ -58039,6 +58118,80 @@ mod tests {
             "",
         );
         assert!(!ok(&secret, &engine, &receiptless, &deployment));
+    }
+
+    #[test]
+    fn the_generation_check_rejects_the_drifts_it_guards() {
+        use super::{check_restarts_check_the_commit_generation, repo_root};
+        let root = repo_root();
+        let read =
+            |rel: &str| production_source_slice(&std::fs::read_to_string(root.join(rel)).unwrap());
+        let engine = read("runtime/uo-evm/src/engine.rs");
+        let store_meta = read("runtime/uo-evm/src/store_meta.rs");
+        let freshness = read("runtime/uo-evm/src/freshness.rs");
+        let ok = check_restarts_check_the_commit_generation;
+        assert!(ok(&engine, &store_meta, &freshness));
+        let drift = |source: &str, from: &str, to: &str| {
+            assert_eq!(source.matches(from).count(), 1, "{from}");
+            source.replacen(from, to, 1)
+        };
+        // A restart that takes metadata of any generation.
+        let any = drift(
+            &engine,
+            "        let found = meta.against_attested(attested_generation)?;\n",
+            "        let found = StoreGeneration::Attested;\n",
+        );
+        assert!(!ok(&any, &store_meta, &freshness));
+        // A restart that takes metadata two commits past the counter.
+        let two_past = drift(
+            &store_meta,
+            "attested_generation.checked_add(1)",
+            "attested_generation.checked_add(2)",
+        );
+        assert!(!ok(&engine, &two_past, &freshness));
+        // A restart that takes metadata behind the counter.
+        let behind = drift(
+            &store_meta,
+            "        if self.generation < attested_generation {\n            bail!(",
+            "        if self.generation < attested_generation {\n            return Ok(StoreGeneration::Attested);\n        }\n        if false {\n            bail!(",
+        );
+        assert!(!ok(&engine, &behind, &freshness));
+        // A restart that compares the rollback counter again, which a
+        // committed abort leaves where it was.
+        let counter = drift(
+            &freshness,
+            "    pub(crate) fn recover(snapshot: RuntimeFreshnessSnapshot) -> Self {",
+            "    pub(crate) fn recover(snapshot: RuntimeFreshnessSnapshot, attested_rollback_counter: u64) -> Self {",
+        );
+        assert!(!ok(&engine, &store_meta, &counter));
+        // A call whose commit leaves the instance's generation unchanged.
+        let unmoved = drift(
+            &engine,
+            "        self.generation = staged.generation;\n",
+            "",
+        );
+        assert!(!ok(&unmoved, &store_meta, &freshness));
+        // A bulk load that is not counted.
+        let uncounted = drift(
+            &engine,
+            "        store.make_durable(&meta)?;\n        self.generation = generation;",
+            "        store.make_durable(&meta)?;",
+        );
+        assert!(!ok(&uncounted, &store_meta, &freshness));
+        // Metadata that keeps no generation.
+        let ungenerated = drift(
+            &store_meta,
+            "    pub(crate) generation: u64,\n    epoch: u64,",
+            "    epoch: u64,",
+        );
+        assert!(!ok(&engine, &ungenerated, &freshness));
+        // A production result without the generation the counter follows.
+        let unreported = drift(
+            &engine,
+            "            generation: self.inner.generation,\n        })",
+            "            generation: 0,\n        })",
+        );
+        assert!(!ok(&unreported, &store_meta, &freshness));
     }
 
     #[test]

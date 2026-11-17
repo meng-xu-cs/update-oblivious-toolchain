@@ -2307,7 +2307,11 @@ A restart accepts a store from before a committed aborted call, which leaves
 the rollback counter as it was. It also resumes each key at a reservation
 read from unauthenticated files. So a rollback needs no change of the
 attested counter, and the remaining exclusion stated above is too narrow.
-Issues 67 and 68 there repair it.
+Issues 67 and 68 there repair it. Issue 67 replaced the comparison of the
+rollback counter with the commit generation, which every commit advances, a
+committed abort's too: a restart takes the store at the attested generation
+or one past it, says which, and refuses every other, and the test above is
+refused with a generation one ahead. The reservations are Issue 68's.
 
 ### Issue 59 — Keep sealed records in the store alone
 

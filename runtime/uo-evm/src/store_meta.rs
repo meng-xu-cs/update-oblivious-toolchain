@@ -2,13 +2,14 @@
 //! and how a runtime that restarts from the store takes it back.
 //!
 //! The metadata is what a restart cannot read off the records: the
-//! freshness counters, whether the contract is initialized, the digest of
-//! the public state, and for a production deployment the receipt it issued
-//! last, which the next call must name. All of it is public. It carries a tag under a key
-//! that derives from the master secret, so a restart takes only metadata
-//! that a runtime with the same secret wrote. The tag does not say that the
-//! metadata is the latest: that is the rollback counter's part, which a
-//! restart compares with an attested one.
+//! generation of the commit, the freshness counters, whether the contract is
+//! initialized, the digest of the public state, and for a production
+//! deployment the receipt it issued last, which the next call must name. All
+//! of it is public. It carries a tag under a key that derives from the
+//! master secret, so a restart takes only metadata that a runtime with the
+//! same secret wrote. The tag does not say that the metadata is the latest:
+//! that is the generation's part, which a restart compares with the one the
+//! platform's monotonic counter attests.
 
 use crate::deployment::ProductionReceipt;
 use crate::freshness::RuntimeFreshnessSnapshot;
@@ -18,13 +19,17 @@ use serde::{Deserialize, Serialize};
 use uo_core::manifest::CALL_SEAL_BOUND;
 use uo_store::{storage_failure, SharedStorage, StorageFailure, StoreCipher};
 
-const STORE_META_SCHEMA: &str = "uo-runtime-store-meta-v1";
+const STORE_META_SCHEMA: &str = "uo-runtime-store-meta-v2";
 const STORE_META_TAG_BYTES: usize = 32;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct StoreMeta {
     schema: String,
+    /// How many commits the store holds, this one among them: a
+    /// deployment's, every committed call's, aborted or not, and every bulk
+    /// load's of a diagnostics build.
+    pub(crate) generation: u64,
     epoch: u64,
     rollback_counter: u64,
     next_call_counter: u64,
@@ -39,12 +44,14 @@ pub(crate) struct StoreMeta {
 
 impl StoreMeta {
     pub(crate) fn new(
+        generation: u64,
         freshness: RuntimeFreshnessSnapshot,
         initialized: bool,
         public_state_sha256: String,
     ) -> Self {
         Self {
             schema: STORE_META_SCHEMA.into(),
+            generation,
             epoch: freshness.epoch,
             rollback_counter: freshness.rollback_counter,
             next_call_counter: freshness.next_call_counter,
@@ -58,6 +65,33 @@ impl StoreMeta {
     pub(crate) fn with_last_receipt(mut self, receipt: Option<&ProductionReceipt>) -> Self {
         self.last_receipt = receipt.cloned();
         self
+    }
+
+    /// Where the metadata's generation stands to `attested_generation`,
+    /// the generation the platform's monotonic counter attests. A restart
+    /// takes metadata at that generation or one past it, and refuses any
+    /// other: metadata behind it is older than a commit whose result was
+    /// released, and the counter is never more than one commit behind the
+    /// store, since it catches up before the instance commits again.
+    pub(crate) fn against_attested(&self, attested_generation: u64) -> Result<StoreGeneration> {
+        if self.generation == attested_generation {
+            return Ok(StoreGeneration::Attested);
+        }
+        if Some(self.generation) == attested_generation.checked_add(1) {
+            return Ok(StoreGeneration::OnePast);
+        }
+        if self.generation < attested_generation {
+            bail!(
+                "the store's commit generation {} is behind the attested generation {}: its files are older than a commit whose result was released",
+                self.generation,
+                attested_generation
+            );
+        }
+        bail!(
+            "the store's commit generation {} is more than one past the attested generation {}",
+            self.generation,
+            attested_generation
+        )
     }
 
     pub(crate) fn freshness(&self) -> RuntimeFreshnessSnapshot {
@@ -98,6 +132,26 @@ impl StoreMeta {
         }
         Ok(meta)
     }
+}
+
+/// Where the generation of the store a deployment restarted from stands to
+/// the generation the platform's monotonic counter attests. The counter
+/// follows the generation: before the deployment releases anything an
+/// instance returned (a call's result, a receipt), and before the instance
+/// commits again, the counter holds the instance's generation
+/// (`ProductionCallResult::generation`,
+/// `ProductionContractInstance::generation`). A restart takes no store
+/// behind the counter, and none more than one commit past it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StoreGeneration {
+    /// The store's last commit is the one the counter attests.
+    Attested,
+    /// The store's last commit is one past the one the counter attests: a
+    /// commit whose result the deployment did not release, after a call
+    /// whose outcome was unknown or a stop before the counter advanced. The
+    /// deployment advances the counter to the restarted instance's
+    /// generation before it releases anything the instance returns.
+    OnePast,
 }
 
 /// The records a staged call handed the store, which are pending there. The
@@ -241,6 +295,7 @@ mod tests {
 
     fn meta() -> StoreMeta {
         StoreMeta::new(
+            4,
             RuntimeFreshnessSnapshot {
                 epoch: 7,
                 rollback_counter: 3,
@@ -259,6 +314,7 @@ mod tests {
         let sealed = meta().tagged_bytes(&key).unwrap();
         let opened = StoreMeta::from_tagged_bytes(&key, &sealed).unwrap();
         assert_eq!(opened, meta());
+        assert_eq!(opened.generation, 4);
         assert_eq!(opened.freshness().rollback_counter, 3);
 
         // A changed byte of the metadata or of the tag, metadata cut short,
@@ -286,5 +342,32 @@ mod tests {
             .to_string();
         assert!(refused.contains("tag"), "{refused}");
         assert!(!refused.contains("ab"), "{refused}");
+
+        // Metadata of the schema before the generation, under the right tag,
+        // is refused.
+        let mut older = serde_json::to_value(meta()).unwrap();
+        older.as_object_mut().unwrap().remove("generation");
+        older["schema"] = serde_json::json!("uo-runtime-store-meta-v1");
+        let body = serde_json::to_vec(&older).unwrap();
+        let mut tagged = key.tag(&body).unwrap().to_vec();
+        tagged.extend_from_slice(&body);
+        assert!(StoreMeta::from_tagged_bytes(&key, &tagged).is_err());
+    }
+
+    #[test]
+    fn a_restart_takes_the_attested_generation_or_one_past_it() {
+        // The metadata's generation is 4.
+        let meta = meta();
+        assert_eq!(meta.against_attested(4).unwrap(), StoreGeneration::Attested);
+        assert_eq!(meta.against_attested(3).unwrap(), StoreGeneration::OnePast);
+        let behind = meta.against_attested(5).unwrap_err().to_string();
+        assert!(
+            behind.contains("behind the attested generation 5"),
+            "{behind}"
+        );
+        let past = meta.against_attested(2).unwrap_err().to_string();
+        assert!(past.contains("more than one past"), "{past}");
+        assert!(meta.against_attested(0).is_err());
+        assert!(meta.against_attested(u64::MAX).is_err());
     }
 }

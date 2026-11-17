@@ -1159,6 +1159,7 @@
           "refinement_trace_public_buffers_boxed": "true",
           "resource_event_constructor_files": "array 1",
           "resource_event_constructor_surface_restricted": "true",
+          "restarts_check_the_commit_generation": "true",
           "restricted_signature_checks": "array 15",
           "runtime_boundary_obligation_classification": "object",
           "runtime_call_outcome_api_is_explicit": "true",
@@ -3933,6 +3934,7 @@
         "refinement_trace_public_buffers_boxed": "true",
         "resource_event_constructor_files": "array 1",
         "resource_event_constructor_surface_restricted": "true",
+        "restarts_check_the_commit_generation": "true",
         "restricted_signature_checks": "array 15",
         "runtime_boundary_obligation_classification": {
           "proof_critical": "array 9",
@@ -5008,19 +5010,21 @@
       }
     },
     "storage_boundary": {
-      "declared_schema": "uo-storage-boundary-v3",
+      "declared_schema": "uo-storage-boundary-v4",
       "fields": {
         "accepted": "true",
         "benchmarks": "array 14",
         "checks": {
           "a_dropped_call_leaves_the_store_as_it_was": "true",
           "a_record_reaches_the_store_only_under_a_reserved_nonce": "true",
+          "a_restart_refuses_the_files_from_before_a_committed_abort": "true",
           "every_restart_continues_its_deployment": "true",
           "every_storage_fault_fails_closed": "true",
           "store_log_agrees_with_trace_in_every_call": "true",
           "store_reads_are_the_traced_reads": "true",
           "store_writes_are_the_traced_writes": "true"
         },
+        "committed_aborts": "array 3",
         "coverage": {
           "benchmark_backend_pairs": "count 14",
           "calls": "count 47"
