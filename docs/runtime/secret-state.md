@@ -254,17 +254,29 @@ and the ownership boundaries that keep them auditable.
     the state the store holds.
 
 19. A call that is dropped leaves each key's seal count at a value that
-    the count before the call fixes, wherever it stopped. A staged call
-    takes the count of every key before it runs (`DroppedCallSeals` in
-    `runtime/uo-evm/src/store_meta.rs`). A commit that made the store
-    durable keeps the counts the call's seals reached. Any other end of
-    the call, an evaluation error, a failed production check or a store
-    that could not commit, moves each count to the second multiple of
-    2^32 above its count before the call (`seal_count_after_dropped_call`)
-    and has the store reserve that count. No call seals 2^32 records under
-    one key, so the count after the drop is above every count the call
-    used, and is the same whether the call stopped at its first seal or
-    after its last. A key has room for 2^32 dropped calls.
+    the count before the call fixes, wherever it stopped, and so does a
+    restart after a crash in the middle of a call. A staged call takes the
+    count of every key before it runs (`DroppedCallSeals` in
+    `runtime/uo-evm/src/store_meta.rs`). Before it seals anything, the
+    store reserves for each key the second multiple of 2^32 above that
+    count (`seal_count_after_dropped_call`), in one journal entry for every
+    key not reserved that far, and the call fails if the store cannot. A key
+    needs a new reservation only after a dropped call, after a restart, or
+    once in 2^32 seals. A commit that made the store durable keeps the counts
+    the call's seals reached. Any other end of the call, an evaluation error,
+    a failed production check or a store that could not commit, moves each
+    count to the reserved one in memory and writes nothing. A crash, which
+    runs nothing at the end of the call, leaves the reservation in the files,
+    and a restart resumes there.
+
+    No entrypoint can seal 2^32 records under one key in a call: its commit
+    and load operations bound its seals, and the compiler, `uo-check` and
+    every deployment and restart refuse an entrypoint whose two bounds add
+    up to 2^32 (`check_call_seal_bound` in
+    `crates/uo-core/src/manifest.rs`). So the count a dropped call leaves is
+    above every count the call used, and is the same whether the call
+    stopped at its first seal or after its last, and no reservation is made
+    while the call runs. A key has room for 2^31 dropped calls or restarts.
 
 ### What a nonce shows
 

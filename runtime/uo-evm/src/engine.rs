@@ -482,6 +482,7 @@ impl ContractInstance {
         storage: SharedStorage,
         attested_rollback_counter: u64,
     ) -> Result<(Self, StoreMeta)> {
+        check_call_seal_bounds(&artifact)?;
         let store_meta_key = master.store_meta_key()?;
         let meta = storage
             .with(|adapter| StoreMeta::from_tagged_bytes(&store_meta_key, adapter.meta()))?;
@@ -511,6 +512,7 @@ impl ContractInstance {
         replay_seed: Option<u64>,
         storage: SharedStorage,
     ) -> Result<Self> {
+        check_call_seal_bounds(&artifact)?;
         let initialized = !artifact
             .contract
             .manifest
@@ -825,7 +827,7 @@ impl ContractInstance {
         // fails, or is dropped after it was staged, `store` is dropped and
         // the store puts back what the call replaced, and `seals` moves each
         // key's count to a value its count before the call fixes.
-        let seals = DroppedCallSeals::begin(contract_seal_ciphers(&self.state));
+        let seals = DroppedCallSeals::begin(contract_seal_ciphers(&self.state), &self.storage)?;
         let store = StagedStore::begin(&self.storage)?;
         let mut staged_state = stage_contract_runtime(&self.state)?;
         let (return_value, encrypted_return, aborted, trace, zero_writes) = run_contract_call(
@@ -853,6 +855,16 @@ impl ContractInstance {
             seals,
         })
     }
+}
+
+/// Refuse an artifact with an entrypoint that could seal
+/// `uo_core::manifest::CALL_SEAL_BOUND` records under one key in a call: the
+/// count a dropped call's keys resume at assumes that none does.
+fn check_call_seal_bounds(artifact: &CompiledArtifact) -> Result<()> {
+    for (entrypoint, entry) in &artifact.contract.manifest.entrypoints {
+        uo_core::manifest::check_call_seal_bound(entrypoint, entry)?;
+    }
+    Ok(())
 }
 
 /// Deploy an artifact from OS randomness and call an entrypoint that takes
@@ -4104,6 +4116,198 @@ bounds:
         assert!(early
             .iter()
             .all(|(_, count)| *count >= seal_count_after_dropped_call(0)));
+    }
+
+    /// Each key's name and seal count.
+    fn key_counts(instance: &ContractInstance) -> Vec<(String, u64)> {
+        instance
+            .state
+            .seal_ciphers()
+            .iter()
+            .map(|cipher| {
+                (
+                    cipher.storage().unwrap().object().to_owned(),
+                    cipher.seal_count(),
+                )
+            })
+            .collect()
+    }
+
+    /// Before a call seals anything, the store has reserved for each key the
+    /// count a dropped call resumes at, so however the call ends every key
+    /// resumes there: a store opened again in the middle of the call, a call
+    /// that is dropped, and a call that never ends, as a crash leaves it,
+    /// with neither its store nor its seal guard dropped. Nothing is written
+    /// to the journal after the call began.
+    #[test]
+    fn a_call_resumes_every_key_at_its_reservation_however_it_ends() {
+        use crate::store_meta::seal_count_after_dropped_call;
+        use uo_store::{FileStorage, SharedStorage, SyncPolicy};
+        let artifact = || {
+            compile_bench(
+                bench_raw!("ConfidentialMixer.sol"),
+                include_str!(bench_raw!("ConfidentialMixer.oram.yaml")),
+                ProgramMode::Uo,
+            )
+        };
+        for ending in ["reopened", "dropped", "forgotten"] {
+            let directory = scratch_store_directory(ending);
+            let storage =
+                SharedStorage::new(FileStorage::create(&directory, SyncPolicy::Always).unwrap());
+            let mut instance =
+                ContractInstance::deploy_with_seed_and_storage(artifact(), 29, storage.clone())
+                    .unwrap();
+            instance
+                .call("deposit(bytes32,uint256)", vec![b32(1), Value::uint(5)])
+                .unwrap();
+            let rollback_counter = instance.freshness.snapshot().rollback_counter;
+            let starts = key_counts(&instance);
+            let resumes: Vec<(String, u64)> = starts
+                .iter()
+                .map(|(object, start)| (object.clone(), seal_count_after_dropped_call(*start)))
+                .collect();
+            let journal = || fs::metadata(directory.join("journal.bin")).unwrap().len();
+            // The first call reserved; this one needs no reservation, and
+            // its records are pending in memory.
+            let before = journal();
+            let staged = instance
+                .stage_call(
+                    "deposit(bytes32,uint256)",
+                    vec![b32(2), Value::uint(7)],
+                    None,
+                    None,
+                    None,
+                )
+                .unwrap();
+            assert_eq!(journal(), before, "{ending}");
+            let sealed = key_counts(&instance);
+            assert!(
+                sealed
+                    .iter()
+                    .zip(&starts)
+                    .any(|(now, start)| now.1 > start.1),
+                "{ending}: the call sealed nothing"
+            );
+            match ending {
+                "reopened" => {}
+                "dropped" => {
+                    drop(staged);
+                    assert_eq!(key_counts(&instance), resumes, "{ending}");
+                }
+                _ => std::mem::forget(staged),
+            }
+            assert_eq!(journal(), before, "{ending}");
+            // The files hold each key's reservation at the count a dropped
+            // call resumes at, and a restart resumes every key there.
+            let reopened =
+                SharedStorage::new(FileStorage::open(&directory, SyncPolicy::Always).unwrap());
+            for (object, resume) in &resumes {
+                assert_eq!(
+                    reopened.with(|adapter| adapter.reserved_seals(object)),
+                    *resume,
+                    "{ending}: {object}"
+                );
+            }
+            let restarted =
+                ContractInstance::restart_with_seed(artifact(), 29, reopened, rollback_counter)
+                    .unwrap();
+            assert_eq!(key_counts(&restarted), resumes, "{ending}");
+            drop(restarted);
+            drop(instance);
+            fs::remove_dir_all(&directory).unwrap();
+        }
+    }
+
+    /// A call whose reservation the store cannot make fails before it seals
+    /// anything: no key's count moves, no record reaches the store, and the
+    /// store, which an append failed in, refuses every later operation.
+    #[test]
+    fn a_call_whose_reservation_fails_fails_before_it_seals() {
+        use uo_store::{
+            storage_failure, AppendFailure, FileStorage, JournalEntry, SharedStorage,
+            StorageFailure, StorageFault, SyncPolicy,
+        };
+        let artifact = compile_bench(
+            bench_raw!("ConfidentialMixer.sol"),
+            include_str!(bench_raw!("ConfidentialMixer.oram.yaml")),
+            ProgramMode::Uo,
+        );
+        let directory = scratch_store_directory("reservation-fails");
+        let storage =
+            SharedStorage::new(FileStorage::create(&directory, SyncPolicy::Always).unwrap());
+        let mut instance =
+            ContractInstance::deploy_with_seed_and_storage(artifact, 31, storage.clone()).unwrap();
+        let starts = key_counts(&instance);
+        let writes = instance.storage_stats().writes;
+        // The deployment's first call reserves for its keys.
+        storage
+            .inject_fault(StorageFault::Append {
+                entry: JournalEntry::Reservation,
+                failure: AppendFailure::WriteStopsInPayload,
+            })
+            .unwrap();
+        let error = instance
+            .call("deposit(bytes32,uint256)", vec![b32(1), Value::uint(5)])
+            .unwrap_err();
+        assert_eq!(
+            storage_failure(&error),
+            Some(StorageFailure::OutcomeUnknown),
+            "{error:#}"
+        );
+        assert_eq!(key_counts(&instance), starts);
+        assert_eq!(instance.storage_stats().writes, writes);
+        assert!(storage.poisoned().is_some());
+        drop(instance);
+        fs::remove_dir_all(&directory).unwrap();
+    }
+
+    /// A deployment and a restart refuse an artifact with an entrypoint that
+    /// could seal 2^32 records under one key in a call.
+    #[test]
+    fn an_artifact_past_the_call_seal_bound_is_refused() {
+        use uo_store::{FileStorage, SharedStorage, SyncPolicy};
+        let artifact = || {
+            compile_bench(
+                bench_raw!("ConfidentialMixer.sol"),
+                include_str!(bench_raw!("ConfidentialMixer.uo.yaml")),
+                ProgramMode::Uo,
+            )
+        };
+        let past = || {
+            let mut artifact = artifact();
+            artifact
+                .contract
+                .manifest
+                .entrypoints
+                .get_mut("deposit(bytes32,uint256)")
+                .unwrap()
+                .max_commit_ops = uo_core::manifest::CALL_SEAL_BOUND as usize;
+            artifact
+        };
+        let error = ContractInstance::deploy_with_seed(past(), 37).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("entrypoint deposit(bytes32,uint256) could seal"),
+            "{error}"
+        );
+        let directory = scratch_store_directory("past-the-bound");
+        let instance = ContractInstance::deploy_with_seed_and_storage(
+            artifact(),
+            37,
+            SharedStorage::new(FileStorage::create(&directory, SyncPolicy::Never).unwrap()),
+        )
+        .unwrap();
+        drop(instance);
+        let error = ContractInstance::restart_with_seed(
+            past(),
+            37,
+            SharedStorage::new(FileStorage::open(&directory, SyncPolicy::Never).unwrap()),
+            0,
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("could seal"), "{error}");
+        fs::remove_dir_all(&directory).unwrap();
     }
 
     fn scratch_store_directory(name: &str) -> PathBuf {

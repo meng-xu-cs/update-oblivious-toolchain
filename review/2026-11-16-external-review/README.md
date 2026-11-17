@@ -100,8 +100,8 @@ baseline of Issue 69. Issue 50 stays deferred.
 | 62 | Give the acceptance gate an evidence contract | 10 | M | 61 | done | `fbe1080` |
 | 63 | Make the matched baselines' coverage fail closed, and test the planner under a budget | 10 | S | | done | `d9553e5` |
 | 64 | State the receipt MAC assumption over what an adversary can produce, with a non-vacuity model | 11 | S to M | 60 (D10) | done | `ed5f05d` |
-| 65 | Fail closed on storage errors, and test every failure | 11 | M to L | 60 (D8) | done | |
-| 66 | Make a dropped call's restart point durable before the call runs, and bound a call's seals | 11 | M | 65 | todo | |
+| 65 | Fail closed on storage errors, and test every failure | 11 | M to L | 60 (D8) | done | `988b876` |
+| 66 | Make a dropped call's restart point durable before the call runs, and bound a call's seals | 11 | M | 65 | done | |
 | 67 | Advance a commit generation with every committed call, and check it at restart | 11 | M | 60 (D9), 65 | todo | |
 | 68 | Keep a restart from resuming a key below a count it has used | 11 | M | 66, 67 | todo | |
 | 69 | Measure the repaired baseline | 12 | M | 61 to 68 | todo | |

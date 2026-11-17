@@ -806,8 +806,10 @@ fn a_production_deployment_restarts_from_its_files_on_its_platform() {
 ///
 /// - the append of the next call's commit: the call returns an error that
 ///   says its outcome is unknown, and no receipt;
-/// - the append of the next reservation, which a read whose commit budget is
-///   zero makes as it is dropped: the read fails;
+/// - the append of the next reservation: after a read whose commit budget is
+///   zero is dropped, the next call reserves the counts its keys resume at if
+///   it is dropped too, before it seals anything. It fails there, with an
+///   error that says its outcome is unknown, having sealed nothing;
 /// - the next checkpoint, which the next call's commit runs: the call
 ///   returns its receipt, since its commit is in the journal.
 ///
@@ -847,9 +849,10 @@ fn every_storage_failure_fails_closed_and_a_restart_resolves_the_call() {
                 ..
             }
         );
-        // A read with no commit budget is dropped after it ran, and its
-        // keys' seal counts are reserved past what it reached: the
-        // reservation the store fails.
+        // A read with no commit budget is dropped after it ran, and its keys
+        // move on in memory to the counts reserved before it began; the call
+        // after it reserves again, and that is the reservation the store
+        // fails.
         let mut artifact = single_access_map();
         if reservation {
             artifact
@@ -885,34 +888,48 @@ fn every_storage_failure_fails_closed_and_a_restart_resolves_the_call() {
                 .unwrap();
         }
 
+        if reservation {
+            let evidence = public_evidence(
+                &artifact,
+                &policy,
+                &session,
+                &environment,
+                production.last_receipt(),
+            );
+            let journal = std::fs::metadata(directory.join("journal.bin"))
+                .unwrap()
+                .len();
+            production
+                .call_authorized("read(bytes32)", read(1), &session, &evidence)
+                .unwrap_err();
+            // Dropping it wrote nothing.
+            assert_eq!(
+                std::fs::metadata(directory.join("journal.bin"))
+                    .unwrap()
+                    .len(),
+                journal
+            );
+        }
+
         storage.inject_fault(fault).unwrap();
         let held = production.last_receipt().clone();
         let evidence = public_evidence(&artifact, &policy, &session, &environment, &held);
-        let (entrypoint, args) = if reservation {
-            ("read(bytes32)", read(1))
-        } else {
-            ("put(bytes32,uint256)", put(3, 30))
-        };
-        let result = production.call_authorized(entrypoint, args, &session, &evidence);
+        let result =
+            production.call_authorized("put(bytes32,uint256)", put(3, 30), &session, &evidence);
         let returned = match fault {
-            StorageFault::Append {
-                entry: JournalEntry::Commit,
-                ..
-            } => {
+            StorageFault::Append { .. } => {
                 let error = result.unwrap_err();
                 assert_eq!(
                     storage_failure(&error),
                     Some(StorageFailure::OutcomeUnknown),
                     "{fault:?}: {error:#}"
                 );
-                assert!(
-                    error.to_string().contains("outcome is unknown"),
-                    "{fault:?}: {error:#}"
-                );
-                held.clone()
-            }
-            StorageFault::Append { .. } => {
-                assert!(result.is_err(), "{fault:?}");
+                if !reservation {
+                    assert!(
+                        error.to_string().contains("outcome is unknown"),
+                        "{fault:?}: {error:#}"
+                    );
+                }
                 held.clone()
             }
             StorageFault::Checkpoint { .. } => {

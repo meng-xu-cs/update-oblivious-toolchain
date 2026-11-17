@@ -15,6 +15,7 @@ use crate::freshness::RuntimeFreshnessSnapshot;
 use crate::secret::StoreMetaKey;
 use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
+use uo_core::manifest::CALL_SEAL_BOUND;
 use uo_store::{storage_failure, SharedStorage, StorageFailure, StoreCipher};
 
 const STORE_META_SCHEMA: &str = "uo-runtime-store-meta-v1";
@@ -147,11 +148,13 @@ impl Drop for StagedStore {
     }
 }
 
-/// A dropped call's keys resume past the second multiple of this quantum
-/// above their count before the call. A call seals far fewer records than
-/// this under one key, so that count is a function of the count before the
-/// call alone.
-pub(crate) const DROPPED_CALL_SEAL_QUANTUM: u64 = 1 << 32;
+/// A dropped call's keys resume at the second multiple of this quantum
+/// above their count before the call. No entrypoint can seal this many
+/// records under one key in a call (`uo_core::manifest::check_call_seal_bound`,
+/// which the compiler, `uo-check` and every deployment apply), so that count
+/// is above every count the call used and is a function of the count before
+/// the call alone.
+pub(crate) const DROPPED_CALL_SEAL_QUANTUM: u64 = CALL_SEAL_BOUND;
 
 /// The seal count a key resumes at after a call that started at `start` was
 /// dropped: the second multiple of the quantum above `start`, or the end of
@@ -166,9 +169,11 @@ pub(crate) fn seal_count_after_dropped_call(start: u64) -> u64 {
 /// The seal count of every key of a deployment when a call is staged. A
 /// call that is dropped, whatever the reason and wherever it stopped, leaves
 /// each key's count at `seal_count_after_dropped_call` of its count before
-/// the call, and the store reserves that count, so that neither the next
-/// record's nonce nor a restart shows how far the call got. A call that is
-/// committed keeps the counts its seals reached, which its entrypoint fixes.
+/// the call, so that neither the next record's nonce nor a restart shows how
+/// far the call got. The store has that count reserved before the call
+/// seals anything, so a restart after a crash, when nothing runs at the end
+/// of the call, resumes there too. A call that is committed keeps the counts
+/// its seals reached, which its entrypoint fixes.
 #[derive(Debug)]
 pub(crate) struct DroppedCallSeals {
     starts: Vec<(StoreCipher, u64)>,
@@ -176,19 +181,32 @@ pub(crate) struct DroppedCallSeals {
 }
 
 impl DroppedCallSeals {
-    /// The counts of `ciphers`, each sharing its key's count, before a call.
-    pub(crate) fn begin(ciphers: Vec<StoreCipher>) -> Self {
-        let starts = ciphers
+    /// The counts of `ciphers`, each sharing its key's count, before a call,
+    /// with the count each key resumes at if the call is dropped made
+    /// durable in `storage` first: one reservation of every key not
+    /// reserved that far, which a key needs only after a dropped call or once
+    /// in `DROPPED_CALL_SEAL_QUANTUM` seals. If the store cannot make it, the
+    /// call fails before it seals anything.
+    pub(crate) fn begin(ciphers: Vec<StoreCipher>, storage: &SharedStorage) -> Result<Self> {
+        let starts: Vec<(StoreCipher, u64)> = ciphers
             .into_iter()
             .map(|cipher| {
                 let start = cipher.seal_count();
                 (cipher, start)
             })
             .collect();
-        Self {
+        let resumes: Vec<(String, u64)> = starts
+            .iter()
+            .filter_map(|(cipher, start)| {
+                let object = cipher.storage()?.object().to_owned();
+                Some((object, seal_count_after_dropped_call(*start)))
+            })
+            .collect();
+        storage.reserve_seals_together(&resumes)?;
+        Ok(Self {
             starts,
             dropped: true,
-        }
+        })
     }
 
     /// The call is committed: its keys keep the counts its seals reached.
@@ -202,14 +220,10 @@ impl Drop for DroppedCallSeals {
         if !self.dropped {
             return;
         }
+        // The store reserved these counts before the call sealed anything,
+        // and a restart resumes at them: nothing is written here.
         for (cipher, start) in &self.starts {
-            let resume = seal_count_after_dropped_call(*start);
-            cipher.resume_seal_count(resume);
-            // A restart resumes at the count the store reserved, so the
-            // store reserves the count the key resumes at.
-            if let Some(storage) = cipher.storage() {
-                let _ = storage.reserve_seals(resume);
-            }
+            cipher.resume_seal_count(seal_count_after_dropped_call(*start));
         }
     }
 }

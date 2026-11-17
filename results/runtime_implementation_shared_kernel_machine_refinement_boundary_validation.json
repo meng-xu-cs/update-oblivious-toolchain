@@ -15,7 +15,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1836670,
+      "boundary_json_bytes": 1845382,
       "confidential_slot_program": {
         "entrypoint_id": "classify(uint256)",
         "expected_runtime_step_count": 4,
@@ -34,7 +34,7 @@
         "confidential_kernel": 123298,
         "controller": 25042,
         "core_lib": 9034,
-        "engine": 185114,
+        "engine": 193564,
         "fresh_coins": 5031,
         "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
@@ -266,7 +266,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1836670,
+      "boundary_json_bytes": 1845382,
       "confidential_slot_program": {
         "entrypoint_id": "classify(uint256)",
         "expected_runtime_step_count": 4,
@@ -285,7 +285,7 @@
         "confidential_kernel": 123298,
         "controller": 25042,
         "core_lib": 9034,
-        "engine": 185114,
+        "engine": 193564,
         "fresh_coins": 5031,
         "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
@@ -517,7 +517,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1839465,
+      "boundary_json_bytes": 1848177,
       "confidential_slot_program": {
         "entrypoint_id": "auth(bytes32)",
         "expected_runtime_step_count": 8,
@@ -536,7 +536,7 @@
         "confidential_kernel": 123298,
         "controller": 25042,
         "core_lib": 9034,
-        "engine": 185114,
+        "engine": 193564,
         "fresh_coins": 5031,
         "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
@@ -880,7 +880,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1839465,
+      "boundary_json_bytes": 1848177,
       "confidential_slot_program": {
         "entrypoint_id": "auth(bytes32)",
         "expected_runtime_step_count": 8,
@@ -899,7 +899,7 @@
         "confidential_kernel": 123298,
         "controller": 25042,
         "core_lib": 9034,
-        "engine": 185114,
+        "engine": 193564,
         "fresh_coins": 5031,
         "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
@@ -1243,7 +1243,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1836544,
+      "boundary_json_bytes": 1845256,
       "confidential_slot_program": {
         "entrypoint_id": "upsert(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -1262,7 +1262,7 @@
         "confidential_kernel": 123298,
         "controller": 25042,
         "core_lib": 9034,
-        "engine": 185114,
+        "engine": 193564,
         "fresh_coins": 5031,
         "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
@@ -1498,7 +1498,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1836544,
+      "boundary_json_bytes": 1845256,
       "confidential_slot_program": {
         "entrypoint_id": "upsert(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -1517,7 +1517,7 @@
         "confidential_kernel": 123298,
         "controller": 25042,
         "core_lib": 9034,
-        "engine": 185114,
+        "engine": 193564,
         "fresh_coins": 5031,
         "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
@@ -1753,7 +1753,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1838009,
+      "boundary_json_bytes": 1846721,
       "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
@@ -1772,7 +1772,7 @@
         "confidential_kernel": 123298,
         "controller": 25042,
         "core_lib": 9034,
-        "engine": 185114,
+        "engine": 193564,
         "fresh_coins": 5031,
         "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
@@ -2085,7 +2085,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1838009,
+      "boundary_json_bytes": 1846721,
       "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
@@ -2104,7 +2104,7 @@
         "confidential_kernel": 123298,
         "controller": 25042,
         "core_lib": 9034,
-        "engine": 185114,
+        "engine": 193564,
         "fresh_coins": 5031,
         "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
@@ -2417,7 +2417,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1836997,
+      "boundary_json_bytes": 1845709,
       "confidential_slot_program": {
         "entrypoint_id": "approve(address,address,uint256)",
         "expected_runtime_step_count": 4,
@@ -2436,7 +2436,7 @@
         "confidential_kernel": 123298,
         "controller": 25042,
         "core_lib": 9034,
-        "engine": 185114,
+        "engine": 193564,
         "fresh_coins": 5031,
         "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
@@ -2703,7 +2703,7 @@
     {
       "accepted": true,
       "boundary_events": 2,
-      "boundary_json_bytes": 1836997,
+      "boundary_json_bytes": 1845709,
       "confidential_slot_program": {
         "entrypoint_id": "approve(address,address,uint256)",
         "expected_runtime_step_count": 4,
@@ -2722,7 +2722,7 @@
         "confidential_kernel": 123298,
         "controller": 25042,
         "core_lib": 9034,
-        "engine": 185114,
+        "engine": 193564,
         "fresh_coins": 5031,
         "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
@@ -2989,7 +2989,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "boundary_json_bytes": 1837000,
+      "boundary_json_bytes": 1845712,
       "confidential_slot_program": {
         "entrypoint_id": "put(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -3008,7 +3008,7 @@
         "confidential_kernel": 123298,
         "controller": 25042,
         "core_lib": 9034,
-        "engine": 185114,
+        "engine": 193564,
         "fresh_coins": 5031,
         "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
@@ -3285,7 +3285,7 @@
     {
       "accepted": true,
       "boundary_events": 4,
-      "boundary_json_bytes": 1837000,
+      "boundary_json_bytes": 1845712,
       "confidential_slot_program": {
         "entrypoint_id": "put(bytes32,uint256)",
         "expected_runtime_step_count": 4,
@@ -3304,7 +3304,7 @@
         "confidential_kernel": 123298,
         "controller": 25042,
         "core_lib": 9034,
-        "engine": 185114,
+        "engine": 193564,
         "fresh_coins": 5031,
         "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
@@ -3581,7 +3581,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 1837996,
+      "boundary_json_bytes": 1846708,
       "confidential_slot_program": {
         "entrypoint_id": "add(bytes32,uint256)",
         "expected_runtime_step_count": 5,
@@ -3600,7 +3600,7 @@
         "confidential_kernel": 123298,
         "controller": 25042,
         "core_lib": 9034,
-        "engine": 185114,
+        "engine": 193564,
         "fresh_coins": 5031,
         "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
@@ -3946,7 +3946,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 1837996,
+      "boundary_json_bytes": 1846708,
       "confidential_slot_program": {
         "entrypoint_id": "add(bytes32,uint256)",
         "expected_runtime_step_count": 5,
@@ -3965,7 +3965,7 @@
         "confidential_kernel": 123298,
         "controller": 25042,
         "core_lib": 9034,
-        "engine": 185114,
+        "engine": 193564,
         "fresh_coins": 5031,
         "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
@@ -4311,7 +4311,7 @@
     {
       "accepted": true,
       "boundary_events": 6,
-      "boundary_json_bytes": 1838959,
+      "boundary_json_bytes": 1847671,
       "confidential_slot_program": {
         "entrypoint_id": "deposit(bytes32,uint256)",
         "expected_runtime_step_count": 7,
@@ -4330,7 +4330,7 @@
         "confidential_kernel": 123298,
         "controller": 25042,
         "core_lib": 9034,
-        "engine": 185114,
+        "engine": 193564,
         "fresh_coins": 5031,
         "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,
@@ -4730,7 +4730,7 @@
     {
       "accepted": true,
       "boundary_events": 14,
-      "boundary_json_bytes": 1842906,
+      "boundary_json_bytes": 1851618,
       "confidential_slot_program": {
         "entrypoint_id": "transferFrom(address,address,address,uint256)",
         "expected_runtime_step_count": 9,
@@ -4749,7 +4749,7 @@
         "confidential_kernel": 123298,
         "controller": 25042,
         "core_lib": 9034,
-        "engine": 185114,
+        "engine": 193564,
         "fresh_coins": 5031,
         "generated_confidential_kernel": 24848,
         "generated_kernel_machine": 5241,

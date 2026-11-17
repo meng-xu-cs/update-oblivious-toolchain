@@ -13,6 +13,28 @@ pub const SURROGATE_ORAM_SCHEME: &str = "surrogate_public_schedule_v1";
 pub const PATH_ORAM_SCHEME: &str = "path_oram_local_posmap_v1";
 pub const PATH_ORAM_PRIVATE_POSMAP_SCHEME: &str = "path_oram_private_posmap_v1";
 pub const PATH_ORAM_LOCAL_POSMAP_MAX_CAPACITY: usize = 128;
+
+/// A call seals fewer records than this under one key. A dropped call's
+/// keys move on to twice this many seals past the multiple of it below their
+/// counts before the call, so that where they resume shows nothing of how far
+/// the call got (`DROPPED_CALL_SEAL_QUANTUM` in the runtime).
+pub const CALL_SEAL_BOUND: u64 = 1 << 32;
+
+/// Refuse an entrypoint that could seal `CALL_SEAL_BOUND` records under one
+/// key in a call. A record a call seals is one of its commit operations, and
+/// an aborting call reseals at most what it loaded, so the call's commit and
+/// load operations bound its seals under every key together.
+pub fn check_call_seal_bound(entrypoint: &str, entry: &EntrypointManifest) -> Result<()> {
+    let seals = (entry.max_commit_ops as u64).saturating_add(entry.max_load_ops as u64);
+    if seals >= CALL_SEAL_BOUND {
+        bail!(
+            "entrypoint {entrypoint} could seal {seals} records in a call, from its {} commit and {} load operations, and a call must seal fewer than {CALL_SEAL_BOUND} under a key",
+            entry.max_commit_ops,
+            entry.max_load_ops
+        );
+    }
+    Ok(())
+}
 /// The largest Path ORAM stash bound. By Theorem 1 of Path ORAM (Stefanov et
 /// al.), with 5 blocks per bucket the stash exceeds `R` blocks after an access
 /// with probability at most `14 * 0.6002^R`, which is below `2^-108` at
@@ -965,5 +987,62 @@ mod tests {
             manifest.canonical_kernel_step_manifest(),
             slot_program.expected_runtime_step_manifest()
         );
+    }
+
+    /// An entrypoint whose commit and load operations together allow
+    /// `CALL_SEAL_BOUND` seals is refused, and one that allows one fewer is
+    /// admitted, whichever operations the seals are counted from.
+    #[test]
+    fn an_entrypoint_is_refused_at_the_call_seal_bound() {
+        use super::{check_call_seal_bound, CALL_SEAL_BOUND};
+        let manifest = |commit: u64, load: u64| EntrypointManifest {
+            secret_args: Vec::new(),
+            param_names: Vec::new(),
+            public_env: Vec::new(),
+            entry_input_len: 0,
+            initializer: false,
+            requires_initialized: false,
+            public_gas_budget: 0,
+            arena_bytes: 0,
+            max_stack_words: 0,
+            max_hash_part_bytes: 0,
+            return_canonical_len: None,
+            returns: Default::default(),
+            status: Default::default(),
+            declassifies: Vec::new(),
+            public_state_declassifies: Vec::new(),
+            confidential_program: None,
+            confidential_slot_program: None,
+            kernel_steps: Vec::new(),
+            uocell_reads: 0,
+            uocell_writes: 0,
+            uoarray_reads: 0,
+            uoarray_writes: 0,
+            uomap_reads: 0,
+            uomap_writes: 0,
+            max_commit_ops: commit as usize,
+            max_load_ops: load as usize,
+            may_write_objects: Vec::new(),
+            oram_accesses: BTreeMap::new(),
+        };
+        for (commit, load) in [
+            (CALL_SEAL_BOUND - 1, 0),
+            (0, CALL_SEAL_BOUND - 1),
+            (CALL_SEAL_BOUND / 2, CALL_SEAL_BOUND / 2 - 1),
+        ] {
+            check_call_seal_bound("f()", &manifest(commit, load)).unwrap();
+        }
+        for (commit, load) in [
+            (CALL_SEAL_BOUND, 0),
+            (0, CALL_SEAL_BOUND),
+            (CALL_SEAL_BOUND / 2, CALL_SEAL_BOUND / 2),
+            (u64::MAX, u64::MAX),
+        ] {
+            let error = check_call_seal_bound("f()", &manifest(commit, load)).unwrap_err();
+            assert!(
+                error.to_string().contains("entrypoint f() could seal"),
+                "{error}"
+            );
+        }
     }
 }

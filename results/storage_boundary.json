@@ -1322,8 +1322,8 @@
     {
       "backend": "full_scan",
       "bytes_cut_on_open": 6,
-      "call": "failed",
-      "entrypoint": "approve(address,address,uint256)",
+      "call": "outcome_unknown",
+      "entrypoint": "mint(address,uint256)",
       "fault": {
         "entry": "reservation",
         "failure": "write_stops_in_header",
@@ -1337,15 +1337,15 @@
       "rollback_counters_a_restart_accepts": [
         1
       ],
-      "storage_failure": null,
+      "storage_failure": "outcome_unknown",
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
     {
       "backend": "full_scan",
-      "bytes_cut_on_open": 22,
-      "call": "failed",
-      "entrypoint": "approve(address,address,uint256)",
+      "bytes_cut_on_open": 35,
+      "call": "outcome_unknown",
+      "entrypoint": "mint(address,uint256)",
       "fault": {
         "entry": "reservation",
         "failure": "write_stops_in_payload",
@@ -1359,15 +1359,15 @@
       "rollback_counters_a_restart_accepts": [
         1
       ],
-      "storage_failure": null,
+      "storage_failure": "outcome_unknown",
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
     {
       "backend": "full_scan",
-      "bytes_cut_on_open": 64,
-      "call": "failed",
-      "entrypoint": "approve(address,address,uint256)",
+      "bytes_cut_on_open": 90,
+      "call": "outcome_unknown",
+      "entrypoint": "mint(address,uint256)",
       "fault": {
         "entry": "reservation",
         "failure": "write_stops_in_digest",
@@ -1381,15 +1381,15 @@
       "rollback_counters_a_restart_accepts": [
         1
       ],
-      "storage_failure": null,
+      "storage_failure": "outcome_unknown",
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
     {
       "backend": "full_scan",
       "bytes_cut_on_open": 0,
-      "call": "failed",
-      "entrypoint": "approve(address,address,uint256)",
+      "call": "outcome_unknown",
+      "entrypoint": "mint(address,uint256)",
       "fault": {
         "entry": "reservation",
         "failure": "sync_fails",
@@ -1403,7 +1403,7 @@
       "rollback_counters_a_restart_accepts": [
         1
       ],
-      "storage_failure": null,
+      "storage_failure": "outcome_unknown",
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
@@ -1561,8 +1561,8 @@
     {
       "backend": "oram",
       "bytes_cut_on_open": 6,
-      "call": "failed",
-      "entrypoint": "approve(address,address,uint256)",
+      "call": "outcome_unknown",
+      "entrypoint": "mint(address,uint256)",
       "fault": {
         "entry": "reservation",
         "failure": "write_stops_in_header",
@@ -1576,15 +1576,15 @@
       "rollback_counters_a_restart_accepts": [
         1
       ],
-      "storage_failure": null,
+      "storage_failure": "outcome_unknown",
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
     {
       "backend": "oram",
-      "bytes_cut_on_open": 22,
-      "call": "failed",
-      "entrypoint": "approve(address,address,uint256)",
+      "bytes_cut_on_open": 35,
+      "call": "outcome_unknown",
+      "entrypoint": "mint(address,uint256)",
       "fault": {
         "entry": "reservation",
         "failure": "write_stops_in_payload",
@@ -1598,15 +1598,15 @@
       "rollback_counters_a_restart_accepts": [
         1
       ],
-      "storage_failure": null,
+      "storage_failure": "outcome_unknown",
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
     {
       "backend": "oram",
-      "bytes_cut_on_open": 64,
-      "call": "failed",
-      "entrypoint": "approve(address,address,uint256)",
+      "bytes_cut_on_open": 90,
+      "call": "outcome_unknown",
+      "entrypoint": "mint(address,uint256)",
       "fault": {
         "entry": "reservation",
         "failure": "write_stops_in_digest",
@@ -1620,15 +1620,15 @@
       "rollback_counters_a_restart_accepts": [
         1
       ],
-      "storage_failure": null,
+      "storage_failure": "outcome_unknown",
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
     {
       "backend": "oram",
       "bytes_cut_on_open": 0,
-      "call": "failed",
-      "entrypoint": "approve(address,address,uint256)",
+      "call": "outcome_unknown",
+      "entrypoint": "mint(address,uint256)",
       "fault": {
         "entry": "reservation",
         "failure": "sync_fails",
@@ -1642,7 +1642,7 @@
       "rollback_counters_a_restart_accepts": [
         1
       ],
-      "storage_failure": null,
+      "storage_failure": "outcome_unknown",
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
@@ -1800,8 +1800,8 @@
     {
       "backend": "oram_private_posmap",
       "bytes_cut_on_open": 6,
-      "call": "failed",
-      "entrypoint": "approve(address,address,uint256)",
+      "call": "outcome_unknown",
+      "entrypoint": "mint(address,uint256)",
       "fault": {
         "entry": "reservation",
         "failure": "write_stops_in_header",
@@ -1815,15 +1815,15 @@
       "rollback_counters_a_restart_accepts": [
         1
       ],
-      "storage_failure": null,
+      "storage_failure": "outcome_unknown",
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
     {
       "backend": "oram_private_posmap",
-      "bytes_cut_on_open": 22,
-      "call": "failed",
-      "entrypoint": "approve(address,address,uint256)",
+      "bytes_cut_on_open": 35,
+      "call": "outcome_unknown",
+      "entrypoint": "mint(address,uint256)",
       "fault": {
         "entry": "reservation",
         "failure": "write_stops_in_payload",
@@ -1837,15 +1837,15 @@
       "rollback_counters_a_restart_accepts": [
         1
       ],
-      "storage_failure": null,
+      "storage_failure": "outcome_unknown",
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
     {
       "backend": "oram_private_posmap",
-      "bytes_cut_on_open": 64,
-      "call": "failed",
-      "entrypoint": "approve(address,address,uint256)",
+      "bytes_cut_on_open": 90,
+      "call": "outcome_unknown",
+      "entrypoint": "mint(address,uint256)",
       "fault": {
         "entry": "reservation",
         "failure": "write_stops_in_digest",
@@ -1859,15 +1859,15 @@
       "rollback_counters_a_restart_accepts": [
         1
       ],
-      "storage_failure": null,
+      "storage_failure": "outcome_unknown",
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
     {
       "backend": "oram_private_posmap",
       "bytes_cut_on_open": 0,
-      "call": "failed",
-      "entrypoint": "approve(address,address,uint256)",
+      "call": "outcome_unknown",
+      "entrypoint": "mint(address,uint256)",
       "fault": {
         "entry": "reservation",
         "failure": "sync_fails",
@@ -1881,7 +1881,7 @@
       "rollback_counters_a_restart_accepts": [
         1
       ],
-      "storage_failure": null,
+      "storage_failure": "outcome_unknown",
       "store_refuses_operations": true,
       "takes_calls_after_restart": true
     },
@@ -1961,7 +1961,7 @@
   "oram_reads": "a call reads the counter and the metadata pages of an ORAM map once, where it loads the map, and holds them through the call; each access reads its buckets; the trace names each of those reads where the call makes it",
   "provenance": {
     "restart": "a seeded deployment restarts from a store in files; the sync policy is off, so the report times no device",
-    "toolchain_manifest_sha256": "caef044aca36b3395a5a3dc873b9236465d128486dfd03ea8f7cd0296487c97a"
+    "toolchain_manifest_sha256": "b30cff82ca0797529873902accca5dc84a972632cc95a28e330fababaee3ab1e"
   },
   "restarts": [
     {
@@ -1971,7 +1971,7 @@
       "files_hold_the_last_commit": true,
       "journal_bytes_by_call": [
         {
-          "bytes": 389,
+          "bytes": 454,
           "entrypoint": "classify(uint256)"
         }
       ],
@@ -1989,7 +1989,7 @@
       "files_hold_the_last_commit": true,
       "journal_bytes_by_call": [
         {
-          "bytes": 669,
+          "bytes": 756,
           "entrypoint": "seed(uint256,bytes32)"
         },
         {
@@ -2015,7 +2015,7 @@
       "files_hold_the_last_commit": true,
       "journal_bytes_by_call": [
         {
-          "bytes": 1399,
+          "bytes": 1485,
           "entrypoint": "deposit(bytes32,uint256)"
         }
       ],
@@ -2033,7 +2033,7 @@
       "files_hold_the_last_commit": true,
       "journal_bytes_by_call": [
         {
-          "bytes": 8509,
+          "bytes": 8595,
           "entrypoint": "deposit(bytes32,uint256)"
         }
       ],
@@ -2051,7 +2051,7 @@
       "files_hold_the_last_commit": true,
       "journal_bytes_by_call": [
         {
-          "bytes": 18506,
+          "bytes": 18592,
           "entrypoint": "deposit(bytes32,uint256)"
         }
       ],
@@ -2069,7 +2069,7 @@
       "files_hold_the_last_commit": true,
       "journal_bytes_by_call": [
         {
-          "bytes": 148904,
+          "bytes": 148990,
           "entrypoint": "deposit(bytes32,uint256)"
         }
       ],
@@ -2087,7 +2087,7 @@
       "files_hold_the_last_commit": true,
       "journal_bytes_by_call": [
         {
-          "bytes": 1399,
+          "bytes": 1485,
           "entrypoint": "deposit(bytes32,uint256)"
         },
         {
@@ -2109,7 +2109,7 @@
       "files_hold_the_last_commit": true,
       "journal_bytes_by_call": [
         {
-          "bytes": 8509,
+          "bytes": 8595,
           "entrypoint": "deposit(bytes32,uint256)"
         },
         {
@@ -2131,7 +2131,7 @@
       "files_hold_the_last_commit": true,
       "journal_bytes_by_call": [
         {
-          "bytes": 18506,
+          "bytes": 18592,
           "entrypoint": "deposit(bytes32,uint256)"
         },
         {
@@ -2153,7 +2153,7 @@
       "files_hold_the_last_commit": true,
       "journal_bytes_by_call": [
         {
-          "bytes": 148904,
+          "bytes": 148990,
           "entrypoint": "deposit(bytes32,uint256)"
         },
         {
@@ -2175,7 +2175,7 @@
       "files_hold_the_last_commit": true,
       "journal_bytes_by_call": [
         {
-          "bytes": 1313,
+          "bytes": 1404,
           "entrypoint": "mint(address,uint256)"
         },
         {
@@ -2201,7 +2201,7 @@
       "files_hold_the_last_commit": true,
       "journal_bytes_by_call": [
         {
-          "bytes": 16116,
+          "bytes": 16207,
           "entrypoint": "mint(address,uint256)"
         },
         {
@@ -2227,7 +2227,7 @@
       "files_hold_the_last_commit": true,
       "journal_bytes_by_call": [
         {
-          "bytes": 135346,
+          "bytes": 135437,
           "entrypoint": "mint(address,uint256)"
         },
         {
@@ -2253,7 +2253,7 @@
       "files_hold_the_last_commit": true,
       "journal_bytes_by_call": [
         {
-          "bytes": 1297,
+          "bytes": 1365,
           "entrypoint": "upsert(bytes32,uint256)"
         },
         {

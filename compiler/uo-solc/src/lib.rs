@@ -1580,7 +1580,7 @@ fn build_manifest_entry(
         })
         .transpose()?
         .unwrap_or(0);
-    Ok(EntrypointManifest {
+    let entry = EntrypointManifest {
         secret_args: function.secret_args.clone(),
         param_names: function
             .params
@@ -1619,7 +1619,11 @@ fn build_manifest_entry(
         max_load_ops,
         may_write_objects: may_write_objects.into_iter().collect(),
         oram_accesses,
-    })
+    };
+    // A dropped call's keys resume past twice the bound, so no call may
+    // reach it.
+    uo_core::manifest::check_call_seal_bound(&function.signature, &entry)?;
+    Ok(entry)
 }
 
 fn ctx_requires_initialized(entry_meta: &uo_core::EntrypointMetadata, frontend: &Frontend) -> bool {
@@ -3798,6 +3802,59 @@ bounds:
             .unwrap();
         assert_eq!(manifest_entry.public_env, function.public_env);
         assert_eq!(manifest_entry.entry_input_len, 32 + 20 + 20 + 32 + 32 + 32);
+    }
+
+    /// An entrypoint that could seal 2^32 records under one key in a call is
+    /// refused: a full-scan map of 2^32 entries that a call writes reseals
+    /// every slot of it, and loads every slot, so its commit and load
+    /// operations allow 2^33 seals.
+    #[test]
+    fn refuses_an_entrypoint_that_could_seal_past_the_call_seal_bound() {
+        let source = write_temp(
+            "seal-bound",
+            r#"
+            contract C {
+                mapping(address => uint256) private balances;
+                function put(address owner, uint256 amount) public {
+                    balances[owner] = amount;
+                }
+            }
+            "#,
+        );
+        let meta = |capacity: u64| {
+            parse_metadata(&format!(
+                r#"
+contract: C
+entrypoints:
+  put(address,uint256):
+    confidential: true
+    secret_args: [owner, amount]
+    returns: forbidden
+    status: declassified
+    declassifies: [success]
+state:
+  balances:
+    kind: map
+    key: address
+    value: uint256
+    backend: full_scan
+    capacity: {capacity}
+    confidential: true
+bounds:
+  loops: {{}}
+"#
+            ))
+        };
+        let error = compile(
+            source.to_str().unwrap(),
+            &meta(uo_core::manifest::CALL_SEAL_BOUND),
+            ProgramMode::Uo,
+        )
+        .unwrap_err();
+        assert!(
+            format!("{error:#}").contains("could seal 8589934592 records in a call"),
+            "{error:#}"
+        );
     }
 
     #[test]

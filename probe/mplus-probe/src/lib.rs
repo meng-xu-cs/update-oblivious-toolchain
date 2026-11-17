@@ -28456,39 +28456,53 @@ fn check_sealed_records_cross_the_storage_boundary(
         )
 }
 
-/// Whether a dropped call leaves each key's seal count at a value its
+/// Whether a dropped call leaves each key's seal count at a value that its
 /// count before the call fixes (invariant 19 of
-/// `docs/runtime/secret-state.md`). A staged call takes the count of every
-/// key before it runs, in a guard that a commit alone disarms; dropping the
-/// guard moves each count past the second multiple of 2^32 above its start
-/// and has the store reserve that count, so that neither the next nonce nor
-/// a restart shows how far the dropped call got.
+/// `docs/runtime/secret-state.md`), over a restart too. A staged call takes
+/// the count of every key before it runs, in a guard that a commit alone
+/// disarms. Before the call seals anything, the guard has the store reserve,
+/// in one entry, the second multiple of 2^32 above each key's count, and the
+/// call fails if the store cannot. Dropping the guard moves each count there
+/// in memory and writes nothing. So neither the next nonce nor a restart, after
+/// a crash too, shows how far the dropped call got. No entrypoint can seal 2^32
+/// records under one key in a call: the compiler, `uo-check`, and every
+/// deployment and restart check it (`check_call_seal_bound` in
+/// `crates/uo-core/src/manifest.rs`), from its commit and load operations.
 fn check_dropped_calls_leave_fixed_seal_counts(
     engine_impl_source: &str,
     store_meta_production_source: &str,
     state_production_source: &str,
     objects_production_source: &str,
+    bound_sources: [&str; 3],
 ) -> bool {
+    let [manifest, compiler, checker] = bound_sources;
     let store_meta = store_meta_production_source;
-    store_meta.contains("pub(crate) const DROPPED_CALL_SEAL_QUANTUM: u64 = 1 << 32;")
+    store_meta.contains("pub(crate) const DROPPED_CALL_SEAL_QUANTUM: u64 = CALL_SEAL_BOUND;")
+        && store_meta.contains("use uo_core::manifest::CALL_SEAL_BOUND;")
         && store_meta.contains(
             "pub(crate) fn seal_count_after_dropped_call(start: u64) -> u64 {\n    (start / DROPPED_CALL_SEAL_QUANTUM)\n        .checked_add(2)\n        .and_then(|quanta| quanta.checked_mul(DROPPED_CALL_SEAL_QUANTUM))\n        .unwrap_or(u64::MAX)\n}",
         )
+        // The guard reserves, before the call runs, the count each key
+        // resumes at, from its count before the call.
         && store_meta.contains(
-            "            .map(|cipher| {\n                let start = cipher.seal_count();\n                (cipher, start)\n            })\n            .collect();\n        Self {\n            starts,\n            dropped: true,\n        }",
+            "    pub(crate) fn begin(ciphers: Vec<StoreCipher>, storage: &SharedStorage) -> Result<Self> {\n        let starts: Vec<(StoreCipher, u64)> = ciphers\n            .into_iter()\n            .map(|cipher| {\n                let start = cipher.seal_count();\n                (cipher, start)\n            })\n            .collect();\n        let resumes: Vec<(String, u64)> = starts\n            .iter()\n            .filter_map(|(cipher, start)| {\n                let object = cipher.storage()?.object().to_owned();\n                Some((object, seal_count_after_dropped_call(*start)))\n            })\n            .collect();\n        storage.reserve_seals_together(&resumes)?;\n        Ok(Self {\n            starts,\n            dropped: true,\n        })\n    }",
         )
         && store_meta.contains(
             "    pub(crate) fn keep(mut self) {\n        self.dropped = false;\n    }",
         )
         && store_meta.matches("dropped = false").count() == 1
+        // Dropping it moves the counts in memory and writes nothing.
         && store_meta.contains(
-            "        for (cipher, start) in &self.starts {\n            let resume = seal_count_after_dropped_call(*start);\n            cipher.resume_seal_count(resume);\n            // A restart resumes at the count the store reserved, so the\n            // store reserves the count the key resumes at.\n            if let Some(storage) = cipher.storage() {\n                let _ = storage.reserve_seals(resume);\n            }\n        }",
+            "impl Drop for DroppedCallSeals {\n    fn drop(&mut self) {\n        if !self.dropped {\n            return;\n        }\n        // The store reserved these counts before the call sealed anything,\n        // and a restart resumes at them: nothing is written here.\n        for (cipher, start) in &self.starts {\n            cipher.resume_seal_count(seal_count_after_dropped_call(*start));\n        }\n    }\n}",
         )
-        // Every staged call carries the guard, made before the call runs,
-        // and only a commit that made the store durable disarms it.
+        && rust_code_text(store_meta).matches("reserve_seals").count() == 1
+        && rust_code_text(store_meta).matches(".storage()").count() == 1
+        // Every staged call carries the guard, made before the store takes
+        // the call's records and before the call runs, and only a commit
+        // that made the store durable disarms it.
         && engine_impl_source.contains("    store: StagedStore,\n    seals: DroppedCallSeals,\n}")
         && engine_impl_source.contains(
-            "        let seals = DroppedCallSeals::begin(contract_seal_ciphers(&self.state));\n        let store = StagedStore::begin(&self.storage)?;\n        let mut staged_state = stage_contract_runtime(&self.state)?;",
+            "        let seals = DroppedCallSeals::begin(contract_seal_ciphers(&self.state), &self.storage)?;\n        let store = StagedStore::begin(&self.storage)?;\n        let mut staged_state = stage_contract_runtime(&self.state)?;",
         )
         && engine_impl_source.contains(
             "        crate::instrumentation::time_store_persistence(|| staged.store.make_durable(&meta))?;\n        staged.seals.keep();\n        self.state = staged.state;",
@@ -28502,6 +28516,24 @@ fn check_dropped_calls_leave_fixed_seal_counts(
         && objects_production_source.contains(
             "            Self::UoSmallMap(object) => Some(object.cipher.clone_for_runtime_state()),\n            Self::UoOramMap(object) => Some(object.oram.seal_cipher()),\n            Self::RawMap(_) => None,",
         )
+        // No call seals 2^32 records under one key: the bound, from the
+        // commit and load operations, and the four places that check it.
+        && manifest.contains("pub const CALL_SEAL_BOUND: u64 = 1 << 32;")
+        && manifest.contains(
+            "    let seals = (entry.max_commit_ops as u64).saturating_add(entry.max_load_ops as u64);\n    if seals >= CALL_SEAL_BOUND {\n        bail!(",
+        )
+        && engine_impl_source.contains(
+            "fn check_call_seal_bounds(artifact: &CompiledArtifact) -> Result<()> {\n    for (entrypoint, entry) in &artifact.contract.manifest.entrypoints {\n        uo_core::manifest::check_call_seal_bound(entrypoint, entry)?;\n    }\n    Ok(())\n}",
+        )
+        && engine_impl_source.matches("        check_call_seal_bounds(&artifact)?;\n").count() == 2
+        && compiler
+            .matches("    uo_core::manifest::check_call_seal_bound(&function.signature, &entry)?;\n")
+            .count()
+            == 1
+        && checker
+            .matches("        uo_core::manifest::check_call_seal_bound(&function.signature, entry)?;\n")
+            .count()
+            == 1
 }
 
 /// The fields of a struct in a Rust source, each with whether it is `pub`
@@ -46962,6 +46994,17 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         &production_source_slice(&fs::read_to_string(
             root.join("runtime/uo-evm/src/objects.rs"),
         )?),
+        [
+            &production_source_slice(&fs::read_to_string(
+                root.join("crates/uo-core/src/manifest.rs"),
+            )?),
+            &production_source_slice(&fs::read_to_string(
+                root.join("compiler/uo-solc/src/lib.rs"),
+            )?),
+            &production_source_slice(&fs::read_to_string(
+                root.join("checker/uo-check/src/lib.rs"),
+            )?),
+        ],
     );
     let private_evidence_stays_inside_the_runtime = check_private_evidence_stays_inside_the_runtime(
         &core_trace_source,
@@ -58099,64 +58142,106 @@ mod tests {
         let store_meta = read("runtime/uo-evm/src/store_meta.rs");
         let state = read("runtime/uo-evm/src/state.rs");
         let objects = read("runtime/uo-evm/src/objects.rs");
-        let ok = |engine: &str, store_meta: &str, state: &str, objects: &str| {
-            check_dropped_calls_leave_fixed_seal_counts(engine, store_meta, state, objects)
+        let manifest = read("crates/uo-core/src/manifest.rs");
+        let compiler = read("compiler/uo-solc/src/lib.rs");
+        let checker = read("checker/uo-check/src/lib.rs");
+        let ok = |engine: &str, store_meta: &str, bound: [&str; 3]| {
+            check_dropped_calls_leave_fixed_seal_counts(engine, store_meta, &state, &objects, bound)
         };
-        assert!(ok(&engine, &store_meta, &state, &objects));
+        let bound = [manifest.as_str(), compiler.as_str(), checker.as_str()];
+        assert!(ok(&engine, &store_meta, bound));
         let drift = |source: &str, from: &str, to: &str| {
             let changed = source.replace(from, to);
             assert_ne!(changed, source, "no {from:?} to change");
             changed
         };
-        // A smaller quantum, which a call could outrun.
-        let small = drift(&store_meta, "u64 = 1 << 32;", "u64 = 1 << 20;");
-        assert!(!ok(&engine, &small, &state, &objects));
-        // A count after the drop taken from the count the call reached.
-        let reached = drift(
-            &store_meta,
-            "            let resume = seal_count_after_dropped_call(*start);",
-            "            let resume = seal_count_after_dropped_call(cipher.seal_count());",
-        );
-        assert!(!ok(&engine, &reached, &state, &objects));
-        // A drop that the store does not reserve, so that a restart resumes
-        // where the call's last seal reserved.
-        let unreserved = drift(
-            &store_meta,
-            "            if let Some(storage) = cipher.storage() {\n                let _ = storage.reserve_seals(resume);\n            }\n",
-            "",
-        );
-        assert!(!ok(&engine, &unreserved, &state, &objects));
-        // A guard that a dropped call disarms too.
-        let disarmed = drift(
-            &store_meta,
-            "            dropped: true,",
-            "            dropped: false,",
-        );
-        assert!(!ok(&engine, &disarmed, &state, &objects));
-        // A commit that never disarms it, and one that disarms it before
-        // the store is durable.
-        let never = drift(&engine, "        staged.seals.keep();\n", "");
-        assert!(!ok(&never, &store_meta, &state, &objects));
-        let early = drift(
-            &engine,
-            "        crate::instrumentation::time_store_persistence(|| staged.store.make_durable(&meta))?;\n        staged.seals.keep();\n",
-            "        staged.seals.keep();\n        crate::instrumentation::time_store_persistence(|| staged.store.make_durable(&meta))?;\n",
-        );
-        assert!(!ok(&early, &store_meta, &state, &objects));
-        // A guard taken after the call ran.
-        let late = drift(
-            &engine,
-            "        let seals = DroppedCallSeals::begin(contract_seal_ciphers(&self.state));\n        let store = StagedStore::begin(&self.storage)?;\n        let mut staged_state = stage_contract_runtime(&self.state)?;",
-            "        let store = StagedStore::begin(&self.storage)?;\n        let mut staged_state = stage_contract_runtime(&self.state)?;\n        let seals = DroppedCallSeals::begin(contract_seal_ciphers(&self.state));",
-        );
-        assert!(!ok(&late, &store_meta, &state, &objects));
         // A guard that leaves the ORAM maps out.
         let no_maps = drift(
             &objects,
             "            Self::UoOramMap(object) => Some(object.oram.seal_cipher()),",
             "            Self::UoOramMap(_) => None,",
         );
-        assert!(!ok(&engine, &store_meta, &state, &no_maps));
+        assert!(!check_dropped_calls_leave_fixed_seal_counts(
+            &engine,
+            &store_meta,
+            &state,
+            &no_maps,
+            bound,
+        ));
+        let rejected_store_meta = [
+            // A count to resume at taken from the count the call reached.
+            drift(
+                &store_meta,
+                "            cipher.resume_seal_count(seal_count_after_dropped_call(*start));",
+                "            cipher.resume_seal_count(seal_count_after_dropped_call(cipher.seal_count()));",
+            ),
+            // No reservation before the call, so that a restart after a
+            // crash resumes where the call's last seal reserved.
+            drift(&store_meta, "        storage.reserve_seals_together(&resumes)?;\n", ""),
+            // A reservation whose failure the call goes on after.
+            drift(
+                &store_meta,
+                "        storage.reserve_seals_together(&resumes)?;\n",
+                "        let _ = storage.reserve_seals_together(&resumes);\n",
+            ),
+            // A drop that writes to the store again.
+            drift(
+                &store_meta,
+                "            cipher.resume_seal_count(seal_count_after_dropped_call(*start));\n",
+                "            cipher.resume_seal_count(seal_count_after_dropped_call(*start));\n            if let Some(storage) = cipher.storage() {\n                let _ = storage.reserve_seals(seal_count_after_dropped_call(*start));\n            }\n",
+            ),
+            // A guard that a dropped call disarms too.
+            drift(&store_meta, "            dropped: true,", "            dropped: false,"),
+        ];
+        for changed in &rejected_store_meta {
+            assert!(!ok(&engine, changed, bound));
+        }
+        let rejected_engine = [
+            // A commit that never disarms the guard, and one that disarms
+            // it before the store is durable.
+            drift(&engine, "        staged.seals.keep();\n", ""),
+            drift(
+                &engine,
+                "        crate::instrumentation::time_store_persistence(|| staged.store.make_durable(&meta))?;\n        staged.seals.keep();\n",
+                "        staged.seals.keep();\n        crate::instrumentation::time_store_persistence(|| staged.store.make_durable(&meta))?;\n",
+            ),
+            // A guard taken after the call ran.
+            drift(
+                &engine,
+                "        let seals = DroppedCallSeals::begin(contract_seal_ciphers(&self.state), &self.storage)?;\n        let store = StagedStore::begin(&self.storage)?;\n        let mut staged_state = stage_contract_runtime(&self.state)?;",
+                "        let store = StagedStore::begin(&self.storage)?;\n        let mut staged_state = stage_contract_runtime(&self.state)?;\n        let seals = DroppedCallSeals::begin(contract_seal_ciphers(&self.state), &self.storage)?;",
+            ),
+            // A deployment or a restart that does not check the bound.
+            engine.replacen("        check_call_seal_bounds(&artifact)?;\n", "", 1),
+        ];
+        for changed in &rejected_engine {
+            assert_ne!(changed, &engine);
+            assert!(!ok(changed, &store_meta, bound));
+        }
+        // A smaller bound, which a call could outrun; and a compiler and a
+        // checker that do not check it.
+        let small = drift(&manifest, "u64 = 1 << 32;", "u64 = 1 << 20;");
+        assert!(!ok(&engine, &store_meta, [&small, &compiler, &checker]));
+        let compiler_unchecked = drift(
+            &compiler,
+            "    uo_core::manifest::check_call_seal_bound(&function.signature, &entry)?;\n",
+            "",
+        );
+        assert!(!ok(
+            &engine,
+            &store_meta,
+            [&manifest, &compiler_unchecked, &checker]
+        ));
+        let checker_unchecked = drift(
+            &checker,
+            "        uo_core::manifest::check_call_seal_bound(&function.signature, entry)?;\n",
+            "",
+        );
+        assert!(!ok(
+            &engine,
+            &store_meta,
+            [&manifest, &compiler, &checker_unchecked]
+        ));
     }
 
     #[test]

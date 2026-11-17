@@ -686,6 +686,61 @@ go; the in-memory move and the bound stay.
   began.
 - The bound is checked, and the tests pass.
 
+**As built.** `DroppedCallSeals::begin` (`runtime/uo-evm/src/store_meta.rs`)
+takes the store. Before the call seals anything, it reserves for each key
+`seal_count_after_dropped_call` of its count, in one journal entry for every
+key not yet reserved that far. That entry is a new kind in `FileStorage`'s
+journal, holding the reservations of several objects
+(`StorageAdapter::reserve_seals_together`). A failed reservation fails the
+call before it seals: the error is the store's, whose outcome is unknown, and
+the store is then poisoned (Issue 65). A key needs a new reservation only
+after a dropped call, after a restart, or once in 2^32 seals; a deployment's
+first call makes one. `DroppedCallSeals::drop` now moves the counts in memory
+and writes nothing.
+
+The bound is `CALL_SEAL_BOUND` (2^32) in `crates/uo-core/src/manifest.rs`,
+and the runtime's quantum is now that constant. `check_call_seal_bound`
+refuses an entrypoint whose `max_commit_ops + max_load_ops` reaches it. Four
+places call it:
+
+- the compiler, as it builds each entrypoint's manifest;
+- `uo-check`, before it compares the bounds with the body's;
+- every deployment and every restart (`check_call_seal_bounds` in
+  `engine.rs`).
+
+Every seal under a store key is a traced write, which the runtime checks
+against `max_commit_ops` after a call. Adding the load operations follows
+the description and covers what an aborting call reseals.
+
+Tests:
+
+- `a_call_resumes_every_key_at_its_reservation_however_it_ends` covers a
+  store opened again in the middle of a call, a call that is dropped, and
+  a call forgotten without its `Drop`, as a crash leaves it. In each case
+  the files reserve each key's resume count, a restart resumes every key
+  there, and the journal does not grow after the call began.
+- `a_call_whose_reservation_fails_fails_before_it_seals`: no key's count
+  moves, no record reaches the store, and the store is poisoned. Without
+  the reservation in `begin`, this test and the one above fail.
+- `an_artifact_past_the_call_seal_bound_is_refused`, by a deployment and
+  by a restart.
+- `reservations_made_together_are_one_journal_entry` in the store.
+- The bound in uo-core, and its refusal by the compiler (a written
+  full-scan map of 2^32 entries, which allows 2^33 seals) and by
+  `uo-check`.
+
+Issue 65's fault matrix moves with the reservation. A dropped call no longer
+appends, so the reservation that fails is the one the call after a dropped
+call makes before it seals: the `mint` in the report and the `put` in the
+production test. Each now fails before it seals, with an outcome-unknown
+error, and the restart finds the state before it.
+
+The static check `dropped_calls_leave_fixed_seal_counts` now pins three
+things: the reservation in `begin`, a drop without I/O, and the bound with
+its four checks. Its unit test rejects 13 drifts. Invariant 19 of
+`docs/runtime/secret-state.md` and the claim boundary's storage paragraph
+describe the change.
+
 ### Issue 67 — Advance a commit generation with every committed call, and check it at restart
 
 Source: R2 (§3). Size: M. Depends on: Issues 60 (D9) and 65.

@@ -10,8 +10,8 @@
     "metadata_canonicalization_sha256": "5d7e0e39511b322d207f119a44239bcf3440117ab6b656566b22d91e5569f7c8",
     "compilation_mode": "uo",
     "compiler_version": "0.1.0",
-    "toolchain_manifest_sha256": "caef044aca36b3395a5a3dc873b9236465d128486dfd03ea8f7cd0296487c97a",
-    "package_sha256": "4eb620e66bd216a91a016609b9045a349e07fdfc49954fec97bedc8e506c2823"
+    "toolchain_manifest_sha256": "b30cff82ca0797529873902accca5dc84a972632cc95a28e330fababaee3ab1e",
+    "package_sha256": "c1fd4172e125f6e5025dad46f50e492b6066f9bd3b25996ea4d0f2b48940c38b"
   },
   "contract": {
     "contract": "ConfidentialMixer",

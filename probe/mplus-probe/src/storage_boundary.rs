@@ -28,12 +28,14 @@
 //! Last, it makes the store fail (`fault_matrix`): every failure a file
 //! store can be made to meet (`StorageFault::ALL`), on each sealed backend
 //! of ERC20Lite. The store must refuse every operation after it, so that the
-//! runtime refuses the next call. A call whose commit's append failed must
-//! not return, and its error must say that its outcome is unknown. The files
-//! must hold every call that returned, and the failed call whole or not at
-//! all: whole when its sync failed after a whole write or a checkpoint
-//! failed after the commit, not at all when its write stopped part way or
-//! it was dropped. A restart from the files takes the rollback counter of
+//! runtime refuses the next call. A call whose commit's append failed, or
+//! whose reservation did before it sealed anything, must not return, and its
+//! error must say that its outcome is unknown. The reservation is the one the
+//! call after a dropped call makes. The files must hold every call that
+//! returned, and the failed call whole or not at all: whole when its
+//! commit's sync failed after a whole write or a checkpoint failed after the
+//! commit, not at all when its write stopped part way or its reservation
+//! failed. A restart from the files takes the rollback counter of
 //! the state they hold, and only that one, and answers reads as that state
 //! says. The production build runs the same failures through the production
 //! runtime, whose receipts say which state the files hold
@@ -532,10 +534,12 @@ fn dropped_call(
 
 /// A deployment of `artifact` on a store in files meets `fault` in a call
 /// after one call that returned (`fault_matrix` in the module's comment).
-/// `setup` returns; `target` is the call that meets the fault, unless the
-/// fault is a reservation's: then `dropped`, an entrypoint whose commit
-/// budget is zero, is called, and its keys' seal counts are reserved as it
-/// is dropped. `read` is a read of what `setup` and `target` wrote.
+/// `setup` returns; `target` is the call that meets the fault. If the fault
+/// is a reservation's, `dropped`, an entrypoint whose commit budget is zero,
+/// is called and dropped before it: its keys move on in memory to the
+/// counts reserved before it began, so `target` reserves again before it
+/// seals anything, and fails there. `read` is a read of what `setup` and
+/// `target` wrote.
 fn storage_fault(
     artifact: &CompiledArtifact,
     backend: &str,
@@ -551,7 +555,7 @@ fn storage_fault(
         }
     );
     let mut artifact = artifact.clone();
-    let call = if reservation {
+    if reservation {
         artifact
             .contract
             .manifest
@@ -559,15 +563,25 @@ fn storage_fault(
             .get_mut(dropped.entrypoint)
             .ok_or_else(|| anyhow!("manifest entry missing for {}", dropped.entrypoint))?
             .max_commit_ops = 0;
-        dropped
-    } else {
-        target
+    }
+    let call = target;
+    // The calls before the one that meets the fault.
+    let prepare = |instance: &mut ContractInstance| -> Result<u64> {
+        let setup_result = instance.call(setup.entrypoint, setup.args.clone())?;
+        if reservation
+            && instance
+                .call(dropped.entrypoint, dropped.args.clone())
+                .is_ok()
+        {
+            bail!("{} was not dropped", dropped.entrypoint);
+        }
+        Ok(u64::from(!setup_result.aborted))
     };
     // The state the files may hold after the call: the one before it, and
     // the one a twin that meets no fault reaches with it.
     let mut twin = ContractInstance::deploy_with_seed(artifact.clone(), PROBE_DEPLOY_SEED)?;
     twin.keep_decoded_position_map_witness()?;
-    twin.call(setup.entrypoint, setup.args.clone())?;
+    prepare(&mut twin)?;
     let state = |instance: &ContractInstance| -> Result<(String, String)> {
         Ok((
             instance.public_state_digest()?,
@@ -595,8 +609,7 @@ fn storage_fault(
             storage.clone(),
         )?;
         instance.keep_decoded_position_map_witness()?;
-        let setup_result = instance.call(setup.entrypoint, setup.args.clone())?;
-        let counter_before = u64::from(!setup_result.aborted);
+        let counter_before = prepare(&mut instance)?;
 
         storage.inject_fault(fault)?;
         let result = instance.call(call.entrypoint, call.args.clone());
@@ -610,11 +623,7 @@ fn storage_fault(
             },
         };
         let call_as_expected = match fault {
-            StorageFault::Append {
-                entry: JournalEntry::Commit,
-                ..
-            } => call_result == "outcome_unknown",
-            StorageFault::Append { .. } => call_result == "failed",
+            StorageFault::Append { .. } => call_result == "outcome_unknown",
             StorageFault::Checkpoint { .. } => call_result == "returned",
         };
         let store_refuses_operations = storage.poisoned().is_some();
@@ -662,7 +671,7 @@ fn storage_fault(
             let mut before_twin =
                 ContractInstance::deploy_with_seed(artifact.clone(), PROBE_DEPLOY_SEED)?;
             before_twin.keep_decoded_position_map_witness()?;
-            before_twin.call(setup.entrypoint, setup.args.clone())?;
+            prepare(&mut before_twin)?;
             before_twin
                 .call(read.entrypoint, read.args.clone())?
                 .return_value

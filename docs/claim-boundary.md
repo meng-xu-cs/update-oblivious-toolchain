@@ -521,7 +521,12 @@ from the master secret. A call that is dropped leaves the adapter as it was,
 and each key's seal count at a value that its count before the call fixes, so
 that the next nonce shows nothing of how far the dropped call got (invariant
 19 of [`runtime/secret-state.md`](./runtime/secret-state.md),
-`dropped_calls_leave_fixed_seal_counts`). The adapter takes a sealed record
+`dropped_calls_leave_fixed_seal_counts`). The adapter has that value reserved
+before the call seals anything, so a restart after a crash in the middle of a
+call resumes there too, and nothing is written when the call is dropped. No
+entrypoint can seal 2^32 records under one key in a call, which the compiler,
+`uo-check`, and every deployment and restart check from its commit and load
+operations. The adapter takes a sealed record
 only under a nonce it has reserved for the record's key, and a reservation is
 durable before it takes effect, so a runtime that restarts from the adapter's
 files, at the counts they reserve, repeats no nonce. The report restarts each
@@ -579,8 +584,9 @@ Both runtimes are made to meet every failure a file store can meet: each way
 an append of a commit or of a reservation fails, and each step of a
 checkpoint (`StorageFault::ALL`, 11 failures). `fault_matrix` in
 `storage_boundary.json` runs them on each sealed backend of ERC20Lite, 33
-cases. The commit is a `mint`; the reservation is the one a dropped call
-makes, an `approve` with no commit budget. The production build runs them
+cases. The commit is a `mint`. The reservation is the one a `mint` makes
+before it seals anything, after an `approve` with no commit budget was
+dropped; it fails before the call seals. The production build runs them
 through the production runtime, which resolves each call by its receipts
 (`every_storage_failure_fails_closed_and_a_restart_resolves_the_call` in
 `runtime/uo-evm/tests/production_boundary.rs`). In every case:

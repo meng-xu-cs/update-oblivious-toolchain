@@ -322,6 +322,9 @@ pub fn check_artifact(artifact: &CompiledArtifact) -> Result<Vec<String>> {
                 expected_may_write
             );
         }
+        // A dropped call's keys resume past twice the bound, so no call may
+        // reach it.
+        uo_core::manifest::check_call_seal_bound(&function.signature, entry)?;
         let expected_max_commit_ops = expected_commit_ops(
             &function.body,
             &expected_accesses,
@@ -2031,6 +2034,28 @@ bounds:
                 "{err}"
             );
         }
+    }
+
+    /// An artifact with an entrypoint that could seal 2^32 records under one
+    /// key in a call is refused for that, before its bounds are compared
+    /// with the body's.
+    #[test]
+    fn artifact_checker_rejects_an_entrypoint_past_the_call_seal_bound() {
+        let (_, _, mut artifact) = sample_artifact();
+        let signature = artifact.contract.functions[0].signature.clone();
+        artifact
+            .contract
+            .manifest
+            .entrypoints
+            .get_mut(&signature)
+            .unwrap()
+            .max_commit_ops = uo_core::manifest::CALL_SEAL_BOUND as usize;
+        let err = check_artifact(&artifact).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains(&format!("entrypoint {signature} could seal")),
+            "{err}"
+        );
     }
 
     #[test]

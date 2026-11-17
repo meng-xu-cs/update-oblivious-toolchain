@@ -166,6 +166,18 @@ pub trait StorageAdapter: Send + fmt::Debug {
     /// make that durable before returning. A reservation is never undone.
     fn reserve_seals(&mut self, object: &str, below: u64) -> Result<()>;
 
+    /// Reserve, for each object, the seal counts below its count, at once:
+    /// a store in files makes one journal entry of every object not yet
+    /// reserved that far, and none if there is no such object.
+    fn reserve_seals_together(&mut self, reservations: &[(&str, u64)]) -> Result<()> {
+        for (object, below) in reservations {
+            if *below > self.reserved_seals(object) {
+                self.reserve_seals(object, *below)?;
+            }
+        }
+        Ok(())
+    }
+
     /// The count below which the seals of `object`'s key are reserved.
     fn reserved_seals(&self, object: &str) -> u64;
 
@@ -711,6 +723,8 @@ const FRAME_HEADER_BYTES: usize = 12;
 const FRAME_DIGEST_BYTES: usize = 32;
 const ENTRY_COMMIT: u8 = 1;
 const ENTRY_RESERVATION: u8 = 2;
+/// Reservations of several objects, made at once.
+const ENTRY_RESERVATIONS: u8 = 3;
 
 /// The kind of a journal entry.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -726,7 +740,7 @@ impl JournalEntry {
     fn of(payload: &[u8]) -> Option<Self> {
         match payload.first() {
             Some(&ENTRY_COMMIT) => Some(Self::Commit),
-            Some(&ENTRY_RESERVATION) => Some(Self::Reservation),
+            Some(&ENTRY_RESERVATION | &ENTRY_RESERVATIONS) => Some(Self::Reservation),
             _ => None,
         }
     }
@@ -1355,6 +1369,13 @@ fn load_journal_entry(image: &mut MemoryStorage, payload: &[u8]) -> Result<()> {
             let below = decoder.u64()?;
             image.load_reservation(object, below)?;
         }
+        ENTRY_RESERVATIONS => {
+            for _ in 0..decoder.u32()? {
+                let object = decoder.text()?;
+                let below = decoder.u64()?;
+                image.load_reservation(object, below)?;
+            }
+        }
         other => bail!("the journal holds an entry of unknown kind {other}"),
     }
     decoder.finish()
@@ -1394,6 +1415,35 @@ impl StorageAdapter for FileStorage {
         put_u64(&mut payload, below);
         self.append(&payload)?;
         self.image.reserve_seals(object, below)
+    }
+
+    fn reserve_seals_together(&mut self, reservations: &[(&str, u64)]) -> Result<()> {
+        self.refuse_if_poisoned()?;
+        let needed: Vec<(&str, u64)> = reservations
+            .iter()
+            .copied()
+            .filter(|(object, below)| *below > self.image.reserved_seals(object))
+            .collect();
+        if needed.is_empty() {
+            return Ok(());
+        }
+        // One entry for all of them, appended before any of them takes
+        // effect.
+        let mut payload = vec![ENTRY_RESERVATIONS];
+        (|| -> Result<()> {
+            put_u32(&mut payload, count(needed.len())?);
+            for (object, below) in &needed {
+                put_bytes(&mut payload, object.as_bytes())?;
+                put_u64(&mut payload, *below);
+            }
+            Ok(())
+        })()
+        .map_err(|error| StorageError::definite(format!("{error:#}")))?;
+        self.append(&payload)?;
+        for (object, below) in needed {
+            self.image.reserve_seals(object, below)?;
+        }
+        Ok(())
     }
 
     fn reserved_seals(&self, object: &str) -> u64 {
@@ -1528,6 +1578,16 @@ impl SharedStorage {
     }
 
     /// The part of the store that keeps the records of `object`.
+    /// Reserve, for each object, the seal counts below its count, at once
+    /// (`StorageAdapter::reserve_seals_together`).
+    pub fn reserve_seals_together(&self, reservations: &[(String, u64)]) -> Result<()> {
+        let reservations: Vec<(&str, u64)> = reservations
+            .iter()
+            .map(|(object, below)| (object.as_str(), *below))
+            .collect();
+        self.with(|adapter| adapter.reserve_seals_together(&reservations))
+    }
+
     /// Why the store refuses every operation, if it does.
     pub fn poisoned(&self) -> Option<String> {
         self.with(|adapter| adapter.poisoned())
@@ -2131,6 +2191,47 @@ mod tests {
             drop(store);
             fs::remove_dir_all(&directory).unwrap();
         }
+    }
+
+    /// Reservations made together are one journal entry, which reserves
+    /// every object it names once the store is opened again. An object
+    /// already reserved that far is left out of it, and so is the entry
+    /// when no object needs one.
+    #[test]
+    fn reservations_made_together_are_one_journal_entry() {
+        let directory = scratch_directory("together");
+        let mut store = FileStorage::create(&directory, SyncPolicy::Never).unwrap();
+        store.reserve_seals("a", 8).unwrap();
+        store.commit(b"deployed").unwrap();
+        let before = store.journal_bytes().unwrap();
+        store
+            .reserve_seals_together(&[("a", 4), ("b", 1 << 33), ("c", 1 << 34)])
+            .unwrap();
+        let entry = store.journal_bytes().unwrap() - before;
+        // One frame: the header, the kind, the count, the two objects with
+        // their counts, and the digest.
+        assert_eq!(
+            entry as usize,
+            FRAME_HEADER_BYTES + 1 + 4 + 2 * (4 + 1 + 8) + FRAME_DIGEST_BYTES
+        );
+        let after = store.journal_bytes().unwrap();
+        store
+            .reserve_seals_together(&[("a", 8), ("b", 1 << 33)])
+            .unwrap();
+        assert_eq!(store.journal_bytes().unwrap(), after);
+        drop(store);
+        let store = FileStorage::open(&directory, SyncPolicy::Never).unwrap();
+        assert_eq!(store.reserved_seals("a"), 8);
+        assert_eq!(store.reserved_seals("b"), 1 << 33);
+        assert_eq!(store.reserved_seals("c"), 1 << 34);
+        drop(store);
+        // A store in memory reserves each object as a file store would.
+        let mut memory = MemoryStorage::new();
+        memory
+            .reserve_seals_together(&[("a", 4), ("b", 1 << 33)])
+            .unwrap();
+        assert_eq!(memory.reserved_seals("b"), 1 << 33);
+        fs::remove_dir_all(&directory).unwrap();
     }
 
     /// The journal's last entry, damaged or cut short, is cut off; a whole
