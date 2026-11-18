@@ -58,11 +58,15 @@ and the ownership boundaries that keep them auditable.
 10. The freshness epoch is public and is drawn from the OS independently of
     the master secret. Production call evidence carries it, so whoever
     prepares that evidence knows it, and it says nothing about a key.
-11. No two records are sealed under one key with the same nonce. A record's
-    nonce is the count of the seals made under its key before it. Every copy
-    of a cipher shares the count, the count only grows, and a seal fails once
-    it is exhausted. A call that is staged and then dropped therefore keeps
-    the nonces it used: the next call seals with later ones.
+11. No two records of one history of a key are sealed with the same nonce. A
+    record's nonce is the count of the seals made under its key before it.
+    Every copy of a cipher shares the count, the count only grows, and a seal
+    fails once it is exhausted. A call that is staged and then dropped
+    therefore keeps the nonces it used: the next call seals with later ones.
+    A restart keeps the history when it starts from the files the
+    deployment's last operation left (invariant 18). Two stores that one
+    generation names are two histories, and a key can repeat a nonce across
+    them.
 
 12. A call returns its public receipt. Its private evidence stays inside
     the runtime and is dropped, and wiped, when the call ends. Only a test
@@ -250,9 +254,10 @@ and the ownership boundaries that keep them auditable.
     platform's counter attests the restarted store's generation. With the
     counter at each commit's generation before the next call, every count a
     call seals is below a reservation the counter attested before the call
-    began, so a restart seals no record under a nonce that a record handed
-    to the store carries, whether the call that sealed that record was
-    committed, abandoned or cut off.
+    began, so a restart from the files of the deployment's one history
+    seals no record under a nonce that a record handed to the store carries,
+    whether the call that sealed that record was committed, abandoned or cut
+    off.
 
     A restart (`ContractInstance::restart_with_seed`, in test and
     diagnostics builds) takes the commit metadata only with the tag of the
@@ -519,7 +524,9 @@ Boundary in [`claim-boundary.md`](../claim-boundary.md)).
 
 Invariant 11 also has a Lean statement and tests. `sealNonceRun_nodup` and
 `sealNonceRun_disjoint_of_le` in `UOToolchain/RuntimeStoreCodecSemantics.lean`
-prove that a model of the counter hands out no nonce twice. That the Rust
+prove that a model of the counter hands out no nonce twice in a run or in two
+runs in turn, and `sealNonceHistory_nodup` over a history of runs in which
+each starts at or above the count every run before it reached. That the Rust
 `seal_nonce` computes the model's bytes is tested, not proved
 (`seal_nonce_is_the_big_endian_counter` in `runtime/uo-store/src/codec.rs`).
 `a_dropped_staged_call_does_not_give_its_nonces_back` in

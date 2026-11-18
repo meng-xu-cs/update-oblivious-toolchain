@@ -2066,7 +2066,7 @@
       "declared_schema": "uo.claim_artifact_manifest.v1",
       "fields": {
         "accepted": "true",
-        "checks": "array 280",
+        "checks": "array 281",
         "entries": "array 41",
         "entry_count": "count 41",
         "schema": "string",
@@ -2090,7 +2090,7 @@
       "declared_schema": "uo.claim_status.v1",
       "fields": {
         "accepted": "true",
-        "checks": "array 280",
+        "checks": "array 281",
         "claim_count": "count 41",
         "claims": "array 41",
         "failing_check_count": "count 0",

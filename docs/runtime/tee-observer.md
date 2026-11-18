@@ -132,8 +132,10 @@ restarted instance takes no call until it resumes
 (`ProductionContractInstance::resume`), with the counter at its store's
 generation, and has committed the reservations its first call needs; the
 deployment advances the counter to that commit too before the first call.
-The counter's rollback resistance is a deployment assumption, and a
-generation does not name the store it counts (Non-Claims of
+The counter's rollback resistance is a deployment assumption, and so is one
+history of the store: the deployment restarts only from the files its last
+operation left. A generation does not name the store it counts, and across
+two stores that one generation names a key can repeat a nonce (Non-Claims of
 [`../claim-boundary.md`](../claim-boundary.md)).
 
 ## Non-Claim

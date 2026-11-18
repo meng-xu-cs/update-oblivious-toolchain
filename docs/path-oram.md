@@ -886,13 +886,14 @@ Lean proves about a Path ORAM call is that its leaf schedule is uniform and
 that the two sides of a pair write storage at the same locations with the
 same shapes. The step to computational indistinguishability is an argument
 on paper, with the bound `ε(Q) ≤ ε_PRF + ε_AEAD + ε_nonce + Q · ε_stash`
-over `Q` primitive accesses; the Explicit Assumptions section of
+over `Q` primitive accesses of a deployment that keeps one history of its
+store; the Explicit Assumptions section of
 [`claim-boundary.md`](./claim-boundary.md) defines each term.
 
 | Assumption | Provenance |
 | --- | --- |
 | `stashOverflowBounded` | JACM Path ORAM stash theorem specialized to deployed `Z = 5` / `stash_bound = min(max(capacity, 1), 152)` parameters: a stash overflows after an access with probability at most `14 · 0.6002^152 < 2^-108`, so with probability at most `2^-60` over the `2^48` node accesses budgeted for a map's lifetime, and a map of capacity at most 152 cannot overflow. That the private scheme's operations, which hold their nodes until they end, keep this tail above the `3h + 1` nodes they return is assumed and measured (`results/stash_occupancy_full.json`), not proved |
-| `bucketEncryptionINDCPA` | concrete sealed bucket/path records implemented with `ChaCha20Poly1305` and paired with RFC 8439 plus AEAD composition analysis. A record's key derives from the runtime's master secret and its nonce is the count of the seals under the key, so no key seals twice with one nonce (see [`claim-boundary.md`](./claim-boundary.md)) |
+| `bucketEncryptionINDCPA` | concrete sealed bucket/path records implemented with `ChaCha20Poly1305` and paired with RFC 8439 plus AEAD composition analysis. A record's key derives from the runtime's master secret and its nonce is the count of the seals under the key, so no key seals twice with one nonce over one history of the deployment's store (see [`claim-boundary.md`](./claim-boundary.md)) |
 | `metadataEncryptionINDCPA` | same sealed-record crypto route for encrypted position-map metadata pages |
 
 Fresh leaf remapping is checked by the canonical fresh-coin runtime-family

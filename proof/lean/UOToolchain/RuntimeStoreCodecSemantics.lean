@@ -1828,6 +1828,44 @@ theorem sealNonceRun_disjoint_of_le
       (hEqA.symm.trans hEqB)
   omega
 
+/-- The nonces of a history of runs of seals under one key, in order. A run
+is its start, the count of the seals made under the key before it, and the
+most seals it makes. -/
+def sealNonceHistory (runs : List (Nat × Nat)) : List (List Nat) :=
+  runs.flatMap fun run => sealNonceRun run.1 run.2
+
+/-- A history of runs under one key is continuous when every run starts at or
+above the count each run before it reached: no run starts below a count an
+earlier run used. A deployment's runs of one key make such a history when it
+restarts only from the files its last operation left, since a restart
+resumes each key above every count a call used; two stores that one
+generation names do not. -/
+def SealHistoryContinuous : List (Nat × Nat) → Prop
+  | [] => True
+  | run :: later =>
+      (∀ next ∈ later, run.1 + run.2 ≤ next.1) ∧ SealHistoryContinuous later
+
+/-- No nonce is handed out twice over a continuous history of runs under one
+key: the zero nonce reuse of the Path ORAM route's bound, over one history.
+Each run hands out no nonce twice (`sealNonceRun_nodup`), and a run shares no
+nonce with one that starts at or above the count it reached
+(`sealNonceRun_disjoint_of_le`). -/
+theorem sealNonceHistory_nodup {runs : List (Nat × Nat)}
+    (hContinuous : SealHistoryContinuous runs) :
+    (sealNonceHistory runs).Nodup := by
+  induction runs with
+  | nil => simp [sealNonceHistory]
+  | cons run later ih =>
+    obtain ⟨hAfter, hLater⟩ := hContinuous
+    have hRest := ih hLater
+    unfold sealNonceHistory at hRest ⊢
+    rw [List.flatMap_cons, List.nodup_append]
+    refine ⟨sealNonceRun_nodup run.1 run.2, hRest, ?_⟩
+    intro nonce hFirst other hOther hSame
+    subst hSame
+    obtain ⟨next, hNext, hIn⟩ := List.mem_flatMap.mp hOther
+    exact sealNonceRun_disjoint_of_le (hAfter next hNext) hFirst hIn
+
 end RuntimeStoreCodecSemantics
 
 end UOToolchain

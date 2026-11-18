@@ -549,13 +549,15 @@ instance takes no call until it resumes (`resume`): with the platform's
 counter at the generation of the store it restarted from, it commits, with no
 record, the reservations its first call needs. So every count a call seals is
 below a reservation that a commit made before the call began, and the counter
-attests that commit before the call (below): a restart, which takes no store
-behind the counter, resumes every key above every count a call used, and
-repeats no nonce. Until Issue 68 of the review of 16 November 2026 a
-reservation was an untagged journal entry that a call made as it began, so
-neither the tag nor the counter covered it, and files with a lowered or
-older reservation were taken (`restarts_resume_at_the_reservations_of_their_commit`
-in `runtime_boundary_validation.json` freezes the scheme). Tagging the
+attests that commit before the call (below): a restart from the files of the
+deployment's one history (the TEE deployment assumptions), which takes no
+store behind the counter, resumes every key above every count a call used,
+and repeats no nonce (the premise of `sealNonceHistory_nodup`). Until Issue
+68 of the review of 16 November 2026 a reservation was an untagged journal
+entry that a call made as it began, so neither the tag nor the counter
+covered it, and files with a lowered or older reservation were taken
+(`restarts_resume_at_the_reservations_of_their_commit` in
+`runtime_boundary_validation.json` freezes the scheme). Tagging the
 reservation a call makes as it begins would not do: the counter advances only
 between operations, so it cannot attest such a reservation before the call
 hands over records sealed under it, and a host that stopped the enclave in
@@ -598,19 +600,21 @@ above them, and its files from before its last call are refused with the
 generation after it (`restarts_check_the_commit_generation` in
 `runtime_boundary_validation.json` freezes the check).
 
-The generation counts commits; it does not name them. If the files that
-hold a commit whose result was not released are set aside, and the
-deployment restarts from the files before it at the attested generation,
-its next commit has the same generation; so have the commits of two
-instances restarted from the same files. A host that kept two such stores
-can restart from either once the counter holds their generation, and so roll
-back a call whose result was released, or resume a key below a count that
-calls on the other store used, which repeats a nonce. The receipt chain shows
-it to a caller who holds a receipt the restarted store does not: the two
-stores' last receipts follow the same receipt. A sealed record is
-authenticated with its location, not its version, so a record replaced by
-an older record of its location is not detected (a digest tree over the
-records is Issue 44).
+The generation counts commits; it does not name them. If the files that hold
+a commit whose result was not released are set aside, and the deployment
+restarts from the files before it at the attested generation, its next commit
+has the same generation; so have the commits of two instances restarted from
+the same files. A host that kept two such stores can restart from either once
+the counter holds their generation, and so roll back a call whose result was
+released, or resume a key below a count that calls on the other store used,
+which repeats a nonce. So zero nonce reuse (`ε_nonce` under Explicit
+Assumptions) holds over one history of the store, which the TEE deployment
+assumptions ask of the deployment, and which neither the generation nor the
+reservations enforce. The receipt chain shows a fork to a caller who holds a
+receipt the restarted store does not: the two stores' last receipts follow
+the same receipt. A sealed record is authenticated with its location, not its
+version, so a record replaced by an older record of its location is not
+detected (a digest tree over the records is Issue 44).
 
 A production deployment restarts from its files in the build a production
 runtime uses. It seals its master secret to its platform when it deploys
@@ -932,7 +936,7 @@ often it is made.
 | Runtime key derivation | gives each object a storage key, an initial placement and Path ORAM leaf coins that are pseudo-random and independent of the other objects', which the two encryption assumptions and the leaf-coin model take as given | trusted, not modeled in Lean: a 256-bit master secret from the OS, HKDF-SHA256 (RFC 5869) with one label per use, and the ChaCha20 generator. `runtime_secrets_derive_from_the_master_secret` in `runtime_boundary_validation.json` pins the derivation's call sites, and `runtime/uo-evm/src/secret.rs` tests the RFC's first test vector |
 | Return-channel AEAD | hides a value returned under `encrypted_to_client` from the host. The theorems erase the payload's ciphertext and tag as a declared release, so what those bytes show of the value is in no Lean statement | trusted, not named in Lean: `ChaCha20Poly1305` under the session key, with the associated data and the nonce that `runtime/uo-evm/src/return_channel.rs` builds. The nonce is the first 96 bits of a hash of the runtime's freshness epoch, rollback counter and call counter, the session binding and the hash of the associated data, so two calls of a deployment seal under different nonces unless those 96 bits collide. That the session key is fresh and known to the client alone comes from the attested key exchange of the deployment, which the repository does not implement (the TEE deployment row) |
 | Production receipt MAC | lets the holder of a session conclude from a receipt's tag that the runtime issued the receipt as it is | trusted, stated in Lean as the two hypotheses of `deployment_receipt_tag_verifies_issued` in `UOToolchain/DeploymentAcceptance.lean` and not proved, both about what an adversary of the session can output: HMAC-SHA256, under a key that HKDF-SHA256 derives from the session key and id, is unforgeable against it, so a receipt and a tag it outputs whose tag verifies have the hash of an issued receipt (`UnforgeableAgainst`); and it outputs no receipt but an issued one with the SHA-256 hash of an issued receipt (`HashBindsIssued`). Both hold in a model in which the runtime did not issue a receipt the adversary outputs (`deployment_receipt_tag_assumptions_not_vacuous`). The session key comes from the attested key exchange, as in the row above |
-| TEE deployment assumptions | enclave memory confidentiality/integrity, attestation authenticity, rollback resistance (a monotonic counter that follows the store's commit generation: after each operation of an instance, a call that returned or failed, its deployment, a restart or a resume, the deployment advances it to the instance's generation before it releases anything the instance returned or makes another call, and a restart takes it as the attested generation), freshness, crash recovery discipline, patch-level trust, platform sealing (the sealing key a production deployment seals its master secret under derives only in the same enclave on the same platform) | explicit Lean bundle `SgxDeploymentAssumptions`, paired with Intel SGX provenance and probe drift checks |
+| TEE deployment assumptions | enclave memory confidentiality/integrity, attestation authenticity, rollback resistance (a monotonic counter that follows the store's commit generation: after each operation of an instance, a call that returned or failed, its deployment, a restart or a resume, the deployment advances it to the instance's generation before it releases anything the instance returned or makes another call, and a restart takes it as the attested generation; and one history of the store: the deployment restarts only from the files its instance's last operation left, never from files it set aside, and never runs two instances from the same files, which the generation does not check), freshness, crash recovery discipline, patch-level trust, platform sealing (the sealing key a production deployment seals its master secret under derives only in the same enclave on the same platform) | explicit Lean bundle `SgxDeploymentAssumptions`, paired with Intel SGX provenance and probe drift checks |
 | Parser/preprocessing equivalence | connects raw Solidity-like source text to the post-resolution AST consumed by Lean | still trusted front-end surface |
 | Real Keccak equivalence | connects runtime `tiny_keccak::Keccak::v256()` to the Lean mock-hash abstraction | not yet proved; Lean preservation uses the shared abstraction |
 
@@ -955,8 +959,8 @@ What is Lean-proved about a Path ORAM call is combinatorial:
 
 The step from these two facts to "the two sides' storage is computationally
 indistinguishable" is an argument on paper, not in Lean. Over a deployment
-that makes `Q` primitive ORAM accesses, it bounds a distinguisher's
-advantage by
+that keeps one history of its store (below, under `ε_nonce`) and makes `Q`
+primitive ORAM accesses, it bounds a distinguisher's advantage by
 
 ```text
 ε(Q) ≤ ε_PRF + ε_AEAD + ε_nonce + Q · ε_stash
@@ -971,9 +975,20 @@ advantage by
   the records sealed under the deployment's keys. It is what
   `bucketEncryptionINDCPA` and `metadataEncryptionINDCPA` name.
 - `ε_nonce` is the probability that one key seals twice with one nonce. It
-  is zero: a nonce is the count of the seals under its key, and a key
-  refuses to seal once the count is exhausted (`sealNonceRun_nodup` for a
-  model of the counter; tested for the Rust code).
+  is zero over one history of each key: runs of seals in which every run
+  starts at or above the count each run before it reached. A nonce is the
+  count of the seals under its key, and a key refuses to seal once the count
+  is exhausted, so no nonce of such a history repeats
+  (`sealNonceHistory_nodup` for a model of the counter, from
+  `sealNonceRun_nodup` for one run and `sealNonceRun_disjoint_of_le` for two
+  in turn; tested for the Rust code). A deployment keeps one history of each
+  key when it restarts only from the files its instance's last operation
+  left, the TEE deployment assumption of one history: a restart then
+  resumes each key above every count a call used (The Storage Boundary). The
+  generation and the reservations do not establish that premise against two
+  stores that one generation names, between which a key can resume below a
+  count the other store's calls used (Non-Claims), and this bound does not
+  cover them.
 - `ε_stash` is the probability that one access overflows the stash, which
   `stashOverflowBounded` names: at most `14 · 0.6002^152 < 2^-108` at the
   deployed parameters, by the cited theorem, so `Q · ε_stash` is at most
@@ -982,9 +997,11 @@ advantage by
   makes 77 node accesses. An overflow is an error that drops the call: the
   host learns that it happened, and the map loses nothing.
 
-None of the four terms is Lean-proved. The first two are trusted
-cryptographic assumptions, the third follows from the nonce's construction,
-and the fourth is a cited theorem applied to pinned parameters.
+None of the four terms is Lean-proved of the Rust code. The first two are
+trusted cryptographic assumptions. The third follows from the nonce's
+construction over one history of each key: Lean proves that of a model of the
+counter, and the deployment assumptions ask the deployment to keep one
+history. The fourth is a cited theorem applied to pinned parameters.
 
 The fresh-leaf remapping bridge is not a separate backend assumption. The
 canonical fresh-coin runtime-family and hidden-leaf coverage checkers discharge
@@ -1072,7 +1089,8 @@ This repository does not claim:
   files before it, or two instances restarted from the same files), between
   which a restart can roll back a released result or resume a key below a
   count the other store's calls used, or of a store that holds an older
-  record of a location (see The Storage Boundary)
+  record of a location (see The Storage Boundary); nor nonce safety across
+  such stores, which `ε_nonce` = 0 leaves to the deployment's one history
 - Solidity 0.8 checked-arithmetic, division/modulo-by-zero, ABI, revert, or
   context-variable semantics beyond the admitted public environment fields
   (`msg.sender`, `tx.origin`, `block.number`, `block.timestamp`, and
