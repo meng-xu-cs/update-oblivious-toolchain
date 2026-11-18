@@ -19,10 +19,10 @@ claim.
 
 A later review, of 16 November 2026, kept most of this response. It
 reopened guarantees of Issues 41, 49, 52, 53 and 58 and qualified Issue 36.
-Issues 60 to 69 in
-[`review/2026-11-16-external-review/`](../2026-11-16-external-review/README.md)
-repair them, and a note at the end of each issue in `tasks.md` says what was
-reopened. The rows below keep `done` for the work those issues built.
+Issues 60 to 69 (`8f30524` to `185e205`) repaired them, and the topic
+documents hold what they built. A note at the end of each issue in
+`tasks.md` says what was reopened and which commit repaired it. The rows
+below keep `done` for the work those issues built.
 
 ## Using the Tracker
 
@@ -45,6 +45,19 @@ At `030ae9e`, with Rust 1.82.0 and Lean 4.30.0-rc2: the workspace builds,
 UOToolchain.ProofGradeRoot` builds, and CI's probe steps regenerate
 `results/` unchanged. Not run: the all-features tests, clippy, the full
 validation and the capacity sweep.
+
+The research issues (43 to 46) start from the repaired baseline, `88d3338`,
+the last repair of the review of 16 November 2026. On its runtime, Issue 69
+of that review measured the capacity sweep's full profile, with every commit
+synced, and the matched baselines' full profile
+(`results/capacity_sweep_full.json` and `results/matched_baselines_full.json`;
+see [`docs/evaluation.md`](../../docs/evaluation.md) and
+[`docs/path-oram.md`](../../docs/path-oram.md)). The baseline does not
+measure what a production call adds, the receipt's digest of every sealed
+record of a Path ORAM map the call wrote (Issue 44 would make the transition
+certified incrementally), nor an enclave's memory: the backend planner
+charges each backend the memory its model gives, and the sweep reports the
+probe process's resident memory in the diagnostics build.
 
 ## Positions
 
@@ -131,8 +144,8 @@ and Issue 49 for D5 to D7.
    which takes the one that moves the fewest bytes, and the matched
    baselines check the planner's model against every call they make.
 
-The research issues (43 to 46) start once the issues they depend on are
-done. Issue 50 is deferred, and the folding of this directory into the
+The research issues (43 to 46) start from the repaired baseline (see
+Baseline). Issue 50 is deferred, and the folding of this directory into the
 topic documents (see Using the Tracker) waits for the maintainer.
 
 This differs from the review's sequence in two ways. The measurement work

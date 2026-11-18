@@ -224,9 +224,16 @@ under Explicit Assumptions). The assumptions are not vacuous
 the runtime issued one receipt and not a second, the first with another
 digest of the ciphertext store after its call. There both assumptions hold,
 the issued receipt's tag verifies, and no tag the adversary can output with
-the second receipt does. A tag convinces its session's holder alone: a MAC
-is no signature, and a third party who is shown a receipt and its tag learns
-nothing from the tag.
+the second receipt does. Until Issue 64 of the review of 16 November 2026 the
+module assumed instead that every hash whose tag is the one computed from it
+is an issued receipt's hash, and that no two receipts share a hash. Together
+those made every receipt an issued one, so the premises of the rejection
+theorem (`deployment_receipt_not_issued_tag_rejected`) could not hold
+together. Both old statements are false in the model, so the theorem above
+would not build with either. The maintainer chose this route over removing
+the two theorems and arguing the MAC outside Lean. A tag convinces its
+session's holder alone: a MAC is no signature, and a third party who is shown
+a receipt and its tag learns nothing from the tag.
 
 No proof object and no private evidence leaves a production runtime, and
 nothing in a receipt derives from either. What a production result rests on
@@ -548,10 +555,19 @@ repeats no nonce. Until Issue 68 of the review of 16 November 2026 a
 reservation was an untagged journal entry that a call made as it began, so
 neither the tag nor the counter covered it, and files with a lowered or
 older reservation were taken (`restarts_resume_at_the_reservations_of_their_commit`
-in `runtime_boundary_validation.json` freezes the scheme). The report
-restarts each benchmark from files and checks that every key resumes at the
-reservation of the last commit, that its reads answer as before and that no
-nonce repeats.
+in `runtime_boundary_validation.json` freezes the scheme). Tagging the
+reservation a call makes as it begins would not do: the counter advances only
+between operations, so it cannot attest such a reservation before the call
+hands over records sealed under it, and a host that stopped the enclave in
+that call and restarted it from the files before the reservation, which the
+counter still attests, would get a runtime that seals under counts the host
+has seen. So the maintainer chose to reserve ahead. The maintainer also chose
+authenticated reservations over fresh keys at every restart, which would
+reseal the whole store at each restart and, since that changes the digest of
+the ciphertext store that a receipt names, need a restart receipt in the
+runtime and in `DeploymentAcceptance.lean`. The report restarts each
+benchmark from files and checks that every key resumes at the reservation of
+the last commit, that its reads answer as before and that no nonce repeats.
 
 The generation counts the commits the store holds: the deployment's, each
 committed call's, aborted or not, each bulk load's of a diagnostics build,
@@ -629,7 +645,12 @@ checkpoint has committed and returns its receipt, and the adapter then
 refuses every operation as well. Opening the files cuts off a last entry that
 an append left cut short, and reports how many bytes it cut. It refuses a
 journal in which a whole entry follows a damaged one, which only an append
-after a failed one leaves.
+after a failed one leaves. The maintainer chose this contract over one in
+which the adapter, after a failed append, cuts the journal back to its last
+entry or appends an entry that cancels the commit, syncs, and goes on. That
+contract has more states, and its certainty that the call failed rests on a
+sync after a failed sync, which not every file system honors; a storage
+error is rare enough that a restart is a fair price for it.
 
 A restart from the files resolves a call whose outcome is unknown. Its last
 receipt is either the call's, which follows the receipt the caller held and

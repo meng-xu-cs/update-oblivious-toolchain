@@ -799,9 +799,7 @@ witness that is not compared with the store after a call.
 - In tests the maintained witness equals the full decode after every call.
 - The Lean witness checkers accept the bundles; results regenerate.
 
-Qualified by the review of 16 November 2026 (Q1 of its validation,
-[`review/2026-11-16-external-review/`](../2026-11-16-external-review/README.md)).
-What this issue meets is that a measured or production call opens no sealed
+Qualified by the review of 16 November 2026. What this issue meets is that a measured or production call opens no sealed
 record for its witness, and that the witness costs a copy of the two
 position maps, a thousandth of its former cost. Its time still grows with
 the capacity. Witnesses of the changed leaves alone, which would end that
@@ -1409,11 +1407,10 @@ engine and of the report's comparison.
   durable (Issue 24).
 - A restart test passes; the latencies of Issue 27 include persistence.
 
-Reopened in part by the review of 16 November 2026 (R1 of its validation,
-[`review/2026-11-16-external-review/`](../2026-11-16-external-review/README.md)):
-a failed journal append leaves the adapter serving calls, behind a torn
-frame or beside a commit that the live runtime dropped. Issue 65 there
-repairs it.
+Reopened in part by the review of 16 November 2026: a failed journal
+append left the adapter serving calls, behind a torn frame or beside a
+commit that the live runtime dropped. Issue 65 (`988b876`) repaired it: the
+store fails closed.
 
 ### Issue 42 — Widen the runtime-versus-model tests of the tree and the tape substitution
 
@@ -1750,11 +1747,9 @@ profile as well: the model gives each of its 1,141 calls, and the planner
 chooses what its mixes measured to move the fewest bytes. The claim manifest
 lists the model as tested (`backend-planner-bytes-model`).
 
-Reopened in part by the review of 16 November 2026 (R4 and Q2 of its
-validation,
-[`review/2026-11-16-external-review/`](../2026-11-16-external-review/README.md)):
-the matched baselines accept a competitor that failed to compile, and no
-planned map declares a memory budget. Issue 63 there repairs it.
+Reopened in part by the review of 16 November 2026: the matched baselines
+accepted a competitor that failed to compile, and no planned map declared a
+memory budget. Issue 63 (`d9553e5`) repaired it.
 
 ### Issue 50 — Bridge a scoped subset to Solidity 0.8 semantics
 
@@ -1851,11 +1846,11 @@ guard, the rule and where the engine makes and disarms it, and its unit
 test rejects eight drifts; invariant 19 of `docs/runtime/secret-state.md`
 states the rule.
 
-Reopened in part by the review of 16 November 2026 (R1 of its validation,
-[`review/2026-11-16-external-review/`](../2026-11-16-external-review/README.md)):
-the reservation that carries a dropped call's counts over a restart is made
-after the call, with its error discarded, and the bound of 2^32 seals per
-call is not checked. Issue 66 there repairs it.
+Reopened in part by the review of 16 November 2026: the reservation that
+carries a dropped call's counts over a restart was made after the call, with
+its error discarded, and the bound of 2^32 seals per call was not checked.
+Issue 66 (`d102318`) repaired it, and since Issue 68 (`88d3338`) the commit
+before a call makes that reservation.
 
 ### Issue 53 — Authenticate production receipts under an attested key
 
@@ -1924,11 +1919,10 @@ constant-time check, the tag computed before the commit and the tagged last
 receipt, with a unit test of five drifts, and
 `production_calls_issue_chained_receipts` pins the call as it now ends.
 
-Reopened in part by the review of 16 November 2026 (R3 of its validation,
-[`review/2026-11-16-external-review/`](../2026-11-16-external-review/README.md)):
-with `HashInjective`, the Lean statement `Unforgeable` makes every receipt
-issued, so `deployment_receipt_not_issued_tag_rejected` is vacuous. Issue 64
-there repairs it.
+Reopened in part by the review of 16 November 2026: with `HashInjective`,
+the Lean statement `Unforgeable` made every receipt issued, so
+`deployment_receipt_not_issued_tag_rejected` was vacuous. Issue 64
+(`ed5f05d`) repaired it.
 
 ### Issue 54 — Compare a runtime trace with the exact encoding in Lean
 
@@ -2301,13 +2295,12 @@ back together with the attested counter, or holding an older record.
 restart in the production build, the receipt in the metadata and its check
 against the store, with a unit test of six drifts.
 
-Reopened in part by the review of 16 November 2026 (R2 of its validation,
-[`review/2026-11-16-external-review/`](../2026-11-16-external-review/README.md)).
-A restart accepts a store from before a committed aborted call, which leaves
-the rollback counter as it was. It also resumes each key at a reservation
-read from unauthenticated files. So a rollback needs no change of the
-attested counter, and the remaining exclusion stated above is too narrow.
-Issues 67 and 68 there repair it. Issue 67 replaced the comparison of the
+Reopened in part by the review of 16 November 2026. A restart accepted a
+store from before a committed aborted call, which leaves the rollback
+counter as it was. It also resumed each key at a reservation read from
+unauthenticated files. So a rollback needed no change of the attested
+counter, and the remaining exclusion stated above was too narrow. Issues 67
+(`51d0ab7`) and 68 (`88d3338`) repaired it. Issue 67 replaced the comparison of the
 rollback counter with the commit generation, which every commit advances, a
 committed abort's too: a restart takes the store at the attested generation
 or one past it, says which, and refuses every other, and the test above is
