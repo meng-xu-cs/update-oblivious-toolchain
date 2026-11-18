@@ -234,7 +234,8 @@ and the ownership boundaries that keep them auditable.
     an entry whose sync failed can be read back and still be lost; an open
     whose publication fails serves nothing. Creating a store syncs its
     files, the directory that holds them, and each directory it made in the
-    one above it. A model of what a crash keeps, in test and diagnostics
+    one above it, the working directory among them for a relative path,
+    which the store resolves once, when it is created or opened. A model of what a crash keeps, in test and diagnostics
     builds, tests both (`crash_model`).
 
     Each key's reservation, the count below which its seals may have been

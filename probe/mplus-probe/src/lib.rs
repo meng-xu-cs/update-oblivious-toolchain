@@ -29045,12 +29045,27 @@ fn check_restarts_resume_at_the_reservations_of_their_commit(
 /// so that nothing the store serves, nor what a restart resolves from it,
 /// rests on bytes whose sync failed. Creating a store syncs the journal and
 /// the snapshot, then the directory that holds them, then each directory it
-/// made in the one above it. Every sync, rename, truncation and file the
-/// store creates goes through one function, which a test's crash model
-/// observes.
+/// made in the one above it. Both resolve a relative path against the
+/// working directory first (Issue 72), so that each directory a store makes
+/// has one above it to sync, and the store keeps its files wherever the
+/// process works later. Every sync, rename, truncation and file the store
+/// creates goes through one function, which a test's crash model observes.
 fn check_stores_are_published_before_they_are_served(storage_source: &str) -> bool {
     let storage = storage_source;
+    // Creation and opening resolve the directory once, the same way.
     storage.contains(
+        "fn absolute_directory(directory: &Path) -> Result<PathBuf> {\n    std::path::absolute(directory)",
+    ) && storage
+        .matches("        let directory = absolute_directory(directory.as_ref())?;\n")
+        .count()
+        == 2
+        && storage.contains(
+            "    pub fn create(directory: impl AsRef<Path>, sync: SyncPolicy) -> Result<Self> {\n        let directory = absolute_directory(directory.as_ref())?;",
+        )
+        && storage.contains(
+            "    pub fn open(directory: impl AsRef<Path>, sync: SyncPolicy) -> Result<Self> {\n        let directory = absolute_directory(directory.as_ref())?;",
+        )
+        && storage.contains(
         "fn publish_journal(directory: &Path, entries: &[u8], sync: SyncPolicy) -> Result<File> {\n    let temp = directory.join(JOURNAL_TEMP_FILE);\n    let mut file = create_file(&temp)?;\n    file.write_all(entries)?;\n    if sync == SyncPolicy::Always {\n        sync_file(&file, &temp)?;\n    }\n    drop(file);\n    rename_file(&temp, &directory.join(JOURNAL_FILE))?;\n    if sync == SyncPolicy::Always {\n        sync_directory(directory)?;\n    }\n    Ok(journal_file(directory, false)?)\n}",
     ) && storage.matches("publish_journal(").count() == 2
         // The open publishes, and serves the published journal.
@@ -58555,6 +58570,12 @@ mod tests {
         assert!(!ok(&drift(
             "        truncate_file(&self.journal, &self.journal_path, 0)?;",
             "        truncate_file(&self.journal, &self.journal_path, 0)?;\n        self.journal.sync_data()?;",
+        )));
+        // A creation that keeps a relative path, whose outermost new directory
+        // has an empty path above it (Issue 72).
+        assert!(!ok(&drift(
+            "    pub fn create(directory: impl AsRef<Path>, sync: SyncPolicy) -> Result<Self> {\n        let directory = absolute_directory(directory.as_ref())?;",
+            "    pub fn create(directory: impl AsRef<Path>, sync: SyncPolicy) -> Result<Self> {\n        let directory = directory.as_ref().to_path_buf();",
         )));
     }
 

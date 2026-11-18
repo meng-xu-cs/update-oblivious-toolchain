@@ -668,7 +668,12 @@ fails and serves nothing, and the files keep every whole entry they held. A
 restart, and with it the resolution of a call whose outcome is unknown,
 waits for an open that publishes. Creating a store syncs its journal and its
 snapshot, then the directory that holds them, then each directory it made in
-the one above it, before it returns. A store that a crash leaves therefore
+the one above it, before it returns. Both resolve a relative directory
+against the working directory first, so that each directory a store makes
+has one above it to sync and the store keeps its files wherever the process
+works later. Until Issue 72, from a second review of 18 November 2026, a
+store made in a new directory named by a relative path, such as `store`,
+failed to sync the empty path above it after its files were made. A store that a crash leaves therefore
 holds every commit that returned and every state a restart resolved
 (`stores_are_published_before_they_are_served` in
 `runtime_boundary_validation.json` freezes the order). Until Issue 70 of the

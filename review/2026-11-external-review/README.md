@@ -25,8 +25,10 @@ documents hold what they built. A note at the end of each issue in
 below keep `done` for the work those issues built. A review of 18 November
 2026 closed those repairs within their stated scope and asked for two more,
 with no tracker: Issue 70 (`bb4fa10`) publishes a file store before it is
-served and syncs a new one, and Issue 71 states zero nonce reuse over one
-history of the store.
+served and syncs a new one, and Issue 71 (`b1aeb19`) states zero nonce reuse
+over one history of the store. A second review that day closed both and found
+that Issue 70 broke a store made in a new directory named by a relative path;
+Issue 72 resolves a store's directory once, when it is created or opened.
 
 ## Using the Tracker
 
@@ -50,18 +52,22 @@ UOToolchain.ProofGradeRoot` builds, and CI's probe steps regenerate
 `results/` unchanged. Not run: the all-features tests, clippy, the full
 validation and the capacity sweep.
 
-The research issues (43 to 46) start from Issue 71's commit, the last
-repair of the review of 18 November 2026. The measured baseline is still
+The research issues (43 to 46) start from Issue 72's commit, the last
+repair of the reviews of 18 November 2026. The measured baseline is still
 `88d3338`, the last repair of the review of 16 November 2026: on its
 runtime, Issue 69 of that review measured the capacity sweep's full profile,
 with every commit synced, and the matched baselines' full profile
 (`results/capacity_sweep_full.json` and `results/matched_baselines_full.json`;
 see [`docs/evaluation.md`](../../docs/evaluation.md) and
-[`docs/path-oram.md`](../../docs/path-oram.md)). Issues 70 and 71 change no
-count and no measured call: Issue 70 changes how a store is opened and
-created, and in a diagnostics build a sync also asks whether a crash model
-watches the files; Issue 71 changes claims and adds a Lean theorem. The
-baseline does not measure what a production call adds, the receipt's digest of every sealed
+[`docs/path-oram.md`](../../docs/path-oram.md)). Issues 70 to 72 change no
+count. Issues 70 and 72 change how a store is opened and created, which no
+measured call does, and Issue 71 changes claims and adds a Lean theorem.
+Since Issue 70, though, each sync, rename, truncation and file a store makes
+in a diagnostics build, the build the sweep runs, also asks whether a crash
+model watches the store's files, and no full profile has timed that: the
+baseline's latencies are those of a call at `88d3338`, not evidence that
+the question costs nothing.
+The baseline does not measure what a production call adds, the receipt's digest of every sealed
 record of a Path ORAM map the call wrote (Issue 44 would make the transition
 certified incrementally), nor an enclave's memory: the backend planner
 charges each backend the memory its model gives, and the sweep reports the

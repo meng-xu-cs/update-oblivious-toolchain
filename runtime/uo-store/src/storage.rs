@@ -38,7 +38,8 @@
 //! journal, and the directory is synced. An open whose publication fails
 //! fails, and serves nothing. Creating a store syncs the journal and the
 //! snapshot, the directory that holds them, and each directory it made in
-//! the one above it, before it returns.
+//! the one above it, before it returns. A store resolves a relative path
+//! against the working directory once, when it is created or opened.
 
 use crate::codec::sealed_record_seal_count;
 use anyhow::{anyhow, bail, Context, Result};
@@ -994,6 +995,14 @@ fn journal_file(directory: &Path, new: bool) -> std::io::Result<File> {
 // tells the model of a test that watches the files what it did, and fails
 // where the test armed it to.
 
+/// `directory`, absolute: a relative path is resolved against the working
+/// directory once, when a store is created or opened. The store names its
+/// files and directories by that path from then on, wherever the process
+/// works later, and each directory it makes has one above it to sync.
+fn absolute_directory(directory: &Path) -> Result<PathBuf> {
+    std::path::absolute(directory).with_context(|| format!("resolving {}", directory.display()))
+}
+
 /// Create each directory of `directory` that does not exist, the outermost
 /// first, and name them.
 #[cfg_attr(not(any(test, feature = "fault-injection")), allow(unused_variables))]
@@ -1124,14 +1133,17 @@ fn publish_journal(directory: &Path, entries: &[u8], sync: SyncPolicy) -> Result
 }
 
 impl FileStorage {
-    /// A new store in `directory`, which must not hold one. Under
-    /// `SyncPolicy::Always` it is on the device when this returns: the
-    /// journal and the snapshot are synced, then the directory that holds
-    /// them, then each directory this made, in the one above it, the
-    /// innermost first. A directory that was there is the caller's to have
-    /// put on the device. If any of this fails, no store is made.
+    /// A new store in `directory`, which must not hold one. A relative path
+    /// is resolved against the working directory (`absolute_directory`).
+    /// Under `SyncPolicy::Always` the store is on the device when this
+    /// returns: the journal and the snapshot are synced, then the directory
+    /// that holds them, then each directory this made, in the one above it,
+    /// the innermost first. A directory that was there is the caller's to
+    /// have put on the device. If any of this fails, the error is returned
+    /// and no store is served; the files made so far may stay, holding no
+    /// commit, and a store is made again in a directory without them.
     pub fn create(directory: impl AsRef<Path>, sync: SyncPolicy) -> Result<Self> {
-        let directory = directory.as_ref().to_path_buf();
+        let directory = absolute_directory(directory.as_ref())?;
         let made = create_directories(&directory)
             .with_context(|| format!("creating {}", directory.display()))?;
         if directory.join(SNAPSHOT_FILE).exists() || directory.join(JOURNAL_FILE).exists() {
@@ -1179,7 +1191,8 @@ impl FileStorage {
         self
     }
 
-    /// The store in `directory`, as its last commit left it. The journal's
+    /// The store in `directory`, as its last commit left it; a relative
+    /// path is resolved against the working directory. The journal's
     /// last entry, if an append left it cut short or damaged, is cut off
     /// (`bytes_cut_on_open`). A journal in which a whole entry follows a
     /// damaged one is refused: that entry was appended after one that
@@ -1194,7 +1207,7 @@ impl FileStorage {
     /// publication replaces the journal, and an adapter that had the old
     /// one would append to a file that is no longer the journal.
     pub fn open(directory: impl AsRef<Path>, sync: SyncPolicy) -> Result<Self> {
-        let directory = directory.as_ref().to_path_buf();
+        let directory = absolute_directory(directory.as_ref())?;
         let snapshot = fs::read(directory.join(SNAPSHOT_FILE))
             .with_context(|| format!("reading the snapshot in {}", directory.display()))?;
         let (payload, _) = read_frame(SNAPSHOT_MAGIC, &snapshot)
@@ -2551,6 +2564,99 @@ mod tests {
             drop(model);
             fs::remove_dir_all(root).unwrap();
         }
+    }
+
+    /// The variable that has the test below run its body: in a process of
+    /// its own, whose working directory is new.
+    const RELATIVE_PATH_CHILD: &str = "UO_STORE_RELATIVE_PATH_CHILD";
+
+    /// A store made through a relative path, a new directory or one in a
+    /// directory that is new too, takes commits, opens again, and is on the
+    /// device: each directory it made is synced in the one above it, the
+    /// working directory among them. The test runs its body
+    /// (`relative_paths_in_a_new_working_directory`) in a process of its
+    /// own, with a new working directory, so that it moves no other test's.
+    #[test]
+    fn a_store_made_through_a_relative_path_is_on_the_device() {
+        let working = scratch_directory("relative");
+        fs::create_dir_all(&working).unwrap();
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "storage::tests::relative_paths_in_a_new_working_directory",
+                "--nocapture",
+                "--test-threads=1",
+            ])
+            .env(RELATIVE_PATH_CHILD, "1")
+            .current_dir(&working)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        // The body ran, and made the stores where the paths name them.
+        for directory in ["store", "deployments/store"] {
+            assert!(
+                working.join(directory).join(JOURNAL_FILE).exists(),
+                "{directory}"
+            );
+        }
+        fs::remove_dir_all(&working).unwrap();
+    }
+
+    /// The body of the test above, which does nothing unless that test runs
+    /// it in a process of its own.
+    #[test]
+    fn relative_paths_in_a_new_working_directory() {
+        if std::env::var_os(RELATIVE_PATH_CHILD).is_none() {
+            return;
+        }
+        let working = std::env::current_dir().unwrap();
+        let model = crate::crash_model::CrashModel::watch(&working).unwrap();
+        let cipher = StoreCipher::random();
+        let first = sealed(&cipher, &[1u8; 48]);
+        let second = resealed(&cipher, &first, &[2u8; 48]);
+        let third = resealed(&cipher, &second, &[3u8; 48]);
+        let paths = ["store", "deployments/store"];
+        for directory in paths {
+            let mut store = FileStorage::create(directory, SyncPolicy::Always).unwrap();
+            store.reserve_seals("map", 8).unwrap();
+            store.create("map", "map#0", &first).unwrap();
+            store.commit(b"deployed").unwrap();
+            store.begin().unwrap();
+            store.write("map#0", &second).unwrap();
+            store.commit(b"first call").unwrap();
+            drop(store);
+            let store = FileStorage::open(directory, SyncPolicy::Always).unwrap();
+            assert_eq!(store.meta(), b"first call", "{directory}");
+            assert_eq!(store.record("map#0"), Some(&*second), "{directory}");
+            assert!(store.directory().is_absolute(), "{directory}");
+        }
+        // A crash keeps both stores.
+        let crashed =
+            std::env::temp_dir().join(format!("uo-store-relative-crash-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&crashed);
+        model.crash_into(&crashed).unwrap();
+        for directory in paths {
+            let store = FileStorage::open(crashed.join(directory), SyncPolicy::Always).unwrap();
+            assert_eq!(store.meta(), b"first call", "{directory}");
+        }
+        fs::remove_dir_all(&crashed).unwrap();
+        // The process moves to another working directory: a store it opened
+        // before keeps its files where they were.
+        let mut store = FileStorage::open("store", SyncPolicy::Always).unwrap();
+        std::env::set_current_dir(std::env::temp_dir()).unwrap();
+        store.begin().unwrap();
+        store.write("map#0", &third).unwrap();
+        store.commit(b"second call").unwrap();
+        store.checkpoint().unwrap();
+        drop(store);
+        let store = FileStorage::open(working.join("store"), SyncPolicy::Always).unwrap();
+        assert_eq!(store.meta(), b"second call");
+        assert_eq!(store.record("map#0"), Some(&*third));
     }
 
     /// The journal's last entry, damaged or cut short, is cut off; a whole

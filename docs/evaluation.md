@@ -105,18 +105,22 @@ establish and what they do not).
   profile from before the optimizations that review asked for; its gas is
   that of cost model v1, which charged no reads. The committed full report
   was measured on the runtime of `88d3338`, the last commit of the repairs
-  of the review of 16 November 2026, from which the research issues 43 to
-  46 start, and its `provenance` names the build that measured it and where
-  the records were kept. Its counts are those of the full report before it,
-  measured at `990b054`, to their digest. The latencies of two reports
-  compare only if one machine in one state measured both, so the review
-  directory also holds four controls, for Issues 36 to 38, for the stash
-  cap of Issue 40, for the storage adapter of Issue 41 and for the eviction
-  networks of Issue 47: the largest maps measured on the code before the
-  change and on the code after it, one run after the other. No control
-  covers Issues 51 to 59, nor the repairs of the review of 16 November
-  2026, whose cost to a call the full report counts in commits, bytes and
-  syncs (see [`path-oram.md`](./path-oram.md)).
+  of the review of 16 November 2026, and its `provenance` names the build
+  that measured it and where the records were kept. Its counts are those of
+  the full report before it, measured at `990b054`, to their digest. The
+  research issues 43 to 46 start from the repairs of the reviews of 18
+  November 2026, Issues 70 to 72, which change no count. Since Issue 70,
+  though, each sync, rename, truncation and file a store makes in a
+  diagnostics build, the build the sweep runs, also asks whether a crash
+  model watches the store's files, and no full profile has timed that.
+  The latencies of two reports compare only if one machine in one state
+  measured both, so the review directory also holds four controls, for
+  Issues 36 to 38, for the stash cap of Issue 40, for the storage adapter
+  of Issue 41 and for the eviction networks of Issue 47: the largest maps
+  measured on the code before the change and on the code after it, one run
+  after the other. No control covers Issues 51 to 59, nor the repairs of
+  the review of 16 November 2026, whose cost to a call the full report
+  counts in commits, bytes and syncs (see [`path-oram.md`](./path-oram.md)).
 - The matched baselines have two profiles with one schema
   (`uo-matched-baselines-v2`). `run_validation.sh` runs the quick one into
   `results/matched_baselines.json` from a release build: three maps, with
