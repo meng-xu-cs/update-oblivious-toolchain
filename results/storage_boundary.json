@@ -1194,6 +1194,7 @@
     "a_restart_refuses_the_files_from_before_a_committed_abort": true,
     "every_restart_continues_its_deployment": true,
     "every_storage_fault_fails_closed": true,
+    "restarts_resolve_only_what_is_on_the_device": true,
     "store_log_agrees_with_trace_in_every_call": true,
     "store_reads_are_the_traced_reads": true,
     "store_writes_are_the_traced_writes": true
@@ -1243,6 +1244,188 @@
     "benchmark_backend_pairs": 14,
     "calls": 47
   },
+  "crash_recovery": [
+    {
+      "backend": "full_scan",
+      "call_whose_sync_fails": "mint(address,uint256)",
+      "holds": true,
+      "publication_fails": {
+        "after_a_crash_after_the_first_call": {
+          "read": {
+            "Uint": "0"
+          },
+          "restart": "attested"
+        },
+        "after_a_crash_after_the_reopen": {
+          "read": {
+            "Uint": "0"
+          },
+          "restart": "attested"
+        },
+        "after_a_crash_before_any_reopen": {
+          "read": {
+            "Uint": "0"
+          },
+          "restart": "attested"
+        },
+        "failed_call": "outcome_unknown",
+        "reopen": "refused"
+      },
+      "published": {
+        "after_a_crash_after_the_first_call": {
+          "read": {
+            "Uint": "0"
+          },
+          "restart": "attested"
+        },
+        "after_a_crash_after_the_reopen": {
+          "read": {
+            "Uint": "20"
+          },
+          "restart": "attested"
+        },
+        "after_a_crash_before_any_reopen": {
+          "read": {
+            "Uint": "0"
+          },
+          "restart": "attested"
+        },
+        "failed_call": "outcome_unknown",
+        "read_after_the_reopen": {
+          "Uint": "20"
+        },
+        "reopen": "one_past"
+      },
+      "read": "balanceOf(address)",
+      "read_after_the_call": {
+        "Uint": "20"
+      },
+      "read_before_the_call": {
+        "Uint": "0"
+      },
+      "setup": "mint(address,uint256)"
+    },
+    {
+      "backend": "oram",
+      "call_whose_sync_fails": "mint(address,uint256)",
+      "holds": true,
+      "publication_fails": {
+        "after_a_crash_after_the_first_call": {
+          "read": {
+            "Uint": "0"
+          },
+          "restart": "attested"
+        },
+        "after_a_crash_after_the_reopen": {
+          "read": {
+            "Uint": "0"
+          },
+          "restart": "attested"
+        },
+        "after_a_crash_before_any_reopen": {
+          "read": {
+            "Uint": "0"
+          },
+          "restart": "attested"
+        },
+        "failed_call": "outcome_unknown",
+        "reopen": "refused"
+      },
+      "published": {
+        "after_a_crash_after_the_first_call": {
+          "read": {
+            "Uint": "0"
+          },
+          "restart": "attested"
+        },
+        "after_a_crash_after_the_reopen": {
+          "read": {
+            "Uint": "20"
+          },
+          "restart": "attested"
+        },
+        "after_a_crash_before_any_reopen": {
+          "read": {
+            "Uint": "0"
+          },
+          "restart": "attested"
+        },
+        "failed_call": "outcome_unknown",
+        "read_after_the_reopen": {
+          "Uint": "20"
+        },
+        "reopen": "one_past"
+      },
+      "read": "balanceOf(address)",
+      "read_after_the_call": {
+        "Uint": "20"
+      },
+      "read_before_the_call": {
+        "Uint": "0"
+      },
+      "setup": "mint(address,uint256)"
+    },
+    {
+      "backend": "oram_private_posmap",
+      "call_whose_sync_fails": "mint(address,uint256)",
+      "holds": true,
+      "publication_fails": {
+        "after_a_crash_after_the_first_call": {
+          "read": {
+            "Uint": "0"
+          },
+          "restart": "attested"
+        },
+        "after_a_crash_after_the_reopen": {
+          "read": {
+            "Uint": "0"
+          },
+          "restart": "attested"
+        },
+        "after_a_crash_before_any_reopen": {
+          "read": {
+            "Uint": "0"
+          },
+          "restart": "attested"
+        },
+        "failed_call": "outcome_unknown",
+        "reopen": "refused"
+      },
+      "published": {
+        "after_a_crash_after_the_first_call": {
+          "read": {
+            "Uint": "0"
+          },
+          "restart": "attested"
+        },
+        "after_a_crash_after_the_reopen": {
+          "read": {
+            "Uint": "20"
+          },
+          "restart": "attested"
+        },
+        "after_a_crash_before_any_reopen": {
+          "read": {
+            "Uint": "0"
+          },
+          "restart": "attested"
+        },
+        "failed_call": "outcome_unknown",
+        "read_after_the_reopen": {
+          "Uint": "20"
+        },
+        "reopen": "one_past"
+      },
+      "read": "balanceOf(address)",
+      "read_after_the_call": {
+        "Uint": "20"
+      },
+      "read_before_the_call": {
+        "Uint": "0"
+      },
+      "setup": "mint(address,uint256)"
+    }
+  ],
   "dropped_calls": [
     {
       "a_commit_of_no_record_reserves_for_the_next_call": true,
@@ -2340,8 +2523,8 @@
   },
   "oram_reads": "a call reads the counter and the metadata pages of an ORAM map once, where it loads the map, and holds them through the call; each access reads its buckets; the trace names each of those reads where the call makes it",
   "provenance": {
-    "restart": "a seeded deployment restarts from a store in files, with an attested generation that stands for the platform's monotonic counter; the sync policy is off, so the report times no device",
-    "toolchain_manifest_sha256": "7999f8d4b1d442bd3b287365d2a146153746ae0e60ee4a1ee4ac09e1257244ba"
+    "restart": "a seeded deployment restarts from a store in files, with an attested generation that stands for the platform's monotonic counter; the sync policy is off, so the report times no device, but in crash_recovery, which syncs every commit and asks a model of the device what a crash would leave",
+    "toolchain_manifest_sha256": "bea3e2836ce1dd70361d873f90d501e01bcba01fc631025ece2115d08e0f4fa1"
   },
   "restarts": [
     {
@@ -2957,7 +3140,7 @@
       "resume_commits_the_first_calls_reservations": true
     }
   ],
-  "schema": "uo-storage-boundary-v5",
+  "schema": "uo-storage-boundary-v6",
   "totals": {
     "store_reads": 3862,
     "store_writes": 4395,

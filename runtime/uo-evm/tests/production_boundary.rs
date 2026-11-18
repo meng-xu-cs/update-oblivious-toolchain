@@ -1330,3 +1330,174 @@ fn every_storage_failure_fails_closed_and_a_restart_resolves_the_call() {
     }
     assert_eq!(checked, 2 * StorageFault::ALL.len());
 }
+
+/// A restart resolves a call whose commit's sync failed after a whole write
+/// only from files that are on the device. A crash model watches the store.
+/// After the failed call, a crash would leave the files without the call,
+/// whose sync failed. The process restarts with no crash, and the open
+/// publishes what it read: the restart finds the files one past the
+/// counter, its last receipt resolves the call as committed, the counter
+/// catches up and the instance resumes. A crash then leaves files that hold
+/// the call, at the counter's generation: a restart takes them as attested,
+/// with the resolved call's receipt last, and reads answer as the call left
+/// them. When the open's publication fails instead, the open fails and
+/// nothing is resolved; a crash then leaves the files without the call,
+/// which a restart at the counter takes and resolves as not committed.
+#[test]
+fn a_restart_resolves_a_call_only_from_published_files() {
+    use std::path::{Path, PathBuf};
+    use uo_evm::{
+        resolve_production_call_outcome, AppendFailure, PlatformSealingKey, ProductionCallOutcome,
+        StorageFault, StoreGeneration,
+    };
+    use uo_store::crash_model::{CrashModel, FileOperation};
+    use uo_store::{FileStorage, SharedStorage, SyncPolicy};
+    let policy = policy();
+    let session = session();
+    let environment = PublicEnvironment::default();
+    let platform = || PlatformSealingKey::from_platform([0x5A; 32]);
+    let artifact = single_access_map();
+    let read = |key: u8| vec![Value::Bytes32([key; 32])];
+    for publication_fails in [false, true] {
+        let scratch = |name: &str| -> PathBuf {
+            std::env::temp_dir().join(format!(
+                "uo-production-crash-{}-{publication_fails}-{name}",
+                std::process::id()
+            ))
+        };
+        let root = scratch("files");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let model = CrashModel::watch(&root).unwrap();
+        let directory = root.join("store");
+        // What a crash now would leave of the store, opened.
+        let crash = |name: &str| -> PathBuf {
+            let target = scratch(name);
+            let _ = std::fs::remove_dir_all(&target);
+            model.crash_into(&target).unwrap();
+            target
+        };
+        let storage =
+            SharedStorage::new(FileStorage::create(&directory, SyncPolicy::Always).unwrap());
+        let (mut production, sealed) = ProductionContractInstance::deploy_with_storage(
+            artifact.clone(),
+            policy.clone(),
+            storage.clone(),
+            &platform(),
+        )
+        .unwrap();
+        let restart = |files: &Path, attested_generation: u64| {
+            ProductionContractInstance::restart(
+                artifact.clone(),
+                policy.clone(),
+                SharedStorage::new(FileStorage::open(files, SyncPolicy::Always).unwrap()),
+                &sealed,
+                &platform(),
+                attested_generation,
+            )
+        };
+        let evidence = public_evidence(
+            &artifact,
+            &policy,
+            &session,
+            &environment,
+            production.last_receipt(),
+        );
+        production
+            .call_authorized("put(bytes32,uint256)", put(1, 10), &session, &evidence)
+            .unwrap();
+        storage
+            .inject_fault(StorageFault::Append {
+                failure: AppendFailure::SyncFails,
+            })
+            .unwrap();
+        let held = production.last_receipt().clone();
+        let counter = production.generation();
+        let evidence = public_evidence(&artifact, &policy, &session, &environment, &held);
+        production
+            .call_authorized("put(bytes32,uint256)", put(2, 20), &session, &evidence)
+            .unwrap_err();
+        drop(production);
+        drop(storage);
+
+        // A crash before the process restarts loses the call.
+        let lost = crash("before");
+        let (before, found) = restart(&lost.join("store"), counter).unwrap();
+        assert_eq!(found, StoreGeneration::Attested);
+        assert_eq!(before.last_receipt(), &held);
+        drop(before);
+        std::fs::remove_dir_all(lost).unwrap();
+
+        if publication_fails {
+            model.fail_next(FileOperation::SyncFile, directory.join("journal.tmp"));
+            let error = FileStorage::open(&directory, SyncPolicy::Always).unwrap_err();
+            assert!(
+                format!("{error:#}").contains("nothing is served"),
+                "{error:#}"
+            );
+            // Nothing was resolved, and the counter holds where it was. A
+            // crash leaves the files without the call.
+            let crashed = crash("after");
+            let (mut restarted, found) = restart(&crashed.join("store"), counter).unwrap();
+            assert_eq!(found, StoreGeneration::Attested);
+            let outcome =
+                resolve_production_call_outcome(&held, &evidence, restarted.last_receipt())
+                    .unwrap();
+            assert_eq!(outcome, ProductionCallOutcome::NotCommitted);
+            restarted.resume(restarted.generation()).unwrap();
+            for (key, value) in [(1, 10), (2, 0)] {
+                let evidence = public_evidence(
+                    &artifact,
+                    &policy,
+                    &session,
+                    &environment,
+                    restarted.last_receipt(),
+                );
+                let result = restarted
+                    .call_authorized("read(bytes32)", read(key), &session, &evidence)
+                    .unwrap();
+                assert_eq!(result.call.return_value, Some(Value::uint(value)));
+            }
+            drop(restarted);
+            std::fs::remove_dir_all(crashed).unwrap();
+        } else {
+            // The process restarts with no crash: the open publishes what it
+            // read, and the restart resolves the call from it.
+            let (mut restarted, found) = restart(&directory, counter).unwrap();
+            assert_eq!(found, StoreGeneration::OnePast);
+            let outcome =
+                resolve_production_call_outcome(&held, &evidence, restarted.last_receipt())
+                    .unwrap();
+            assert_eq!(outcome, ProductionCallOutcome::Committed);
+            let resolved = restarted.last_receipt().clone();
+            // The counter catches up, the instance resumes, and the counter
+            // follows the resume's commit.
+            restarted.resume(restarted.generation()).unwrap();
+            let attested = restarted.generation();
+            drop(restarted);
+            // A crash keeps what the restart resolved.
+            let crashed = crash("after");
+            let (mut again, found) = restart(&crashed.join("store"), attested).unwrap();
+            assert_eq!(found, StoreGeneration::Attested);
+            assert_eq!(again.last_receipt(), &resolved);
+            again.resume(attested).unwrap();
+            for (key, value) in [(1, 10), (2, 20)] {
+                let evidence = public_evidence(
+                    &artifact,
+                    &policy,
+                    &session,
+                    &environment,
+                    again.last_receipt(),
+                );
+                let result = again
+                    .call_authorized("read(bytes32)", read(key), &session, &evidence)
+                    .unwrap();
+                assert_eq!(result.call.return_value, Some(Value::uint(value)));
+            }
+            drop(again);
+            std::fs::remove_dir_all(crashed).unwrap();
+        }
+        drop(model);
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+}

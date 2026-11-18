@@ -223,7 +223,15 @@ and the ownership boundaries that keep them auditable.
     emptied, and it too makes the store refuse every operation. Only a test
     or a diagnostics build can make the store fail so
     (`FileStorage::inject_fault`, under the store's `fault-injection`
-    feature).
+    feature). What the store serves is on the device when it syncs every
+    commit: opening the files publishes what they hold before the store
+    serves it, writing the journal's whole entries into a new file that is
+    synced and renamed over the journal, and syncing the directory, since
+    an entry whose sync failed can be read back and still be lost; an open
+    whose publication fails serves nothing. Creating a store syncs its
+    files, the directory that holds them, and each directory it made in the
+    one above it. A model of what a crash keeps, in test and diagnostics
+    builds, tests both (`crash_model`).
 
     Each key's reservation, the count below which its seals may have been
     used, is in the tagged commit metadata, and the store makes it durable

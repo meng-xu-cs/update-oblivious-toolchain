@@ -1410,7 +1410,10 @@ engine and of the report's comparison.
 Reopened in part by the review of 16 November 2026: a failed journal
 append left the adapter serving calls, behind a torn frame or beside a
 commit that the live runtime dropped. Issue 65 (`988b876`) repaired it: the
-store fails closed.
+store fails closed. The review of 18 November 2026 found that a reopened
+store served what a crash could still take, and that a new store's journal
+was not named on the device; Issue 70 publishes a store before it is served,
+and syncs a new one's files and directories.
 
 ### Issue 42 — Widen the runtime-versus-model tests of the tree and the tape substitution
 

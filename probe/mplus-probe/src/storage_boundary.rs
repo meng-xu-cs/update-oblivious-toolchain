@@ -52,6 +52,21 @@
 //! runtime, whose receipts say which state the files hold
 //! (`every_storage_failure_fails_closed_and_a_restart_resolves_the_call` in
 //! `runtime/uo-evm/tests/production_boundary.rs`).
+//!
+//! Those are the failures the store's fault hook injects. What a crash
+//! keeps is less than what a process reads back: a file's bytes are on the
+//! device once it is synced, a name once its directory is, and the bytes a
+//! failed sync left off the device no later sync of that file puts there.
+//! So the report also runs ERC20Lite on each sealed backend with every
+//! commit synced, under a model of what a crash would leave of the files
+//! (`crash_recovery`, `uo_store::crash_model`). A crash after the first
+//! call must leave a store that a restart takes with it: creating the store
+//! put its files and their names on the device. A call whose sync then fails
+//! is lost by a crash before the files are opened again. Opened again with
+//! no crash, the store publishes what it read before it serves it, so the
+//! restart finds the files one past the counter, and a crash after it keeps
+//! the call. When that publication fails, the open fails, nothing is
+//! resolved, and a crash leaves the store without the call.
 
 use crate::capacity_sweep::WitnessAuditOff;
 use crate::{
@@ -64,12 +79,13 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use uo_core::ir::BackendKind;
 use uo_core::{CompiledArtifact, PublicReceipt, Value, WriteClass};
+use uo_evm::crash_model::{CrashModel, FileOperation};
 use uo_evm::{
-    storage_failure, ContractInstance, FileStorage, MemoryStorage, SharedStorage, StorageAdapter,
-    StorageFailure, StorageFault, StorageIo, StoreGeneration, SyncPolicy,
+    storage_failure, AppendFailure, ContractInstance, FileStorage, MemoryStorage, SharedStorage,
+    StorageAdapter, StorageFailure, StorageFault, StorageIo, StoreGeneration, SyncPolicy,
 };
 
-pub(crate) const STORAGE_BOUNDARY_SCHEMA: &str = "uo-storage-boundary-v5";
+pub(crate) const STORAGE_BOUNDARY_SCHEMA: &str = "uo-storage-boundary-v6";
 
 /// The sealed objects of an artifact.
 fn sealed_objects(artifact: &CompiledArtifact) -> BTreeSet<String> {
@@ -902,6 +918,184 @@ fn storage_fault(
     outcome
 }
 
+/// The name of where a restart found a store's generation.
+fn found_name(found: StoreGeneration) -> &'static str {
+    match found {
+        StoreGeneration::Attested => "attested",
+        StoreGeneration::OnePast => "one_past",
+    }
+}
+
+/// A deployment of `artifact` on a store in files that syncs every commit,
+/// under a crash model (`crash_recovery` in the module's comment): `setup`
+/// returns, `target` meets a sync that fails after a whole write, and `read`
+/// reads what `target` writes. If `publication_fails`, the open after it
+/// fails to sync the journal it publishes.
+fn crash_run(
+    artifact: &CompiledArtifact,
+    label: &str,
+    calls: [&CallSpec; 3],
+    publication_fails: bool,
+) -> Result<JsonValue> {
+    let [setup, target, read] = calls;
+    let root = scratch_directory(label);
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(&root)?;
+    let outcome = (|| -> Result<JsonValue> {
+        let model = CrashModel::watch(&root)?;
+        let directory = root.join("store");
+        // What a restart at `attested` from what a crash now would leave
+        // finds, and what `read` answers once it resumed.
+        let after_a_crash = |attested: u64, name: &str| -> Result<(&'static str, JsonValue)> {
+            let crashed = scratch_directory(&format!("{label}-{name}"));
+            let _ = std::fs::remove_dir_all(&crashed);
+            model.crash_into(&crashed)?;
+            let found = (|| -> Result<(&'static str, JsonValue)> {
+                let storage = SharedStorage::new(FileStorage::open(
+                    crashed.join("store"),
+                    SyncPolicy::Always,
+                )?);
+                let (mut restarted, found) = ContractInstance::restart_with_seed(
+                    artifact.clone(),
+                    PROBE_DEPLOY_SEED,
+                    storage,
+                    attested,
+                )?;
+                restarted.keep_decoded_position_map_witness()?;
+                restarted.resume(restarted.generation())?;
+                let value = restarted
+                    .call(read.entrypoint, read.args.clone())?
+                    .return_value;
+                Ok((found_name(found), serde_json::to_value(value)?))
+            })();
+            let _ = std::fs::remove_dir_all(&crashed);
+            found
+        };
+        let storage = SharedStorage::new(FileStorage::create(&directory, SyncPolicy::Always)?);
+        let mut instance = ContractInstance::deploy_with_seed_and_storage(
+            artifact.clone(),
+            PROBE_DEPLOY_SEED,
+            storage.clone(),
+        )?;
+        instance.keep_decoded_position_map_witness()?;
+        instance.call(setup.entrypoint, setup.args.clone())?;
+        let counter = instance.generation();
+        let after_the_first_call = after_a_crash(counter, "first")?;
+        storage.inject_fault(StorageFault::Append {
+            failure: AppendFailure::SyncFails,
+        })?;
+        let failed = instance
+            .call(target.entrypoint, target.args.clone())
+            .err()
+            .and_then(|error| storage_failure(&error));
+        drop(instance);
+        drop(storage);
+        let before_any_reopen = after_a_crash(counter, "before")?;
+        let mut row = json!({
+            "failed_call": if failed == Some(StorageFailure::OutcomeUnknown) {
+                "outcome_unknown"
+            } else {
+                "other"
+            },
+            "after_a_crash_after_the_first_call": {
+                "restart": after_the_first_call.0,
+                "read": after_the_first_call.1,
+            },
+            "after_a_crash_before_any_reopen": {
+                "restart": before_any_reopen.0,
+                "read": before_any_reopen.1,
+            },
+        });
+        if publication_fails {
+            model.fail_next(FileOperation::SyncFile, directory.join("journal.tmp"));
+            let reopen = match FileStorage::open(&directory, SyncPolicy::Always) {
+                Ok(_) => "served",
+                Err(_) => "refused",
+            };
+            let after = after_a_crash(counter, "after")?;
+            row["reopen"] = json!(reopen);
+            row["after_a_crash_after_the_reopen"] = json!({
+                "restart": after.0,
+                "read": after.1,
+            });
+        } else {
+            // The process restarts with no crash.
+            let storage = SharedStorage::new(FileStorage::open(&directory, SyncPolicy::Always)?);
+            let (mut restarted, found) = ContractInstance::restart_with_seed(
+                artifact.clone(),
+                PROBE_DEPLOY_SEED,
+                storage,
+                counter,
+            )?;
+            restarted.keep_decoded_position_map_witness()?;
+            restarted.resume(restarted.generation())?;
+            let served = restarted
+                .call(read.entrypoint, read.args.clone())?
+                .return_value;
+            let attested = restarted.generation();
+            drop(restarted);
+            let after = after_a_crash(attested, "after")?;
+            row["reopen"] = json!(found_name(found));
+            row["read_after_the_reopen"] = serde_json::to_value(served)?;
+            row["after_a_crash_after_the_reopen"] = json!({
+                "restart": after.0,
+                "read": after.1,
+            });
+        }
+        drop(model);
+        Ok(row)
+    })();
+    let _ = std::fs::remove_dir_all(&root);
+    outcome
+}
+
+/// A store in files, under a crash model, on one sealed backend of
+/// `artifact` (`crash_recovery` in the module's comment): the run whose open
+/// publishes, and the run whose publication fails.
+fn crash_recovery(
+    artifact: &CompiledArtifact,
+    backend: &str,
+    calls: [&CallSpec; 3],
+) -> Result<JsonValue> {
+    let [setup, target, read] = calls;
+    // What `read` answers before `target` and after it, on a runtime that
+    // meets no fault.
+    let mut twin = ContractInstance::deploy_with_seed(artifact.clone(), PROBE_DEPLOY_SEED)?;
+    twin.keep_decoded_position_map_witness()?;
+    twin.call(setup.entrypoint, setup.args.clone())?;
+    let before = serde_json::to_value(twin.call(read.entrypoint, read.args.clone())?.return_value)?;
+    twin.call(target.entrypoint, target.args.clone())?;
+    let after = serde_json::to_value(twin.call(read.entrypoint, read.args.clone())?.return_value)?;
+    let published = crash_run(artifact, &format!("crash-{backend}"), calls, false)?;
+    let unpublished = crash_run(
+        artifact,
+        &format!("crash-{backend}-unpublished"),
+        calls,
+        true,
+    )?;
+    let state = |restart: &str, read: &JsonValue| json!({ "restart": restart, "read": read });
+    let holds = published["failed_call"] == json!("outcome_unknown")
+        && published["after_a_crash_after_the_first_call"] == state("attested", &before)
+        && published["after_a_crash_before_any_reopen"] == state("attested", &before)
+        && published["reopen"] == json!("one_past")
+        && published["read_after_the_reopen"] == after
+        && published["after_a_crash_after_the_reopen"] == state("attested", &after)
+        && unpublished["failed_call"] == json!("outcome_unknown")
+        && unpublished["reopen"] == json!("refused")
+        && unpublished["after_a_crash_after_the_reopen"] == state("attested", &before);
+    Ok(json!({
+        "backend": backend,
+        "setup": setup.entrypoint,
+        "call_whose_sync_fails": target.entrypoint,
+        "read": read.entrypoint,
+        "read_before_the_call": before,
+        "read_after_the_call": after,
+        "published": published,
+        "publication_fails": unpublished,
+        "holds": holds,
+    }))
+}
+
 /// A store takes a sealed record only when the record's nonce is below the
 /// count it has reserved for the record's object: in a call, the count the
 /// last commit reserved, since a reservation takes effect with the commit
@@ -1097,6 +1291,15 @@ pub(crate) fn run_storage_boundary(
         }
     }
 
+    let mut crash_rows = Vec::new();
+    let mut restarts_resolve_only_what_is_on_the_device = true;
+    for (backend, artifact) in sealed_variants(erc20) {
+        let row = crash_recovery(artifact, &backend, [&mint, &second_mint, &second_balance])
+            .with_context(|| format!("crash recovery on ERC20Lite/{backend}"))?;
+        restarts_resolve_only_what_is_on_the_device &= row["holds"] == json!(true);
+        crash_rows.push(row);
+    }
+
     let checks = json!({
         "store_log_agrees_with_trace_in_every_call": every_log_agrees,
         "store_reads_are_the_traced_reads": totals.store_reads == totals.traced_reads,
@@ -1106,6 +1309,7 @@ pub(crate) fn run_storage_boundary(
         "a_dropped_call_leaves_the_records_as_they_were": every_dropped_call_holds,
         "a_record_reaches_the_store_only_under_a_reserved_nonce": nonce_reservation_holds,
         "every_storage_fault_fails_closed": every_storage_fault_fails_closed,
+        "restarts_resolve_only_what_is_on_the_device": restarts_resolve_only_what_is_on_the_device,
     });
     let accepted = checks
         .as_object()
@@ -1130,10 +1334,11 @@ pub(crate) fn run_storage_boundary(
         "dropped_calls": dropped_calls,
         "nonce_reservation": nonce_reservation,
         "fault_matrix": fault_matrix,
+        "crash_recovery": crash_rows,
         "checks": checks,
         "provenance": {
             "toolchain_manifest_sha256": toolchain,
-            "restart": "a seeded deployment restarts from a store in files, with an attested generation that stands for the platform's monotonic counter; the sync policy is off, so the report times no device",
+            "restart": "a seeded deployment restarts from a store in files, with an attested generation that stands for the platform's monotonic counter; the sync policy is off, so the report times no device, but in crash_recovery, which syncs every commit and asks a model of the device what a crash would leave",
         },
         "accepted": accepted,
     }))

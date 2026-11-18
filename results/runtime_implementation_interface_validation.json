@@ -1,6 +1,6 @@
 {
   "accepted": true,
-  "artifact_json_bytes": 1867418,
+  "artifact_json_bytes": 1867708,
   "checker": "proof/lean/.lake/build/bin/checkProofGradeRuntimeImplementationInterface",
   "deeper_semantics_of_rust_refinement_required": true,
   "evidence_classification": "source-frozen/static-drift checked",
@@ -19,7 +19,7 @@
     "pinned_bytes_cut_as_test_items": 651668,
     "pinned_files": 31,
     "slicer": "a lexer that knows strings, raw strings, characters and comments: probe/mplus-probe/src/rust_source.rs and proof/lean/UOToolchain/RustSourceSlice.lean",
-    "workspace_rust_files_scanned": 77
+    "workspace_rust_files_scanned": 78
   },
   "public_shell_canonical_hashing_guarded_by_public_entry_theorem_checked": true,
   "public_shell_rejects_confidential_expression_evaluation_theorem_checked": true,
@@ -46,12 +46,12 @@
     "objects": 143458,
     "oram": 119506,
     "precompiles": 240,
-    "runtime_evm_lib": 91371,
+    "runtime_evm_lib": 91522,
     "runtime_module": 4524,
     "shell": 22085,
     "state": 65007,
     "store_codec": 16870,
-    "store_lib": 475,
+    "store_lib": 603,
     "store_store": 4610,
     "theorem": 6557,
     "trace": 491942,

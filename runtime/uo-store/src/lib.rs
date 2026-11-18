@@ -1,6 +1,9 @@
 #![allow(clippy::borrowed_box, clippy::needless_lifetimes)]
 
 pub mod codec;
+/// What a crash leaves of a file store's files, for tests.
+#[cfg(any(test, feature = "fault-injection"))]
+pub mod crash_model;
 pub mod storage;
 mod store;
 

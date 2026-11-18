@@ -50,6 +50,10 @@ pub use return_channel::{open_encrypted_return, ReturnChannelSession, RETURN_CHA
 pub use runtime::PathOramFreshCoinPlan;
 pub use secret::PlatformSealingKey;
 pub use store_meta::StoreGeneration;
+/// What a crash leaves of a file store's files, for a diagnostics build's
+/// reports.
+#[cfg(feature = "diagnostics")]
+pub use uo_store::crash_model;
 pub use uo_store::{
     storage_failure, AppendFailure, CheckpointStep, FileStorage, MemoryStorage, SharedStorage,
     StorageAdapter, StorageError, StorageFailure, StorageFault, StorageIo, StorageStats,

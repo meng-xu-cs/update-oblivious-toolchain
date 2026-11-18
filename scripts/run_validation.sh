@@ -92,8 +92,9 @@ cargo run -q --release -p mplus-probe -- --only stash-occupancy "${PROBE_ARGS[@]
 cargo run -q --release -p mplus-probe -- --only public-state "${PROBE_ARGS[@]}"
 # The storage boundary (Issue 41): every benchmark on every sealed backend,
 # with the store's own log of the records the runtime opens and seals
-# compared with each call's trace, and a runtime restarted from a store in
-# files. Its counts are a function of its seed (about a minute).
+# compared with each call's trace, a runtime restarted from a store in files,
+# and what a crash keeps of a store that syncs every commit, under a model of
+# the device. Its counts are a function of its seed (about two minutes).
 cargo run -q -p mplus-probe -- --only storage-boundary "${PROBE_ARGS[@]}"
 # Runtime against model (Issue 42). The AVL map replay runs random operations
 # on the runtime's oblivious AVL map and checks each against the Lean model;

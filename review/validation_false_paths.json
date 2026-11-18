@@ -3999,6 +3999,7 @@
       "store_slots_use_generated_boxed_helpers": true,
       "store_wipe_helper_surface_restricted": true,
       "store_write_api_uses_mutable_plaintext": true,
+      "stores_are_published_before_they_are_served": true,
       "surrogate_oram_directory_buffers_use_exact_page_slices": true,
       "tamper_validation_covers_host_coordination_secret_serialization_drift": true,
       "tamper_validation_covers_kernel_interface_confinement_boundary_witness_drift": true,

@@ -29,6 +29,16 @@
 //! whole or not at all. A checkpoint that fails leaves every commit in the
 //! files and also makes the store refuse every operation. Any other error
 //! comes before a file is touched (`StorageFailure::Definite`).
+//!
+//! What a store serves is on the device, under `SyncPolicy::Always`. After
+//! a sync failed, the files a process reads can hold bytes that are not on
+//! the device and that no later sync of that file puts there, so opening a
+//! store publishes what it read before it serves it: the journal's whole
+//! entries go into a new file, which is synced and renamed over the
+//! journal, and the directory is synced. An open whose publication fails
+//! fails, and serves nothing. Creating a store syncs the journal and the
+//! snapshot, the directory that holds them, and each directory it made in
+//! the one above it, before it returns.
 
 use crate::codec::sealed_record_seal_count;
 use anyhow::{anyhow, bail, Context, Result};
@@ -43,6 +53,9 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use uo_core::trace::{classify_write, WriteClass};
 use uo_core::STORAGE_OBSERVER_UNIT_BYTES;
+
+#[cfg(any(test, feature = "fault-injection"))]
+use crate::crash_model::{self, FileOperation};
 
 /// One read or write of a sealed record, as the adapter saw it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -741,6 +754,8 @@ pub enum SyncPolicy {
 const SNAPSHOT_FILE: &str = "snapshot.bin";
 const SNAPSHOT_TEMP_FILE: &str = "snapshot.tmp";
 const JOURNAL_FILE: &str = "journal.bin";
+/// The journal an open publishes, before it is renamed over the journal.
+const JOURNAL_TEMP_FILE: &str = "journal.tmp";
 const SNAPSHOT_MAGIC: u32 = 0x554F_534E;
 const JOURNAL_MAGIC: u32 = 0x554F_4A4E;
 const FRAME_HEADER_BYTES: usize = 12;
@@ -857,6 +872,7 @@ pub struct FileStorage {
     image: MemoryStorage,
     directory: PathBuf,
     journal: File,
+    journal_path: PathBuf,
     journal_bytes: u64,
     /// The journal length above which a commit writes a snapshot and
     /// empties the journal.
@@ -974,23 +990,177 @@ fn journal_file(directory: &Path, new: bool) -> std::io::Result<File> {
     OpenOptions::open(&options, directory.join(JOURNAL_FILE))
 }
 
+// The file operations of a file store. In a test or a diagnostics build each
+// tells the model of a test that watches the files what it did, and fails
+// where the test armed it to.
+
+/// Create each directory of `directory` that does not exist, the outermost
+/// first, and name them.
+#[cfg_attr(not(any(test, feature = "fault-injection")), allow(unused_variables))]
+fn create_directories(directory: &Path) -> std::io::Result<Vec<PathBuf>> {
+    let mut missing = Vec::new();
+    let mut at = Some(directory);
+    while let Some(path) = at.filter(|path| !path.as_os_str().is_empty() && !path.exists()) {
+        missing.push(path.to_path_buf());
+        at = path.parent();
+    }
+    missing.reverse();
+    fs::create_dir_all(directory)?;
+    for path in &missing {
+        #[cfg(any(test, feature = "fault-injection"))]
+        crash_model::created_directory(path);
+    }
+    Ok(missing)
+}
+
+/// A new journal in `directory`, at `path`, to append to.
+#[cfg_attr(not(any(test, feature = "fault-injection")), allow(unused_variables))]
+fn create_journal(directory: &Path, path: &Path) -> std::io::Result<File> {
+    let file = journal_file(directory, true)?;
+    #[cfg(any(test, feature = "fault-injection"))]
+    crash_model::created_file(path);
+    Ok(file)
+}
+
+/// A file at `path` to write whole, empty: a new one, or the one there.
+fn create_file(path: &Path) -> std::io::Result<File> {
+    #[cfg(any(test, feature = "fault-injection"))]
+    let armed = crash_model::fails(path, FileOperation::Write);
+    #[cfg(not(any(test, feature = "fault-injection")))]
+    let armed = false;
+    if armed {
+        return Err(injected("the file could not be created"));
+    }
+    let file = File::create(path)?;
+    #[cfg(any(test, feature = "fault-injection"))]
+    crash_model::created_file(path);
+    Ok(file)
+}
+
+/// Sync `file`, which is at `path`.
+#[cfg_attr(not(any(test, feature = "fault-injection")), allow(unused_variables))]
+fn sync_file(file: &File, path: &Path) -> std::io::Result<()> {
+    #[cfg(any(test, feature = "fault-injection"))]
+    let armed = crash_model::fails(path, FileOperation::SyncFile);
+    #[cfg(not(any(test, feature = "fault-injection")))]
+    let armed = false;
+    let synced = if armed {
+        Err(injected("the sync failed"))
+    } else {
+        file.sync_data()
+    };
+    #[cfg(any(test, feature = "fault-injection"))]
+    crash_model::synced_file(path, synced.is_ok());
+    synced
+}
+
+/// The error of a sync of the file at `path` that a test made fail.
+#[cfg_attr(not(any(test, feature = "fault-injection")), allow(unused_variables))]
+fn sync_failed(path: &Path, what: &str) -> std::io::Error {
+    #[cfg(any(test, feature = "fault-injection"))]
+    crash_model::synced_file(path, false);
+    injected(what)
+}
+
+/// Cut `file`, which is at `path`, to `len` bytes.
+#[cfg_attr(not(any(test, feature = "fault-injection")), allow(unused_variables))]
+fn truncate_file(file: &File, path: &Path, len: u64) -> std::io::Result<()> {
+    file.set_len(len)?;
+    #[cfg(any(test, feature = "fault-injection"))]
+    crash_model::truncated(path, len);
+    Ok(())
+}
+
+/// Rename the file at `from` to `to`, over the file there.
+fn rename_file(from: &Path, to: &Path) -> std::io::Result<()> {
+    #[cfg(any(test, feature = "fault-injection"))]
+    let armed = crash_model::fails(to, FileOperation::Rename);
+    #[cfg(not(any(test, feature = "fault-injection")))]
+    let armed = false;
+    if armed {
+        return Err(injected("the rename failed"));
+    }
+    fs::rename(from, to)?;
+    #[cfg(any(test, feature = "fault-injection"))]
+    crash_model::renamed(from, to);
+    Ok(())
+}
+
+/// Sync the directory `directory`: the names in it are on the device once
+/// this returns.
+fn sync_directory(directory: &Path) -> std::io::Result<()> {
+    #[cfg(any(test, feature = "fault-injection"))]
+    let armed = crash_model::fails(directory, FileOperation::SyncDirectory);
+    #[cfg(not(any(test, feature = "fault-injection")))]
+    let armed = false;
+    let synced = if armed {
+        Err(injected("the directory's sync failed"))
+    } else {
+        File::open(directory).and_then(|handle| handle.sync_all())
+    };
+    #[cfg(any(test, feature = "fault-injection"))]
+    crash_model::synced_directory(directory, synced.is_ok());
+    synced
+}
+
+/// Publish `entries`, the whole entries of the journal of the store in
+/// `directory`: write them into a new file, sync it, rename it over the
+/// journal, and sync the directory, as `sync` says. What the store serves
+/// then rests on bytes a sync put on the device since they were read, not
+/// on the journal a sync may have failed for. The journal, to append to.
+fn publish_journal(directory: &Path, entries: &[u8], sync: SyncPolicy) -> Result<File> {
+    let temp = directory.join(JOURNAL_TEMP_FILE);
+    let mut file = create_file(&temp)?;
+    file.write_all(entries)?;
+    if sync == SyncPolicy::Always {
+        sync_file(&file, &temp)?;
+    }
+    drop(file);
+    rename_file(&temp, &directory.join(JOURNAL_FILE))?;
+    if sync == SyncPolicy::Always {
+        sync_directory(directory)?;
+    }
+    Ok(journal_file(directory, false)?)
+}
+
 impl FileStorage {
-    /// A new store in `directory`, which must not hold one.
+    /// A new store in `directory`, which must not hold one. Under
+    /// `SyncPolicy::Always` it is on the device when this returns: the
+    /// journal and the snapshot are synced, then the directory that holds
+    /// them, then each directory this made, in the one above it, the
+    /// innermost first. A directory that was there is the caller's to have
+    /// put on the device. If any of this fails, no store is made.
     pub fn create(directory: impl AsRef<Path>, sync: SyncPolicy) -> Result<Self> {
         let directory = directory.as_ref().to_path_buf();
-        fs::create_dir_all(&directory)
+        let made = create_directories(&directory)
             .with_context(|| format!("creating {}", directory.display()))?;
         if directory.join(SNAPSHOT_FILE).exists() || directory.join(JOURNAL_FILE).exists() {
             bail!("{} already holds a store", directory.display());
         }
-        let image = MemoryStorage::new();
-        write_snapshot(&directory, &image, sync, None)?;
-        let journal = journal_file(&directory, true)
+        let journal_path = directory.join(JOURNAL_FILE);
+        let journal = create_journal(&directory, &journal_path)
             .with_context(|| format!("creating the journal in {}", directory.display()))?;
+        if sync == SyncPolicy::Always {
+            sync_file(&journal, &journal_path)
+                .with_context(|| format!("syncing the journal in {}", directory.display()))?;
+        }
+        let image = MemoryStorage::new();
+        // The snapshot's rename and the directory's sync after it put both
+        // names on the device.
+        write_snapshot(&directory, &image, sync, None)?;
+        if sync == SyncPolicy::Always {
+            for made in made.iter().rev() {
+                if let Some(above) = made.parent() {
+                    sync_directory(above)
+                        .with_context(|| format!("syncing {}", above.display()))?;
+                }
+            }
+        }
         Ok(Self {
             image,
             directory,
             journal,
+            journal_path,
             journal_bytes: 0,
             checkpoint_bytes: None,
             sync,
@@ -1014,6 +1184,15 @@ impl FileStorage {
     /// (`bytes_cut_on_open`). A journal in which a whole entry follows a
     /// damaged one is refused: that entry was appended after one that
     /// failed, and dropping it could drop a commit that was acknowledged.
+    ///
+    /// The store publishes what it read before it returns
+    /// (`publish_journal`): under `SyncPolicy::Always`, whatever it serves,
+    /// and so whatever a restart from it resolves, is on the device, though
+    /// the journal held an entry whose sync failed. If the publication
+    /// fails, the open fails, and the files hold every whole entry they
+    /// held. One adapter at a time has a store's files open: the
+    /// publication replaces the journal, and an adapter that had the old
+    /// one would append to a file that is no longer the journal.
     pub fn open(directory: impl AsRef<Path>, sync: SyncPolicy) -> Result<Self> {
         let directory = directory.as_ref().to_path_buf();
         let snapshot = fs::read(directory.join(SNAPSHOT_FILE))
@@ -1022,10 +1201,10 @@ impl FileStorage {
             .ok_or_else(|| anyhow!("the snapshot in {} is damaged", directory.display()))?;
         let mut image = MemoryStorage::new();
         load_snapshot(&mut image, payload)?;
-        let mut journal = journal_file(&directory, false)
-            .with_context(|| format!("opening the journal in {}", directory.display()))?;
         let mut entries = Vec::new();
-        journal.read_to_end(&mut entries)?;
+        journal_file(&directory, false)
+            .and_then(|mut journal| journal.read_to_end(&mut entries))
+            .with_context(|| format!("opening the journal in {}", directory.display()))?;
         let mut offset = 0usize;
         while let Some((payload, len)) = entries
             .get(offset..)
@@ -1045,12 +1224,16 @@ impl FileStorage {
                     directory.display()
                 );
             }
-            journal.set_len(offset as u64)?;
-            journal.seek(SeekFrom::End(0))?;
-            journal.sync_data()?;
         }
+        let journal = publish_journal(&directory, &entries[..offset], sync).with_context(|| {
+            format!(
+                "publishing the store in {} before it is served: nothing is served, and the files hold every whole entry they held",
+                directory.display()
+            )
+        })?;
         Ok(Self {
             image,
+            journal_path: directory.join(JOURNAL_FILE),
             directory,
             journal,
             journal_bytes: offset as u64,
@@ -1093,11 +1276,11 @@ impl FileStorage {
         if fail_at == Some(CheckpointStep::JournalTruncation) {
             return Err(injected("the journal's truncation failed").into());
         }
-        self.journal.set_len(0)?;
+        truncate_file(&self.journal, &self.journal_path, 0)?;
         self.journal.seek(SeekFrom::End(0))?;
         self.journal_bytes = 0;
         if self.sync == SyncPolicy::Always {
-            self.journal.sync_data()?;
+            sync_file(&self.journal, &self.journal_path)?;
             self.image.stats.syncs += 1;
         }
         Ok(())
@@ -1211,10 +1394,13 @@ impl FileStorage {
         }
         self.journal.write_all(entry)?;
         if fault == Some(AppendFailure::SyncFails) {
-            return Err(injected("the sync after a whole write failed"));
+            return Err(sync_failed(
+                &self.journal_path,
+                "the sync after a whole write failed",
+            ));
         }
         if self.sync == SyncPolicy::Always {
-            self.journal.sync_data()?;
+            sync_file(&self.journal, &self.journal_path)?;
             self.image.stats.syncs += 1;
         }
         Ok(())
@@ -1272,7 +1458,7 @@ fn write_snapshot(
         put_public_record(&mut payload, image, location, record)?;
     }
     let temp = directory.join(SNAPSHOT_TEMP_FILE);
-    let mut file = File::create(&temp).with_context(|| format!("creating {}", temp.display()))?;
+    let mut file = create_file(&temp).with_context(|| format!("creating {}", temp.display()))?;
     let snapshot = frame(SNAPSHOT_MAGIC, &payload);
     if fail_at == Some(CheckpointStep::SnapshotWrite) {
         file.write_all(&snapshot[..snapshot.len() / 2])?;
@@ -1280,16 +1466,16 @@ fn write_snapshot(
     }
     file.write_all(&snapshot)?;
     if sync == SyncPolicy::Always {
-        file.sync_data()?;
+        sync_file(&file, &temp)?;
     }
     drop(file);
     if fail_at == Some(CheckpointStep::SnapshotRename) {
         return Err(injected("the snapshot's rename failed").into());
     }
-    fs::rename(&temp, directory.join(SNAPSHOT_FILE))?;
+    rename_file(&temp, &directory.join(SNAPSHOT_FILE))?;
     if sync == SyncPolicy::Always {
-        // The rename is durable once the directory is.
-        File::open(directory)?.sync_all()?;
+        // The rename is on the device once the directory is.
+        sync_directory(directory)?;
     }
     Ok(())
 }
@@ -2165,9 +2351,17 @@ mod tests {
         store.reserve_seals("a", 4).unwrap();
         assert_eq!(store.journal_bytes().unwrap(), before);
         assert_eq!(store.reserved_seals("b"), 0);
-        let reopened = FileStorage::open(&directory, SyncPolicy::Never).unwrap();
+        // A copy of the files, opened: one adapter at a time opens a store's
+        // files, since an open publishes a journal of its own.
+        let copy = scratch_directory("reservation-copy");
+        fs::create_dir_all(&copy).unwrap();
+        for file in [SNAPSHOT_FILE, JOURNAL_FILE] {
+            fs::copy(directory.join(file), copy.join(file)).unwrap();
+        }
+        let reopened = FileStorage::open(&copy, SyncPolicy::Never).unwrap();
         assert_eq!(reopened.reserved_seals("b"), 0);
         drop(reopened);
+        fs::remove_dir_all(&copy).unwrap();
         store.begin().unwrap();
         store.commit(b"reserved").unwrap();
         // One frame: the header; the kind, the metadata, one reservation, no
@@ -2185,6 +2379,178 @@ mod tests {
         assert_eq!(store.meta(), b"reserved");
         drop(store);
         fs::remove_dir_all(&directory).unwrap();
+    }
+
+    /// A directory a crash model watches, empty, with what a crash leaves of
+    /// it written to `crashed` and `crashed_again`.
+    fn watched(name: &str) -> (PathBuf, crate::crash_model::CrashModel) {
+        let root = scratch_directory(name);
+        fs::create_dir_all(&root).unwrap();
+        let model = crate::crash_model::CrashModel::watch(&root).unwrap();
+        (root, model)
+    }
+
+    /// A store made in directories that did not exist, with a commit that
+    /// returned, keeps the commit through a crash before any checkpoint:
+    /// the journal is on the device, its name and the snapshot's in their
+    /// directory, and each directory the store made in the one above it.
+    #[test]
+    fn a_created_store_keeps_its_commits_through_a_crash() {
+        let cipher = StoreCipher::random();
+        let first = sealed(&cipher, &[1u8; 48]);
+        let second = resealed(&cipher, &first, &[2u8; 48]);
+        let (root, model) = watched("crash-create");
+        let directory = root.join("deployments").join("store");
+        let mut store = FileStorage::create(&directory, SyncPolicy::Always).unwrap();
+        store.reserve_seals("map", 8).unwrap();
+        store.create("map", "map#0", &first).unwrap();
+        store.commit(b"deployed").unwrap();
+        store.begin().unwrap();
+        store.write("map#0", &second).unwrap();
+        store.commit(b"first call").unwrap();
+        drop(store);
+        let crashed = scratch_directory("crash-create-after");
+        model.crash_into(&crashed).unwrap();
+        let store = FileStorage::open(
+            crashed.join("deployments").join("store"),
+            SyncPolicy::Always,
+        )
+        .unwrap();
+        assert_eq!(store.meta(), b"first call");
+        assert_eq!(store.record("map#0"), Some(&*second));
+        assert_eq!(store.reserved_seals("map"), 8);
+        drop(store);
+        // A store that syncs nothing leaves nothing on the device.
+        drop(model);
+        let (unsynced_root, unsynced) = watched("crash-create-unsynced");
+        let mut store =
+            FileStorage::create(unsynced_root.join("store"), SyncPolicy::Never).unwrap();
+        store.commit(b"deployed").unwrap();
+        drop(store);
+        let unsynced_crash = scratch_directory("crash-create-unsynced-after");
+        unsynced.crash_into(&unsynced_crash).unwrap();
+        assert!(!unsynced_crash.join("store").exists());
+        for directory in [root, crashed, unsynced_root, unsynced_crash] {
+            fs::remove_dir_all(directory).unwrap();
+        }
+    }
+
+    /// The deployment's commit and a commit that returned, then a commit
+    /// whose sync failed after a whole write, in a store a crash model
+    /// watches: what a test that resolves that commit starts from.
+    fn store_with_a_failed_sync(
+        name: &str,
+    ) -> (PathBuf, PathBuf, crate::crash_model::CrashModel, Box<[u8]>) {
+        let cipher = StoreCipher::random();
+        let first = sealed(&cipher, &[1u8; 48]);
+        let second = resealed(&cipher, &first, &[2u8; 48]);
+        let third = resealed(&cipher, &second, &[3u8; 48]);
+        let (root, model) = watched(name);
+        let directory = root.join("store");
+        let mut store = FileStorage::create(&directory, SyncPolicy::Always).unwrap();
+        store.reserve_seals("map", 8).unwrap();
+        store.create("map", "map#0", &first).unwrap();
+        store.commit(b"deployed").unwrap();
+        store.begin().unwrap();
+        store.write("map#0", &second).unwrap();
+        store.commit(b"acknowledged").unwrap();
+        store.inject_fault(StorageFault::Append {
+            failure: AppendFailure::SyncFails,
+        });
+        store.begin().unwrap();
+        store.write("map#0", &third).unwrap();
+        let error = store.commit(b"unknown").unwrap_err();
+        assert_eq!(
+            storage_failure(&error),
+            Some(StorageFailure::OutcomeUnknown)
+        );
+        store.abandon();
+        (root, directory, model, third)
+    }
+
+    /// The meta of the store a crash now would leave.
+    fn meta_after_a_crash(model: &crate::crash_model::CrashModel, name: &str) -> Vec<u8> {
+        let crashed = scratch_directory(name);
+        model.crash_into(&crashed).unwrap();
+        let meta = FileStorage::open(crashed.join("store"), SyncPolicy::Always)
+            .unwrap()
+            .meta()
+            .to_vec();
+        fs::remove_dir_all(crashed).unwrap();
+        meta
+    }
+
+    /// A commit whose sync failed after a whole write is in the journal a
+    /// process reads, and not on the device: a crash loses it, and a sync
+    /// of the journal after the failure does not put it there. A store
+    /// opened again serves it only once it published it, so a crash after
+    /// the open keeps what the open served.
+    #[test]
+    fn a_reopened_store_publishes_what_it_read_before_it_serves_it() {
+        let (root, directory, model, third) = store_with_a_failed_sync("publish");
+        assert_eq!(
+            meta_after_a_crash(&model, "publish-before"),
+            b"acknowledged"
+        );
+        // A sync of the journal after the failed one: the entry stays off
+        // the device.
+        let journal = journal_file(&directory, false).unwrap();
+        sync_file(&journal, &directory.join(JOURNAL_FILE)).unwrap();
+        drop(journal);
+        assert_eq!(
+            meta_after_a_crash(&model, "publish-resync"),
+            b"acknowledged"
+        );
+        // The process restarts with no crash: the open reads the entry and
+        // publishes it before it serves it.
+        let store = FileStorage::open(&directory, SyncPolicy::Always).unwrap();
+        assert_eq!(store.meta(), b"unknown");
+        assert_eq!(store.record("map#0"), Some(&*third));
+        assert_eq!(store.bytes_cut_on_open(), 0);
+        drop(store);
+        assert_eq!(meta_after_a_crash(&model, "publish-after"), b"unknown");
+        assert!(!directory.join(JOURNAL_TEMP_FILE).exists());
+        drop(model);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    /// An open whose publication fails at any step fails and serves
+    /// nothing. A crash then leaves a store without the commit whose sync
+    /// failed, which no open resolved; an open that publishes, with no
+    /// crash before it, serves it.
+    #[test]
+    fn an_open_whose_publication_fails_serves_nothing() {
+        use crate::crash_model::FileOperation;
+        for (operation, file) in [
+            (FileOperation::Write, Some(JOURNAL_TEMP_FILE)),
+            (FileOperation::SyncFile, Some(JOURNAL_TEMP_FILE)),
+            (FileOperation::Rename, Some(JOURNAL_FILE)),
+            (FileOperation::SyncDirectory, None),
+        ] {
+            let (root, directory, model, _) = store_with_a_failed_sync("publish-fault");
+            let target = file.map_or_else(|| directory.clone(), |file| directory.join(file));
+            model.fail_next(operation, &target);
+            let error = FileStorage::open(&directory, SyncPolicy::Always).unwrap_err();
+            assert!(
+                format!("{error:#}").contains("before it is served: nothing is served"),
+                "{operation:?}: {error:#}"
+            );
+            assert_eq!(
+                meta_after_a_crash(&model, "publish-fault-crash"),
+                b"acknowledged",
+                "{operation:?}"
+            );
+            let store = FileStorage::open(&directory, SyncPolicy::Always).unwrap();
+            assert_eq!(store.meta(), b"unknown", "{operation:?}");
+            drop(store);
+            assert_eq!(
+                meta_after_a_crash(&model, "publish-fault-after"),
+                b"unknown",
+                "{operation:?}"
+            );
+            drop(model);
+            fs::remove_dir_all(root).unwrap();
+        }
     }
 
     /// The journal's last entry, damaged or cut short, is cut off; a whole

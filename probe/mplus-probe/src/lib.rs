@@ -28721,11 +28721,29 @@ fn check_production_calls_issue_chained_receipts(
 /// runtime's diagnostics feature and its tests do.
 fn check_store_failures_are_injected_only_in_test_and_diagnostics_builds(
     storage_source: &str,
+    store_lib_source: &str,
     store_manifest: &str,
     runtime_manifest: &str,
 ) -> bool {
     let gate = "#[cfg(any(test, feature = \"fault-injection\"))]";
     let lines: Vec<&str> = storage_source.lines().collect();
+    // The crash model of tests (Issue 70 of the review of 18 November 2026):
+    // every line of the store's production code that names it is under the
+    // gate, and so is the module.
+    let production = production_source_slice(storage_source);
+    let production_lines: Vec<&str> = production.lines().collect();
+    let model_lines: Vec<usize> = production_lines
+        .iter()
+        .enumerate()
+        .filter(|(_, line)| line.contains("crash_model"))
+        .map(|(index, _)| index)
+        .collect();
+    let crash_model_gated = model_lines.len() == 13
+        && model_lines
+            .iter()
+            .all(|&index| index > 0 && production_lines[index - 1].trim() == gate)
+        && store_lib_source.contains(&format!("{gate}\npub mod crash_model;\n"))
+        && store_lib_source.matches("crash_model").count() == 1;
     // Every line that holds `needle` follows the gate, and there are `count`.
     let gated = |needle: &str, count: usize| {
         let at: Vec<usize> = lines
@@ -28745,7 +28763,8 @@ fn check_store_failures_are_injected_only_in_test_and_diagnostics_builds(
             .map(|(_, rest)| rest.split("\n[").next().unwrap_or_default())
             .unwrap_or_default()
     };
-    gated("    fault: Option<StorageFault>,", 1)
+    crash_model_gated
+        && gated("    fault: Option<StorageFault>,", 1)
         && gated("            fault: None,", 2)
         && gated("fn inject_fault(", 4)
         && storage_source.contains(
@@ -29017,6 +29036,52 @@ fn check_restarts_resume_at_the_reservations_of_their_commit(
             "        // The reservation is written with the next commit, and takes effect\n        // in a call once that commit is in the journal.\n        self.image.reserve_seals(object, below)\n    }",
         )
         && storage_source.matches("const ENTRY_").count() == 1
+}
+
+/// Whether a store in files serves only what is on the device (Issue 70 of
+/// the review of 18 November 2026). Opening a store publishes what it read
+/// before it serves it: the journal's whole entries go into a new file, which
+/// is synced and renamed over the journal, and then the directory is synced,
+/// so that nothing the store serves, nor what a restart resolves from it,
+/// rests on bytes whose sync failed. Creating a store syncs the journal and
+/// the snapshot, then the directory that holds them, then each directory it
+/// made in the one above it. Every sync, rename, truncation and file the
+/// store creates goes through one function, which a test's crash model
+/// observes.
+fn check_stores_are_published_before_they_are_served(storage_source: &str) -> bool {
+    let storage = storage_source;
+    storage.contains(
+        "fn publish_journal(directory: &Path, entries: &[u8], sync: SyncPolicy) -> Result<File> {\n    let temp = directory.join(JOURNAL_TEMP_FILE);\n    let mut file = create_file(&temp)?;\n    file.write_all(entries)?;\n    if sync == SyncPolicy::Always {\n        sync_file(&file, &temp)?;\n    }\n    drop(file);\n    rename_file(&temp, &directory.join(JOURNAL_FILE))?;\n    if sync == SyncPolicy::Always {\n        sync_directory(directory)?;\n    }\n    Ok(journal_file(directory, false)?)\n}",
+    ) && storage.matches("publish_journal(").count() == 2
+        // The open publishes, and serves the published journal.
+        && storage.contains(
+            "            }\n        }\n        let journal = publish_journal(&directory, &entries[..offset], sync).with_context(|| {",
+        )
+        && storage.contains(
+            "        })?;\n        Ok(Self {\n            image,\n            journal_path: directory.join(JOURNAL_FILE),\n            directory,\n            journal,\n",
+        )
+        // Creation: the journal, synced; the snapshot, synced, renamed, and
+        // the directory synced; then each directory made, above it.
+        && storage.contains(
+            "        let journal = create_journal(&directory, &journal_path)\n            .with_context(|| format!(\"creating the journal in {}\", directory.display()))?;\n        if sync == SyncPolicy::Always {\n            sync_file(&journal, &journal_path)\n",
+        )
+        && storage.contains(
+            "        write_snapshot(&directory, &image, sync, None)?;\n        if sync == SyncPolicy::Always {\n            for made in made.iter().rev() {\n                if let Some(above) = made.parent() {\n                    sync_directory(above)\n",
+        )
+        && storage.contains(
+            "        sync_file(&file, &temp)?;\n    }\n    drop(file);\n    if fail_at == Some(CheckpointStep::SnapshotRename) {",
+        )
+        && storage.contains(
+            "    rename_file(&temp, &directory.join(SNAPSHOT_FILE))?;\n    if sync == SyncPolicy::Always {\n        // The rename is on the device once the directory is.\n        sync_directory(directory)?;\n    }",
+        )
+        // One function makes each kind of operation.
+        && storage.matches("sync_data()").count() == 1
+        && storage.matches("sync_all()").count() == 1
+        && storage.contains("        File::open(directory).and_then(|handle| handle.sync_all())")
+        && storage.matches("set_len(").count() == 1
+        && storage.matches("fs::rename(").count() == 1
+        && storage.matches("File::create(").count() == 1
+        && storage.matches("fs::create_dir_all(").count() == 1
 }
 
 /// Whether the production path's freshness errors carry no runtime value. An
@@ -47177,6 +47242,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
     let store_failures_are_injected_only_in_test_and_diagnostics_builds =
         check_store_failures_are_injected_only_in_test_and_diagnostics_builds(
             &fs::read_to_string(root.join("runtime/uo-store/src/storage.rs"))?,
+            &fs::read_to_string(root.join("runtime/uo-store/src/lib.rs"))?,
             &fs::read_to_string(root.join("runtime/uo-store/Cargo.toml"))?,
             &runtime_evm_cargo_source,
         );
@@ -47217,6 +47283,10 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
                 root.join("runtime/uo-store/src/storage.rs"),
             )?),
         );
+    let stores_are_published_before_they_are_served =
+        check_stores_are_published_before_they_are_served(&production_source_slice(
+            &fs::read_to_string(root.join("runtime/uo-store/src/storage.rs"))?,
+        ));
     let production_calls_record_no_position_map_witness =
         check_production_calls_record_no_position_map_witness(
             &production_source_slice(&state_source),
@@ -48674,6 +48744,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "production_deployments_restart_from_a_sealed_secret": production_deployments_restart_from_a_sealed_secret,
         "restarts_check_the_commit_generation": restarts_check_the_commit_generation,
         "restarts_resume_at_the_reservations_of_their_commit": restarts_resume_at_the_reservations_of_their_commit,
+        "stores_are_published_before_they_are_served": stores_are_published_before_they_are_served,
         "theorem_certificate_constructor_checks":
             theorem_certificate_constructor_checks,
         "theorem_certificate_constructor_surface_restricted":
@@ -49633,6 +49704,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && production_deployments_restart_from_a_sealed_secret
             && restarts_check_the_commit_generation
             && restarts_resume_at_the_reservations_of_their_commit
+            && stores_are_published_before_they_are_served
             && theorem_certificate_constructor_surface_restricted
             && runtime_public_call_trace_bundle_surface_restricted
             && runtime_public_call_trace_bundle_fields_private
@@ -58385,10 +58457,35 @@ mod tests {
         };
         let read = |path: &str| std::fs::read_to_string(repo_root().join(path)).unwrap();
         let storage = read("runtime/uo-store/src/storage.rs");
+        let lib = read("runtime/uo-store/src/lib.rs");
         let store = read("runtime/uo-store/Cargo.toml");
         let runtime = read("runtime/uo-evm/Cargo.toml");
-        let check = check_store_failures_are_injected_only_in_test_and_diagnostics_builds;
+        let check = |storage: &str, store: &str, runtime: &str| {
+            check_store_failures_are_injected_only_in_test_and_diagnostics_builds(
+                storage, &lib, store, runtime,
+            )
+        };
         assert!(check(&storage, &store, &runtime));
+        // A hook of the crash model compiled in every build.
+        let hook = storage.replacen(
+            "    #[cfg(any(test, feature = \"fault-injection\"))]\n    crash_model::renamed(from, to);",
+            "    crash_model::renamed(from, to);",
+            1,
+        );
+        assert_ne!(hook, storage);
+        assert!(!check(&hook, &store, &runtime));
+        // The crash model's module in every build.
+        let module = lib.replacen(
+            "#[cfg(any(test, feature = \"fault-injection\"))]\npub mod crash_model;",
+            "pub mod crash_model;",
+            1,
+        );
+        assert_ne!(module, lib);
+        assert!(
+            !check_store_failures_are_injected_only_in_test_and_diagnostics_builds(
+                &storage, &module, &store, &runtime,
+            )
+        );
         // The field compiled in every build.
         let ungated = storage.replacen(
             "    #[cfg(any(test, feature = \"fault-injection\"))]\n    fault: Option<StorageFault>,",
@@ -58413,6 +58510,52 @@ mod tests {
         );
         assert_ne!(always, runtime);
         assert!(!check(&storage, &store, &always));
+    }
+
+    #[test]
+    fn the_store_publication_check_rejects_the_drifts_it_guards() {
+        use super::{check_stores_are_published_before_they_are_served, repo_root};
+        let storage = production_source_slice(
+            &std::fs::read_to_string(repo_root().join("runtime/uo-store/src/storage.rs")).unwrap(),
+        );
+        let ok = check_stores_are_published_before_they_are_served;
+        assert!(ok(&storage));
+        let drift = |from: &str, to: &str| {
+            let changed = storage.replacen(from, to, 1);
+            assert_ne!(changed, storage, "no {from:?} to change");
+            changed
+        };
+        // An open that serves the journal it read, without publishing it.
+        assert!(!ok(&drift(
+            "        let journal = publish_journal(&directory, &entries[..offset], sync).with_context(|| {",
+            "        let journal = journal_file(&directory, false).with_context(|| {",
+        )));
+        // A publication that renames the new journal before it is synced.
+        assert!(!ok(&drift(
+            "    if sync == SyncPolicy::Always {\n        sync_file(&file, &temp)?;\n    }\n    drop(file);\n    rename_file(&temp, &directory.join(JOURNAL_FILE))?;",
+            "    rename_file(&temp, &directory.join(JOURNAL_FILE))?;\n    if sync == SyncPolicy::Always {\n        sync_file(&file, &temp)?;\n    }\n    drop(file);",
+        )));
+        // A publication that leaves the directory unsynced.
+        assert!(!ok(&drift(
+            "    rename_file(&temp, &directory.join(JOURNAL_FILE))?;\n    if sync == SyncPolicy::Always {\n        sync_directory(directory)?;\n    }",
+            "    rename_file(&temp, &directory.join(JOURNAL_FILE))?;",
+        )));
+        // A creation that leaves the directories it made unsynced.
+        assert!(!ok(&drift(
+            "            for made in made.iter().rev() {",
+            "            for made in made.iter().rev().take(0) {",
+        )));
+        // A creation that makes the journal after the snapshot's directory
+        // sync, and syncs no directory after it.
+        assert!(!ok(&drift(
+            "        let journal = create_journal(&directory, &journal_path)",
+            "        let journal = journal_file(&directory, true)",
+        )));
+        // A sync that the crash model does not see.
+        assert!(!ok(&drift(
+            "        truncate_file(&self.journal, &self.journal_path, 0)?;",
+            "        truncate_file(&self.journal, &self.journal_path, 0)?;\n        self.journal.sync_data()?;",
+        )));
     }
 
     #[test]

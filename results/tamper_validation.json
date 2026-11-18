@@ -976,7 +976,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870114,
+      "artifact_json_bytes": 1870404,
       "artifact_kind": "proofgrade_runtime_implementation_confidential_statement_trace_bridge_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -990,7 +990,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870274,
+      "artifact_json_bytes": 1870564,
       "artifact_kind": "proofgrade_runtime_implementation_confidential_statement_trace_bridge_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1002,7 +1002,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870264,
+      "artifact_json_bytes": 1870554,
       "artifact_kind": "proofgrade_runtime_implementation_confidential_statement_trace_bridge_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1259,7 +1259,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870300,
+      "artifact_json_bytes": 1870590,
       "artifact_kind": "proofgrade_runtime_implementation_shared_kernel_machine_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1271,7 +1271,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870300,
+      "artifact_json_bytes": 1870590,
       "artifact_kind": "proofgrade_runtime_implementation_residual_helper_shell_machine_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1283,7 +1283,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870300,
+      "artifact_json_bytes": 1870590,
       "artifact_kind": "proofgrade_runtime_implementation_small_confidential_kernel_machine_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1295,7 +1295,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870300,
+      "artifact_json_bytes": 1870590,
       "artifact_kind": "proofgrade_runtime_implementation_slot_adapter_machine_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1307,7 +1307,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1872791,
+      "artifact_json_bytes": 1873081,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_meeting_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1319,7 +1319,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1872791,
+      "artifact_json_bytes": 1873081,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_meeting_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1331,7 +1331,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870300,
+      "artifact_json_bytes": 1870590,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1367,7 +1367,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870300,
+      "artifact_json_bytes": 1870590,
       "artifact_kind": "proofgrade_runtime_implementation_shared_kernel_machine_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1379,7 +1379,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870300,
+      "artifact_json_bytes": 1870590,
       "artifact_kind": "proofgrade_runtime_implementation_residual_helper_shell_machine_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1391,7 +1391,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870300,
+      "artifact_json_bytes": 1870590,
       "artifact_kind": "proofgrade_runtime_implementation_small_confidential_kernel_machine_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1403,7 +1403,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870300,
+      "artifact_json_bytes": 1870590,
       "artifact_kind": "proofgrade_runtime_implementation_slot_adapter_machine_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1415,7 +1415,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1872791,
+      "artifact_json_bytes": 1873081,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_meeting_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1427,7 +1427,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1872791,
+      "artifact_json_bytes": 1873081,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_meeting_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1439,7 +1439,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870300,
+      "artifact_json_bytes": 1870590,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1475,7 +1475,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870300,
+      "artifact_json_bytes": 1870590,
       "artifact_kind": "proofgrade_runtime_implementation_shared_kernel_machine_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1487,7 +1487,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870300,
+      "artifact_json_bytes": 1870590,
       "artifact_kind": "proofgrade_runtime_implementation_residual_helper_shell_machine_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1499,7 +1499,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870300,
+      "artifact_json_bytes": 1870590,
       "artifact_kind": "proofgrade_runtime_implementation_small_confidential_kernel_machine_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1511,7 +1511,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870300,
+      "artifact_json_bytes": 1870590,
       "artifact_kind": "proofgrade_runtime_implementation_slot_adapter_machine_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1523,7 +1523,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870300,
+      "artifact_json_bytes": 1870590,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1549,7 +1549,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870151,
+      "artifact_json_bytes": 1870441,
       "artifact_kind": "proofgrade_runtime_implementation_residual_helper_shell_machine_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1563,7 +1563,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870151,
+      "artifact_json_bytes": 1870441,
       "artifact_kind": "proofgrade_runtime_implementation_small_confidential_kernel_machine_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1577,7 +1577,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870151,
+      "artifact_json_bytes": 1870441,
       "artifact_kind": "proofgrade_runtime_implementation_slot_adapter_machine_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1591,7 +1591,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1872642,
+      "artifact_json_bytes": 1872932,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_meeting_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1605,7 +1605,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1872642,
+      "artifact_json_bytes": 1872932,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_meeting_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1619,7 +1619,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870151,
+      "artifact_json_bytes": 1870441,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1633,7 +1633,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870151,
+      "artifact_json_bytes": 1870441,
       "artifact_kind": "proofgrade_runtime_implementation_public_bridge_observer_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1659,7 +1659,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870311,
+      "artifact_json_bytes": 1870601,
       "artifact_kind": "proofgrade_runtime_implementation_residual_helper_shell_machine_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1671,7 +1671,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870311,
+      "artifact_json_bytes": 1870601,
       "artifact_kind": "proofgrade_runtime_implementation_public_bridge_observer_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1683,7 +1683,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870311,
+      "artifact_json_bytes": 1870601,
       "artifact_kind": "proofgrade_runtime_implementation_small_confidential_kernel_machine_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1695,7 +1695,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870311,
+      "artifact_json_bytes": 1870601,
       "artifact_kind": "proofgrade_runtime_implementation_slot_adapter_machine_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1707,7 +1707,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1872802,
+      "artifact_json_bytes": 1873092,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_meeting_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1719,7 +1719,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1872802,
+      "artifact_json_bytes": 1873092,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_meeting_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1731,7 +1731,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870311,
+      "artifact_json_bytes": 1870601,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1743,7 +1743,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1872792,
+      "artifact_json_bytes": 1873082,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_meeting_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1755,7 +1755,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1872792,
+      "artifact_json_bytes": 1873082,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_meeting_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1767,7 +1767,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870301,
+      "artifact_json_bytes": 1870591,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -1991,7 +1991,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867456,
+      "artifact_json_bytes": 1867746,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2003,7 +2003,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871782,
+      "artifact_json_bytes": 1872072,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2015,7 +2015,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1872829,
+      "artifact_json_bytes": 1873119,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_meeting_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2027,7 +2027,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870338,
+      "artifact_json_bytes": 1870628,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2039,7 +2039,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867461,
+      "artifact_json_bytes": 1867751,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2051,7 +2051,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867490,
+      "artifact_json_bytes": 1867780,
       "artifact_kind": "proofgrade_runtime_small_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2063,7 +2063,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870343,
+      "artifact_json_bytes": 1870633,
       "artifact_kind": "proofgrade_runtime_implementation_small_confidential_kernel_machine_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2075,7 +2075,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870343,
+      "artifact_json_bytes": 1870633,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2087,7 +2087,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1872834,
+      "artifact_json_bytes": 1873124,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_meeting_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2099,7 +2099,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1872834,
+      "artifact_json_bytes": 1873124,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_meeting_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2111,7 +2111,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867490,
+      "artifact_json_bytes": 1867780,
       "artifact_kind": "proofgrade_runtime_shared_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2123,7 +2123,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871787,
+      "artifact_json_bytes": 1872077,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2135,7 +2135,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867420,
+      "artifact_json_bytes": 1867710,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2147,7 +2147,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867449,
+      "artifact_json_bytes": 1867739,
       "artifact_kind": "proofgrade_runtime_small_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2159,7 +2159,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870302,
+      "artifact_json_bytes": 1870592,
       "artifact_kind": "proofgrade_runtime_implementation_small_confidential_kernel_machine_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2171,7 +2171,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870302,
+      "artifact_json_bytes": 1870592,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2183,7 +2183,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1872793,
+      "artifact_json_bytes": 1873083,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_meeting_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2195,7 +2195,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1872793,
+      "artifact_json_bytes": 1873083,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_meeting_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2207,7 +2207,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867449,
+      "artifact_json_bytes": 1867739,
       "artifact_kind": "proofgrade_runtime_shared_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2219,7 +2219,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871746,
+      "artifact_json_bytes": 1872036,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2231,7 +2231,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867417,
+      "artifact_json_bytes": 1867707,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2243,7 +2243,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867446,
+      "artifact_json_bytes": 1867736,
       "artifact_kind": "proofgrade_runtime_small_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2255,7 +2255,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867446,
+      "artifact_json_bytes": 1867736,
       "artifact_kind": "proofgrade_runtime_slot_adapter_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2267,7 +2267,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870299,
+      "artifact_json_bytes": 1870589,
       "artifact_kind": "proofgrade_runtime_implementation_slot_adapter_machine_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2279,7 +2279,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867446,
+      "artifact_json_bytes": 1867736,
       "artifact_kind": "proofgrade_runtime_shared_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2291,7 +2291,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871743,
+      "artifact_json_bytes": 1872033,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2303,7 +2303,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867387,
+      "artifact_json_bytes": 1867677,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2315,7 +2315,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867416,
+      "artifact_json_bytes": 1867706,
       "artifact_kind": "proofgrade_runtime_slot_adapter_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2327,7 +2327,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870269,
+      "artifact_json_bytes": 1870559,
       "artifact_kind": "proofgrade_runtime_implementation_slot_adapter_machine_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2339,7 +2339,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867478,
+      "artifact_json_bytes": 1867768,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2351,7 +2351,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867419,
+      "artifact_json_bytes": 1867709,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2363,7 +2363,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867443,
+      "artifact_json_bytes": 1867733,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2375,7 +2375,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867507,
+      "artifact_json_bytes": 1867797,
       "artifact_kind": "proofgrade_runtime_small_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2387,7 +2387,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867507,
+      "artifact_json_bytes": 1867797,
       "artifact_kind": "proofgrade_runtime_shared_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2399,7 +2399,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870360,
+      "artifact_json_bytes": 1870650,
       "artifact_kind": "proofgrade_runtime_implementation_slot_adapter_machine_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2411,7 +2411,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870360,
+      "artifact_json_bytes": 1870650,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2423,7 +2423,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871804,
+      "artifact_json_bytes": 1872094,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2435,7 +2435,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867418,
+      "artifact_json_bytes": 1867708,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2447,7 +2447,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867447,
+      "artifact_json_bytes": 1867737,
       "artifact_kind": "proofgrade_runtime_small_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2459,7 +2459,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867447,
+      "artifact_json_bytes": 1867737,
       "artifact_kind": "proofgrade_runtime_slot_adapter_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2471,7 +2471,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870300,
+      "artifact_json_bytes": 1870590,
       "artifact_kind": "proofgrade_runtime_implementation_slot_adapter_machine_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2483,7 +2483,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867447,
+      "artifact_json_bytes": 1867737,
       "artifact_kind": "proofgrade_runtime_shared_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2495,7 +2495,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871744,
+      "artifact_json_bytes": 1872034,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2507,7 +2507,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867486,
+      "artifact_json_bytes": 1867776,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2519,7 +2519,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867515,
+      "artifact_json_bytes": 1867805,
       "artifact_kind": "proofgrade_runtime_small_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2531,7 +2531,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867515,
+      "artifact_json_bytes": 1867805,
       "artifact_kind": "proofgrade_runtime_slot_adapter_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2543,7 +2543,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870368,
+      "artifact_json_bytes": 1870658,
       "artifact_kind": "proofgrade_runtime_implementation_slot_adapter_machine_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2555,7 +2555,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867515,
+      "artifact_json_bytes": 1867805,
       "artifact_kind": "proofgrade_runtime_shared_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2567,7 +2567,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871812,
+      "artifact_json_bytes": 1872102,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2579,7 +2579,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870368,
+      "artifact_json_bytes": 1870658,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2591,7 +2591,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867418,
+      "artifact_json_bytes": 1867708,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2603,7 +2603,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867447,
+      "artifact_json_bytes": 1867737,
       "artifact_kind": "proofgrade_runtime_small_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2615,7 +2615,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867447,
+      "artifact_json_bytes": 1867737,
       "artifact_kind": "proofgrade_runtime_shared_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2627,7 +2627,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871744,
+      "artifact_json_bytes": 1872034,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2639,7 +2639,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870300,
+      "artifact_json_bytes": 1870590,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2651,7 +2651,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867403,
+      "artifact_json_bytes": 1867693,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2663,7 +2663,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867432,
+      "artifact_json_bytes": 1867722,
       "artifact_kind": "proofgrade_runtime_small_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2675,7 +2675,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867432,
+      "artifact_json_bytes": 1867722,
       "artifact_kind": "proofgrade_runtime_shared_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2687,7 +2687,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871729,
+      "artifact_json_bytes": 1872019,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2699,7 +2699,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870285,
+      "artifact_json_bytes": 1870575,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2711,7 +2711,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867426,
+      "artifact_json_bytes": 1867716,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2723,7 +2723,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867213,
+      "artifact_json_bytes": 1867503,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2735,7 +2735,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867219,
+      "artifact_json_bytes": 1867509,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2747,7 +2747,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867276,
+      "artifact_json_bytes": 1867566,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2759,7 +2759,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867396,
+      "artifact_json_bytes": 1867686,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2771,7 +2771,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867437,
+      "artifact_json_bytes": 1867727,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2783,7 +2783,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867368,
+      "artifact_json_bytes": 1867658,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2795,7 +2795,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867276,
+      "artifact_json_bytes": 1867566,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2807,7 +2807,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867370,
+      "artifact_json_bytes": 1867660,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2819,7 +2819,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867372,
+      "artifact_json_bytes": 1867662,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2831,7 +2831,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867427,
+      "artifact_json_bytes": 1867717,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2843,7 +2843,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867368,
+      "artifact_json_bytes": 1867658,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2855,7 +2855,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867492,
+      "artifact_json_bytes": 1867782,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2867,7 +2867,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867406,
+      "artifact_json_bytes": 1867696,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2879,7 +2879,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867329,
+      "artifact_json_bytes": 1867619,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2891,7 +2891,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867392,
+      "artifact_json_bytes": 1867682,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2903,7 +2903,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867364,
+      "artifact_json_bytes": 1867654,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2915,7 +2915,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867366,
+      "artifact_json_bytes": 1867656,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2927,7 +2927,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867455,
+      "artifact_json_bytes": 1867745,
       "artifact_kind": "proofgrade_runtime_small_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2939,7 +2939,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867455,
+      "artifact_json_bytes": 1867745,
       "artifact_kind": "proofgrade_runtime_shared_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2951,7 +2951,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871752,
+      "artifact_json_bytes": 1872042,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2963,7 +2963,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870308,
+      "artifact_json_bytes": 1870598,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2975,7 +2975,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867416,
+      "artifact_json_bytes": 1867706,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2987,7 +2987,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867445,
+      "artifact_json_bytes": 1867735,
       "artifact_kind": "proofgrade_runtime_small_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -2999,7 +2999,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867445,
+      "artifact_json_bytes": 1867735,
       "artifact_kind": "proofgrade_runtime_shared_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3011,7 +3011,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871742,
+      "artifact_json_bytes": 1872032,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3023,7 +3023,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870298,
+      "artifact_json_bytes": 1870588,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3035,7 +3035,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867408,
+      "artifact_json_bytes": 1867698,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3047,7 +3047,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867437,
+      "artifact_json_bytes": 1867727,
       "artifact_kind": "proofgrade_runtime_small_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3059,7 +3059,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867437,
+      "artifact_json_bytes": 1867727,
       "artifact_kind": "proofgrade_runtime_shared_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3071,7 +3071,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871734,
+      "artifact_json_bytes": 1872024,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3083,7 +3083,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870290,
+      "artifact_json_bytes": 1870580,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3095,7 +3095,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867400,
+      "artifact_json_bytes": 1867690,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3107,7 +3107,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867429,
+      "artifact_json_bytes": 1867719,
       "artifact_kind": "proofgrade_runtime_small_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3119,7 +3119,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867429,
+      "artifact_json_bytes": 1867719,
       "artifact_kind": "proofgrade_runtime_shared_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3131,7 +3131,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871726,
+      "artifact_json_bytes": 1872016,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3143,7 +3143,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870282,
+      "artifact_json_bytes": 1870572,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3155,7 +3155,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867427,
+      "artifact_json_bytes": 1867717,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3167,7 +3167,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867456,
+      "artifact_json_bytes": 1867746,
       "artifact_kind": "proofgrade_runtime_small_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3179,7 +3179,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867456,
+      "artifact_json_bytes": 1867746,
       "artifact_kind": "proofgrade_runtime_shared_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3191,7 +3191,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871753,
+      "artifact_json_bytes": 1872043,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3203,7 +3203,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870309,
+      "artifact_json_bytes": 1870599,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3215,7 +3215,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867440,
+      "artifact_json_bytes": 1867730,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3227,7 +3227,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867418,
+      "artifact_json_bytes": 1867708,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3239,7 +3239,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867390,
+      "artifact_json_bytes": 1867680,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3251,7 +3251,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867432,
+      "artifact_json_bytes": 1867722,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3263,7 +3263,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867469,
+      "artifact_json_bytes": 1867759,
       "artifact_kind": "proofgrade_runtime_small_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3275,7 +3275,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867469,
+      "artifact_json_bytes": 1867759,
       "artifact_kind": "proofgrade_runtime_shared_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3287,7 +3287,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871766,
+      "artifact_json_bytes": 1872056,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3299,7 +3299,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870322,
+      "artifact_json_bytes": 1870612,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3311,7 +3311,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867418,
+      "artifact_json_bytes": 1867708,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3323,7 +3323,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867447,
+      "artifact_json_bytes": 1867737,
       "artifact_kind": "proofgrade_runtime_small_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3335,7 +3335,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870300,
+      "artifact_json_bytes": 1870590,
       "artifact_kind": "proofgrade_runtime_implementation_small_confidential_kernel_machine_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3347,7 +3347,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867447,
+      "artifact_json_bytes": 1867737,
       "artifact_kind": "proofgrade_runtime_shared_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3359,7 +3359,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871744,
+      "artifact_json_bytes": 1872034,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3371,7 +3371,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867418,
+      "artifact_json_bytes": 1867708,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3383,7 +3383,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867447,
+      "artifact_json_bytes": 1867737,
       "artifact_kind": "proofgrade_runtime_shared_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3395,7 +3395,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871744,
+      "artifact_json_bytes": 1872034,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3407,7 +3407,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867417,
+      "artifact_json_bytes": 1867707,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3419,7 +3419,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867446,
+      "artifact_json_bytes": 1867736,
       "artifact_kind": "proofgrade_runtime_small_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3431,7 +3431,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870299,
+      "artifact_json_bytes": 1870589,
       "artifact_kind": "proofgrade_runtime_implementation_small_confidential_kernel_machine_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3443,7 +3443,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867446,
+      "artifact_json_bytes": 1867736,
       "artifact_kind": "proofgrade_runtime_shared_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3455,7 +3455,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871743,
+      "artifact_json_bytes": 1872033,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3467,7 +3467,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867368,
+      "artifact_json_bytes": 1867658,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3479,7 +3479,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871694,
+      "artifact_json_bytes": 1871984,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3491,7 +3491,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867623,
+      "artifact_json_bytes": 1867913,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3503,7 +3503,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867652,
+      "artifact_json_bytes": 1867942,
       "artifact_kind": "proofgrade_runtime_small_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3515,7 +3515,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867652,
+      "artifact_json_bytes": 1867942,
       "artifact_kind": "proofgrade_runtime_shared_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3527,7 +3527,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871949,
+      "artifact_json_bytes": 1872239,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3539,7 +3539,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870505,
+      "artifact_json_bytes": 1870795,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3551,7 +3551,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870505,
+      "artifact_json_bytes": 1870795,
       "artifact_kind": "proofgrade_runtime_implementation_public_bridge_observer_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3563,7 +3563,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867485,
+      "artifact_json_bytes": 1867775,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3575,7 +3575,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871811,
+      "artifact_json_bytes": 1872101,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3587,7 +3587,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870367,
+      "artifact_json_bytes": 1870657,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3599,7 +3599,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870367,
+      "artifact_json_bytes": 1870657,
       "artifact_kind": "proofgrade_runtime_implementation_public_bridge_observer_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3611,7 +3611,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867467,
+      "artifact_json_bytes": 1867757,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3623,7 +3623,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871793,
+      "artifact_json_bytes": 1872083,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3635,7 +3635,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870349,
+      "artifact_json_bytes": 1870639,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3647,7 +3647,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870349,
+      "artifact_json_bytes": 1870639,
       "artifact_kind": "proofgrade_runtime_implementation_public_bridge_observer_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3659,7 +3659,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867561,
+      "artifact_json_bytes": 1867851,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3671,7 +3671,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867590,
+      "artifact_json_bytes": 1867880,
       "artifact_kind": "proofgrade_runtime_residual_helper_shell_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3683,7 +3683,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870443,
+      "artifact_json_bytes": 1870733,
       "artifact_kind": "proofgrade_runtime_implementation_residual_helper_shell_machine_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3695,7 +3695,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870443,
+      "artifact_json_bytes": 1870733,
       "artifact_kind": "proofgrade_runtime_implementation_public_bridge_observer_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3707,7 +3707,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871887,
+      "artifact_json_bytes": 1872177,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3719,7 +3719,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870443,
+      "artifact_json_bytes": 1870733,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3731,7 +3731,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867397,
+      "artifact_json_bytes": 1867687,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3743,7 +3743,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871723,
+      "artifact_json_bytes": 1872013,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3755,7 +3755,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867499,
+      "artifact_json_bytes": 1867789,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/get",
       "entrypoint": "put(bytes32,uint256)",
@@ -3767,7 +3767,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867528,
+      "artifact_json_bytes": 1867818,
       "artifact_kind": "proofgrade_runtime_small_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/get",
       "entrypoint": "put(bytes32,uint256)",
@@ -3779,7 +3779,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867528,
+      "artifact_json_bytes": 1867818,
       "artifact_kind": "proofgrade_runtime_shared_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/get",
       "entrypoint": "put(bytes32,uint256)",
@@ -3791,7 +3791,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871825,
+      "artifact_json_bytes": 1872115,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/get",
       "entrypoint": "put(bytes32,uint256)",
@@ -3803,7 +3803,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870381,
+      "artifact_json_bytes": 1870671,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/get",
       "entrypoint": "put(bytes32,uint256)",
@@ -3815,7 +3815,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867532,
+      "artifact_json_bytes": 1867822,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3827,7 +3827,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867561,
+      "artifact_json_bytes": 1867851,
       "artifact_kind": "proofgrade_runtime_small_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3839,7 +3839,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870414,
+      "artifact_json_bytes": 1870704,
       "artifact_kind": "proofgrade_runtime_implementation_small_confidential_kernel_machine_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3851,7 +3851,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867561,
+      "artifact_json_bytes": 1867851,
       "artifact_kind": "proofgrade_runtime_shared_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3863,7 +3863,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871858,
+      "artifact_json_bytes": 1872148,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3875,7 +3875,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867586,
+      "artifact_json_bytes": 1867876,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3887,7 +3887,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871912,
+      "artifact_json_bytes": 1872202,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3899,7 +3899,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867416,
+      "artifact_json_bytes": 1867706,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3911,7 +3911,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867438,
+      "artifact_json_bytes": 1867728,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3923,7 +3923,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867445,
+      "artifact_json_bytes": 1867735,
       "artifact_kind": "proofgrade_runtime_small_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3935,7 +3935,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867445,
+      "artifact_json_bytes": 1867735,
       "artifact_kind": "proofgrade_runtime_shared_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3947,7 +3947,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870298,
+      "artifact_json_bytes": 1870588,
       "artifact_kind": "proofgrade_runtime_implementation_small_confidential_kernel_machine_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3959,7 +3959,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870298,
+      "artifact_json_bytes": 1870588,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3971,7 +3971,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1872789,
+      "artifact_json_bytes": 1873079,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_meeting_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3983,7 +3983,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1872789,
+      "artifact_json_bytes": 1873079,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_meeting_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -3995,7 +3995,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871742,
+      "artifact_json_bytes": 1872032,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4007,7 +4007,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867601,
+      "artifact_json_bytes": 1867891,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4019,7 +4019,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871927,
+      "artifact_json_bytes": 1872217,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4031,7 +4031,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867415,
+      "artifact_json_bytes": 1867705,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4043,7 +4043,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867444,
+      "artifact_json_bytes": 1867734,
       "artifact_kind": "proofgrade_runtime_small_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4055,7 +4055,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867444,
+      "artifact_json_bytes": 1867734,
       "artifact_kind": "proofgrade_runtime_residual_helper_shell_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4067,7 +4067,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867444,
+      "artifact_json_bytes": 1867734,
       "artifact_kind": "proofgrade_runtime_shared_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4079,7 +4079,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871741,
+      "artifact_json_bytes": 1872031,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4091,7 +4091,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870297,
+      "artifact_json_bytes": 1870587,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4103,7 +4103,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870297,
+      "artifact_json_bytes": 1870587,
       "artifact_kind": "proofgrade_runtime_implementation_residual_helper_shell_machine_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4115,7 +4115,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867407,
+      "artifact_json_bytes": 1867697,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4127,7 +4127,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867436,
+      "artifact_json_bytes": 1867726,
       "artifact_kind": "proofgrade_runtime_small_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4139,7 +4139,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867436,
+      "artifact_json_bytes": 1867726,
       "artifact_kind": "proofgrade_runtime_shared_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4151,7 +4151,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871733,
+      "artifact_json_bytes": 1872023,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4163,7 +4163,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870289,
+      "artifact_json_bytes": 1870579,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4175,7 +4175,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867408,
+      "artifact_json_bytes": 1867698,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4187,7 +4187,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867437,
+      "artifact_json_bytes": 1867727,
       "artifact_kind": "proofgrade_runtime_small_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4199,7 +4199,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867437,
+      "artifact_json_bytes": 1867727,
       "artifact_kind": "proofgrade_runtime_shared_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4211,7 +4211,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871734,
+      "artifact_json_bytes": 1872024,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4223,7 +4223,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870290,
+      "artifact_json_bytes": 1870580,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4235,7 +4235,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867399,
+      "artifact_json_bytes": 1867689,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4247,7 +4247,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867428,
+      "artifact_json_bytes": 1867718,
       "artifact_kind": "proofgrade_runtime_small_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4259,7 +4259,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867428,
+      "artifact_json_bytes": 1867718,
       "artifact_kind": "proofgrade_runtime_shared_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4271,7 +4271,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871725,
+      "artifact_json_bytes": 1872015,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4283,7 +4283,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870281,
+      "artifact_json_bytes": 1870571,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4295,7 +4295,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867422,
+      "artifact_json_bytes": 1867712,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4307,7 +4307,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867451,
+      "artifact_json_bytes": 1867741,
       "artifact_kind": "proofgrade_runtime_small_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4319,7 +4319,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867451,
+      "artifact_json_bytes": 1867741,
       "artifact_kind": "proofgrade_runtime_shared_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4331,7 +4331,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871748,
+      "artifact_json_bytes": 1872038,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4343,7 +4343,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870304,
+      "artifact_json_bytes": 1870594,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4355,7 +4355,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867516,
+      "artifact_json_bytes": 1867806,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4367,7 +4367,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867545,
+      "artifact_json_bytes": 1867835,
       "artifact_kind": "proofgrade_runtime_residual_helper_shell_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4379,7 +4379,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867545,
+      "artifact_json_bytes": 1867835,
       "artifact_kind": "proofgrade_runtime_small_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4391,7 +4391,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867545,
+      "artifact_json_bytes": 1867835,
       "artifact_kind": "proofgrade_runtime_shared_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4403,7 +4403,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871842,
+      "artifact_json_bytes": 1872132,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4415,7 +4415,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870398,
+      "artifact_json_bytes": 1870688,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4427,7 +4427,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867364,
+      "artifact_json_bytes": 1867654,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4439,7 +4439,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870246,
+      "artifact_json_bytes": 1870536,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4451,7 +4451,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867422,
+      "artifact_json_bytes": 1867712,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4463,7 +4463,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867451,
+      "artifact_json_bytes": 1867741,
       "artifact_kind": "proofgrade_runtime_small_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4475,7 +4475,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867451,
+      "artifact_json_bytes": 1867741,
       "artifact_kind": "proofgrade_runtime_shared_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4487,7 +4487,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871748,
+      "artifact_json_bytes": 1872038,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4499,7 +4499,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870304,
+      "artifact_json_bytes": 1870594,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4511,7 +4511,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867421,
+      "artifact_json_bytes": 1867711,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4523,7 +4523,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867450,
+      "artifact_json_bytes": 1867740,
       "artifact_kind": "proofgrade_runtime_small_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4535,7 +4535,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867450,
+      "artifact_json_bytes": 1867740,
       "artifact_kind": "proofgrade_runtime_shared_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4547,7 +4547,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871747,
+      "artifact_json_bytes": 1872037,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4559,7 +4559,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870303,
+      "artifact_json_bytes": 1870593,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4571,7 +4571,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867417,
+      "artifact_json_bytes": 1867707,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4583,7 +4583,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867446,
+      "artifact_json_bytes": 1867736,
       "artifact_kind": "proofgrade_runtime_small_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4595,7 +4595,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867446,
+      "artifact_json_bytes": 1867736,
       "artifact_kind": "proofgrade_runtime_shared_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4607,7 +4607,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871743,
+      "artifact_json_bytes": 1872033,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4619,7 +4619,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870299,
+      "artifact_json_bytes": 1870589,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4631,7 +4631,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867436,
+      "artifact_json_bytes": 1867726,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4643,7 +4643,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867465,
+      "artifact_json_bytes": 1867755,
       "artifact_kind": "proofgrade_runtime_small_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4655,7 +4655,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867465,
+      "artifact_json_bytes": 1867755,
       "artifact_kind": "proofgrade_runtime_shared_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4667,7 +4667,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871762,
+      "artifact_json_bytes": 1872052,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4679,7 +4679,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870318,
+      "artifact_json_bytes": 1870608,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4691,7 +4691,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867337,
+      "artifact_json_bytes": 1867627,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4703,7 +4703,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870219,
+      "artifact_json_bytes": 1870509,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4715,7 +4715,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867250,
+      "artifact_json_bytes": 1867540,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4727,7 +4727,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870132,
+      "artifact_json_bytes": 1870422,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4739,7 +4739,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867357,
+      "artifact_json_bytes": 1867647,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4751,7 +4751,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870239,
+      "artifact_json_bytes": 1870529,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4763,7 +4763,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867407,
+      "artifact_json_bytes": 1867697,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4775,7 +4775,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870289,
+      "artifact_json_bytes": 1870579,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4787,7 +4787,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867385,
+      "artifact_json_bytes": 1867675,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/get",
       "entrypoint": "put(bytes32,uint256)",
@@ -4799,7 +4799,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867447,
+      "artifact_json_bytes": 1867737,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/get",
       "entrypoint": "put(bytes32,uint256)",
@@ -4811,7 +4811,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871711,
+      "artifact_json_bytes": 1872001,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/get",
       "entrypoint": "put(bytes32,uint256)",
@@ -4823,7 +4823,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867585,
+      "artifact_json_bytes": 1867875,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4835,7 +4835,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871911,
+      "artifact_json_bytes": 1872201,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4847,7 +4847,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867506,
+      "artifact_json_bytes": 1867796,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4859,7 +4859,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871832,
+      "artifact_json_bytes": 1872122,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4871,7 +4871,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867592,
+      "artifact_json_bytes": 1867882,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4883,7 +4883,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867621,
+      "artifact_json_bytes": 1867911,
       "artifact_kind": "proofgrade_runtime_small_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4895,7 +4895,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867621,
+      "artifact_json_bytes": 1867911,
       "artifact_kind": "proofgrade_runtime_shared_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4907,7 +4907,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871918,
+      "artifact_json_bytes": 1872208,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4919,7 +4919,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870474,
+      "artifact_json_bytes": 1870764,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4931,7 +4931,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867389,
+      "artifact_json_bytes": 1867679,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4943,7 +4943,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867418,
+      "artifact_json_bytes": 1867708,
       "artifact_kind": "proofgrade_runtime_confidential_statement_trace_bridge_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4955,7 +4955,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871715,
+      "artifact_json_bytes": 1872005,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4967,7 +4967,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870234,
+      "artifact_json_bytes": 1870524,
       "artifact_kind": "proofgrade_runtime_implementation_confidential_statement_trace_bridge_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4979,7 +4979,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867419,
+      "artifact_json_bytes": 1867709,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -4991,7 +4991,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867432,
+      "artifact_json_bytes": 1867722,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5003,7 +5003,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867461,
+      "artifact_json_bytes": 1867751,
       "artifact_kind": "proofgrade_runtime_public_bridge_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5015,7 +5015,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867448,
+      "artifact_json_bytes": 1867738,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5027,7 +5027,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867477,
+      "artifact_json_bytes": 1867767,
       "artifact_kind": "proofgrade_runtime_public_bridge_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5039,7 +5039,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867473,
+      "artifact_json_bytes": 1867763,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5051,7 +5051,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867502,
+      "artifact_json_bytes": 1867792,
       "artifact_kind": "proofgrade_runtime_public_bridge_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5063,7 +5063,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867418,
+      "artifact_json_bytes": 1867708,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5075,7 +5075,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867447,
+      "artifact_json_bytes": 1867737,
       "artifact_kind": "proofgrade_runtime_public_bridge_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5087,7 +5087,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870300,
+      "artifact_json_bytes": 1870590,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5099,7 +5099,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867472,
+      "artifact_json_bytes": 1867762,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5111,7 +5111,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867501,
+      "artifact_json_bytes": 1867791,
       "artifact_kind": "proofgrade_runtime_public_bridge_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5123,7 +5123,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867454,
+      "artifact_json_bytes": 1867744,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5135,7 +5135,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870336,
+      "artifact_json_bytes": 1870626,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5147,7 +5147,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867436,
+      "artifact_json_bytes": 1867726,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5159,7 +5159,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867363,
+      "artifact_json_bytes": 1867653,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5171,7 +5171,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867368,
+      "artifact_json_bytes": 1867658,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5183,7 +5183,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867465,
+      "artifact_json_bytes": 1867755,
       "artifact_kind": "proofgrade_runtime_public_bridge_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5195,7 +5195,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867405,
+      "artifact_json_bytes": 1867695,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5207,7 +5207,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867434,
+      "artifact_json_bytes": 1867724,
       "artifact_kind": "proofgrade_runtime_public_bridge_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5219,7 +5219,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870287,
+      "artifact_json_bytes": 1870577,
       "artifact_kind": "proofgrade_runtime_implementation_public_bridge_observer_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5231,7 +5231,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1872778,
+      "artifact_json_bytes": 1873068,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_meeting_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5243,7 +5243,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870287,
+      "artifact_json_bytes": 1870577,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5255,7 +5255,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871731,
+      "artifact_json_bytes": 1872021,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5267,7 +5267,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867505,
+      "artifact_json_bytes": 1867795,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5279,7 +5279,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870387,
+      "artifact_json_bytes": 1870677,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5291,7 +5291,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867460,
+      "artifact_json_bytes": 1867750,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5303,7 +5303,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867489,
+      "artifact_json_bytes": 1867779,
       "artifact_kind": "proofgrade_runtime_public_bridge_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5315,7 +5315,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870342,
+      "artifact_json_bytes": 1870632,
       "artifact_kind": "proofgrade_runtime_implementation_public_bridge_observer_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5327,7 +5327,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1872833,
+      "artifact_json_bytes": 1873123,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_meeting_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5339,7 +5339,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870342,
+      "artifact_json_bytes": 1870632,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5351,7 +5351,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871786,
+      "artifact_json_bytes": 1872076,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5363,7 +5363,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867448,
+      "artifact_json_bytes": 1867738,
       "artifact_kind": "proofgrade_runtime_confidential_statement_trace_bridge_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5375,7 +5375,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867448,
+      "artifact_json_bytes": 1867738,
       "artifact_kind": "proofgrade_runtime_shared_confidential_kernel_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5387,7 +5387,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870264,
+      "artifact_json_bytes": 1870554,
       "artifact_kind": "proofgrade_runtime_implementation_shared_kernel_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5399,7 +5399,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871745,
+      "artifact_json_bytes": 1872035,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5411,7 +5411,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870264,
+      "artifact_json_bytes": 1870554,
       "artifact_kind": "proofgrade_runtime_implementation_confidential_statement_trace_bridge_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5423,7 +5423,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1872792,
+      "artifact_json_bytes": 1873082,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_meeting_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5435,7 +5435,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1872792,
+      "artifact_json_bytes": 1873082,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_meeting_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5447,7 +5447,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870301,
+      "artifact_json_bytes": 1870591,
       "artifact_kind": "proofgrade_runtime_implementation_kernel_machine_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5459,7 +5459,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867346,
+      "artifact_json_bytes": 1867636,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5471,7 +5471,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867375,
+      "artifact_json_bytes": 1867665,
       "artifact_kind": "proofgrade_runtime_confidential_statement_trace_bridge_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5483,7 +5483,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870191,
+      "artifact_json_bytes": 1870481,
       "artifact_kind": "proofgrade_runtime_implementation_shared_kernel_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5495,7 +5495,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871672,
+      "artifact_json_bytes": 1871962,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5507,7 +5507,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870191,
+      "artifact_json_bytes": 1870481,
       "artifact_kind": "proofgrade_runtime_implementation_confidential_statement_trace_bridge_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5519,7 +5519,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1870274,
+      "artifact_json_bytes": 1870564,
       "artifact_kind": "proofgrade_runtime_implementation_shared_kernel_refinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5531,7 +5531,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1867346,
+      "artifact_json_bytes": 1867636,
       "artifact_kind": "proofgrade_runtime_implementation_interface",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",
@@ -5543,7 +5543,7 @@
     },
     {
       "accepted": false,
-      "artifact_json_bytes": 1871672,
+      "artifact_json_bytes": 1871962,
       "artifact_kind": "proofgrade_runtime_implementation_confinement_boundary",
       "benchmark": "SingleAccessMap/pathoram/put",
       "entrypoint": "put(bytes32,uint256)",

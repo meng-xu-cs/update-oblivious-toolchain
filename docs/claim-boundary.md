@@ -652,6 +652,27 @@ contract has more states, and its certainty that the call failed rests on a
 sync after a failed sync, which not every file system honors; a storage
 error is rare enough that a restart is a fair price for it.
 
+What a store in files serves is on the device, when it syncs every commit
+(`SyncPolicy::Always`). After a sync that failed, a process reads back the
+entry it wrote, but a power failure can still take it, and a later sync of
+the journal need not put it on the device: the operating system may have
+marked it written. So opening the files publishes what they hold before the
+store serves it (`publish_journal` in `runtime/uo-store/src/storage.rs`): the
+journal's whole entries go into a new file, which is synced and renamed over
+the journal, and the directory is synced. An open whose publication fails
+fails and serves nothing, and the files keep every whole entry they held. A
+restart, and with it the resolution of a call whose outcome is unknown,
+waits for an open that publishes. Creating a store syncs its journal and its
+snapshot, then the directory that holds them, then each directory it made in
+the one above it, before it returns. A store that a crash leaves therefore
+holds every commit that returned and every state a restart resolved
+(`stores_are_published_before_they_are_served` in
+`runtime_boundary_validation.json` freezes the order). Until Issue 70 of the
+review of 18 November 2026 an open served the journal it read, so a restart
+could resolve a call as committed, and the counter advance past it, while a
+crash could still take the call; and the journal's name was not synced into
+its directory when a store was created.
+
 A restart from the files resolves a call whose outcome is unknown. Its last
 receipt is either the call's, which follows the receipt the caller held and
 names the evidence it sent, or the receipt the caller held
@@ -665,11 +686,11 @@ instance resumes. In Issue 67 the maintainer chose this catch-up over a
 restart that takes the attested generation alone, which would refuse the
 files of a call that committed and returned no result.
 
-Both runtimes are made to meet every failure a file store can meet: each way
-the append of a commit fails, and each step of a checkpoint
-(`StorageFault::ALL`, 7 failures), at each of the two commits a call can
-make: its own, and the commit of no record that a call dropped after it ran
-makes before its error returns. `fault_matrix` in `storage_boundary.json`
+Both runtimes are made to meet the seven failures that the store's fault
+hook injects (`StorageFault::ALL`): each way the append of a commit fails, and
+each step of a checkpoint, at each of the two commits a call can make: its
+own, and the commit of no record that a call dropped after it ran makes
+before its error returns. `fault_matrix` in `storage_boundary.json`
 runs them on each sealed backend of ERC20Lite, 42 cases. The call is a
 `mint`, and the dropped call an `approve` with no commit budget. The
 production build runs them through the production runtime, which resolves
@@ -696,6 +717,24 @@ one past it. On that backend the commit of no record after a dropped
 `approve` is 431 bytes. Only a test or a diagnostics build can make
 the store fail (`store_failures_are_injected_only_in_test_and_diagnostics_builds`
 in `runtime_boundary_validation.json`).
+
+Those seven are failures of the files a process reads. What a crash keeps of
+them is tested with a model of the device (`runtime/uo-store/src/crash_model.rs`,
+in test and diagnostics builds): a file's bytes are on the device once the
+file is synced, a name once its directory is, and the bytes a failed sync
+left off the device stay off it, whatever syncs follow. `crash_recovery` in
+`storage_boundary.json` runs ERC20Lite on each sealed backend with every
+commit synced. A crash after the first call leaves a store a restart takes at
+that call's generation. A `mint` whose sync then fails is lost by a crash
+before the files are opened again. Opened with no crash, the files are
+published, the restart finds them one past the counter, and a crash after the
+restart keeps the `mint`. When the open cannot sync the journal it publishes,
+it fails, nothing is resolved, and a crash leaves the store before the
+`mint`. The production build runs the same through the production runtime,
+whose last receipt resolves the call
+(`a_restart_resolves_a_call_only_from_published_files`). The model is the
+semantics the store is written against, not a proof about a file system or a
+device, and a test of it covers the sequences the tests run.
 
 ### The Kernel's Operators
 
