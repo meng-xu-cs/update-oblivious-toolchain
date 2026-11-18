@@ -28440,16 +28440,13 @@ fn check_sealed_records_cross_the_storage_boundary(
         && storage.contains("        if count >= reserved {\n            bail!(")
         && storage.matches("self.ensure_nonce_reserved(object, location, record)?;").count() == 2
         && storage.contains("        let class = sealed_write_class(&stored.bytes, record);")
-        && storage.contains(
-            "        self.append(&payload)?;\n        self.image.reserve_seals(object, below)",
-        )
         // The engine commits in the store first, and a dropped call abandons.
         && engine_impl_source.contains(
             "        crate::instrumentation::time_store_persistence(|| staged.store.make_durable(&meta))?;\n        staged.seals.keep();\n        self.state = staged.state;",
         )
         && engine_impl_source.matches("self.state = staged.state;").count() == 1
         && engine_impl_source.contains(
-            "        let store = StagedStore::begin(&self.storage)?;\n        let mut staged_state = stage_contract_runtime(&self.state)?;",
+            "        let store = StagedStore::begin(&self.storage)?;\n        let seals = DroppedCallSeals::begin(",
         )
         && store_meta_production_source.contains(
             "impl Drop for StagedStore {\n    fn drop(&mut self) {\n        if self.pending {\n            self.storage.with(|adapter| adapter.abandon());\n        }\n    }\n}",
@@ -28460,14 +28457,15 @@ fn check_sealed_records_cross_the_storage_boundary(
 /// count before the call fixes (invariant 19 of
 /// `docs/runtime/secret-state.md`), over a restart too. A staged call takes
 /// the count of every key before it runs, in a guard that a commit alone
-/// disarms. Before the call seals anything, the guard has the store reserve,
-/// in one entry, the second multiple of 2^32 above each key's count, and the
-/// call fails if the store cannot. Dropping the guard moves each count there
-/// in memory and writes nothing. So neither the next nonce nor a restart, after
-/// a crash too, shows how far the dropped call got. No entrypoint can seal 2^32
-/// records under one key in a call: the compiler, `uo-check`, and every
-/// deployment and restart check it (`check_call_seal_bound` in
-/// `crates/uo-core/src/manifest.rs`), from its commit and load operations.
+/// disarms. The guard writes nothing: it starts the call only if the last
+/// commit reserved, for each key, the second multiple of 2^32 above its
+/// count, and the call fails before it seals anything otherwise. Dropping
+/// the guard moves each count there in memory and writes nothing. So
+/// neither the next nonce nor a restart, after a crash too, shows how far
+/// the dropped call got. No entrypoint can seal 2^32 records under one key
+/// in a call: the compiler, `uo-check`, and every deployment and restart
+/// check it (`check_call_seal_bound` in `crates/uo-core/src/manifest.rs`),
+/// from its commit and load operations.
 fn check_dropped_calls_leave_fixed_seal_counts(
     engine_impl_source: &str,
     store_meta_production_source: &str,
@@ -28482,27 +28480,32 @@ fn check_dropped_calls_leave_fixed_seal_counts(
         && store_meta.contains(
             "pub(crate) fn seal_count_after_dropped_call(start: u64) -> u64 {\n    (start / DROPPED_CALL_SEAL_QUANTUM)\n        .checked_add(2)\n        .and_then(|quanta| quanta.checked_mul(DROPPED_CALL_SEAL_QUANTUM))\n        .unwrap_or(u64::MAX)\n}",
         )
-        // The guard reserves, before the call runs, the count each key
+        // The guard takes each key's count before the call runs, and starts
+        // the call only if the last commit reserved the count each key
         // resumes at, from its count before the call.
         && store_meta.contains(
-            "    pub(crate) fn begin(ciphers: Vec<StoreCipher>, storage: &SharedStorage) -> Result<Self> {\n        let starts: Vec<(StoreCipher, u64)> = ciphers\n            .into_iter()\n            .map(|cipher| {\n                let start = cipher.seal_count();\n                (cipher, start)\n            })\n            .collect();\n        let resumes: Vec<(String, u64)> = starts\n            .iter()\n            .filter_map(|(cipher, start)| {\n                let object = cipher.storage()?.object().to_owned();\n                Some((object, seal_count_after_dropped_call(*start)))\n            })\n            .collect();\n        storage.reserve_seals_together(&resumes)?;\n        Ok(Self {\n            starts,\n            dropped: true,\n        })\n    }",
+            "    pub(crate) fn begin(\n        ciphers: Vec<StoreCipher>,\n        reserved: &BTreeMap<String, u64>,\n    ) -> Result<Self> {\n        let starts: Vec<(StoreCipher, u64)> = ciphers\n            .into_iter()\n            .map(|cipher| {\n                let start = cipher.seal_count();\n                (cipher, start)\n            })\n            .collect();\n        for (cipher, start) in &starts {",
         )
+        && store_meta.contains(
+            "            if seal_count_after_dropped_call(*start) > reserved.get(object).copied().unwrap_or(0) {\n                bail!(",
+        )
+        && store_meta.contains("        Ok(Self {\n            starts,\n            dropped: true,\n        })\n    }")
         && store_meta.contains(
             "    pub(crate) fn keep(mut self) {\n        self.dropped = false;\n    }",
         )
         && store_meta.matches("dropped = false").count() == 1
         // Dropping it moves the counts in memory and writes nothing.
         && store_meta.contains(
-            "impl Drop for DroppedCallSeals {\n    fn drop(&mut self) {\n        if !self.dropped {\n            return;\n        }\n        // The store reserved these counts before the call sealed anything,\n        // and a restart resumes at them: nothing is written here.\n        for (cipher, start) in &self.starts {\n            cipher.resume_seal_count(seal_count_after_dropped_call(*start));\n        }\n    }\n}",
+            "impl Drop for DroppedCallSeals {\n    fn drop(&mut self) {\n        if !self.dropped {\n            return;\n        }\n        // The last commit reserved these counts before the call began, and\n        // a restart resumes at them: nothing is written here.\n        for (cipher, start) in &self.starts {\n            cipher.resume_seal_count(seal_count_after_dropped_call(*start));\n        }\n    }\n}",
         )
-        && rust_code_text(store_meta).matches("reserve_seals").count() == 1
-        && rust_code_text(store_meta).matches(".storage()").count() == 1
+        && !rust_code_text(store_meta).contains("reserve_seals")
+        && rust_code_text(store_meta).matches(".storage()").count() == 2
         // Every staged call carries the guard, made before the store takes
         // the call's records and before the call runs, and only a commit
         // that made the store durable disarms it.
         && engine_impl_source.contains("    store: StagedStore,\n    seals: DroppedCallSeals,\n}")
         && engine_impl_source.contains(
-            "        let seals = DroppedCallSeals::begin(contract_seal_ciphers(&self.state), &self.storage)?;\n        let store = StagedStore::begin(&self.storage)?;\n        let mut staged_state = stage_contract_runtime(&self.state)?;",
+            "        let store = StagedStore::begin(&self.storage)?;\n        let seals = DroppedCallSeals::begin(\n            contract_seal_ciphers(&self.state),\n            self.committed.reservations(),\n        )?;\n        let mut staged_state = stage_contract_runtime(&self.state)?;",
         )
         && engine_impl_source.contains(
             "        crate::instrumentation::time_store_persistence(|| staged.store.make_durable(&meta))?;\n        staged.seals.keep();\n        self.state = staged.state;",
@@ -28698,7 +28701,7 @@ fn check_production_calls_issue_chained_receipts(
             "            self.inner.freshness.snapshot(),\n            &self.last_receipt_sha256,\n        )?;",
         )
         && engine_impl_source.contains(
-            "        let receipt = ProductionReceipt::for_call(\n            evidence,\n            &self.last_receipt,\n            &staged.trace.receipt,\n            staged.freshness.snapshot(),\n            staged.state.public_state_digest()?,\n            staged.state.ciphertext_store_digest()?,\n        )?;\n        let receipt_sha256 = receipt.sha256()?;\n        let receipt_tag = production_receipt_tag(session, &receipt_sha256)?;\n        let call = self\n            .inner\n            .commit_staged_with_receipt(staged, Some(&receipt))?\n            .0;\n        self.last_receipt = receipt.clone();\n        self.last_receipt_sha256 = receipt_sha256;\n        Ok(ProductionCallResult {\n            call,\n            receipt,\n            receipt_tag,\n            generation: self.inner.generation,\n        })",
+            "        let receipt = ProductionReceipt::for_call(\n            evidence,\n            &self.last_receipt,\n            &staged.trace.receipt,\n            staged.freshness.snapshot(),\n            staged.state.public_state_digest()?,\n            staged.state.ciphertext_store_digest()?,\n        )?;\n        let receipt_sha256 = receipt.sha256()?;\n        let receipt_tag = production_receipt_tag(session, &receipt_sha256)?;\n        let call = self\n            .inner\n            .commit_staged_with_receipt(staged, Some(&receipt))?\n            .0;\n        self.last_receipt = receipt.clone();\n        self.last_receipt_sha256 = receipt_sha256;\n        Ok(ProductionCallResult {\n            call,\n            receipt,\n            receipt_tag,\n            generation: self.inner.generation(),\n        })",
         )
         && engine_impl_source.matches("self.last_receipt = ").count() == 1
         && engine_impl_source.matches("self.last_receipt_sha256 = ").count() == 1
@@ -28745,13 +28748,15 @@ fn check_store_failures_are_injected_only_in_test_and_diagnostics_builds(
     gated("    fault: Option<StorageFault>,", 1)
         && gated("            fault: None,", 2)
         && gated("fn inject_fault(", 4)
-        && gated("fn take_append_fault(&mut self, payload: &[u8]) -> Option<AppendFailure> {", 1)
+        && storage_source.contains(
+            "    #[cfg(any(test, feature = \"fault-injection\"))]\n    fn take_append_fault(&mut self) -> Option<AppendFailure> {\n        match self.fault {",
+        )
         && storage_source.contains(
             "    #[cfg(any(test, feature = \"fault-injection\"))]\n    fn take_checkpoint_fault(&mut self) -> Option<CheckpointStep> {\n        match self.fault {",
         )
         && storage_source.matches("self.fault").count() == 5
         && storage_source.contains(
-            "    #[cfg(not(any(test, feature = \"fault-injection\")))]\n    fn take_append_fault(&mut self, _payload: &[u8]) -> Option<AppendFailure> {\n        None\n    }",
+            "    #[cfg(not(any(test, feature = \"fault-injection\")))]\n    fn take_append_fault(&mut self) -> Option<AppendFailure> {\n        None\n    }",
         )
         && storage_source.contains(
             "    #[cfg(not(any(test, feature = \"fault-injection\")))]\n    fn take_checkpoint_fault(&mut self) -> Option<CheckpointStep> {\n        None\n    }",
@@ -28850,7 +28855,7 @@ fn check_production_deployments_restart_from_a_sealed_secret(
         && engine_impl_source.matches("Self::restart_internal(").count() == 1
         && engine_impl_source.matches("ContractInstance::restart_internal(").count() == 1
         // Every commit of the deployment leaves its last receipt.
-        && engine_impl_source.contains("            Some(&last_receipt),\n        )?;\n        make_deployment_durable(&inner.storage, &meta)?;")
+        && engine_impl_source.contains("            .with_last_receipt(Some(&last_receipt));\n        let meta = committed.tagged_bytes(&inner.store_meta_key)?;\n        make_deployment_durable(&inner.storage, &meta)?;")
         && engine_impl_source.contains(".commit_staged_with_receipt(staged, Some(&receipt))?")
         && store_meta_source.contains(
             "    #[serde(default, skip_serializing_if = \"Option::is_none\")]\n    pub(crate) last_receipt: Option<ProductionReceipt>,",
@@ -28875,7 +28880,7 @@ fn check_restarts_check_the_commit_generation(
     store_meta_source: &str,
     freshness_source: &str,
 ) -> bool {
-    store_meta_source.contains("const STORE_META_SCHEMA: &str = \"uo-runtime-store-meta-v2\";")
+    store_meta_source.contains("const STORE_META_SCHEMA: &str = \"uo-runtime-store-meta-v3\";")
         && store_meta_source.contains(
             "    schema: String,\n    /// How many commits the store holds, this one among them: a\n    /// deployment's, every committed call's, aborted or not, and every bulk\n    /// load's of a diagnostics build.\n    pub(crate) generation: u64,\n    epoch: u64,",
         )
@@ -28889,43 +28894,129 @@ fn check_restarts_check_the_commit_generation(
             "            .with(|adapter| StoreMeta::from_tagged_bytes(&store_meta_key, adapter.meta()))?;\n        let found = meta.against_attested(attested_generation)?;\n        let freshness = RuntimeFreshnessState::recover(meta.freshness());\n        let state = deploy_contract_runtime(&artifact.contract.state, master, &storage, true)?;",
         )
         && engine_impl_source.matches(".against_attested(").count() == 1
-        && engine_impl_source.contains("            generation: meta.generation,\n")
+        && engine_impl_source.contains("            committed: meta,\n")
         && engine_impl_source
             .matches("        attested_generation: u64,\n    ) -> Result<(Self, StoreGeneration)> {")
             .count()
-            == 2
+            == 3
         && !engine_impl_source.contains("rollback_counter")
         && freshness_source
             .contains("    pub(crate) fn recover(snapshot: RuntimeFreshnessSnapshot) -> Self {")
         && !freshness_source.contains("attested")
-        // Every commit leaves the generation one past the instance's.
-        && engine_impl_source.contains("            generation: 1,\n")
+        // Every commit leaves the generation one past the instance's: the
+        // deployment's, a production deployment's receipt, a call's, a bulk
+        // load's and a commit of reservations alone.
+        && engine_impl_source.contains("        let committed = StoreMeta::new(\n            1,\n            freshness.snapshot(),")
         && engine_impl_source.contains(
-            "        let generation = next_generation(inner.generation)?;\n        let meta = inner.store_meta(\n            generation,",
+            "        let generation = next_generation(inner.committed.generation)?;\n        let committed = inner\n            .committed\n            .clone()\n            .at_generation(generation)",
         )
         && engine_impl_source.contains(
-            "        make_deployment_durable(&inner.storage, &meta)?;\n        inner.generation = generation;",
+            "        make_deployment_durable(&inner.storage, &meta)?;\n        inner.committed = committed;",
         )
         && engine_impl_source.contains(
-            "        // The call's commit, aborted or not, is the store's next.\n        let generation = next_generation(self.generation)?;\n        let mut staged_freshness = self.freshness.clone();",
+            "        // The call's commit, aborted or not, is the store's next.\n        let generation = next_generation(self.committed.generation)?;\n        let mut staged_freshness = self.freshness.clone();",
         )
         && engine_impl_source.contains(
-            "        let meta = self.store_meta(\n            staged.generation,\n            &staged.freshness,",
+            "        let committed = StoreMeta::new(\n            staged.generation,\n            staged.freshness.snapshot(),",
         )
         && engine_impl_source.contains(
-            "        self.initialized = staged.initialized;\n        self.generation = staged.generation;",
+            "        self.initialized = staged.initialized;\n        self.committed = committed;",
         )
         && engine_impl_source.contains(
-            "        let generation = next_generation(self.generation)?;\n        let meta = self.store_meta(\n            generation,\n            &self.freshness,",
+            "        let generation = next_generation(self.committed.generation)?;\n        let committed = StoreMeta::new(\n            generation,\n            self.freshness.snapshot(),",
         )
-        && engine_impl_source.contains("        store.make_durable(&meta)?;\n        self.generation = generation;")
-        && engine_impl_source.matches("next_generation(").count() == 4
+        && engine_impl_source.contains("            .at_generation(next_generation(self.committed.generation)?)")
+        && engine_impl_source
+            .matches("        store.make_durable(&meta)?;\n        self.committed = committed;")
+            .count()
+            == 2
+        && engine_impl_source.matches("next_generation(").count() == 5
         && engine_impl_source.contains(
             "fn next_generation(generation: u64) -> Result<u64> {\n    generation\n        .checked_add(1)",
         )
         // A production call returns its commit's generation.
         && engine_impl_source.contains("    pub generation: u64,\n}")
-        && engine_impl_source.contains("            generation: self.inner.generation,\n        })")
+        && engine_impl_source.contains("            generation: self.inner.generation(),\n        })")
+}
+
+/// Whether a restart resumes each key at a reservation that the counter
+/// attested before any call used a count past it (Issue 68 of the review of
+/// 16 November 2026). Each key's reservation is in the tagged commit
+/// metadata, which the store makes durable with the commit, and every
+/// commit reserves ahead: the deployment's, a call's, a bulk load's, and
+/// a commit of reservations alone, after a call that was dropped and when a
+/// restarted instance resumes. A call writes no reservation: it starts only
+/// if the last commit's cover what it can seal. In a call, the store takes a
+/// record only below the last commit's reservation, and its journal has no
+/// entry of a reservation of its own. A restart refuses a store whose keys
+/// do not resume at the reservations its metadata names, and the restarted
+/// instance takes no call until it resumes, which the attested generation of
+/// its store must allow.
+fn check_restarts_resume_at_the_reservations_of_their_commit(
+    engine_impl_source: &str,
+    store_meta_source: &str,
+    storage_source: &str,
+) -> bool {
+    let store_meta = store_meta_source;
+    let engine = engine_impl_source;
+    store_meta.contains(
+        "    reservations: BTreeMap<String, u64>,\n    /// The receipt a production deployment issued last",
+    ) && store_meta.contains(
+        "        let ahead = seal_count_after_dropped_call(cipher.seal_count());\n        let reserved = reservations.entry(storage.object().to_owned()).or_insert(0);\n        *reserved = (*reserved).max(ahead);",
+    ) && store_meta.contains(
+        "            if seal_count_after_dropped_call(*start) > reserved.get(object).copied().unwrap_or(0) {\n                bail!(",
+    ) && !rust_code_text(store_meta).contains("reserve_seals")
+        // Every commit reserves ahead, and has the store make the
+        // reservations durable with it.
+        && engine.matches("reservations_ahead(").count() == 4
+        && engine.matches(".reserve_seals(committed.reservation_entries())?;").count() == 4
+        && engine.contains(
+            "        .with_reservations(reservations_ahead(\n            &contract_seal_ciphers(&staged.state),\n            self.committed.reservations(),\n        ));",
+        )
+        && engine.contains(
+            "        let seals = DroppedCallSeals::begin(\n            contract_seal_ciphers(&self.state),\n            self.committed.reservations(),\n        )?;",
+        )
+        // A call dropped after it was staged has its reservation committed
+        // before its error returns.
+        && engine.contains(
+            "            .and_then(|staged| self.commit_staged(staged));\n        self.reserve_after_failed_call(outcome)",
+        )
+        && engine.contains("        self.inner.reserve_after_failed_call(outcome)")
+        && engine.contains(
+            "        if !self.resumed || self.storage.poisoned().is_some() {\n            return Err(error);\n        }\n        match self.reserve_ahead() {",
+        )
+        // A restart resumes each key at its reservation, and takes no call
+        // until it resumes with its store's attested generation.
+        && engine.contains(
+            "        check_keys_resume_at_their_reservations(&state, meta.reservations())?;",
+        )
+        && engine.contains(
+            "        if reservations.get(object) != Some(&cipher.seal_count()) {\n            bail!(",
+        )
+        && engine.contains("            committed: meta,\n            resumed: false,")
+        && engine.contains("            committed,\n            resumed: true,")
+        && engine.matches("resumed: true").count() == 1
+        && engine.contains(
+            "        if attested_generation != self.committed.generation {\n            bail!(",
+        )
+        && engine.contains("        self.reserve_ahead()?;\n        self.resumed = true;")
+        && engine.matches("self.ensure_resumed()?;").count() == 2
+        // The store: in a call, the last commit's reservation; a commit
+        // makes the reservations made since durable, in its entry; no entry
+        // of a reservation alone.
+        && storage_source.contains(
+            "                if self.in_call {\n                    object.reserved_seals\n                } else {\n                    object.staged_seals\n                }",
+        )
+        && storage_source.contains(
+            "        for object in &mut self.objects {\n            object.reserved_seals = object.staged_seals;\n        }",
+        )
+        && storage_source.contains(
+            "        let reservations = self.image.staged_reservations();\n        put_u32(&mut payload, count(reservations.len())?);",
+        )
+        && storage_source.contains(
+            "        // The reservation is written with the next commit, and takes effect\n        // in a call once that commit is in the journal.\n        self.image.reserve_seals(object, below)\n    }",
+        )
+        && storage_source.matches("const ENTRY_").count() == 1
 }
 
 /// Whether the production path's freshness errors carry no runtime value. An
@@ -47116,6 +47207,16 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             root.join("runtime/uo-evm/src/freshness.rs"),
         )?),
     );
+    let restarts_resume_at_the_reservations_of_their_commit =
+        check_restarts_resume_at_the_reservations_of_their_commit(
+            &engine_impl_source,
+            &production_source_slice(&fs::read_to_string(
+                root.join("runtime/uo-evm/src/store_meta.rs"),
+            )?),
+            &production_source_slice(&fs::read_to_string(
+                root.join("runtime/uo-store/src/storage.rs"),
+            )?),
+        );
     let production_calls_record_no_position_map_witness =
         check_production_calls_record_no_position_map_witness(
             &production_source_slice(&state_source),
@@ -48572,6 +48673,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
         "store_failures_are_injected_only_in_test_and_diagnostics_builds": store_failures_are_injected_only_in_test_and_diagnostics_builds,
         "production_deployments_restart_from_a_sealed_secret": production_deployments_restart_from_a_sealed_secret,
         "restarts_check_the_commit_generation": restarts_check_the_commit_generation,
+        "restarts_resume_at_the_reservations_of_their_commit": restarts_resume_at_the_reservations_of_their_commit,
         "theorem_certificate_constructor_checks":
             theorem_certificate_constructor_checks,
         "theorem_certificate_constructor_surface_restricted":
@@ -49530,6 +49632,7 @@ fn run_runtime_boundary_validation() -> Result<JsonValue> {
             && store_failures_are_injected_only_in_test_and_diagnostics_builds
             && production_deployments_restart_from_a_sealed_secret
             && restarts_check_the_commit_generation
+            && restarts_resume_at_the_reservations_of_their_commit
             && theorem_certificate_constructor_surface_restricted
             && runtime_public_call_trace_bundle_surface_restricted
             && runtime_public_call_trace_bundle_fields_private
@@ -58164,18 +58267,18 @@ mod tests {
             "    pub(crate) fn recover(snapshot: RuntimeFreshnessSnapshot, attested_rollback_counter: u64) -> Self {",
         );
         assert!(!ok(&engine, &store_meta, &counter));
-        // A call whose commit leaves the instance's generation unchanged.
+        // A call whose commit leaves the instance's metadata unchanged.
         let unmoved = drift(
             &engine,
-            "        self.generation = staged.generation;\n",
-            "",
+            "        self.initialized = staged.initialized;\n        self.committed = committed;",
+            "        self.initialized = staged.initialized;",
         );
         assert!(!ok(&unmoved, &store_meta, &freshness));
         // A bulk load that is not counted.
         let uncounted = drift(
             &engine,
-            "        store.make_durable(&meta)?;\n        self.generation = generation;",
-            "        store.make_durable(&meta)?;",
+            "        self.committed = committed;\n        Ok(())",
+            "        Ok(())",
         );
         assert!(!ok(&uncounted, &store_meta, &freshness));
         // Metadata that keeps no generation.
@@ -58188,10 +58291,91 @@ mod tests {
         // A production result without the generation the counter follows.
         let unreported = drift(
             &engine,
-            "            generation: self.inner.generation,\n        })",
+            "            generation: self.inner.generation(),\n        })",
             "            generation: 0,\n        })",
         );
         assert!(!ok(&unreported, &store_meta, &freshness));
+    }
+
+    #[test]
+    fn the_reservation_check_rejects_the_drifts_it_guards() {
+        use super::{check_restarts_resume_at_the_reservations_of_their_commit, repo_root};
+        let root = repo_root();
+        let read =
+            |rel: &str| production_source_slice(&std::fs::read_to_string(root.join(rel)).unwrap());
+        let engine = read("runtime/uo-evm/src/engine.rs");
+        let store_meta = read("runtime/uo-evm/src/store_meta.rs");
+        let storage = read("runtime/uo-store/src/storage.rs");
+        let ok = check_restarts_resume_at_the_reservations_of_their_commit;
+        assert!(ok(&engine, &store_meta, &storage));
+        let drift = |source: &str, from: &str, to: &str| {
+            assert_eq!(source.matches(from).count(), 1, "{from}");
+            source.replacen(from, to, 1)
+        };
+        // A reservation that does not reach what a dropped call resumes at.
+        let short = drift(
+            &store_meta,
+            "        *reserved = (*reserved).max(ahead);",
+            "        *reserved = (*reserved).max(cipher.seal_count());",
+        );
+        assert!(!ok(&engine, &short, &storage));
+        // A call that starts whatever the last commit reserved.
+        let unchecked = drift(
+            &store_meta,
+            "            if seal_count_after_dropped_call(*start) > reserved.get(object).copied().unwrap_or(0) {",
+            "            if false {",
+        );
+        assert!(!ok(&engine, &unchecked, &storage));
+        // A call's commit that does not reserve for the next call.
+        let behind = drift(
+            &engine,
+            "            &contract_seal_ciphers(&staged.state),\n            self.committed.reservations(),",
+            "            &[],\n            self.committed.reservations(),",
+        );
+        assert!(!ok(&behind, &store_meta, &storage));
+        // A failed call whose reservation is not committed.
+        let unreserved = drift(
+            &engine,
+            "            .and_then(|staged| self.commit_staged(staged));\n        self.reserve_after_failed_call(outcome)",
+            "            .and_then(|staged| self.commit_staged(staged));\n        outcome",
+        );
+        assert!(!ok(&unreserved, &store_meta, &storage));
+        // A restart that resumes where the store's files say alone.
+        let unverified = drift(
+            &engine,
+            "        check_keys_resume_at_their_reservations(&state, meta.reservations())?;\n",
+            "",
+        );
+        assert!(!ok(&unverified, &store_meta, &storage));
+        // A restarted instance that takes calls at once.
+        let eager = drift(
+            &engine,
+            "            committed: meta,\n            resumed: false,",
+            "            committed: meta,\n            resumed: true,",
+        );
+        assert!(!ok(&eager, &store_meta, &storage));
+        // A resume that does not wait for the counter.
+        let early = drift(
+            &engine,
+            "        if attested_generation != self.committed.generation {",
+            "        if false {",
+        );
+        assert!(!ok(&early, &store_meta, &storage));
+        // A store that takes a call's record under a reservation the call
+        // made.
+        let staged = drift(
+            &storage,
+            "                if self.in_call {\n                    object.reserved_seals",
+            "                if self.in_call {\n                    object.staged_seals",
+        );
+        assert!(!ok(&engine, &store_meta, &staged));
+        // A journal entry of a reservation alone, back.
+        let entry = drift(
+            &storage,
+            "const ENTRY_COMMIT: u8 = 1;\n",
+            "const ENTRY_COMMIT: u8 = 1;\nconst ENTRY_RESERVATION: u8 = 2;\n",
+        );
+        assert!(!ok(&engine, &store_meta, &entry));
     }
 
     #[test]
@@ -58328,14 +58512,19 @@ mod tests {
                 "            cipher.resume_seal_count(seal_count_after_dropped_call(*start));",
                 "            cipher.resume_seal_count(seal_count_after_dropped_call(cipher.seal_count()));",
             ),
-            // No reservation before the call, so that a restart after a
-            // crash resumes where the call's last seal reserved.
-            drift(&store_meta, "        storage.reserve_seals_together(&resumes)?;\n", ""),
-            // A reservation whose failure the call goes on after.
+            // A call that starts whatever the last commit reserved, so that
+            // a restart after a crash resumes below the counts it used.
             drift(
                 &store_meta,
-                "        storage.reserve_seals_together(&resumes)?;\n",
-                "        let _ = storage.reserve_seals_together(&resumes);\n",
+                "            if seal_count_after_dropped_call(*start) > reserved.get(object).copied().unwrap_or(0) {",
+                "            if false {",
+            ),
+            // A guard that reserves as the call starts, where the counter
+            // has not attested the reservation before the call seals.
+            drift(
+                &store_meta,
+                "        for (cipher, start) in &starts {\n",
+                "        for (cipher, start) in &starts {\n            if let Some(storage) = cipher.storage() {\n                storage.reserve_seals(seal_count_after_dropped_call(*start))?;\n            }\n",
             ),
             // A drop that writes to the store again.
             drift(
@@ -58361,8 +58550,8 @@ mod tests {
             // A guard taken after the call ran.
             drift(
                 &engine,
-                "        let seals = DroppedCallSeals::begin(contract_seal_ciphers(&self.state), &self.storage)?;\n        let store = StagedStore::begin(&self.storage)?;\n        let mut staged_state = stage_contract_runtime(&self.state)?;",
-                "        let store = StagedStore::begin(&self.storage)?;\n        let mut staged_state = stage_contract_runtime(&self.state)?;\n        let seals = DroppedCallSeals::begin(contract_seal_ciphers(&self.state), &self.storage)?;",
+                "        let seals = DroppedCallSeals::begin(\n            contract_seal_ciphers(&self.state),\n            self.committed.reservations(),\n        )?;\n        let mut staged_state = stage_contract_runtime(&self.state)?;",
+                "        let mut staged_state = stage_contract_runtime(&self.state)?;\n        let seals = DroppedCallSeals::begin(\n            contract_seal_ciphers(&self.state),\n            self.committed.reservations(),\n        )?;",
             ),
             // A deployment or a restart that does not check the bound.
             engine.replacen("        check_call_seal_bounds(&artifact)?;\n", "", 1),
@@ -58513,14 +58702,6 @@ mod tests {
             "        let class = WriteClass::Update;",
         );
         assert!(!ok(&helpers, &surface, &unclassified, &engine, &store_meta));
-        // A store in files whose reservation takes effect before it is in
-        // the journal.
-        let unjournaled = drift(
-            &storage,
-            "        self.append(&payload)?;\n        self.image.reserve_seals(object, below)",
-            "        self.image.reserve_seals(object, below)?;\n        self.append(&payload)",
-        );
-        assert!(!ok(&helpers, &surface, &unjournaled, &engine, &store_meta));
         // An engine that takes the call's state before the store has
         // committed it.
         let early_state = drift(

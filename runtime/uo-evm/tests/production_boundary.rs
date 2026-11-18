@@ -757,12 +757,31 @@ fn a_production_deployment_restarts_from_its_files_on_its_platform() {
         "{error}"
     );
 
-    // The restart, and the chain goes on.
+    // The restart, and the chain goes on once the instance resumed: it
+    // takes no call before.
     let (mut restarted, found) =
         restart(reopen(&directory), &sealed, &platform(), generation).unwrap();
     assert_eq!(found, StoreGeneration::Attested);
     assert_eq!(restarted.generation(), generation);
     assert_eq!(restarted.last_receipt(), &last);
+    let evidence = public_evidence(
+        &artifact,
+        &policy,
+        &session,
+        &environment,
+        restarted.last_receipt(),
+    );
+    let refused = restarted
+        .call_authorized(
+            "read(bytes32)",
+            vec![Value::Bytes32([2; 32])],
+            &session,
+            &evidence,
+        )
+        .unwrap_err();
+    assert!(refused.to_string().contains("has not resumed"), "{refused}");
+    restarted.resume(generation).unwrap();
+    assert_eq!(restarted.generation(), generation + 1);
     let evidence = public_evidence(
         &artifact,
         &policy,
@@ -780,7 +799,7 @@ fn a_production_deployment_restarts_from_its_files_on_its_platform() {
         .unwrap();
     result.receipt.follows(&last).unwrap();
     assert_eq!(result.call.return_value, Some(Value::uint(20)));
-    assert_eq!(result.generation, generation + 1);
+    assert_eq!(result.generation, generation + 2);
     drop(restarted);
     std::fs::remove_dir_all(&directory).unwrap();
     std::fs::remove_dir_all(&changed).unwrap();
@@ -912,39 +931,177 @@ fn a_restart_refuses_the_files_from_before_a_committed_abort() {
     }
 }
 
+/// A call dropped after it ran leaves its keys at counts the next call needs
+/// a reservation above, and the instance commits it, with no record, before
+/// the call's error returns: one generation more, which the platform's
+/// counter follows. The files from before that reservation are refused with
+/// the generation after it. The files with it are taken, and their last
+/// receipt is the one before the dropped call. The instance restarted from
+/// them resumes, and its next call seals each key above the reservation the
+/// dropped call's commit made, so no nonce of a record handed over before
+/// the restart is used again.
+#[test]
+fn a_restart_refuses_the_files_from_before_a_dropped_calls_reservation() {
+    use uo_evm::{PlatformSealingKey, StoreGeneration};
+    use uo_store::{FileStorage, SharedStorage, SyncPolicy};
+    let directory =
+        std::env::temp_dir().join(format!("uo-production-dropped-{}", std::process::id()));
+    let before_drop = directory.with_extension("before-drop");
+    for path in [&directory, &before_drop] {
+        let _ = std::fs::remove_dir_all(path);
+    }
+    let mut artifact = single_access_map();
+    artifact
+        .contract
+        .manifest
+        .entrypoints
+        .get_mut("read(bytes32)")
+        .unwrap()
+        .max_commit_ops = 0;
+    let policy = policy();
+    let session = session();
+    let environment = PublicEnvironment::default();
+    let platform = || PlatformSealingKey::from_platform([0x5D; 32]);
+    let storage = SharedStorage::new(FileStorage::create(&directory, SyncPolicy::Always).unwrap());
+    let (mut production, sealed) = ProductionContractInstance::deploy_with_storage(
+        artifact.clone(),
+        policy.clone(),
+        storage.clone(),
+        &platform(),
+    )
+    .unwrap();
+    let evidence = |production: &ProductionContractInstance| {
+        public_evidence(
+            &artifact,
+            &policy,
+            &session,
+            &environment,
+            production.last_receipt(),
+        )
+    };
+    let put_result = production
+        .call_authorized(
+            "put(bytes32,uint256)",
+            put(1, 10),
+            &session,
+            &evidence(&production),
+        )
+        .unwrap();
+    copy_directory(&directory, &before_drop);
+    production
+        .call_authorized(
+            "read(bytes32)",
+            vec![Value::Bytes32([1; 32])],
+            &session,
+            &evidence(&production),
+        )
+        .unwrap_err();
+    // The reservation is a commit after the last receipt.
+    let counter = production.generation();
+    assert_eq!(counter, put_result.generation + 1);
+    assert_eq!(production.last_receipt(), &put_result.receipt);
+    let records = storage.with(|adapter| adapter.sealed_records_sha256());
+    let reserved: Vec<(String, u64)> = ["records"]
+        .into_iter()
+        .map(|object| {
+            (
+                object.to_owned(),
+                storage.with(|adapter| adapter.reserved_seals(object)),
+            )
+        })
+        .collect();
+    assert!(reserved.iter().all(|(_, below)| *below > 0));
+    let held: Vec<u64> = storage.with(|adapter| adapter.seal_counts("records"));
+    drop(production);
+    drop(storage);
+
+    let restart = |files: &std::path::Path, attested_generation: u64| {
+        let storage = SharedStorage::new(FileStorage::open(files, SyncPolicy::Always).unwrap());
+        ProductionContractInstance::restart(
+            artifact.clone(),
+            policy.clone(),
+            storage.clone(),
+            &sealed,
+            &platform(),
+            attested_generation,
+        )
+        .map(|(instance, found)| (instance, found, storage))
+    };
+    let error = restart(&before_drop, counter).unwrap_err();
+    assert!(
+        error.to_string().contains("behind the attested generation"),
+        "{error}"
+    );
+    let (mut restarted, found, storage) = restart(&directory, counter).unwrap();
+    assert_eq!(found, StoreGeneration::Attested);
+    assert_eq!(restarted.last_receipt(), &put_result.receipt);
+    assert_eq!(
+        storage.with(|adapter| adapter.sealed_records_sha256()),
+        records
+    );
+    restarted.resume(counter).unwrap();
+    let result = restarted
+        .call_authorized(
+            "put(bytes32,uint256)",
+            put(2, 20),
+            &session,
+            &evidence(&restarted),
+        )
+        .unwrap();
+    result.receipt.follows(&put_result.receipt).unwrap();
+    // Every record sealed after the restart carries a count at or above the
+    // reservation the dropped call's commit made; the others are the ones
+    // held before.
+    for (object, below) in &reserved {
+        let counts = storage.with(|adapter| adapter.seal_counts(object));
+        assert!(counts.iter().any(|count| !held.contains(count)), "{object}");
+        for count in counts {
+            assert!(
+                held.contains(&count) || count >= *below,
+                "{object}: {count} below {below}"
+            );
+        }
+    }
+    drop(restarted);
+    for path in [&directory, &before_drop] {
+        std::fs::remove_dir_all(path).unwrap();
+    }
+}
+
 /// What a production call meets when its store fails, for every failure a
-/// file store can be made to meet (`StorageFault::ALL`), in the build a
-/// production runtime uses. Two calls return their receipts first. Then the
-/// store is made to fail:
+/// file store can be made to meet (`StorageFault::ALL`), on each of the two
+/// commits a call can make, in the build a production runtime uses. Two
+/// calls return their receipts first. Then the store is made to fail at:
 ///
-/// - the append of the next call's commit: the call returns an error that
-///   says its outcome is unknown, and no receipt;
-/// - the append of the next reservation: after a read whose commit budget is
-///   zero is dropped, the next call reserves the counts its keys resume at if
-///   it is dropped too, before it seals anything. It fails there, with an
-///   error that says its outcome is unknown, having sealed nothing;
-/// - the next checkpoint, which the next call's commit runs: the call
-///   returns its receipt, since its commit is in the journal.
+/// - the next call's commit. Its append's failure makes the call return an
+///   error that says its outcome is unknown, and no receipt. A checkpoint
+///   the commit runs fails after the commit is in the journal, and the call
+///   returns its receipt.
+/// - the commit of no record that a call dropped after it ran makes before
+///   its error returns, which reserves what the next call can seal (a read
+///   whose commit budget is zero). Its append's failure makes the error say
+///   that the outcome is unknown. A checkpoint it runs fails after the
+///   reservation is in the journal, and the read returns its own error.
 ///
 /// In every case the store refuses every operation, so the instance refuses
 /// the next call and to vouch for its last receipt. The platform's counter
-/// followed the results the runtime returned, and holds the generation of
-/// the last one. The deployment restarts from its files with that
-/// generation attested. The files hold it, or one past it when they hold
-/// the commit of a call that returned no result, and the restart says
-/// which, so that the counter catches up. Of the generations one below the
-/// files' and the files' own, both are accepted; any other is refused. The
-/// restart's last receipt resolves the call: the call's when its commit is
-/// in the files whole (its sync failed after a whole write, or a checkpoint
-/// failed), the one the caller held when it is not (its write stopped part
-/// way, or the call was dropped). Every receipt a call returned is in the
-/// files, the map holds what those calls wrote, and the deployment takes
-/// calls again, each result one generation past the last.
+/// followed the instance, and holds the generation of its last commit that
+/// returned. The deployment restarts from its files with that generation
+/// attested. The files hold it, or one past it when they hold a commit whose
+/// append failed after a whole write, and the restart says which, so that
+/// the counter catches up. Of the generations one below the files' and the
+/// files' own, both are accepted; any other is refused. The restart's last
+/// receipt resolves the call: the call's when its commit is in the files
+/// whole, the one the caller held when it is not, and when the call was the
+/// dropped read. The instance resumes once the counter caught up. Every
+/// receipt a call returned is in the files, the map holds what those calls
+/// wrote, and the deployment takes calls again, each result one generation
+/// past the last.
 #[test]
 fn every_storage_failure_fails_closed_and_a_restart_resolves_the_call() {
     use uo_evm::{
-        resolve_production_call_outcome, storage_failure, AppendFailure, JournalEntry,
-        PlatformSealingKey, ProductionCallOutcome, StorageFailure, StorageFault, StoreGeneration,
+        resolve_production_call_outcome, storage_failure, AppendFailure, PlatformSealingKey,
+        ProductionCallOutcome, StorageFailure, StorageFault, StoreGeneration,
     };
     use uo_store::{FileStorage, SharedStorage, SyncPolicy};
     let policy = policy();
@@ -953,23 +1110,19 @@ fn every_storage_failure_fails_closed_and_a_restart_resolves_the_call() {
     let platform = || PlatformSealingKey::from_platform([0x5A; 32]);
     let read = |key: u8| vec![Value::Bytes32([key; 32])];
     let mut checked = 0;
-    for (index, fault) in StorageFault::ALL.into_iter().enumerate() {
+    let cases = StorageFault::ALL
+        .into_iter()
+        .flat_map(|fault| [(fault, false), (fault, true)]);
+    for (index, (fault, reservation)) in cases.enumerate() {
         let directory = std::env::temp_dir().join(format!(
             "uo-production-fault-{}-{index}",
             std::process::id()
         ));
         let _ = std::fs::remove_dir_all(&directory);
-        let reservation = matches!(
-            fault,
-            StorageFault::Append {
-                entry: JournalEntry::Reservation,
-                ..
-            }
-        );
         // A read with no commit budget is dropped after it ran, and its keys
-        // move on in memory to the counts reserved before it began; the call
-        // after it reserves again, and that is the reservation the store
-        // fails.
+        // move on in memory to the counts the last commit reserved; before
+        // its error returns, the instance commits the reservation the next
+        // call needs, and that is the commit the store fails.
         let mut artifact = single_access_map();
         if reservation {
             artifact
@@ -1005,59 +1158,51 @@ fn every_storage_failure_fails_closed_and_a_restart_resolves_the_call() {
                 .unwrap();
         }
 
-        if reservation {
-            let evidence = public_evidence(
-                &artifact,
-                &policy,
-                &session,
-                &environment,
-                production.last_receipt(),
-            );
-            let journal = std::fs::metadata(directory.join("journal.bin"))
-                .unwrap()
-                .len();
-            production
-                .call_authorized("read(bytes32)", read(1), &session, &evidence)
-                .unwrap_err();
-            // Dropping it wrote nothing.
-            assert_eq!(
-                std::fs::metadata(directory.join("journal.bin"))
-                    .unwrap()
-                    .len(),
-                journal
-            );
-        }
-
         storage.inject_fault(fault).unwrap();
         let held = production.last_receipt().clone();
         let held_generation = production.generation();
         let evidence = public_evidence(&artifact, &policy, &session, &environment, &held);
-        let result =
-            production.call_authorized("put(bytes32,uint256)", put(3, 30), &session, &evidence);
-        // The generation of the last result the runtime returned, which the
-        // platform's counter holds.
-        let mut counter = held_generation;
+        let result = if reservation {
+            production.call_authorized("read(bytes32)", read(1), &session, &evidence)
+        } else {
+            production.call_authorized("put(bytes32,uint256)", put(3, 30), &session, &evidence)
+        };
+        // The generation of the instance's last commit, which the platform's
+        // counter follows once the call returned, with a result or an error.
+        let counter = production.generation();
         let returned = match fault {
             StorageFault::Append { .. } => {
                 let error = result.unwrap_err();
                 assert_eq!(
                     storage_failure(&error),
                     Some(StorageFailure::OutcomeUnknown),
-                    "{fault:?}: {error:#}"
+                    "{fault:?} {reservation}: {error:#}"
                 );
-                if !reservation {
-                    assert!(
-                        error.to_string().contains("outcome is unknown"),
-                        "{fault:?}: {error:#}"
-                    );
-                }
+                let says = if reservation {
+                    "did not commit"
+                } else {
+                    "outcome is unknown"
+                };
+                assert!(
+                    error.to_string().contains(says),
+                    "{fault:?} {reservation}: {error:#}"
+                );
+                assert_eq!(counter, held_generation, "{fault:?} {reservation}");
+                held.clone()
+            }
+            StorageFault::Checkpoint { .. } if reservation => {
+                // The read failed and did not commit; the reservation after
+                // it did, and the checkpoint it ran failed.
+                let error = result.unwrap_err();
+                assert_eq!(storage_failure(&error), None, "{fault:?}: {error:#}");
+                assert_eq!(counter, held_generation + 1, "{fault:?}");
                 held.clone()
             }
             StorageFault::Checkpoint { .. } => {
                 let result = result.unwrap();
                 result.receipt.follows(&held).unwrap();
                 assert_eq!(result.generation, held_generation + 1, "{fault:?}");
-                counter = result.generation;
+                assert_eq!(counter, result.generation, "{fault:?}");
                 result.receipt
             }
         };
@@ -1105,9 +1250,10 @@ fn every_storage_failure_fails_closed_and_a_restart_resolves_the_call() {
             )
         };
         let committed = fault.leaves_the_entry_whole() && !reservation;
-        // A commit is in the files that no returned result carried: the
+        // A commit is in the files that the counter does not hold: the
         // failed append's, when it reached them whole.
-        let unreleased = committed && matches!(fault, StorageFault::Append { .. });
+        let unreleased =
+            fault.leaves_the_entry_whole() && matches!(fault, StorageFault::Append { .. });
         let files_generation = counter + u64::from(unreleased);
         let accepted: Vec<u64> = [counter - 1, counter, counter + 1]
             .into_iter()
@@ -1134,7 +1280,9 @@ fn every_storage_failure_fails_closed_and_a_restart_resolves_the_call() {
         } else {
             ProductionCallOutcome::NotCommitted
         };
-        assert_eq!(outcome, expected, "{fault:?}");
+        assert_eq!(outcome, expected, "{fault:?} {reservation}");
+        // The counter catches up, and the instance resumes.
+        restarted.resume(files_generation).unwrap();
         // Every receipt a call returned is in the files.
         let last = restarted.last_receipt().clone();
         assert!(
@@ -1180,5 +1328,5 @@ fn every_storage_failure_fails_closed_and_a_restart_resolves_the_call() {
         std::fs::remove_dir_all(&directory).unwrap();
         checked += 1;
     }
-    assert_eq!(checked, StorageFault::ALL.len());
+    assert_eq!(checked, 2 * StorageFault::ALL.len());
 }

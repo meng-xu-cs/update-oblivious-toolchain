@@ -25,26 +25,30 @@
 //! reads as the first one did and seal no record under a nonce the files
 //! already hold. The restart takes the files only with an attested
 //! generation that is theirs or one below it, and says which; the files
-//! from before the last call are refused with the generation after it. On
-//! ERC20Lite a committed abort, which leaves the rollback counter where it
-//! was, moves the generation too (`committed_aborts`).
+//! from before the last call are refused with the generation after it. The
+//! restarted runtime resumes each key at the reservation the files' last
+//! commit names, and resumes before its first call, which commits the
+//! reservations that call needs. On ERC20Lite a committed abort, which
+//! leaves the rollback counter where it was, moves the generation too
+//! (`committed_aborts`).
 //!
 //! Last, it makes the store fail (`fault_matrix`): every failure a file
 //! store can be made to meet (`StorageFault::ALL`), on each sealed backend
-//! of ERC20Lite. The store must refuse every operation after it, so that the
-//! runtime refuses the next call. A call whose commit's append failed, or
-//! whose reservation did before it sealed anything, must not return, and its
-//! error must say that its outcome is unknown. The reservation is the one the
-//! call after a dropped call makes. The files must hold every call that
-//! returned, and the failed call whole or not at all: whole when its
-//! commit's sync failed after a whole write or a checkpoint failed after the
-//! commit, not at all when its write stopped part way or its reservation
-//! failed. A restart from the files, with the generation of the last call
-//! that returned attested, takes them, and says that they are one past it
-//! when they hold the failed call; of the attested generations around it, it
-//! accepts the files' own and the one below, and it answers reads as the
-//! state the files hold says. The production build runs the same failures
-//! through the production
+//! of ERC20Lite, at each of the two commits a call makes: its own, and the
+//! commit of no record that a call dropped after it ran makes before its
+//! error returns, which reserves what the next call can seal. The store must
+//! refuse every operation after the failure, so that the runtime refuses the
+//! next call. A call whose commit's append failed, or whose reservation's
+//! did, must not return, and its error must say that its outcome is unknown.
+//! The files must hold every commit that returned, and the failed one whole
+//! or not at all: whole when its sync failed after a whole write or a
+//! checkpoint failed after it, not at all when its write stopped part way.
+//! A restart from the files, with the generation of the last commit that
+//! returned attested, takes them, and says that they are one past it when
+//! they hold the failed append's commit; of the attested generations around
+//! it, it accepts the files' own and the one below. Once resumed, it answers
+//! reads as the state the files hold says. The production build runs the
+//! same failures through the production
 //! runtime, whose receipts say which state the files hold
 //! (`every_storage_failure_fails_closed_and_a_restart_resolves_the_call` in
 //! `runtime/uo-evm/tests/production_boundary.rs`).
@@ -61,11 +65,11 @@ use std::path::{Path, PathBuf};
 use uo_core::ir::BackendKind;
 use uo_core::{CompiledArtifact, PublicReceipt, Value, WriteClass};
 use uo_evm::{
-    storage_failure, ContractInstance, FileStorage, JournalEntry, MemoryStorage, SharedStorage,
-    StorageAdapter, StorageFailure, StorageFault, StorageIo, StoreGeneration, SyncPolicy,
+    storage_failure, ContractInstance, FileStorage, MemoryStorage, SharedStorage, StorageAdapter,
+    StorageFailure, StorageFault, StorageIo, StoreGeneration, SyncPolicy,
 };
 
-pub(crate) const STORAGE_BOUNDARY_SCHEMA: &str = "uo-storage-boundary-v4";
+pub(crate) const STORAGE_BOUNDARY_SCHEMA: &str = "uo-storage-boundary-v5";
 
 /// The sealed objects of an artifact.
 fn sealed_objects(artifact: &CompiledArtifact) -> BTreeSet<String> {
@@ -513,6 +517,16 @@ fn run_restart(
             storage.clone(),
             generation,
         )?;
+        // Every key resumed at the reservation of the last commit; resuming
+        // commits what the first call can seal.
+        let keys_resume_at_their_reservations =
+            nonce_state(&storage, artifact)
+                .iter()
+                .all(|(object, (_, reserved))| {
+                    before.get(object).is_some_and(|(_, held)| held == reserved)
+                });
+        restarted.resume(generation)?;
+        let resumed_with_one_commit = restarted.generation() == generation + 1;
         restarted.keep_decoded_position_map_witness()?;
         let public_state_restored = restarted.public_state_digest()? == public_state;
         let mut getters_answer_as_before = workload.getters.len() == expected.len();
@@ -543,6 +557,8 @@ fn run_restart(
             && generation_window_holds
             && files_before_the_last_call == "refused"
             && other_secret_refused
+            && keys_resume_at_their_reservations
+            && resumed_with_one_commit
             && files_hold_the_last_commit
             && public_state_restored
             && getters_answer_as_before
@@ -559,6 +575,8 @@ fn run_restart(
                 "restart_by_attested_generation": generation_window,
                 "files_before_the_last_call_at_its_generation": files_before_the_last_call,
                 "other_deployment_secret_refused": other_secret_refused,
+                "keys_resume_at_the_reservations_of_the_last_commit": keys_resume_at_their_reservations,
+                "resume_commits_the_first_calls_reservations": resumed_with_one_commit,
                 "files_hold_the_last_commit": files_hold_the_last_commit,
                 "public_state_restored": public_state_restored,
                 "reads_answer_as_before_the_restart": getters_answer_as_before,
@@ -634,7 +652,8 @@ fn committed_abort(
 }
 
 /// A call that fails after it handed records to the store: the store must
-/// hold what it held, and take the next call.
+/// hold the records it held, its metadata must be a commit of no record that
+/// reserves what the next call can seal, and it must take the next call.
 fn dropped_call(
     artifact: &CompiledArtifact,
     call: &CallSpec,
@@ -656,14 +675,17 @@ fn dropped_call(
         storage.clone(),
     )?;
     instance.keep_decoded_position_map_witness()?;
-    let held = |storage: &SharedStorage| {
-        storage.with(|adapter| (adapter.sealed_records_sha256(), adapter.meta().to_vec()))
-    };
-    let before = held(&storage);
+    let records = |storage: &SharedStorage| storage.with(|adapter| adapter.sealed_records_sha256());
+    let before = records(&storage);
+    let generation = instance.generation();
+    let commits_before = instance.storage_stats().commits;
     let writes_before = instance.storage_stats().writes;
     let failed = instance.call(call.entrypoint, call.args.clone()).is_err();
     let records_handed_over = instance.storage_stats().writes - writes_before;
-    let store_unchanged = held(&storage) == before;
+    let records_unchanged = records(&storage) == before;
+    // One commit, of no record: the reservations the next call needs.
+    let reservation_committed = instance.generation() == generation + 1
+        && instance.storage_stats().commits == commits_before + 1;
     let commits = instance.storage_stats().commits;
     let next_call_commits = instance.call(read.entrypoint, read.args.clone()).is_ok()
         && instance.storage_stats().commits == commits + 1;
@@ -671,34 +693,32 @@ fn dropped_call(
         "entrypoint": call.entrypoint,
         "call_failed": failed,
         "records_handed_to_the_store": records_handed_over,
-        "store_holds_what_it_held": store_unchanged,
+        "store_holds_the_records_it_held": records_unchanged,
+        "a_commit_of_no_record_reserves_for_the_next_call": reservation_committed,
         "store_commits_the_next_call": next_call_commits,
-        "holds": failed && records_handed_over > 0 && store_unchanged && next_call_commits,
+        "holds": failed
+            && records_handed_over > 0
+            && records_unchanged
+            && reservation_committed
+            && next_call_commits,
     }))
 }
 
-/// A deployment of `artifact` on a store in files meets `fault` in a call
+/// A deployment of `artifact` on a store in files meets `fault` at a commit
 /// after one call that returned (`fault_matrix` in the module's comment).
-/// `setup` returns; `target` is the call that meets the fault. If the fault
-/// is a reservation's, `dropped`, an entrypoint whose commit budget is zero,
-/// is called and dropped before it: its keys move on in memory to the
-/// counts reserved before it began, so `target` reserves again before it
-/// seals anything, and fails there. `read` is a read of what `setup` and
-/// `target` wrote.
+/// `setup` returns. If `reservation`, the commit that meets the fault is the
+/// one of no record that `dropped`, an entrypoint whose commit budget is
+/// zero, makes after it ran and before its error returns, which reserves
+/// what the next call can seal; otherwise it is `target`'s. `read` is a read
+/// of what `setup` and `target` wrote.
 fn storage_fault(
     artifact: &CompiledArtifact,
     backend: &str,
     fault: StorageFault,
+    reservation: bool,
     calls: [&CallSpec; 4],
 ) -> Result<JsonValue> {
     let [setup, target, dropped, read] = calls;
-    let reservation = matches!(
-        fault,
-        StorageFault::Append {
-            entry: JournalEntry::Reservation,
-            ..
-        }
-    );
     let mut artifact = artifact.clone();
     if reservation {
         artifact
@@ -709,24 +729,12 @@ fn storage_fault(
             .ok_or_else(|| anyhow!("manifest entry missing for {}", dropped.entrypoint))?
             .max_commit_ops = 0;
     }
-    let call = target;
-    // The calls before the one that meets the fault.
-    let prepare = |instance: &mut ContractInstance| -> Result<()> {
-        instance.call(setup.entrypoint, setup.args.clone())?;
-        if reservation
-            && instance
-                .call(dropped.entrypoint, dropped.args.clone())
-                .is_ok()
-        {
-            bail!("{} was not dropped", dropped.entrypoint);
-        }
-        Ok(())
-    };
+    let call = if reservation { dropped } else { target };
     // The state the files may hold after the call: the one before it, and
     // the one a twin that meets no fault reaches with it.
     let mut twin = ContractInstance::deploy_with_seed(artifact.clone(), PROBE_DEPLOY_SEED)?;
     twin.keep_decoded_position_map_witness()?;
-    prepare(&mut twin)?;
+    twin.call(setup.entrypoint, setup.args.clone())?;
     let state = |instance: &ContractInstance| -> Result<(String, String)> {
         Ok((
             instance.public_state_digest()?,
@@ -739,7 +747,12 @@ fn storage_fault(
         Err(_) => None,
     };
 
-    let label = format!("{backend}-{}", serde_json::to_string(&fault)?);
+    let commit = if reservation {
+        "the_reservation_after_a_dropped_call"
+    } else {
+        "the_calls"
+    };
+    let label = format!("{backend}-{commit}-{}", serde_json::to_string(&fault)?);
     let directory = scratch_directory(&format!("fault-{label}"));
     let _ = std::fs::remove_dir_all(&directory);
     let outcome = (|| -> Result<JsonValue> {
@@ -754,17 +767,17 @@ fn storage_fault(
             storage.clone(),
         )?;
         instance.keep_decoded_position_map_witness()?;
-        prepare(&mut instance)?;
+        instance.call(setup.entrypoint, setup.args.clone())?;
         let generation_before = instance.generation();
 
         storage.inject_fault(fault)?;
         let result = instance.call(call.entrypoint, call.args.clone());
-        // The platform's counter holds the generation of the last call that
-        // returned.
-        let counter = match &result {
-            Ok(_) => instance.generation(),
-            Err(_) => generation_before,
-        };
+        // The platform's counter holds the generation of the instance's last
+        // commit that returned: the one before the fault, or, when a
+        // checkpoint failed, the commit that ran it.
+        let counter = instance.generation();
+        let checkpoint = matches!(fault, StorageFault::Checkpoint { .. });
+        let counter_as_expected = counter == generation_before + u64::from(checkpoint);
         let (call_result, failure) = match &result {
             Ok(_) => ("returned", None),
             Err(error) => match storage_failure(error) {
@@ -774,9 +787,10 @@ fn storage_fault(
                 other => ("failed", other),
             },
         };
-        let call_as_expected = match fault {
-            StorageFault::Append { .. } => call_result == "outcome_unknown",
-            StorageFault::Checkpoint { .. } => call_result == "returned",
+        let call_as_expected = match (checkpoint, reservation) {
+            (false, _) => call_result == "outcome_unknown",
+            (true, false) => call_result == "returned",
+            (true, true) => call_result == "failed",
         };
         let store_refuses_operations = storage.poisoned().is_some();
         let next_call_refused = instance
@@ -812,19 +826,21 @@ fn storage_fault(
             StoreGeneration::Attested => "attested",
             StoreGeneration::OnePast => "one_past",
         };
-        let files_generation = restarted.generation();
-        restarted.keep_decoded_position_map_witness()?;
-        let files = state(&restarted)?;
-        let files_hold_the_call = Some(&files) == after.as_ref();
-        // The files are one past the counter when they hold a commit no
-        // returned call carried: the failed append's.
-        let expected_restart = if files_hold_the_call && result.is_err() {
+        // The files are one past the counter when they hold the commit of a
+        // failed append: its sync failed after a whole write.
+        let expected_restart = if !checkpoint && fault.leaves_the_entry_whole() {
             "one_past"
         } else {
             "attested"
         };
+        let files_generation = restarted.generation();
+        let files_hold_the_commit = files_generation == generation_before + 1;
+        restarted.keep_decoded_position_map_witness()?;
+        let files = state(&restarted)?;
+        let files_hold_the_call = Some(&files) == after.as_ref();
         let files_hold_a_state_of_the_call = files == before || files_hold_the_call;
-        let expected_whole = fault.leaves_the_entry_whole() && !reservation;
+        // The counter catches up with the files, and the instance resumes.
+        restarted.resume(files_generation)?;
         // Reads answer as the state the files hold says: as the twin, if
         // they hold the call, and as before it otherwise.
         let expected_read = if files_hold_the_call {
@@ -833,7 +849,7 @@ fn storage_fault(
             let mut before_twin =
                 ContractInstance::deploy_with_seed(artifact.clone(), PROBE_DEPLOY_SEED)?;
             before_twin.keep_decoded_position_map_witness()?;
-            prepare(&mut before_twin)?;
+            before_twin.call(setup.entrypoint, setup.args.clone())?;
             before_twin
                 .call(read.entrypoint, read.args.clone())?
                 .return_value
@@ -845,17 +861,20 @@ fn storage_fault(
         let takes_calls_after_restart =
             restarted.call(setup.entrypoint, setup.args.clone()).is_ok();
         let holds = call_as_expected
+            && counter_as_expected
             && store_refuses_operations
             && next_call_refused
             && restart_at_the_counter == expected_restart
             && accepted == [files_generation - 1, files_generation]
+            && files_hold_the_commit == fault.leaves_the_entry_whole()
             && files_hold_a_state_of_the_call
-            && files_hold_the_call == expected_whole
+            && files_hold_the_call == (files_hold_the_commit && !reservation)
             && (bytes_cut_on_open > 0) != fault.leaves_the_entry_whole()
             && reads_answer_as_the_files_say
             && takes_calls_after_restart;
         Ok(json!({
             "backend": backend,
+            "commit": commit,
             "fault": fault,
             "entrypoint": call.entrypoint,
             "call": call_result,
@@ -863,15 +882,15 @@ fn storage_fault(
             "store_refuses_operations": store_refuses_operations,
             "next_call_refused": next_call_refused,
             "bytes_cut_on_open": bytes_cut_on_open,
-            "generation_of_the_last_call_that_returned": counter,
+            "generation_of_the_last_commit_that_returned": counter,
             "restart_at_that_generation": restart_at_the_counter,
             "attested_generations_a_restart_accepts": accepted,
-            // Which state, as a name and not a flag: a false flag would be
+            // Which commit, as a name and not a flag: a false flag would be
             // a false leaf that the acceptance gate does not classify.
-            "files_hold": if files_hold_the_call {
-                "the_call"
+            "files_hold": if files_hold_the_commit {
+                "the_commit_that_met_the_fault"
             } else {
-                "the_state_before_the_call"
+                "the_commit_before_it"
             },
             "files_hold_the_state_before_or_after_the_call": files_hold_a_state_of_the_call,
             "reads_answer_as_the_files_say": reads_answer_as_the_files_say,
@@ -884,8 +903,9 @@ fn storage_fault(
 }
 
 /// A store takes a sealed record only when the record's nonce is below the
-/// count it has reserved for the record's object. The record is one a
-/// deployment sealed.
+/// count it has reserved for the record's object: in a call, the count the
+/// last commit reserved, since a reservation takes effect with the commit
+/// that makes it durable. The record is one a deployment sealed.
 fn nonce_reservation(artifact: &CompiledArtifact) -> Result<JsonValue> {
     let storage = SharedStorage::memory();
     let instance = ContractInstance::deploy_with_seed_and_storage(
@@ -920,6 +940,15 @@ fn nonce_reservation(artifact: &CompiledArtifact) -> Result<JsonValue> {
     let refused_at_the_reservation = fresh.create(&object, &location, &record).is_err();
     fresh.reserve_seals(&object, own_count + 1)?;
     let taken_once_reserved = fresh.create(&object, &location, &record).is_ok();
+    // In a call, a reservation made in the call does not cover a record
+    // until the commit that makes it durable.
+    let mut in_call = MemoryStorage::new();
+    in_call.begin()?;
+    in_call.reserve_seals(&object, own_count + 1)?;
+    let refused_before_its_commit = in_call.create(&object, &location, &record).is_err();
+    in_call.commit(b"reserved")?;
+    in_call.begin()?;
+    let taken_after_its_commit = in_call.create(&object, &location, &record).is_ok();
     let deployment_reserved_first =
         storage.with(|adapter| adapter.reserved_seals(&object)) > seal_count;
     Ok(json!({
@@ -928,10 +957,14 @@ fn nonce_reservation(artifact: &CompiledArtifact) -> Result<JsonValue> {
         "record_refused_with_nothing_reserved": refused_unreserved,
         "record_refused_at_the_reserved_count": refused_at_the_reservation,
         "record_taken_once_its_count_is_reserved": taken_once_reserved,
+        "record_in_a_call_refused_until_its_reservation_is_committed": refused_before_its_commit,
+        "record_in_a_call_taken_once_its_reservation_is_committed": taken_after_its_commit,
         "a_deployment_reserves_before_it_hands_over_a_record": deployment_reserved_first,
         "holds": refused_unreserved
             && refused_at_the_reservation
             && taken_once_reserved
+            && refused_before_its_commit
+            && taken_after_its_commit
             && deployment_reserved_first,
     }))
 }
@@ -1046,16 +1079,21 @@ pub(crate) fn run_storage_boundary(
     let mut fault_matrix = Vec::new();
     let mut every_storage_fault_fails_closed = true;
     for (backend, artifact) in sealed_variants(erc20) {
-        for fault in StorageFault::ALL {
-            let row = storage_fault(
-                artifact,
-                &backend,
-                fault,
-                [&mint, &second_mint, &approve, &second_balance],
-            )
-            .with_context(|| format!("storage fault {fault:?} on ERC20Lite/{backend}"))?;
-            every_storage_fault_fails_closed &= row["holds"] == json!(true);
-            fault_matrix.push(row);
+        for reservation in [false, true] {
+            for fault in StorageFault::ALL {
+                let row = storage_fault(
+                    artifact,
+                    &backend,
+                    fault,
+                    reservation,
+                    [&mint, &second_mint, &approve, &second_balance],
+                )
+                .with_context(|| {
+                    format!("storage fault {fault:?} ({reservation}) on ERC20Lite/{backend}")
+                })?;
+                every_storage_fault_fails_closed &= row["holds"] == json!(true);
+                fault_matrix.push(row);
+            }
         }
     }
 
@@ -1065,7 +1103,7 @@ pub(crate) fn run_storage_boundary(
         "store_writes_are_the_traced_writes": totals.store_writes == totals.traced_writes,
         "every_restart_continues_its_deployment": every_restart_holds,
         "a_restart_refuses_the_files_from_before_a_committed_abort": every_committed_abort_moves_the_generation,
-        "a_dropped_call_leaves_the_store_as_it_was": every_dropped_call_holds,
+        "a_dropped_call_leaves_the_records_as_they_were": every_dropped_call_holds,
         "a_record_reaches_the_store_only_under_a_reserved_nonce": nonce_reservation_holds,
         "every_storage_fault_fails_closed": every_storage_fault_fails_closed,
     });

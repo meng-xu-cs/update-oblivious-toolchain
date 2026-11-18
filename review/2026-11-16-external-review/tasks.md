@@ -949,6 +949,141 @@ precondition; Issue 58's as-built text is corrected.
 - With (c), every document that describes the restart states the
   precondition and what rests on it.
 
+**As built.** The description's step 1 makes a reservation as the call that
+needs it starts, as Issue 66 did. The platform's counter advances only
+between operations, so it cannot attest that reservation before the call
+hands over records sealed under it. A host that stops the enclave in that
+call and restarts it from the files before the reservation, which the counter
+still attests, gets a runtime that seals under counts the host has seen. The
+maintainer chose to reserve ahead instead: every commit reserves what the
+next call can seal, a call makes no reservation, and a commit of reservations
+alone comes only where the counter attests it before the next call.
+
+The tagged commit metadata (`StoreMeta`, schema `uo-runtime-store-meta-v3`)
+carries each key's reservation. `reservations_ahead` raises each key's last
+reservation to `seal_count_after_dropped_call` of its count, the count a call
+from it resumes at if it is dropped, which is above every count that call can
+seal. Every commit does so, before the store makes the reservations durable
+with it:
+
+- the deployment's commit, so its first call needs none;
+- a production deployment's receipt commit, with the same reservations;
+- each call's commit, and each bulk load's;
+- a commit of no record after a call that was dropped after it was staged
+  (`reserve_after_failed_call`), before the call's error returns. It is not
+  made for a call that failed earlier, by an instance that has not resumed,
+  or on a store that refuses every operation. If its append fails, the error
+  says the outcome is unknown, with the call's failure;
+- a commit of no record when a restarted instance resumes.
+
+`DroppedCallSeals::begin` writes nothing. It starts a call only if the last
+commit's reservations cover the count each key resumes at, and the call
+fails before it seals anything otherwise. `stage_call` now begins the store's
+call before the guard, so a store that refuses every operation refuses the
+call as such.
+
+The store (`runtime/uo-store/src/storage.rs`) holds each object's reservation
+of the last commit and the one the next commit makes durable:
+
+- `reserve_seals` stages a reservation, which the next commit writes in its
+  journal entry.
+- In a call, a record is taken only below the last commit's reservation.
+  Outside a call, a deployment's record is taken below the reservation its
+  commit will make durable.
+- The journal's reservation entries, `reserve_seals_together`,
+  `SEAL_RESERVATION_STEP` and `JournalEntry` are gone. `StorageFault::ALL`
+  holds the four ways a commit's append fails and the three checkpoint steps.
+
+A restart resumes each key at the reservation that the metadata it verified
+names, and refuses files whose own, untagged reservation of a key differs
+(`check_keys_resume_at_their_reservations`). A public object's key, which
+seals nothing, now resumes at its reservation too. The restarted instance
+takes no call until `resume(attested_generation)`, on `ContractInstance` and
+on `ProductionContractInstance`:
+
+- It refuses an attested generation other than its store's. After a restart
+  one past the counter, the counter catches up first, so that the files are
+  never two commits past it.
+- It commits the reservations the first call needs.
+- An instance that never restarted, or already resumed, takes it as a no-op.
+
+The deployment advances the counter to the instance's generation after every
+operation, a failed call and a resume among them, before it releases anything
+or makes another call.
+
+Tests:
+
+- `a_commit_reserves_what_the_next_call_can_seal`, in `store_meta.rs`: the
+  reservation ahead, a call it covers, the call after a dropped one that it
+  does not, and a key with none.
+- `commit_metadata_opens_only_with_its_tag`: a reservation lowered in the
+  metadata fails the tag check, and the schemas before are refused.
+- `a_dropped_call_commits_the_reservation_the_next_call_needs`: one commit
+  of no record, the records as they were, and the next call runs under it.
+  With an append that stops part way or whose sync fails, the error says the
+  outcome is unknown, and a restart finds the store before or one past,
+  every key at or above the counts the dropped call moved it to.
+- `a_restarted_instance_takes_no_call_until_it_resumes`: a call is refused
+  and seals nothing. A resume is refused with the generation below or above
+  the store's, and commits the reservations ahead with it.
+- `a_call_stopped_part_way_leaves_no_count_a_restart_seals_again`, the attack
+  above. After a restart and a resume, a call seals and hands over its
+  records and never ends. The files from before the resume are refused with
+  the counter's generation, and the files the call left resume every key
+  above every count the call used.
+- In the production build,
+  `a_restart_refuses_the_files_from_before_a_dropped_calls_reservation`. A
+  `put`, then a dropped `read`, whose reservation is a commit after the last
+  receipt. The files from before it are refused with the generation after
+  it. The files with it are taken, with the `put`'s receipt as the last. The
+  next call's records carry counts at or above the reservation.
+- The fault matrix fails, in each of the 7 ways, the call's commit and the
+  commit of no record after a dropped read: 14 cases. Each restart resumes
+  once the counter caught up.
+- The store's tests: a record in a call refused until the commit that makes
+  its reservation durable, a reservation written with the next commit and
+  not before, and each append failure of a call's commit and of a commit of
+  reservations alone.
+
+`storage_boundary.json` is now schema `uo-storage-boundary-v5`:
+
+- Each restart row shows every key resuming at the reservation of the last
+  commit, and the resume adding one commit.
+- Each dropped-call row shows the records as they were, and one commit of no
+  record. Its verdict is renamed `a_dropped_call_leaves_the_records_as_they_were`.
+- The nonce-reservation row adds a record in a call, refused until its
+  reservation is committed.
+- `fault_matrix` has 42 rows: the 7 failures at each of the two commits, on
+  each of the 3 sealed backends. Each says which commit met the failure,
+  `files_hold` names the commit the files end with, and the restart's
+  generations are counted from the instance's last commit that returned.
+
+The commit metadata carries the reservations, so a commit's entry is longer:
+the payload cut in the example is 7,861 bytes where 7,828 were, and a commit
+of no record after a dropped `approve` on that backend is 431 bytes.
+
+`restarts_resume_at_the_reservations_of_their_commit` in
+`runtime_boundary_validation.json` pins the reservations in the metadata, the
+reservation ahead at every commit, the guard that writes nothing, the
+reservation after a failed call, the restart's check, the resume, and the
+store's side. Its unit test rejects nine drifts. The pins of
+`dropped_calls_leave_fixed_seal_counts`,
+`sealed_records_cross_the_storage_boundary`,
+`restarts_check_the_commit_generation`,
+`store_failures_are_injected_only_in_test_and_diagnostics_builds`,
+`production_deployments_restart_from_a_sealed_secret` and
+`production_calls_issue_chained_receipts` follow the code.
+
+The claim boundary's The Storage Boundary, its restart, outcome and fault
+matrix paragraphs, its TEE row and the non-claim say what is reserved and
+checked, and so do invariants 18 and 19 of `docs/runtime/secret-state.md`,
+`docs/runtime/tee-observer.md`, the evaluation index and the claim manifest.
+The residual of Issue 67 reaches the nonces too. Two stores that one
+generation names, after a store with a commit whose result was not released
+was set aside or after two instances restarted from the same files, can hold
+reservations below counts that calls on the other used. A restart from one of
+them after the other's calls can then repeat a nonce. The non-claim says so.
+
 ---
 
 ## Wave 12: the repaired baseline

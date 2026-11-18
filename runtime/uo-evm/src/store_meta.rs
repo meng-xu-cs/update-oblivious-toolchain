@@ -3,23 +3,24 @@
 //!
 //! The metadata is what a restart cannot read off the records: the
 //! generation of the commit, the freshness counters, whether the contract is
-//! initialized, the digest of the public state, and for a production
-//! deployment the receipt it issued last, which the next call must name. All
-//! of it is public. It carries a tag under a key that derives from the
-//! master secret, so a restart takes only metadata that a runtime with the
-//! same secret wrote. The tag does not say that the metadata is the latest:
-//! that is the generation's part, which a restart compares with the one the
-//! platform's monotonic counter attests.
+//! initialized, the digest of the public state, each key's reserved seal
+//! count, and for a production deployment the receipt it issued last, which
+//! the next call must name. All of it is public. It carries a tag under a
+//! key that derives from the master secret, so a restart takes only metadata
+//! that a runtime with the same secret wrote. The tag does not say that the
+//! metadata is the latest: that is the generation's part, which a restart
+//! compares with the one the platform's monotonic counter attests.
 
 use crate::deployment::ProductionReceipt;
 use crate::freshness::RuntimeFreshnessSnapshot;
 use crate::secret::StoreMetaKey;
 use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use uo_core::manifest::CALL_SEAL_BOUND;
 use uo_store::{storage_failure, SharedStorage, StorageFailure, StoreCipher};
 
-const STORE_META_SCHEMA: &str = "uo-runtime-store-meta-v2";
+const STORE_META_SCHEMA: &str = "uo-runtime-store-meta-v3";
 const STORE_META_TAG_BYTES: usize = 32;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -35,6 +36,11 @@ pub(crate) struct StoreMeta {
     next_call_counter: u64,
     pub(crate) initialized: bool,
     pub(crate) public_state_sha256: String,
+    /// The count below which this commit reserved the seals of each sealed
+    /// object's key, by object: every count a call from the state it leaves
+    /// can seal is below it, and a restart from it resumes each key there.
+    /// The store makes the reservations durable with the commit.
+    reservations: BTreeMap<String, u64>,
     /// The receipt a production deployment issued last: a restart issues
     /// the next one after it. A deployment that issues no receipts keeps
     /// none.
@@ -57,8 +63,33 @@ impl StoreMeta {
             next_call_counter: freshness.next_call_counter,
             initialized,
             public_state_sha256,
+            reservations: BTreeMap::new(),
             last_receipt: None,
         }
+    }
+
+    /// The metadata with `reservations`.
+    pub(crate) fn with_reservations(mut self, reservations: BTreeMap<String, u64>) -> Self {
+        self.reservations = reservations;
+        self
+    }
+
+    /// The metadata of a commit of the same state at `generation`.
+    pub(crate) fn at_generation(mut self, generation: u64) -> Self {
+        self.generation = generation;
+        self
+    }
+
+    /// The reservation of each sealed object's key.
+    pub(crate) fn reservations(&self) -> &BTreeMap<String, u64> {
+        &self.reservations
+    }
+
+    /// The reservations, as the store takes them for its commit.
+    pub(crate) fn reservation_entries(&self) -> impl Iterator<Item = (&str, u64)> {
+        self.reservations
+            .iter()
+            .map(|(object, below)| (object.as_str(), *below))
     }
 
     /// The metadata with the receipt a production deployment issued last.
@@ -210,6 +241,28 @@ impl Drop for StagedStore {
 /// the call alone.
 pub(crate) const DROPPED_CALL_SEAL_QUANTUM: u64 = CALL_SEAL_BOUND;
 
+/// The reservations a commit makes, of a state whose keys' counts `ciphers`
+/// hold: each key's reservation in `last`, raised to the count a call from
+/// the key's count resumes at if it is dropped
+/// (`seal_count_after_dropped_call`). Every count that call can seal is
+/// below it, so the next call needs no reservation of its own, and the
+/// commit that made it is attested before the call begins.
+pub(crate) fn reservations_ahead(
+    ciphers: &[StoreCipher],
+    last: &BTreeMap<String, u64>,
+) -> BTreeMap<String, u64> {
+    let mut reservations = last.clone();
+    for cipher in ciphers {
+        let Some(storage) = cipher.storage() else {
+            continue;
+        };
+        let ahead = seal_count_after_dropped_call(cipher.seal_count());
+        let reserved = reservations.entry(storage.object().to_owned()).or_insert(0);
+        *reserved = (*reserved).max(ahead);
+    }
+    reservations
+}
+
 /// The seal count a key resumes at after a call that started at `start` was
 /// dropped: the second multiple of the quantum above `start`, or the end of
 /// the count, which no seal can use.
@@ -224,10 +277,10 @@ pub(crate) fn seal_count_after_dropped_call(start: u64) -> u64 {
 /// call that is dropped, whatever the reason and wherever it stopped, leaves
 /// each key's count at `seal_count_after_dropped_call` of its count before
 /// the call, so that neither the next record's nonce nor a restart shows how
-/// far the call got. The store has that count reserved before the call
-/// seals anything, so a restart after a crash, when nothing runs at the end
-/// of the call, resumes there too. A call that is committed keeps the counts
-/// its seals reached, which its entrypoint fixes.
+/// far the call got. The last commit reserved that count before the call
+/// began, so a restart after a crash, when nothing runs at the end of the
+/// call, resumes there too. A call that is committed keeps the counts its
+/// seals reached, which its entrypoint fixes.
 #[derive(Debug)]
 pub(crate) struct DroppedCallSeals {
     starts: Vec<(StoreCipher, u64)>,
@@ -235,13 +288,16 @@ pub(crate) struct DroppedCallSeals {
 }
 
 impl DroppedCallSeals {
-    /// The counts of `ciphers`, each sharing its key's count, before a call,
-    /// with the count each key resumes at if the call is dropped made
-    /// durable in `storage` first: one reservation of every key not
-    /// reserved that far, which a key needs only after a dropped call or once
-    /// in `DROPPED_CALL_SEAL_QUANTUM` seals. If the store cannot make it, the
-    /// call fails before it seals anything.
-    pub(crate) fn begin(ciphers: Vec<StoreCipher>, storage: &SharedStorage) -> Result<Self> {
+    /// The counts of `ciphers`, each sharing its key's count, before a call.
+    /// The call writes no reservation: the last commit's, `reserved`, must
+    /// cover the count each key resumes at if the call is dropped, and with
+    /// it every count the call can seal. If they do not, which only an
+    /// instance that restarted and has not resumed meets, the call fails
+    /// before it seals anything.
+    pub(crate) fn begin(
+        ciphers: Vec<StoreCipher>,
+        reserved: &BTreeMap<String, u64>,
+    ) -> Result<Self> {
         let starts: Vec<(StoreCipher, u64)> = ciphers
             .into_iter()
             .map(|cipher| {
@@ -249,14 +305,17 @@ impl DroppedCallSeals {
                 (cipher, start)
             })
             .collect();
-        let resumes: Vec<(String, u64)> = starts
-            .iter()
-            .filter_map(|(cipher, start)| {
-                let object = cipher.storage()?.object().to_owned();
-                Some((object, seal_count_after_dropped_call(*start)))
-            })
-            .collect();
-        storage.reserve_seals_together(&resumes)?;
+        for (cipher, start) in &starts {
+            let Some(storage) = cipher.storage() else {
+                continue;
+            };
+            let object = storage.object();
+            if seal_count_after_dropped_call(*start) > reserved.get(object).copied().unwrap_or(0) {
+                bail!(
+                    "the last commit did not reserve the seal counts a call can use for {object}: an instance that restarted resumes before its first call, and one whose call was dropped commits the reservation the next call needs"
+                );
+            }
+        }
         Ok(Self {
             starts,
             dropped: true,
@@ -274,8 +333,8 @@ impl Drop for DroppedCallSeals {
         if !self.dropped {
             return;
         }
-        // The store reserved these counts before the call sealed anything,
-        // and a restart resumes at them: nothing is written here.
+        // The last commit reserved these counts before the call began, and
+        // a restart resumes at them: nothing is written here.
         for (cipher, start) in &self.starts {
             cipher.resume_seal_count(seal_count_after_dropped_call(*start));
         }
@@ -283,7 +342,7 @@ impl Drop for DroppedCallSeals {
 }
 
 /// Commit the records a deployment handed the store, with the deployment's
-/// commit metadata.
+/// commit metadata and the reservations it made.
 pub(crate) fn make_deployment_durable(storage: &SharedStorage, meta: &[u8]) -> Result<()> {
     storage.with(|adapter| adapter.commit(meta))
 }
@@ -304,6 +363,7 @@ mod tests {
             true,
             "ab".repeat(32),
         )
+        .with_reservations(BTreeMap::from([("balances".to_owned(), 1 << 33)]))
     }
 
     #[test]
@@ -316,6 +376,7 @@ mod tests {
         assert_eq!(opened, meta());
         assert_eq!(opened.generation, 4);
         assert_eq!(opened.freshness().rollback_counter, 3);
+        assert_eq!(opened.reservations()["balances"], 1 << 33);
 
         // A changed byte of the metadata or of the tag, metadata cut short,
         // and another deployment's key are all refused.
@@ -343,15 +404,67 @@ mod tests {
         assert!(refused.contains("tag"), "{refused}");
         assert!(!refused.contains("ab"), "{refused}");
 
-        // Metadata of the schema before the generation, under the right tag,
-        // is refused.
+        // Metadata of the schemas before the generation and before the
+        // reservations, under the right tag, is refused.
+        let tagged = |body: &serde_json::Value| {
+            let body = serde_json::to_vec(body).unwrap();
+            let mut tagged = key.tag(&body).unwrap().to_vec();
+            tagged.extend_from_slice(&body);
+            tagged
+        };
         let mut older = serde_json::to_value(meta()).unwrap();
+        older.as_object_mut().unwrap().remove("reservations");
+        older["schema"] = serde_json::json!("uo-runtime-store-meta-v2");
+        assert!(StoreMeta::from_tagged_bytes(&key, &tagged(&older)).is_err());
         older.as_object_mut().unwrap().remove("generation");
         older["schema"] = serde_json::json!("uo-runtime-store-meta-v1");
-        let body = serde_json::to_vec(&older).unwrap();
-        let mut tagged = key.tag(&body).unwrap().to_vec();
-        tagged.extend_from_slice(&body);
-        assert!(StoreMeta::from_tagged_bytes(&key, &tagged).is_err());
+        assert!(StoreMeta::from_tagged_bytes(&key, &tagged(&older)).is_err());
+
+        // A reservation lowered in the metadata, under the tag it had, fails
+        // the tag check.
+        let mut lowered = serde_json::to_value(meta()).unwrap();
+        lowered["reservations"]["balances"] = serde_json::json!(1);
+        let mut changed = sealed[..STORE_META_TAG_BYTES].to_vec();
+        changed.extend_from_slice(&serde_json::to_vec(&lowered).unwrap());
+        let refused = StoreMeta::from_tagged_bytes(&key, &changed)
+            .unwrap_err()
+            .to_string();
+        assert!(refused.contains("tag"), "{refused}");
+    }
+
+    /// A commit reserves, for each key, the count a call from its count
+    /// resumes at if it is dropped, and so everything that call can seal.
+    /// A call starts only if the last commit's reservations cover it: after
+    /// a call was dropped, its keys moved to that count, and the next call
+    /// waits for a commit that reserves ahead of it.
+    #[test]
+    fn a_commit_reserves_what_the_next_call_can_seal() {
+        let storage = SharedStorage::memory();
+        let mut cipher = StoreCipher::random();
+        cipher.attach_storage(storage.handle("balances"));
+        let ciphers = || vec![cipher.clone_for_runtime_state()];
+        let quantum = DROPPED_CALL_SEAL_QUANTUM;
+        let reserved = reservations_ahead(&ciphers(), &BTreeMap::new());
+        assert_eq!(
+            reserved,
+            BTreeMap::from([("balances".to_owned(), 2 * quantum)])
+        );
+        // A call from count 0 starts, and is dropped: the key moves to the
+        // reservation, from which no call starts.
+        drop(DroppedCallSeals::begin(ciphers(), &reserved).unwrap());
+        assert_eq!(cipher.seal_count(), 2 * quantum);
+        let refused = DroppedCallSeals::begin(ciphers(), &reserved)
+            .unwrap_err()
+            .to_string();
+        assert!(refused.contains("did not reserve"), "{refused}");
+        // A commit that reserves ahead lets it start.
+        let ahead = reservations_ahead(&ciphers(), &reserved);
+        assert_eq!(ahead["balances"], 4 * quantum);
+        DroppedCallSeals::begin(ciphers(), &ahead).unwrap().keep();
+        assert_eq!(cipher.seal_count(), 2 * quantum);
+        // A reservation never falls, and a key with none starts no call.
+        assert_eq!(reservations_ahead(&[], &ahead), ahead);
+        assert!(DroppedCallSeals::begin(ciphers(), &BTreeMap::new()).is_err());
     }
 
     #[test]

@@ -6,8 +6,8 @@ mod store;
 
 pub use codec::{sealed_record_len, sealed_record_seal_count, StoreCipher};
 pub use storage::{
-    sealed_write_class, storage_failure, AppendFailure, CheckpointStep, FileStorage, JournalEntry,
-    MemoryStorage, SharedStorage, StorageAdapter, StorageError, StorageFailure, StorageFault,
-    StorageHandle, StorageIo, StorageStats, SyncPolicy, SEAL_RESERVATION_STEP,
+    sealed_write_class, storage_failure, AppendFailure, CheckpointStep, FileStorage, MemoryStorage,
+    SharedStorage, StorageAdapter, StorageError, StorageFailure, StorageFault, StorageHandle,
+    StorageIo, StorageStats, SyncPolicy,
 };
 pub use store::StoreExecutionMetrics;

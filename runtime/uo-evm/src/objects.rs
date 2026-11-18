@@ -792,7 +792,8 @@ impl RuntimeObject {
     /// its cipher takes its part of the store, which keeps its records, and
     /// resumes at the seal count the store has reserved, so it repeats no
     /// nonce of a record the store was handed. A public object takes the
-    /// values the store keeps.
+    /// values the store keeps, and its key, which seals nothing, resumes at
+    /// its reservation too.
     pub(in crate::runtime) fn restore_from_storage(
         &mut self,
         storage: &SharedStorage,
@@ -826,6 +827,7 @@ impl RuntimeObject {
                     object.physical = raw_encode_value(&value)?;
                     object.value = value;
                 }
+                object.cipher.resume_seal_count(handle.reserved_seals());
                 object.cipher.attach_storage(handle);
             }
             Self::RawArray(object) => {
@@ -850,6 +852,7 @@ impl RuntimeObject {
                         *slot = value;
                     }
                 }
+                object.cipher.resume_seal_count(handle.reserved_seals());
                 object.cipher.attach_storage(handle);
             }
             Self::RawMap(object) => {

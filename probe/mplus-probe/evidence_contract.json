@@ -1160,6 +1160,7 @@
           "resource_event_constructor_files": "array 1",
           "resource_event_constructor_surface_restricted": "true",
           "restarts_check_the_commit_generation": "true",
+          "restarts_resume_at_the_reservations_of_their_commit": "true",
           "restricted_signature_checks": "array 15",
           "runtime_boundary_obligation_classification": "object",
           "runtime_call_outcome_api_is_explicit": "true",
@@ -3935,6 +3936,7 @@
         "resource_event_constructor_files": "array 1",
         "resource_event_constructor_surface_restricted": "true",
         "restarts_check_the_commit_generation": "true",
+        "restarts_resume_at_the_reservations_of_their_commit": "true",
         "restricted_signature_checks": "array 15",
         "runtime_boundary_obligation_classification": {
           "proof_critical": "array 9",
@@ -5010,12 +5012,12 @@
       }
     },
     "storage_boundary": {
-      "declared_schema": "uo-storage-boundary-v4",
+      "declared_schema": "uo-storage-boundary-v5",
       "fields": {
         "accepted": "true",
         "benchmarks": "array 14",
         "checks": {
-          "a_dropped_call_leaves_the_store_as_it_was": "true",
+          "a_dropped_call_leaves_the_records_as_they_were": "true",
           "a_record_reaches_the_store_only_under_a_reserved_nonce": "true",
           "a_restart_refuses_the_files_from_before_a_committed_abort": "true",
           "every_restart_continues_its_deployment": "true",
@@ -5030,12 +5032,14 @@
           "calls": "count 47"
         },
         "dropped_calls": "array 3",
-        "fault_matrix": "array 33",
+        "fault_matrix": "array 42",
         "nonce_reservation": {
           "a_deployment_reserves_before_it_hands_over_a_record": "true",
           "holds": "true",
           "location": "string",
           "object": "string",
+          "record_in_a_call_refused_until_its_reservation_is_committed": "true",
+          "record_in_a_call_taken_once_its_reservation_is_committed": "true",
           "record_refused_at_the_reserved_count": "true",
           "record_refused_with_nothing_reserved": "true",
           "record_taken_once_its_count_is_reserved": "true"

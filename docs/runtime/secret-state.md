@@ -225,15 +225,26 @@ and the ownership boundaries that keep them auditable.
     (`FileStorage::inject_fault`, under the store's `fault-injection`
     feature).
 
-    The store takes a sealed record only if the seal count in the record's
-    nonce is below the count it has reserved for the record's object, and
-    the cipher reserves the counts of the seals made so far before it hands
-    a record over. A reservation is never undone, and a store in files has
-    it in its journal before it takes effect. A runtime that restarts from
-    the files resumes each key's count at its reservation
-    (`resume_seal_count`, which can only raise a count). So it seals no
-    record under a nonce that a record handed to the store carries, whether
-    the call that sealed that record was committed, abandoned or cut off.
+    Each key's reservation, the count below which its seals may have been
+    used, is in the tagged commit metadata, and the store makes it durable
+    with the commit; a reservation is never undone. Every commit reserves
+    what a call from the state it leaves can seal (`reservations_ahead`), so
+    a call writes no reservation, and in a call the store takes a sealed
+    record only below the last commit's reservation of its key. A
+    deployment's records are below the reservations of the deployment's
+    commit, which the cipher states before it hands a record over. After a
+    call is dropped, the instance commits, with no record, the reservation
+    the next call needs, before the call's error returns. A runtime that
+    restarts from the files resumes each key at the reservation the
+    verified metadata names (`resume_seal_count`, which can only raise a
+    count), and refuses files that name another. It takes no call until it
+    resumes, which commits the reservations its first call needs once the
+    platform's counter attests the restarted store's generation. With the
+    counter at each commit's generation before the next call, every count a
+    call seals is below a reservation the counter attested before the call
+    began, so a restart seals no record under a nonce that a record handed
+    to the store carries, whether the call that sealed that record was
+    committed, abandoned or cut off.
 
     A restart (`ContractInstance::restart_with_seed`, in test and
     diagnostics builds) takes the commit metadata only with the tag of the
@@ -247,8 +258,9 @@ and the ownership boundaries that keep them auditable.
     detect a store that was rolled back together with the attested
     generation, two stores that one generation names (the commit of a
     result that was not released, set aside by a restart from the files
-    before it), nor a record replaced by an older record of its location: a
-    record carries its location and not its version. The first is the
+    before it), between which a key can resume below a count the other
+    store's calls used, nor a record replaced by an older record of its
+    location: a record carries its location and not its version. The first is the
     rollback resistance of the deployment assumptions, whose counter
     follows the generation; a digest tree over the records is Issue 44 of
     the external review. A production
@@ -262,17 +274,17 @@ and the ownership boundaries that keep them auditable.
     the count before the call fixes, wherever it stopped, and so does a
     restart after a crash in the middle of a call. A staged call takes the
     count of every key before it runs (`DroppedCallSeals` in
-    `runtime/uo-evm/src/store_meta.rs`). Before it seals anything, the
-    store reserves for each key the second multiple of 2^32 above that
-    count (`seal_count_after_dropped_call`), in one journal entry for every
-    key not reserved that far, and the call fails if the store cannot. A key
-    needs a new reservation only after a dropped call, after a restart, or
-    once in 2^32 seals. A commit that made the store durable keeps the counts
-    the call's seals reached. Any other end of the call, an evaluation error,
-    a failed production check or a store that could not commit, moves each
-    count to the reserved one in memory and writes nothing. A crash, which
-    runs nothing at the end of the call, leaves the reservation in the files,
-    and a restart resumes there.
+    `runtime/uo-evm/src/store_meta.rs`), and starts only if the last commit
+    reserved, for each key, the second multiple of 2^32 above that count
+    (`seal_count_after_dropped_call`), which every commit reserves for the
+    next call; the call writes no reservation. A commit that made the store
+    durable keeps the counts the call's seals reached. Any other end of the
+    call, an evaluation error, a failed production check or a store that
+    could not commit, moves each count to the reserved one in memory and
+    writes nothing; the instance then commits, with no record, the
+    reservation the next call needs. A crash, which runs nothing at the end
+    of the call, leaves the last commit's reservation in the files, and a
+    restart resumes there.
 
     No entrypoint can seal 2^32 records under one key in a call: its commit
     and load operations bound its seals, and the compiler, `uo-check` and
@@ -295,9 +307,9 @@ the second multiple of 2^32 above its count before the call (invariant 19):
 the next record's nonce shows that a call was dropped, which the caller
 sees, and nothing of how far it got. Evaluation errors are outside the trace
 claims (see [`proof-architecture.md`](../proof-architecture.md)). After a
-restart a key's count resumes at the count its store had reserved, so the
-next record's nonce also shows that the runtime restarted and how many
-counts it skipped.
+restart a key's count resumes at the reservation of the store's last commit,
+so the next record's nonce also shows that the runtime restarted and how
+many counts it skipped.
 
 ### What a marker shows
 
@@ -325,7 +337,7 @@ write/read evidence, direct store cipher calls outside the codec layer, and
 reintroduction of host-visible hidden-state errors that should be modeled
 confidential aborts.
 
-Invariants 9 to 19 have sixteen bits in `runtime_boundary_validation.json`:
+Invariants 9 to 19 have seventeen bits in `runtime_boundary_validation.json`:
 `deployment_seed_stays_out_of_call_traces`,
 `production_errors_carry_no_runtime_freshness_value`,
 `contract_instance_debug_is_opaque`,
@@ -340,8 +352,9 @@ Invariants 9 to 19 have sixteen bits in `runtime_boundary_validation.json`:
 `trace_runs_stand_for_recorded_events`,
 `sealed_records_cross_the_storage_boundary`,
 `dropped_calls_leave_fixed_seal_counts`,
-`store_failures_are_injected_only_in_test_and_diagnostics_builds` and
-`restarts_check_the_commit_generation`. Each is a
+`store_failures_are_injected_only_in_test_and_diagnostics_builds`,
+`restarts_check_the_commit_generation` and
+`restarts_resume_at_the_reservations_of_their_commit`. Each is a
 check of source text,
 and a probe unit test shows that it rejects the drifts it guards against.
 
@@ -484,9 +497,10 @@ record handed over before its seal count is reserved
 The store's own side is handwritten Rust, which the boundary bit pins and
 `runtime/uo-store/src/storage.rs` tests: the log and the classes it
 computes, a read of a record the runtime does not hold, a record refused
-before its nonce is reserved, what an abandoned call leaves, a store in
-files that reopens as its last commit left it, and a commit cut short at
-several lengths, which is dropped whole. `runtime/uo-evm/src/engine.rs`
+before its nonce is reserved, and in a call until its reservation is
+committed, what an abandoned call leaves, a store in files that reopens as
+its last commit left it, with the reservations it made durable, and a commit
+cut short at several lengths, which is dropped whole. `runtime/uo-evm/src/engine.rs`
 compares the store's log with the trace of calls on exact objects and on
 both Path ORAM schemes, drops a call after it handed records over, and
 restarts from files beside a twin that never restarted: the two return the

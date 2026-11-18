@@ -17,9 +17,11 @@ use crate::runtime::{
 };
 use crate::secret::{PlatformSealingKey, RuntimeMasterSecret, StoreMetaKey};
 use crate::store_meta::{
-    make_deployment_durable, DroppedCallSeals, StagedStore, StoreGeneration, StoreMeta,
+    make_deployment_durable, reservations_ahead, DroppedCallSeals, StagedStore, StoreGeneration,
+    StoreMeta,
 };
 use anyhow::{anyhow, bail, Result};
+use std::collections::BTreeMap;
 use uo_core::{
     CompiledArtifact, EncryptedReturnPayload, ExecutionTrace, PublicEnvironment, PublicReceipt,
     ReturnPolicy, Value,
@@ -38,10 +40,15 @@ pub struct ContractInstance {
     freshness: RuntimeFreshnessState,
     environment: PublicEnvironment,
     initialized: bool,
-    /// The generation of the instance's last commit: how many commits its
-    /// store holds. Each commit leaves it in the commit metadata, one past
-    /// the last, and a restart compares it with the attested one.
-    generation: u64,
+    /// The metadata of the instance's last commit: its generation, how many
+    /// commits the store holds, which a restart compares with the attested
+    /// one; and the reservation of each key, below which every count a call
+    /// from it can seal lies. Each commit leaves the next in the store.
+    committed: StoreMeta,
+    /// Whether the instance takes calls: not after a restart, until it
+    /// resumes (`resume`) and has committed the reservations its first call
+    /// needs.
+    resumed: bool,
     /// The store that keeps the contract's sealed records. Every record a
     /// call opens or seals crosses to it, and a call is committed there,
     /// with the commit metadata, before the runtime takes the call's state.
@@ -229,10 +236,12 @@ impl ProductionContractInstance {
     /// stands to the one the platform's monotonic counter attests: at it, or
     /// one past it, in which case the deployment advances the counter to the
     /// instance's generation before it releases anything the instance
-    /// returns. It is refused unless the secret opens on `platform` for this
+    /// returns. The instance takes no call until it resumes (`resume`). The
+    /// restart is refused unless the secret opens on `platform` for this
     /// deployment, the commit metadata carries the tag of that secret, its
-    /// generation is the attested one or one past it, and the store is the
-    /// one the last receipt was issued for: its public state
+    /// generation is the attested one or one past it, each key resumes at
+    /// the reservation the metadata names, and the store is the one the last
+    /// receipt was issued for: its public state
     /// and every sealed record of it. A restart seals no record.
     pub fn restart(
         artifact: CompiledArtifact,
@@ -249,16 +258,17 @@ impl ProductionContractInstance {
             platform,
             &production_deployment_request_sha256(&artifact, &policy)?,
         )?;
-        let (inner, meta, found) = ContractInstance::restart_internal(
+        let (inner, found) = ContractInstance::restart_internal(
             artifact,
             &master,
             None,
             storage,
             attested_generation,
         )?;
-        let last_receipt = meta
-            .last_receipt
-            .ok_or_else(|| anyhow!("the store's commit metadata names no production receipt"))?;
+        let last_receipt =
+            inner.committed.last_receipt.clone().ok_or_else(|| {
+                anyhow!("the store's commit metadata names no production receipt")
+            })?;
         last_receipt.ends_in(
             inner.freshness.snapshot(),
             &inner.state.public_state_digest()?,
@@ -286,16 +296,15 @@ impl ProductionContractInstance {
             inner.state.public_state_digest()?,
             inner.state.ciphertext_store_digest()?,
         )?;
-        let generation = next_generation(inner.generation)?;
-        let meta = inner.store_meta(
-            generation,
-            &inner.freshness,
-            inner.initialized,
-            inner.state.public_state_digest()?,
-            Some(&last_receipt),
-        )?;
+        let generation = next_generation(inner.committed.generation)?;
+        let committed = inner
+            .committed
+            .clone()
+            .at_generation(generation)
+            .with_last_receipt(Some(&last_receipt));
+        let meta = committed.tagged_bytes(&inner.store_meta_key)?;
         make_deployment_durable(&inner.storage, &meta)?;
-        inner.generation = generation;
+        inner.committed = committed;
         let last_receipt_sha256 = last_receipt.sha256()?;
         Ok(Self {
             inner,
@@ -315,10 +324,19 @@ impl ProductionContractInstance {
 
     /// The generation of the instance's last commit. The deployment's
     /// platform counter holds it before the deployment releases anything
-    /// the instance returned: after the deployment, after each call
-    /// (`ProductionCallResult::generation`) and after a restart.
+    /// the instance returned or makes another call: after the deployment,
+    /// after each call, whether it returned
+    /// (`ProductionCallResult::generation`) or failed, and after a restart
+    /// and its `resume`.
     pub fn generation(&self) -> u64 {
-        self.inner.generation
+        self.inner.generation()
+    }
+
+    /// Ready an instance that restarted for its first call
+    /// (`ContractInstance::resume`), once the platform's counter attests
+    /// the generation of the store it restarted from.
+    pub fn resume(&mut self, attested_generation: u64) -> Result<()> {
+        self.inner.resume(attested_generation)
     }
 
     /// The receipt the runtime issued last, with its tag under `session`.
@@ -383,6 +401,21 @@ impl ProductionContractInstance {
             self.inner.freshness.snapshot(),
             &self.last_receipt_sha256,
         )?;
+        let outcome =
+            self.stage_and_commit_authorized(entrypoint, args, session, environment, evidence);
+        self.inner.reserve_after_failed_call(outcome)
+    }
+
+    /// An accepted call after its preflight: staged, checked, given its
+    /// receipt and committed.
+    fn stage_and_commit_authorized(
+        &mut self,
+        entrypoint: &str,
+        args: Vec<Value>,
+        session: &ReturnChannelSession,
+        environment: PublicEnvironment,
+        evidence: &ProductionCallEvidence,
+    ) -> Result<ProductionCallResult> {
         let manifest_entry = self
             .inner
             .artifact
@@ -406,7 +439,10 @@ impl ProductionContractInstance {
         // it. The store then refuses every operation, so the instance refuses
         // every call, and the deployment restarted from its files has as its
         // last receipt this call's or the one before
-        // (`resolve_production_call_outcome`).
+        // (`resolve_production_call_outcome`). A call dropped after it was
+        // staged leaves its keys at counts the next call needs a reservation
+        // for, which is committed before the error is returned
+        // (`ContractInstance::reserve_after_failed_call`).
         let staged =
             self.inner
                 .stage_call(entrypoint, args, None, execution_session, Some(environment))?;
@@ -434,7 +470,7 @@ impl ProductionContractInstance {
             call,
             receipt,
             receipt_tag,
-            generation: self.inner.generation,
+            generation: self.inner.generation(),
         })
     }
 }
@@ -481,10 +517,11 @@ impl ContractInstance {
     /// tag of the deployment's secret, its generation must be the attested
     /// one or one past it, which the restart says, and the public state the
     /// store keeps must have the digest the metadata names. Each storage key
-    /// resumes at the seal count the store has reserved for it. Only a
-    /// seeded deployment can restart: a deployment from OS randomness keeps
-    /// its master secret in memory alone, and sealing it to a platform is not
-    /// this runtime's part.
+    /// resumes at the reservation the metadata names, which the store's files
+    /// must name too. The instance takes no call until it resumes (`resume`).
+    /// Only a seeded deployment can restart: a deployment from OS randomness
+    /// keeps its master secret in memory alone, and sealing it to a platform
+    /// is not this runtime's part.
     #[cfg(any(test, feature = "diagnostics"))]
     pub fn restart_with_seed(
         artifact: CompiledArtifact,
@@ -493,29 +530,28 @@ impl ContractInstance {
         attested_generation: u64,
     ) -> Result<(Self, StoreGeneration)> {
         let master = RuntimeMasterSecret::from_diagnostic_seed(deploy_seed);
-        let (instance, _, found) = Self::restart_internal(
+        Self::restart_internal(
             artifact,
             &master,
             Some(deploy_seed),
             storage,
             attested_generation,
-        )?;
-        Ok((instance, found))
+        )
     }
 
     /// Start again from the store a deployment with `master` left, with the
     /// commit metadata it kept there. The metadata must carry the tag of the
     /// secret, its generation must be the attested one or one past it, and
     /// the public state the store keeps must have the digest the metadata
-    /// names. Each storage key resumes at the seal count the store has
-    /// reserved for it, and no object seals a record.
+    /// names. Each storage key resumes at the reservation the metadata names,
+    /// which the store's files must name too, and no object seals a record.
     fn restart_internal(
         artifact: CompiledArtifact,
         master: &RuntimeMasterSecret,
         replay_seed: Option<u64>,
         storage: SharedStorage,
         attested_generation: u64,
-    ) -> Result<(Self, StoreMeta, StoreGeneration)> {
+    ) -> Result<(Self, StoreGeneration)> {
         check_call_seal_bounds(&artifact)?;
         let store_meta_key = master.store_meta_key()?;
         let meta = storage
@@ -526,6 +562,7 @@ impl ContractInstance {
         if state.public_state_digest()? != meta.public_state_sha256 {
             bail!("the public state the store keeps is not the public state of its last commit");
         }
+        check_keys_resume_at_their_reservations(&state, meta.reservations())?;
         let instance = Self {
             artifact,
             state,
@@ -533,11 +570,12 @@ impl ContractInstance {
             freshness,
             environment: PublicEnvironment::default(),
             initialized: meta.initialized,
-            generation: meta.generation,
+            committed: meta,
+            resumed: false,
             storage,
             store_meta_key,
         };
-        Ok((instance, meta, found))
+        Ok((instance, found))
     }
 
     fn deploy_internal(
@@ -555,55 +593,128 @@ impl ContractInstance {
             .values()
             .any(|entry| entry.initializer);
         let state = deploy_contract_runtime(&artifact.contract.state, master, &storage, false)?;
-        // The deployment's commit is the store's first.
-        let instance = Self {
+        // The deployment's commit is the store's first, and reserves what
+        // the first call can seal.
+        let committed = StoreMeta::new(
+            1,
+            freshness.snapshot(),
+            initialized,
+            state.public_state_digest()?,
+        )
+        .with_reservations(reservations_ahead(
+            &contract_seal_ciphers(&state),
+            &BTreeMap::new(),
+        ));
+        let store_meta_key = master.store_meta_key()?;
+        // The deployment's records are in the store once this commit returns.
+        storage.reserve_seals(committed.reservation_entries())?;
+        make_deployment_durable(&storage, &committed.tagged_bytes(&store_meta_key)?)?;
+        Ok(Self {
             state,
             artifact,
             replay_seed,
             freshness,
             environment: PublicEnvironment::default(),
             initialized,
-            generation: 1,
+            committed,
+            resumed: true,
             storage,
-            store_meta_key: master.store_meta_key()?,
-        };
-        // The deployment's records are in the store once this commit returns.
-        let meta = instance.store_meta(
-            instance.generation,
-            &instance.freshness,
-            instance.initialized,
-            instance.state.public_state_digest()?,
-            None,
-        )?;
-        make_deployment_durable(&instance.storage, &meta)?;
-        Ok(instance)
+            store_meta_key,
+        })
     }
 
     /// The generation of the instance's last commit: how many commits its
     /// store holds.
     pub fn generation(&self) -> u64 {
-        self.generation
+        self.committed.generation
     }
 
-    /// The commit metadata of a state: the commit's generation, the state's
-    /// freshness counters, whether it is initialized and the digest of its
-    /// public state, with the tag.
-    fn store_meta(
-        &self,
-        generation: u64,
-        freshness: &RuntimeFreshnessState,
-        initialized: bool,
-        public_state_sha256: String,
-        last_receipt: Option<&ProductionReceipt>,
-    ) -> Result<Vec<u8>> {
-        StoreMeta::new(
-            generation,
-            freshness.snapshot(),
-            initialized,
-            public_state_sha256,
-        )
-        .with_last_receipt(last_receipt)
-        .tagged_bytes(&self.store_meta_key)
+    /// Ready an instance that restarted for its first call. Every key
+    /// resumed at the reservation of the commit the restart found, and a call
+    /// seals at and above it, so the instance first commits, with no record,
+    /// the reservations its first call needs. `attested_generation` is the
+    /// generation the platform's monotonic counter attests, which must be the
+    /// instance's: after a restart that found the store one past the counter,
+    /// the counter catches up first, so that the store is never two commits
+    /// past it. The deployment then advances the counter to the instance's
+    /// generation before it makes a call. An instance that resumed, or never
+    /// restarted, is ready, and nothing is done.
+    pub fn resume(&mut self, attested_generation: u64) -> Result<()> {
+        if self.resumed {
+            return Ok(());
+        }
+        if attested_generation != self.committed.generation {
+            bail!(
+                "the platform's counter attests generation {attested_generation}, and the store the instance restarted from is at generation {}: the counter catches up before the instance resumes",
+                self.committed.generation
+            );
+        }
+        self.reserve_ahead()?;
+        self.resumed = true;
+        Ok(())
+    }
+
+    /// Fail unless the instance takes calls.
+    fn ensure_resumed(&self) -> Result<()> {
+        if !self.resumed {
+            bail!(
+                "the instance restarted and has not resumed: the deployment advances the platform's counter to its generation and resumes it before its first call"
+            );
+        }
+        Ok(())
+    }
+
+    /// Commit, with no record, the reservations a call from the keys'
+    /// counts needs, if the last commit's do not cover them: after a call
+    /// was dropped, whose keys moved on to the count the last commit
+    /// reserved, and after a restart, whose keys resume there. Whether it
+    /// committed.
+    fn reserve_ahead(&mut self) -> Result<bool> {
+        let reservations = reservations_ahead(
+            &contract_seal_ciphers(&self.state),
+            self.committed.reservations(),
+        );
+        if &reservations == self.committed.reservations() {
+            return Ok(false);
+        }
+        let committed = self
+            .committed
+            .clone()
+            .at_generation(next_generation(self.committed.generation)?)
+            .with_reservations(reservations);
+        let meta = committed.tagged_bytes(&self.store_meta_key)?;
+        let store = StagedStore::begin(&self.storage)?;
+        self.storage
+            .reserve_seals(committed.reservation_entries())?;
+        store.make_durable(&meta)?;
+        self.committed = committed;
+        Ok(true)
+    }
+
+    /// What a call that failed returns, once the reservations the next call
+    /// needs are committed. A call that was staged and dropped moved its keys
+    /// on to the count the last commit reserved, so the next call needs a
+    /// reservation: it is committed here, with no record, before the error
+    /// reaches the deployment, which advances the platform's counter to the
+    /// instance's generation before it makes another call. Nothing is
+    /// committed after a call that failed before it was staged, by an
+    /// instance that has not resumed, or once the store refuses every
+    /// operation. If the reservation fails, its error, which says whether its
+    /// outcome is unknown, is returned with the call's.
+    fn reserve_after_failed_call<T>(&mut self, outcome: Result<T>) -> Result<T> {
+        let error = match outcome {
+            Ok(value) => return Ok(value),
+            Err(error) => error,
+        };
+        if !self.resumed || self.storage.poisoned().is_some() {
+            return Err(error);
+        }
+        match self.reserve_ahead() {
+            Ok(_) => Err(error),
+            Err(reservation) => Err(reservation.context(format!(
+                "the call failed and did not commit ({error:#}), and the commit of the reservations the next call needs failed"
+            ))),
+        }
     }
 
     pub fn call(&mut self, entrypoint: &str, args: Vec<Value>) -> Result<CallResult> {
@@ -701,24 +812,34 @@ impl ContractInstance {
         map: &str,
         entries: Vec<(Value, Value)>,
     ) -> Result<()> {
-        // The load's records reach the store as a call's do, and are
-        // committed there with the metadata the instance had. The store
-        // logs none of them: nothing compares a load with a trace.
+        // The load's records reach the store as a call's do, below the
+        // reservations of the last commit, and are committed there with the
+        // metadata the instance had, which reserves what the next call can
+        // seal. The store logs none of them: nothing compares a load with a
+        // trace.
+        self.ensure_resumed()?;
         let store = StagedStore::begin(&self.storage)?;
         self.storage.with(|adapter| adapter.set_logging(false));
         let loaded = bulk_load_contract_map_for_diagnostics(&mut self.state, map, entries);
         self.storage.with(|adapter| adapter.set_logging(true));
         loaded?;
-        let generation = next_generation(self.generation)?;
-        let meta = self.store_meta(
+        let generation = next_generation(self.committed.generation)?;
+        let committed = StoreMeta::new(
             generation,
-            &self.freshness,
+            self.freshness.snapshot(),
             self.initialized,
             self.state.public_state_digest()?,
-            None,
-        )?;
+        )
+        .with_last_receipt(self.committed.last_receipt.as_ref())
+        .with_reservations(reservations_ahead(
+            &contract_seal_ciphers(&self.state),
+            self.committed.reservations(),
+        ));
+        let meta = committed.tagged_bytes(&self.store_meta_key)?;
+        self.storage
+            .reserve_seals(committed.reservation_entries())?;
         store.make_durable(&meta)?;
-        self.generation = generation;
+        self.committed = committed;
         Ok(())
     }
 
@@ -765,8 +886,10 @@ impl ContractInstance {
         return_channel: Option<&ReturnChannelSession>,
         environment: Option<PublicEnvironment>,
     ) -> Result<(CallResult, usize)> {
-        let staged = self.stage_call(entrypoint, args, fresh_coins, return_channel, environment)?;
-        self.commit_staged(staged)
+        let outcome = self
+            .stage_call(entrypoint, args, fresh_coins, return_channel, environment)
+            .and_then(|staged| self.commit_staged(staged));
+        self.reserve_after_failed_call(outcome)
     }
 
     /// Apply a staged call to `self`. Only called once every host-visible
@@ -790,19 +913,27 @@ impl ContractInstance {
             Some(transition) => transition.committed_public_state_hash.clone(),
             None => staged.state.public_state_digest()?,
         };
-        let meta = self.store_meta(
+        let committed = StoreMeta::new(
             staged.generation,
-            &staged.freshness,
+            staged.freshness.snapshot(),
             staged.initialized,
             public_state_sha256,
-            receipt,
-        )?;
+        )
+        .with_last_receipt(receipt)
+        .with_reservations(reservations_ahead(
+            &contract_seal_ciphers(&staged.state),
+            self.committed.reservations(),
+        ));
+        let meta = committed.tagged_bytes(&self.store_meta_key)?;
+        // The commit reserves what the next call can seal.
+        self.storage
+            .reserve_seals(committed.reservation_entries())?;
         crate::instrumentation::time_store_persistence(|| staged.store.make_durable(&meta))?;
         staged.seals.keep();
         self.state = staged.state;
         self.freshness = staged.freshness;
         self.initialized = staged.initialized;
-        self.generation = staged.generation;
+        self.committed = committed;
         Ok((
             CallResult::from_staged(
                 staged.return_value,
@@ -825,6 +956,7 @@ impl ContractInstance {
         return_channel: Option<&ReturnChannelSession>,
         environment: Option<PublicEnvironment>,
     ) -> Result<StagedCall> {
+        self.ensure_resumed()?;
         let function = self
             .artifact
             .contract
@@ -879,15 +1011,20 @@ impl ContractInstance {
         }
         let args = runtime_args.into_boxed_slice();
         // The call's commit, aborted or not, is the store's next.
-        let generation = next_generation(self.generation)?;
+        let generation = next_generation(self.committed.generation)?;
         let mut staged_freshness = self.freshness.clone();
         let call_freshness = staged_freshness.begin_call()?;
-        // From here the call's records are pending in the store. If the call
-        // fails, or is dropped after it was staged, `store` is dropped and
-        // the store puts back what the call replaced, and `seals` moves each
-        // key's count to a value its count before the call fixes.
-        let seals = DroppedCallSeals::begin(contract_seal_ciphers(&self.state), &self.storage)?;
+        // From here the call's records are pending in the store, which
+        // refuses the call if an earlier failure left it refusing every
+        // operation. If the call fails, or is dropped after it was staged,
+        // `store` is dropped and the store puts back what the call replaced,
+        // and `seals` moves each key's count to a value its count before the
+        // call fixes.
         let store = StagedStore::begin(&self.storage)?;
+        let seals = DroppedCallSeals::begin(
+            contract_seal_ciphers(&self.state),
+            self.committed.reservations(),
+        )?;
         let mut staged_state = stage_contract_runtime(&self.state)?;
         let (return_value, encrypted_return, aborted, trace, zero_writes) = run_contract_call(
             &mut staged_state,
@@ -915,6 +1052,25 @@ impl ContractInstance {
             seals,
         })
     }
+}
+
+/// Refuse a restart in which a key does not resume at the reservation that
+/// the commit metadata it verified names for it. The store's files name each
+/// key's reservation too, untagged, and the restored objects resume there.
+fn check_keys_resume_at_their_reservations(
+    state: &ContractRuntime,
+    reservations: &BTreeMap<String, u64>,
+) -> Result<()> {
+    for cipher in contract_seal_ciphers(state) {
+        let Some(storage) = cipher.storage() else {
+            continue;
+        };
+        let object = storage.object();
+        if reservations.get(object) != Some(&cipher.seal_count()) {
+            bail!("the store's reservation for {object} is not the one its commit metadata names");
+        }
+    }
+    Ok(())
 }
 
 /// The generation of the commit after one of `generation`.
@@ -2094,6 +2250,9 @@ bounds:
             let dropped = sealed_counters(&staged.state);
             drop(staged);
             assert_eq!(sealed_counters(&instance.state), before);
+            // `call` commits the reservations the next call needs after a
+            // call it dropped; a staged call dropped here needs them too.
+            assert!(instance.reserve_ahead().unwrap());
 
             instance.call(entrypoint, args).unwrap();
             let after = sealed_counters(&instance.state);
@@ -3995,7 +4154,7 @@ bounds:
     }
 
     #[test]
-    fn a_dropped_call_leaves_the_store_as_it_was() {
+    fn a_dropped_call_leaves_the_records_as_they_were() {
         let mut artifact = compile_bench(
             bench_raw!("SingleAccessMap.sol"),
             include_str!(bench_raw!("SingleAccessMap.pathoram.yaml")),
@@ -4017,12 +4176,18 @@ bounds:
         };
         let before = stored(&instance);
         let writes_before = instance.storage_stats().writes;
+        let generation = instance.generation();
 
         instance
             .call("put(bytes32,uint256)", vec![b32(7), Value::uint(9)])
             .unwrap_err();
         assert!(instance.storage_stats().writes > writes_before);
-        assert_eq!(stored(&instance), before);
+        // The store holds the records it held. Its metadata is a commit's
+        // with no record, which reserves what the next call can seal.
+        let after = stored(&instance);
+        assert_eq!(after.0, before.0);
+        assert_ne!(after.1, before.1);
+        assert_eq!(instance.generation(), generation + 1);
         assert_eq!(
             instance
                 .state
@@ -4200,7 +4365,7 @@ bounds:
             .collect()
     }
 
-    /// Before a call seals anything, the store has reserved for each key the
+    /// Before a call begins, the last commit has reserved for each key the
     /// count a dropped call resumes at, so however the call ends every key
     /// resumes there: a store opened again in the middle of the call, a call
     /// that is dropped, and a call that never ends, as a crash leaves it,
@@ -4234,8 +4399,8 @@ bounds:
                 .map(|(object, start)| (object.clone(), seal_count_after_dropped_call(*start)))
                 .collect();
             let journal = || fs::metadata(directory.join("journal.bin")).unwrap().len();
-            // The first call reserved; this one needs no reservation, and
-            // its records are pending in memory.
+            // The deposit's commit reserved; this call makes no reservation,
+            // and its records are pending in memory.
             let before = journal();
             let staged = instance
                 .stage_call(
@@ -4265,7 +4430,8 @@ bounds:
             }
             assert_eq!(journal(), before, "{ending}");
             // The files hold each key's reservation at the count a dropped
-            // call resumes at, and a restart resumes every key there.
+            // call resumes at, in the deposit's commit, and a restart resumes
+            // every key there.
             let reopened =
                 SharedStorage::new(FileStorage::open(&directory, SyncPolicy::Always).unwrap());
             for (object, resume) in &resumes {
@@ -4285,47 +4451,295 @@ bounds:
         }
     }
 
-    /// A call whose reservation the store cannot make fails before it seals
-    /// anything: no key's count moves, no record reaches the store, and the
-    /// store, which an append failed in, refuses every later operation.
+    /// A call dropped after it ran leaves its keys at the counts the last
+    /// commit reserved, and the next call needs a reservation above them.
+    /// The instance commits it, with no record, before the call's error
+    /// returns: one more journal entry and generation, the records as they
+    /// were, and the next call runs under it. If that commit's append fails,
+    /// the call's error says the outcome is unknown and the store refuses
+    /// every operation; a restart finds the store before the reservation, or
+    /// with it one past the counter, and every key resumes at or above the
+    /// counts the dropped call moved it to.
     #[test]
-    fn a_call_whose_reservation_fails_fails_before_it_seals() {
+    fn a_dropped_call_commits_the_reservation_the_next_call_needs() {
+        use crate::store_meta::seal_count_after_dropped_call;
         use uo_store::{
-            storage_failure, AppendFailure, FileStorage, JournalEntry, SharedStorage,
-            StorageFailure, StorageFault, SyncPolicy,
+            storage_failure, AppendFailure, FileStorage, SharedStorage, StorageFailure,
+            StorageFault, SyncPolicy,
         };
-        let artifact = compile_bench(
-            bench_raw!("ConfidentialMixer.sol"),
-            include_str!(bench_raw!("ConfidentialMixer.oram.yaml")),
-            ProgramMode::Uo,
-        );
-        let directory = scratch_store_directory("reservation-fails");
+        let artifact = || {
+            let mut artifact = compile_bench(
+                bench_raw!("ConfidentialMixer.sol"),
+                include_str!(bench_raw!("ConfidentialMixer.oram.yaml")),
+                ProgramMode::Uo,
+            );
+            artifact
+                .contract
+                .manifest
+                .entrypoints
+                .get_mut("balanceOf(bytes32)")
+                .unwrap()
+                .max_commit_ops = 0;
+            artifact
+        };
+        for fault in [
+            None,
+            Some(AppendFailure::WriteStopsInPayload),
+            Some(AppendFailure::SyncFails),
+        ] {
+            let directory = scratch_store_directory("dropped-reserves");
+            let storage =
+                SharedStorage::new(FileStorage::create(&directory, SyncPolicy::Always).unwrap());
+            let mut instance =
+                ContractInstance::deploy_with_seed_and_storage(artifact(), 31, storage.clone())
+                    .unwrap();
+            instance
+                .call("deposit(bytes32,uint256)", vec![b32(1), Value::uint(5)])
+                .unwrap();
+            let generation = instance.generation();
+            let starts = key_counts(&instance);
+            let records = storage.with(|adapter| adapter.sealed_records_sha256());
+            let journal = || fs::metadata(directory.join("journal.bin")).unwrap().len();
+            let before = journal();
+            if let Some(failure) = fault {
+                storage
+                    .inject_fault(StorageFault::Append { failure })
+                    .unwrap();
+            }
+            let error = instance
+                .call("balanceOf(bytes32)", vec![b32(1)])
+                .unwrap_err();
+            // The call's keys moved on to the counts the deposit's commit
+            // reserved, and the store holds the records it held.
+            let moved: Vec<(String, u64)> = starts
+                .iter()
+                .map(|(object, start)| (object.clone(), seal_count_after_dropped_call(*start)))
+                .collect();
+            assert_eq!(key_counts(&instance), moved, "{fault:?}");
+            assert_eq!(
+                storage.with(|adapter| adapter.sealed_records_sha256()),
+                records
+            );
+            match fault {
+                None => {
+                    assert!(storage_failure(&error).is_none(), "{error:#}");
+                    assert_eq!(instance.generation(), generation + 1);
+                    assert!(journal() > before);
+                    for (object, count) in &moved {
+                        assert_eq!(
+                            storage.with(|adapter| adapter.reserved_seals(object)),
+                            seal_count_after_dropped_call(*count),
+                            "{object}"
+                        );
+                    }
+                    // The next call runs under it.
+                    instance
+                        .call("deposit(bytes32,uint256)", vec![b32(2), Value::uint(7)])
+                        .unwrap();
+                    assert_eq!(instance.generation(), generation + 2);
+                    drop(instance);
+                }
+                Some(failure) => {
+                    assert_eq!(
+                        storage_failure(&error),
+                        Some(StorageFailure::OutcomeUnknown),
+                        "{error:#}"
+                    );
+                    assert!(error.to_string().contains("did not commit"), "{error:#}");
+                    assert!(storage.poisoned().is_some());
+                    assert_eq!(instance.generation(), generation);
+                    drop(instance);
+                    drop(storage);
+                    let reopened = SharedStorage::new(
+                        FileStorage::open(&directory, SyncPolicy::Always).unwrap(),
+                    );
+                    let (restarted, found) =
+                        ContractInstance::restart_with_seed(artifact(), 31, reopened, generation)
+                            .unwrap();
+                    let whole = failure == AppendFailure::SyncFails;
+                    let expected = if whole {
+                        StoreGeneration::OnePast
+                    } else {
+                        StoreGeneration::Attested
+                    };
+                    assert_eq!(found, expected, "{failure:?}");
+                    assert_eq!(restarted.generation(), generation + u64::from(whole));
+                    for ((object, resumed), (_, moved)) in key_counts(&restarted).iter().zip(&moved)
+                    {
+                        assert!(resumed >= moved, "{failure:?}: {object}");
+                    }
+                    drop(restarted);
+                }
+            }
+            fs::remove_dir_all(&directory).unwrap();
+        }
+    }
+
+    /// A restarted instance takes no call until it resumes, and resumes only
+    /// with the attested generation of the store it restarted from: its keys
+    /// resume at the reservations of that store's last commit, and a call
+    /// seals at and above them. Resuming commits the reservations the call
+    /// needs, with no record.
+    #[test]
+    fn a_restarted_instance_takes_no_call_until_it_resumes() {
+        use crate::store_meta::seal_count_after_dropped_call;
+        use uo_store::{FileStorage, SharedStorage, SyncPolicy};
+        let artifact = || {
+            compile_bench(
+                bench_raw!("ConfidentialMixer.sol"),
+                include_str!(bench_raw!("ConfidentialMixer.oram.yaml")),
+                ProgramMode::Uo,
+            )
+        };
+        let directory = scratch_store_directory("resume");
         let storage =
-            SharedStorage::new(FileStorage::create(&directory, SyncPolicy::Always).unwrap());
+            SharedStorage::new(FileStorage::create(&directory, SyncPolicy::Never).unwrap());
         let mut instance =
-            ContractInstance::deploy_with_seed_and_storage(artifact, 31, storage.clone()).unwrap();
-        let starts = key_counts(&instance);
-        let writes = instance.storage_stats().writes;
-        // The deployment's first call reserves for its keys.
-        storage
-            .inject_fault(StorageFault::Append {
-                entry: JournalEntry::Reservation,
-                failure: AppendFailure::WriteStopsInPayload,
-            })
-            .unwrap();
-        let error = instance
+            ContractInstance::deploy_with_seed_and_storage(artifact(), 41, storage).unwrap();
+        instance
             .call("deposit(bytes32,uint256)", vec![b32(1), Value::uint(5)])
-            .unwrap_err();
-        assert_eq!(
-            storage_failure(&error),
-            Some(StorageFailure::OutcomeUnknown),
-            "{error:#}"
-        );
-        assert_eq!(key_counts(&instance), starts);
-        assert_eq!(instance.storage_stats().writes, writes);
-        assert!(storage.poisoned().is_some());
+            .unwrap();
+        let generation = instance.generation();
         drop(instance);
+        let reopened =
+            SharedStorage::new(FileStorage::open(&directory, SyncPolicy::Never).unwrap());
+        let (mut restarted, _) =
+            ContractInstance::restart_with_seed(artifact(), 41, reopened.clone(), generation)
+                .unwrap();
+        let resumed_at = key_counts(&restarted);
+        for (object, count) in &resumed_at {
+            assert_eq!(
+                reopened.with(|adapter| adapter.reserved_seals(object)),
+                *count,
+                "{object}"
+            );
+        }
+        let writes = restarted.storage_stats().writes;
+        let refused = restarted
+            .call("deposit(bytes32,uint256)", vec![b32(2), Value::uint(7)])
+            .unwrap_err();
+        assert!(refused.to_string().contains("has not resumed"), "{refused}");
+        assert_eq!(key_counts(&restarted), resumed_at);
+        assert_eq!(restarted.storage_stats().writes, writes);
+        assert_eq!(restarted.generation(), generation);
+        // A counter that has not caught up with the store, or that is past
+        // it, resumes nothing.
+        for attested in [generation - 1, generation + 1] {
+            assert!(restarted.resume(attested).is_err());
+            assert_eq!(restarted.generation(), generation);
+        }
+        restarted.resume(generation).unwrap();
+        assert_eq!(restarted.generation(), generation + 1);
+        for (object, count) in &resumed_at {
+            assert_eq!(
+                reopened.with(|adapter| adapter.reserved_seals(object)),
+                seal_count_after_dropped_call(*count),
+                "{object}"
+            );
+        }
+        restarted
+            .call("deposit(bytes32,uint256)", vec![b32(2), Value::uint(7)])
+            .unwrap();
+        // Resuming again does nothing.
+        let after = restarted.generation();
+        restarted.resume(0).unwrap();
+        assert_eq!(restarted.generation(), after);
+        drop(restarted);
         fs::remove_dir_all(&directory).unwrap();
+    }
+
+    /// Every file of the store in `from`, copied into a new directory `to`:
+    /// the files a host that keeps an older store holds.
+    fn copy_store_files(from: &std::path::Path, to: &std::path::Path) {
+        let _ = fs::remove_dir_all(to);
+        fs::create_dir_all(to).unwrap();
+        for entry in fs::read_dir(from).unwrap() {
+            let entry = entry.unwrap();
+            fs::copy(entry.path(), to.join(entry.file_name())).unwrap();
+        }
+    }
+
+    /// What the reservations are ahead of: a host that stops the enclave in
+    /// a call that has handed records over, and restarts it from older files.
+    /// Every count the call sealed is below the reservations of the commit
+    /// the call began after, which the counter attested: the files from
+    /// before that commit are refused, and a restart from the files the call
+    /// left resumes every key above every count the call used.
+    #[test]
+    fn a_call_stopped_part_way_leaves_no_count_a_restart_seals_again() {
+        use uo_store::{FileStorage, SharedStorage, SyncPolicy};
+        let artifact = || {
+            compile_bench(
+                bench_raw!("ConfidentialMixer.sol"),
+                include_str!(bench_raw!("ConfidentialMixer.oram.yaml")),
+                ProgramMode::Uo,
+            )
+        };
+        let directory = scratch_store_directory("stopped");
+        let before_resume = scratch_store_directory("stopped-before-resume");
+        let reopen = |directory: &std::path::Path| {
+            SharedStorage::new(FileStorage::open(directory, SyncPolicy::Never).unwrap())
+        };
+        let storage =
+            SharedStorage::new(FileStorage::create(&directory, SyncPolicy::Never).unwrap());
+        let mut instance =
+            ContractInstance::deploy_with_seed_and_storage(artifact(), 43, storage).unwrap();
+        instance
+            .call("deposit(bytes32,uint256)", vec![b32(1), Value::uint(5)])
+            .unwrap();
+        let generation = instance.generation();
+        drop(instance);
+        // The host keeps the files the restart finds; the restart resumes,
+        // and the counter follows it.
+        copy_store_files(&directory, &before_resume);
+        let (mut restarted, _) =
+            ContractInstance::restart_with_seed(artifact(), 43, reopen(&directory), generation)
+                .unwrap();
+        restarted.resume(generation).unwrap();
+        let counter = restarted.generation();
+        // A call that seals and hands its records over, and never ends.
+        let storage = restarted.storage.clone();
+        let staged = restarted
+            .stage_call(
+                "deposit(bytes32,uint256)",
+                vec![b32(2), Value::uint(7)],
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+        let used: Vec<(String, u64)> = key_counts(&restarted)
+            .into_iter()
+            .map(|(object, _)| {
+                let counts = storage.with(|adapter| adapter.seal_counts(&object));
+                (object, counts.into_iter().max().unwrap())
+            })
+            .collect();
+        std::mem::forget(staged);
+        drop(restarted);
+        // The files from before the resume, with the generation the counter
+        // holds, are refused.
+        let refused =
+            ContractInstance::restart_with_seed(artifact(), 43, reopen(&before_resume), counter)
+                .unwrap_err();
+        assert!(
+            refused
+                .to_string()
+                .contains("behind the attested generation"),
+            "{refused}"
+        );
+        // From the files the call left, every key resumes above every count
+        // the call used.
+        let (again, found) =
+            ContractInstance::restart_with_seed(artifact(), 43, reopen(&directory), counter)
+                .unwrap();
+        assert_eq!(found, StoreGeneration::Attested);
+        for ((object, resumed), (_, used)) in key_counts(&again).iter().zip(&used) {
+            assert!(used < resumed, "{object}: {used} is not below {resumed}");
+        }
+        drop(again);
+        fs::remove_dir_all(&directory).unwrap();
+        fs::remove_dir_all(&before_resume).unwrap();
     }
 
     /// A deployment and a restart refuse an artifact with an entrypoint that
@@ -4458,6 +4872,20 @@ bounds:
             ContractInstance::restart_with_seed(artifact(), seed, reopened(), generation).unwrap();
         assert_eq!(found, StoreGeneration::Attested);
         assert_eq!(restarted.generation(), generation);
+        // Each key resumes at the reservation of the last commit, which the
+        // store's files and the tagged metadata name alike.
+        assert_eq!(
+            &restarted
+                .state
+                .seal_ciphers()
+                .iter()
+                .map(|cipher| (
+                    cipher.storage().unwrap().object().to_owned(),
+                    cipher.seal_count()
+                ))
+                .collect::<BTreeMap<String, u64>>(),
+            restarted.committed.reservations()
+        );
         // The restarted instance holds the records of the last commit, and
         // the freshness and public state of the twin.
         assert_eq!(
@@ -4488,6 +4916,7 @@ bounds:
         for (object, counters) in &counters_before {
             assert!(counters.iter().all(|counter| *counter < reserved[object]));
         }
+        restarted.resume(generation).unwrap();
 
         // It goes on as the twin does: the same results and the same public
         // receipts, call for call.
@@ -4499,7 +4928,8 @@ bounds:
             assert_eq!(ours.trace.receipt, theirs.trace.receipt, "{entrypoint}");
         }
         assert_eq!(restarted.freshness, twin.freshness);
-        assert_eq!(restarted.generation(), twin.generation());
+        // One commit more than the twin: the resume's.
+        assert_eq!(restarted.generation(), twin.generation() + 1);
         // No record sealed after the restart carries a nonce from before
         // it: each is one the restart found, or is at or above the count
         // the store had reserved.
@@ -4618,6 +5048,7 @@ bounds:
             generation,
         )
         .unwrap();
+        restarted.resume(generation).unwrap();
         assert_eq!(restarted.state.public_state_digest().unwrap(), public_state);
         let read = |instance: &mut ContractInstance, entrypoint: &str, args: Vec<Value>| {
             instance.call(entrypoint, args).unwrap().return_value

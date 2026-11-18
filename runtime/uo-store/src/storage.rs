@@ -13,11 +13,13 @@
 //! runtime's public metadata, and `abandon` puts back what the call replaced.
 //!
 //! A sealed record carries the count of the seals made under its key before
-//! it, which is its nonce. The adapter takes a record only if that count is
-//! below the count it has reserved for the record's object, and a
-//! reservation is durable before `reserve_seals` returns. A runtime that
-//! restarts from the adapter's files resumes each key's count at its
-//! reservation, so no nonce that reached the adapter is used again.
+//! it, which is its nonce. The adapter takes a record in a call only if that
+//! count is below the count the last commit reserved for the record's
+//! object: a reservation is made durable by the commit it is made for
+//! (`reserve_seals`), and takes effect after it. A runtime reserves at each
+//! commit what the next call can seal, and a restart resumes each key's count
+//! at the reservation of the commit it restarts from, so no nonce that
+//! reached the adapter is used again.
 //!
 //! A file store fails closed. An append to its journal that fails, whether
 //! its write stopped part way or its sync failed after a whole write, may or
@@ -41,11 +43,6 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use uo_core::trace::{classify_write, WriteClass};
 use uo_core::STORAGE_OBSERVER_UNIT_BYTES;
-
-/// How many seals a reservation covers beyond the ones already made. A
-/// reservation is a durable write, so it is made in steps of this many; a
-/// restart skips at most this many unused nonces of a key.
-pub const SEAL_RESERVATION_STEP: u64 = 1 << 20;
 
 /// One read or write of a sealed record, as the adapter saw it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -119,6 +116,8 @@ pub struct StorageStats {
     pub writes: u64,
     pub written_bytes: u64,
     pub commits: u64,
+    /// Reservations that raised a key's count, each made durable by the
+    /// next commit.
     pub reservations: u64,
     /// Bytes appended to durable files, and the time that took with its
     /// syncs. An adapter that keeps no file has zeros.
@@ -162,23 +161,16 @@ pub trait StorageAdapter: Send + fmt::Debug {
     /// finds it, and it is not logged.
     fn put_public(&mut self, object: &str, location: &str, value: &[u8]) -> Result<()>;
 
-    /// Reserve the seal counts below `below` for the key of `object`, and
-    /// make that durable before returning. A reservation is never undone.
+    /// Reserve the seal counts below `below` for the key of `object`. The
+    /// next commit makes the reservation durable with it, and it takes
+    /// effect then: a record handed over in a call must be below the
+    /// reservation of the last commit. Before a deployment's commit, outside
+    /// a call, its records must be below the reservations that commit will
+    /// make durable. A reservation is never undone.
     fn reserve_seals(&mut self, object: &str, below: u64) -> Result<()>;
 
-    /// Reserve, for each object, the seal counts below its count, at once:
-    /// a store in files makes one journal entry of every object not yet
-    /// reserved that far, and none if there is no such object.
-    fn reserve_seals_together(&mut self, reservations: &[(&str, u64)]) -> Result<()> {
-        for (object, below) in reservations {
-            if *below > self.reserved_seals(object) {
-                self.reserve_seals(object, *below)?;
-            }
-        }
-        Ok(())
-    }
-
-    /// The count below which the seals of `object`'s key are reserved.
+    /// The count below which the last commit reserved the seals of
+    /// `object`'s key.
     fn reserved_seals(&self, object: &str) -> u64;
 
     /// Start a call. Nothing may be pending, and the log starts again.
@@ -247,7 +239,11 @@ struct StoredRecord {
 #[derive(Debug)]
 struct StoredObject {
     name: Box<str>,
+    /// The reservation of the last commit.
     reserved_seals: u64,
+    /// The reservation the next commit makes durable: never below the last
+    /// commit's.
+    staged_seals: u64,
 }
 
 #[derive(Debug)]
@@ -328,6 +324,7 @@ impl MemoryStorage {
         self.objects.push(StoredObject {
             name: object.into(),
             reserved_seals: 0,
+            staged_seals: 0,
         });
         self.object_ids.insert(object.into(), id);
         Ok(id)
@@ -340,8 +337,10 @@ impl MemoryStorage {
             .unwrap_or("")
     }
 
-    /// A sealed record of `object` may be taken only if its nonce is one the
-    /// adapter has made durable a reservation for.
+    /// A sealed record of `object` may be taken in a call only if its nonce
+    /// is below the reservation of the last commit, which is durable; outside
+    /// a call, before a deployment's commit, below the reservation that commit
+    /// will make durable.
     fn ensure_nonce_reserved(&self, object: u32, location: &str, record: &[u8]) -> Result<()> {
         let count = sealed_record_seal_count(record).ok_or_else(|| {
             anyhow!("the bytes handed to the store for {location} are not a sealed record")
@@ -349,11 +348,17 @@ impl MemoryStorage {
         let reserved = self
             .objects
             .get(object as usize)
-            .map(|object| object.reserved_seals)
+            .map(|object| {
+                if self.in_call {
+                    object.reserved_seals
+                } else {
+                    object.staged_seals
+                }
+            })
             .unwrap_or(0);
         if count >= reserved {
             bail!(
-                "the store refuses the record of {location}: its seal count is not below the durable reservation of its key"
+                "the store refuses the record of {location}: its seal count is not below the reservation of its key, in a call the durable reservation of the last commit"
             );
         }
         Ok(())
@@ -392,7 +397,20 @@ impl MemoryStorage {
         (records, public)
     }
 
+    /// The reservations the next commit makes durable: of each object whose
+    /// staged reservation is above its last commit's, in object order.
+    fn staged_reservations(&self) -> Vec<(&str, u64)> {
+        self.objects
+            .iter()
+            .filter(|object| object.staged_seals > object.reserved_seals)
+            .map(|object| (&*object.name, object.staged_seals))
+            .collect()
+    }
+
     fn finish_commit(&mut self, meta: &[u8]) {
+        for object in &mut self.objects {
+            object.reserved_seals = object.staged_seals;
+        }
         for entry in self.pending.drain(..) {
             if let Pending::Replaced { record, .. } | Pending::Created { record } = entry {
                 if let Some(stored) = self.records.get_mut(record as usize) {
@@ -442,10 +460,12 @@ impl MemoryStorage {
         Ok(())
     }
 
+    /// A reservation a commit made durable, as the files hold it.
     fn load_reservation(&mut self, object: &str, below: u64) -> Result<()> {
         let id = self.object_id(object)?;
         if let Some(object) = self.objects.get_mut(id as usize) {
             object.reserved_seals = object.reserved_seals.max(below);
+            object.staged_seals = object.staged_seals.max(below);
         }
         Ok(())
     }
@@ -550,8 +570,13 @@ impl StorageAdapter for MemoryStorage {
     }
 
     fn reserve_seals(&mut self, object: &str, below: u64) -> Result<()> {
-        self.load_reservation(object, below)?;
-        self.stats.reservations += 1;
+        let id = self.object_id(object)?;
+        if let Some(object) = self.objects.get_mut(id as usize) {
+            if below > object.staged_seals {
+                object.staged_seals = below;
+                self.stats.reservations += 1;
+            }
+        }
         Ok(())
     }
 
@@ -705,8 +730,7 @@ impl StorageAdapter for MemoryStorage {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SyncPolicy {
-    /// After every commit and every reservation: a commit that returned is
-    /// on the device.
+    /// After every commit: a commit that returned is on the device.
     Always,
     /// Never: the files are written and the device is left to the operating
     /// system. A commit that returned survives the process, not a power
@@ -721,37 +745,10 @@ const SNAPSHOT_MAGIC: u32 = 0x554F_534E;
 const JOURNAL_MAGIC: u32 = 0x554F_4A4E;
 const FRAME_HEADER_BYTES: usize = 12;
 const FRAME_DIGEST_BYTES: usize = 32;
+/// The kind of the journal's one entry: a commit, with the runtime's
+/// metadata, the reservations it makes durable, and the records and public
+/// values it makes durable. A journal entry of another kind is refused.
 const ENTRY_COMMIT: u8 = 1;
-const ENTRY_RESERVATION: u8 = 2;
-/// Reservations of several objects, made at once.
-const ENTRY_RESERVATIONS: u8 = 3;
-
-/// The kind of a journal entry.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum JournalEntry {
-    /// A commit: a call's records with the runtime's metadata.
-    Commit,
-    /// A reservation of seal counts for a key.
-    Reservation,
-}
-
-impl JournalEntry {
-    fn of(payload: &[u8]) -> Option<Self> {
-        match payload.first() {
-            Some(&ENTRY_COMMIT) => Some(Self::Commit),
-            Some(&ENTRY_RESERVATION | &ENTRY_RESERVATIONS) => Some(Self::Reservation),
-            _ => None,
-        }
-    }
-
-    fn name(self) -> &'static str {
-        match self {
-            Self::Commit => "commit",
-            Self::Reservation => "reservation",
-        }
-    }
-}
 
 /// How an append to the journal fails: its write stops part way, in the
 /// entry's header, in its payload or in its digest, or its sync fails after
@@ -798,54 +795,28 @@ pub enum CheckpointStep {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(tag = "operation", rename_all = "snake_case")]
 pub enum StorageFault {
-    /// The next append of an entry of this kind fails so.
-    Append {
-        entry: JournalEntry,
-        failure: AppendFailure,
-    },
+    /// The next append to the journal, a commit's, fails so.
+    Append { failure: AppendFailure },
     /// The next checkpoint fails at this step.
     Checkpoint { step: CheckpointStep },
 }
 
 impl StorageFault {
-    /// Every failure a file store can be made to meet: each way an append of
-    /// a commit or of a reservation fails, and each step of a checkpoint.
-    pub const ALL: [StorageFault; 11] = {
+    /// Every failure a file store can be made to meet: each way the append
+    /// of a commit fails, and each step of a checkpoint.
+    pub const ALL: [StorageFault; 7] = {
         use AppendFailure::*;
-        use JournalEntry::*;
         [
             StorageFault::Append {
-                entry: Commit,
                 failure: WriteStopsInHeader,
             },
             StorageFault::Append {
-                entry: Commit,
                 failure: WriteStopsInPayload,
             },
             StorageFault::Append {
-                entry: Commit,
                 failure: WriteStopsInDigest,
             },
-            StorageFault::Append {
-                entry: Commit,
-                failure: SyncFails,
-            },
-            StorageFault::Append {
-                entry: Reservation,
-                failure: WriteStopsInHeader,
-            },
-            StorageFault::Append {
-                entry: Reservation,
-                failure: WriteStopsInPayload,
-            },
-            StorageFault::Append {
-                entry: Reservation,
-                failure: WriteStopsInDigest,
-            },
-            StorageFault::Append {
-                entry: Reservation,
-                failure: SyncFails,
-            },
+            StorageFault::Append { failure: SyncFails },
             StorageFault::Checkpoint {
                 step: CheckpointStep::SnapshotWrite,
             },
@@ -875,8 +846,8 @@ fn injected(what: &str) -> std::io::Error {
 }
 
 /// An adapter that keeps its records in two files of a directory: a
-/// snapshot of every record, and a journal of the commits and reservations
-/// since. It serves reads from the image of them it holds in memory.
+/// snapshot of every record, and a journal of the commits since. It serves
+/// reads from the image of them it holds in memory.
 ///
 /// A commit is one journal entry with a digest, appended and then synced as
 /// the policy says, so it is in the files whole or not at all: an entry that
@@ -1145,15 +1116,11 @@ impl FileStorage {
         self.fault = Some(fault);
     }
 
-    /// The failure armed for the next append of the entry `payload` makes.
+    /// The failure armed for the next append.
     #[cfg(any(test, feature = "fault-injection"))]
-    fn take_append_fault(&mut self, payload: &[u8]) -> Option<AppendFailure> {
-        let entry = JournalEntry::of(payload)?;
+    fn take_append_fault(&mut self) -> Option<AppendFailure> {
         match self.fault {
-            Some(StorageFault::Append {
-                entry: armed,
-                failure,
-            }) if armed == entry => {
+            Some(StorageFault::Append { failure }) => {
                 self.fault = None;
                 Some(failure)
             }
@@ -1162,7 +1129,7 @@ impl FileStorage {
     }
 
     #[cfg(not(any(test, feature = "fault-injection")))]
-    fn take_append_fault(&mut self, _payload: &[u8]) -> Option<AppendFailure> {
+    fn take_append_fault(&mut self) -> Option<AppendFailure> {
         None
     }
 
@@ -1199,8 +1166,8 @@ impl FileStorage {
         &self.directory
     }
 
-    /// The bytes of the journal: what the commits and reservations since
-    /// the last snapshot take on the device.
+    /// The bytes of the journal: what the commits since the last snapshot
+    /// take on the device.
     pub fn journal_bytes(&self) -> Result<u64> {
         Ok(self.journal.metadata()?.len())
     }
@@ -1218,12 +1185,11 @@ impl FileStorage {
         self.refuse_if_poisoned()?;
         let started = Instant::now();
         let entry = frame(JOURNAL_MAGIC, payload);
-        let fault = self.take_append_fault(payload);
+        let fault = self.take_append_fault();
         if let Err(error) = self.write_entry(&entry, fault) {
-            let what = JournalEntry::of(payload).map_or("entry", JournalEntry::name);
-            let reason = format!("the append of a {what} to its journal failed ({error})");
+            let reason = format!("the append of a commit to its journal failed ({error})");
             let message = format!(
-                "{reason}: the files of {} hold the {what} whole or not at all, which opening them again shows, and the store refuses every operation until then",
+                "{reason}: the files of {} hold the commit whole or not at all, which opening them again shows, and the store refuses every operation until then",
                 self.directory.display()
             );
             self.poisoned = Some(reason);
@@ -1347,13 +1313,18 @@ fn load_records(image: &mut MemoryStorage, decoder: &mut Decoder<'_>) -> Result<
 fn load_snapshot(image: &mut MemoryStorage, payload: &[u8]) -> Result<()> {
     let mut decoder = Decoder { bytes: payload };
     image.meta = decoder.blob()?.to_vec();
+    load_reservations(image, &mut decoder)?;
+    load_records(image, &mut decoder)?;
+    decoder.finish()
+}
+
+fn load_reservations(image: &mut MemoryStorage, decoder: &mut Decoder<'_>) -> Result<()> {
     for _ in 0..decoder.u32()? {
         let object = decoder.text()?;
         let below = decoder.u64()?;
         image.load_reservation(object, below)?;
     }
-    load_records(image, &mut decoder)?;
-    decoder.finish()
+    Ok(())
 }
 
 fn load_journal_entry(image: &mut MemoryStorage, payload: &[u8]) -> Result<()> {
@@ -1361,20 +1332,9 @@ fn load_journal_entry(image: &mut MemoryStorage, payload: &[u8]) -> Result<()> {
     match decoder.u8()? {
         ENTRY_COMMIT => {
             let meta = decoder.blob()?.to_vec();
+            load_reservations(image, &mut decoder)?;
             load_records(image, &mut decoder)?;
             image.meta = meta;
-        }
-        ENTRY_RESERVATION => {
-            let object = decoder.text()?;
-            let below = decoder.u64()?;
-            image.load_reservation(object, below)?;
-        }
-        ENTRY_RESERVATIONS => {
-            for _ in 0..decoder.u32()? {
-                let object = decoder.text()?;
-                let below = decoder.u64()?;
-                image.load_reservation(object, below)?;
-            }
         }
         other => bail!("the journal holds an entry of unknown kind {other}"),
     }
@@ -1404,46 +1364,9 @@ impl StorageAdapter for FileStorage {
 
     fn reserve_seals(&mut self, object: &str, below: u64) -> Result<()> {
         self.refuse_if_poisoned()?;
-        if below <= self.image.reserved_seals(object) {
-            return Ok(());
-        }
-        // The reservation is in the journal before a record that needs it
-        // can be handed over.
-        let mut payload = vec![ENTRY_RESERVATION];
-        put_bytes(&mut payload, object.as_bytes())
-            .map_err(|error| StorageError::definite(format!("{error:#}")))?;
-        put_u64(&mut payload, below);
-        self.append(&payload)?;
+        // The reservation is written with the next commit, and takes effect
+        // in a call once that commit is in the journal.
         self.image.reserve_seals(object, below)
-    }
-
-    fn reserve_seals_together(&mut self, reservations: &[(&str, u64)]) -> Result<()> {
-        self.refuse_if_poisoned()?;
-        let needed: Vec<(&str, u64)> = reservations
-            .iter()
-            .copied()
-            .filter(|(object, below)| *below > self.image.reserved_seals(object))
-            .collect();
-        if needed.is_empty() {
-            return Ok(());
-        }
-        // One entry for all of them, appended before any of them takes
-        // effect.
-        let mut payload = vec![ENTRY_RESERVATIONS];
-        (|| -> Result<()> {
-            put_u32(&mut payload, count(needed.len())?);
-            for (object, below) in &needed {
-                put_bytes(&mut payload, object.as_bytes())?;
-                put_u64(&mut payload, *below);
-            }
-            Ok(())
-        })()
-        .map_err(|error| StorageError::definite(format!("{error:#}")))?;
-        self.append(&payload)?;
-        for (object, below) in needed {
-            self.image.reserve_seals(object, below)?;
-        }
-        Ok(())
     }
 
     fn reserved_seals(&self, object: &str) -> u64 {
@@ -1522,10 +1445,17 @@ impl StorageAdapter for FileStorage {
 }
 
 impl FileStorage {
-    /// The journal entry of a commit of the pending records, with `meta`.
+    /// The journal entry of a commit of the pending records, with `meta`
+    /// and the reservations made since the last commit.
     fn commit_payload(&self, meta: &[u8]) -> Result<Vec<u8>> {
         let mut payload = vec![ENTRY_COMMIT];
         put_bytes(&mut payload, meta)?;
+        let reservations = self.image.staged_reservations();
+        put_u32(&mut payload, count(reservations.len())?);
+        for (object, below) in reservations {
+            put_bytes(&mut payload, object.as_bytes())?;
+            put_u64(&mut payload, below);
+        }
         let (records, public) = self.image.pending_changes();
         put_u32(&mut payload, count(records.len())?);
         for id in records {
@@ -1577,15 +1507,18 @@ impl SharedStorage {
         f(adapter.as_mut())
     }
 
-    /// The part of the store that keeps the records of `object`.
-    /// Reserve, for each object, the seal counts below its count, at once
-    /// (`StorageAdapter::reserve_seals_together`).
-    pub fn reserve_seals_together(&self, reservations: &[(String, u64)]) -> Result<()> {
-        let reservations: Vec<(&str, u64)> = reservations
-            .iter()
-            .map(|(object, below)| (object.as_str(), *below))
-            .collect();
-        self.with(|adapter| adapter.reserve_seals_together(&reservations))
+    /// Reserve, for each object, the seal counts below its count, for the
+    /// next commit to make durable (`StorageAdapter::reserve_seals`).
+    pub fn reserve_seals<'a>(
+        &self,
+        reservations: impl IntoIterator<Item = (&'a str, u64)>,
+    ) -> Result<()> {
+        self.with(|adapter| {
+            for (object, below) in reservations {
+                adapter.reserve_seals(object, below)?;
+            }
+            Ok(())
+        })
     }
 
     /// Why the store refuses every operation, if it does.
@@ -1649,18 +1582,16 @@ impl StorageHandle {
             .with(|adapter| adapter.put_public(&self.object, location, value))
     }
 
-    /// Make sure the store has reserved the seal counts below `sealed`, the
-    /// count of the seals made under the object's key so far. The store
-    /// reserves a step beyond it, so that most seals need no reservation.
+    /// Reserve the seal counts below `sealed`, the count of the seals made
+    /// under the object's key so far, for the next commit to make durable. A
+    /// deployment's records need it; a call's are below the reservation of
+    /// the last commit, which the store checks.
     pub fn reserve_seals(&self, sealed: u64) -> Result<()> {
-        self.storage.with(|adapter| {
-            if sealed <= adapter.reserved_seals(&self.object) {
-                return Ok(());
-            }
-            adapter.reserve_seals(&self.object, sealed.saturating_add(SEAL_RESERVATION_STEP))
-        })
+        self.storage
+            .with(|adapter| adapter.reserve_seals(&self.object, sealed))
     }
 
+    /// The reservation of the last commit for the object's key.
     pub fn reserved_seals(&self) -> u64 {
         self.storage
             .with(|adapter| adapter.reserved_seals(&self.object))
@@ -1876,40 +1807,66 @@ mod tests {
         assert_eq!(sealed_record_seal_count(&record), Some(0));
         // Nothing is reserved for the object, so its first record is refused.
         assert!(store.create("cell", "cell", &record).is_err());
+        // A deployment's record is taken under the reservation its commit
+        // makes durable.
         store.reserve_seals("cell", 1).unwrap();
         store.create("cell", "cell", &record).unwrap();
-        // The next seal has count 1, which the reservation does not cover.
+        assert_eq!(store.reserved_seals("cell"), 0);
+        store.commit(b"deployed").unwrap();
+        assert_eq!(store.reserved_seals("cell"), 1);
+        // In a call, the next seal has count 1, which the last commit's
+        // reservation does not cover; a reservation made in the call takes
+        // effect after the call's commit.
         let next = resealed(&cipher, &record, &[2u8; 32]);
         assert_eq!(sealed_record_seal_count(&next), Some(1));
-        let refused = store.write("cell", &next).unwrap_err().to_string();
-        assert!(refused.contains("durable reservation"), "{refused}");
-        assert_eq!(store.record("cell"), Some(&*record));
+        store.begin().unwrap();
         store.reserve_seals("cell", 2).unwrap();
+        let refused = store.write("cell", &next).unwrap_err().to_string();
+        assert!(
+            refused.contains("durable reservation of the last commit"),
+            "{refused}"
+        );
+        assert_eq!(store.record("cell"), Some(&*record));
+        store.commit(b"reserved").unwrap();
+        assert_eq!(store.reserved_seals("cell"), 2);
+        store.begin().unwrap();
         assert_eq!(store.write("cell", &next).unwrap(), WriteClass::Update);
+        store.commit(b"called").unwrap();
         assert_eq!(store.seal_counts("cell"), vec![1]);
         // A reservation only grows, and bytes that are no record are refused.
         store.reserve_seals("cell", 1).unwrap();
+        store.commit(b"lower").unwrap();
         assert_eq!(store.reserved_seals("cell"), 2);
+        store.begin().unwrap();
         assert!(store.write("cell", &vec![0u8; next.len()]).is_err());
+        store.abandon();
         assert_eq!(store.reserved_seals("other"), 0);
     }
 
     #[test]
-    fn a_handle_reserves_a_step_beyond_the_seals_made() {
+    fn a_handle_reserves_the_seals_made_for_the_next_commit() {
         let storage = SharedStorage::memory();
         let handle = storage.handle("cell");
         handle.reserve_seals(0).unwrap();
-        assert_eq!(handle.reserved_seals(), 0);
         handle.reserve_seals(3).unwrap();
-        assert_eq!(handle.reserved_seals(), 3 + SEAL_RESERVATION_STEP);
+        // Staged until the next commit makes it durable.
+        assert_eq!(handle.reserved_seals(), 0);
         let reservations = storage.with(|adapter| adapter.stats().reservations);
-        handle.reserve_seals(3 + SEAL_RESERVATION_STEP).unwrap();
+        handle.reserve_seals(3).unwrap();
+        handle.reserve_seals(2).unwrap();
         assert_eq!(
             storage.with(|adapter| adapter.stats().reservations),
             reservations
         );
-        handle.reserve_seals(4 + SEAL_RESERVATION_STEP).unwrap();
-        assert_eq!(handle.reserved_seals(), 4 + 2 * SEAL_RESERVATION_STEP);
+        storage.with(|adapter| adapter.commit(b"deployed")).unwrap();
+        assert_eq!(handle.reserved_seals(), 3);
+        // Several objects at once.
+        storage
+            .reserve_seals([("cell", 1u64 << 33), ("other", 5)])
+            .unwrap();
+        storage.with(|adapter| adapter.commit(b"reserved")).unwrap();
+        assert_eq!(handle.reserved_seals(), 1 << 33);
+        assert_eq!(storage.handle("other").reserved_seals(), 5);
     }
 
     #[test]
@@ -1934,7 +1891,8 @@ mod tests {
             store.write("map#0", &third).unwrap();
             store.put_public("owner", "owner", b"\"b\"").unwrap();
             store.abandon();
-            assert!(store.stats().syncs >= 3);
+            // One sync for each commit; a reservation is written with one.
+            assert_eq!(store.stats().syncs, 2);
             assert!(store.stats().persisted_bytes > 0);
         }
         {
@@ -1952,18 +1910,21 @@ mod tests {
             store.commit(b"second call").unwrap();
             store.checkpoint().unwrap();
             assert_eq!(store.journal_bytes().unwrap(), 0);
+            // A reservation no commit made durable is not in the files.
             store.reserve_seals("map", 20).unwrap();
         }
         {
             // A journal that passes its checkpoint is emptied by the commit
             // that takes it there, and the store reopens as that commit
-            // left it.
+            // left it, with the reservation it made durable.
             let mut store = FileStorage::open(&directory, SyncPolicy::Never)
                 .unwrap()
                 .with_checkpoint_bytes(64);
+            assert_eq!(store.reserved_seals("map"), 8);
             let fourth = resealed(&cipher, &third, &[4u8; 48]);
             store.begin().unwrap();
             store.write("map#0", &fourth).unwrap();
+            store.reserve_seals("map", 20).unwrap();
             store.commit(b"third call").unwrap();
             assert_eq!(store.journal_bytes().unwrap(), 0);
             store.begin().unwrap();
@@ -2056,10 +2017,11 @@ mod tests {
         assert_eq!(store.journal_bytes().unwrap(), journal);
     }
 
-    /// Each way an append of a commit or of a reservation fails: the error
-    /// says the outcome is unknown, the store refuses every later operation
-    /// and appends nothing more, and the reopened store holds every commit
-    /// that returned, with the failed entry whole if its sync failed after a
+    /// Each way the append of a commit fails, a call's commit or one that
+    /// makes a reservation durable and holds no record: the error says the
+    /// outcome is unknown, the store refuses every later operation and
+    /// appends nothing more, and the reopened store holds every commit that
+    /// returned, with the failed entry whole if its sync failed after a
     /// whole write and not at all, cut off, if its write stopped part way.
     #[test]
     fn a_failed_append_poisons_the_store_and_its_entry_is_whole_or_absent() {
@@ -2072,8 +2034,8 @@ mod tests {
             .into_iter()
             .filter(|fault| matches!(fault, StorageFault::Append { .. }));
         let mut checked = 0;
-        for fault in appends {
-            let StorageFault::Append { entry, failure } = fault else {
+        for (fault, reservation) in appends.flat_map(|fault| [(fault, false), (fault, true)]) {
+            let StorageFault::Append { failure } = fault else {
                 unreachable!()
             };
             let directory = scratch_directory("append-fault");
@@ -2089,16 +2051,14 @@ mod tests {
             let before = store.journal_bytes().unwrap();
 
             store.inject_fault(fault);
-            let error = match entry {
-                JournalEntry::Commit => {
-                    store.begin().unwrap();
-                    store.write("map#1", &third).unwrap();
-                    let error = store.commit(b"unknown").unwrap_err();
-                    store.abandon();
-                    error
-                }
-                JournalEntry::Reservation => store.reserve_seals("map", 16).unwrap_err(),
-            };
+            store.begin().unwrap();
+            if reservation {
+                store.reserve_seals("map", 16).unwrap();
+            } else {
+                store.write("map#1", &third).unwrap();
+            }
+            let error = store.commit(b"unknown").unwrap_err();
+            store.abandon();
             assert_eq!(
                 storage_failure(&error),
                 Some(StorageFailure::OutcomeUnknown),
@@ -2115,21 +2075,16 @@ mod tests {
             assert_eq!(store.record("map#0"), Some(&*second), "{fault:?}");
             let whole = fault.leaves_the_entry_whole();
             assert_eq!(whole, failure == AppendFailure::SyncFails);
-            match entry {
-                JournalEntry::Commit => {
-                    let (record, meta): (&[u8], &[u8]) = if whole {
-                        (&third, b"unknown")
-                    } else {
-                        (&other, b"acknowledged")
-                    };
-                    assert_eq!(store.record("map#1"), Some(record), "{fault:?}");
-                    assert_eq!(store.meta(), meta, "{fault:?}");
-                }
-                JournalEntry::Reservation => {
-                    let reserved = if whole { 16 } else { 8 };
-                    assert_eq!(store.reserved_seals("map"), reserved, "{fault:?}");
-                    assert_eq!(store.meta(), b"acknowledged");
-                }
+            let meta: &[u8] = if whole { b"unknown" } else { b"acknowledged" };
+            assert_eq!(store.meta(), meta, "{fault:?}");
+            if reservation {
+                let reserved = if whole { 16 } else { 8 };
+                assert_eq!(store.reserved_seals("map"), reserved, "{fault:?}");
+                assert_eq!(store.record("map#1"), Some(&*other), "{fault:?}");
+            } else {
+                let record: &[u8] = if whole { &third } else { &other };
+                assert_eq!(store.record("map#1"), Some(record), "{fault:?}");
+                assert_eq!(store.reserved_seals("map"), 8, "{fault:?}");
             }
             // A write that stopped part way is cut off, whole; an entry
             // whose sync failed is kept.
@@ -2193,44 +2148,42 @@ mod tests {
         }
     }
 
-    /// Reservations made together are one journal entry, which reserves
-    /// every object it names once the store is opened again. An object
-    /// already reserved that far is left out of it, and so is the entry
-    /// when no object needs one.
+    /// A reservation is written with the next commit, in its journal entry,
+    /// and nothing is written before: a store opened again before that commit
+    /// holds the reservations of the commit before. A commit of no record
+    /// makes the reservations made since the last one durable, each object
+    /// once, and leaves out a reservation below the last commit's.
     #[test]
-    fn reservations_made_together_are_one_journal_entry() {
-        let directory = scratch_directory("together");
+    fn a_reservation_is_durable_with_the_next_commit() {
+        let directory = scratch_directory("reservation");
         let mut store = FileStorage::create(&directory, SyncPolicy::Never).unwrap();
         store.reserve_seals("a", 8).unwrap();
         store.commit(b"deployed").unwrap();
         let before = store.journal_bytes().unwrap();
-        store
-            .reserve_seals_together(&[("a", 4), ("b", 1 << 33), ("c", 1 << 34)])
-            .unwrap();
-        let entry = store.journal_bytes().unwrap() - before;
-        // One frame: the header, the kind, the count, the two objects with
-        // their counts, and the digest.
+        store.reserve_seals("b", 1 << 33).unwrap();
+        store.reserve_seals("b", 1 << 32).unwrap();
+        store.reserve_seals("a", 4).unwrap();
+        assert_eq!(store.journal_bytes().unwrap(), before);
+        assert_eq!(store.reserved_seals("b"), 0);
+        let reopened = FileStorage::open(&directory, SyncPolicy::Never).unwrap();
+        assert_eq!(reopened.reserved_seals("b"), 0);
+        drop(reopened);
+        store.begin().unwrap();
+        store.commit(b"reserved").unwrap();
+        // One frame: the header; the kind, the metadata, one reservation, no
+        // record and no public value; the digest.
         assert_eq!(
-            entry as usize,
-            FRAME_HEADER_BYTES + 1 + 4 + 2 * (4 + 1 + 8) + FRAME_DIGEST_BYTES
+            (store.journal_bytes().unwrap() - before) as usize,
+            FRAME_HEADER_BYTES + 1 + (4 + 8) + 4 + (4 + 1 + 8) + 4 + 4 + FRAME_DIGEST_BYTES
         );
-        let after = store.journal_bytes().unwrap();
-        store
-            .reserve_seals_together(&[("a", 8), ("b", 1 << 33)])
-            .unwrap();
-        assert_eq!(store.journal_bytes().unwrap(), after);
+        assert_eq!(store.reserved_seals("a"), 8);
+        assert_eq!(store.reserved_seals("b"), 1 << 33);
         drop(store);
         let store = FileStorage::open(&directory, SyncPolicy::Never).unwrap();
         assert_eq!(store.reserved_seals("a"), 8);
         assert_eq!(store.reserved_seals("b"), 1 << 33);
-        assert_eq!(store.reserved_seals("c"), 1 << 34);
+        assert_eq!(store.meta(), b"reserved");
         drop(store);
-        // A store in memory reserves each object as a file store would.
-        let mut memory = MemoryStorage::new();
-        memory
-            .reserve_seals_together(&[("a", 4), ("b", 1 << 33)])
-            .unwrap();
-        assert_eq!(memory.reserved_seals("b"), 1 << 33);
         fs::remove_dir_all(&directory).unwrap();
     }
 

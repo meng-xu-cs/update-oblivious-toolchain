@@ -51,9 +51,9 @@ pub use runtime::PathOramFreshCoinPlan;
 pub use secret::PlatformSealingKey;
 pub use store_meta::StoreGeneration;
 pub use uo_store::{
-    storage_failure, AppendFailure, CheckpointStep, FileStorage, JournalEntry, MemoryStorage,
-    SharedStorage, StorageAdapter, StorageError, StorageFailure, StorageFault, StorageIo,
-    StorageStats, SyncPolicy,
+    storage_failure, AppendFailure, CheckpointStep, FileStorage, MemoryStorage, SharedStorage,
+    StorageAdapter, StorageError, StorageFailure, StorageFault, StorageIo, StorageStats,
+    SyncPolicy,
 };
 
 #[cfg(test)]

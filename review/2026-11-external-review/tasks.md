@@ -2311,7 +2311,11 @@ Issues 67 and 68 there repair it. Issue 67 replaced the comparison of the
 rollback counter with the commit generation, which every commit advances, a
 committed abort's too: a restart takes the store at the attested generation
 or one past it, says which, and refuses every other, and the test above is
-refused with a generation one ahead. The reservations are Issue 68's.
+refused with a generation one ahead. Issue 68 put each key's reservation in
+the tagged commit metadata, which every commit makes ahead of what the next
+call can seal: a restart resumes each key there, and a restarted instance
+takes no call until it resumes, which commits the reservations its first
+call needs.
 
 ### Issue 59 — Keep sealed records in the store alone
 

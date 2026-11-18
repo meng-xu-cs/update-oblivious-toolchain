@@ -124,9 +124,14 @@ commit's generation, and the deployment advances the platform's monotonic
 counter to it before it releases the call's result or makes another call. A
 restart takes files at the attested generation or one past it and says
 which; one past, the deployment advances the counter to the restarted
-instance's generation before it releases anything the instance returns. The
-counter's rollback resistance is a deployment assumption, and a generation
-does not name the store it counts (Non-Claims of
+instance's generation before it releases anything the instance returns. Each
+key resumes at the reservation the tagged commit metadata names, and the
+restarted instance takes no call until it resumes
+(`ProductionContractInstance::resume`), with the counter at its store's
+generation, and has committed the reservations its first call needs; the
+deployment advances the counter to that commit too before the first call.
+The counter's rollback resistance is a deployment assumption, and a
+generation does not name the store it counts (Non-Claims of
 [`../claim-boundary.md`](../claim-boundary.md)).
 
 ## Non-Claim

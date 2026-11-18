@@ -1249,6 +1249,7 @@
   ],
   "resource_event_constructor_surface_restricted": true,
   "restarts_check_the_commit_generation": true,
+  "restarts_resume_at_the_reservations_of_their_commit": true,
   "restricted_signature_checks": [
     {
       "present": true,
