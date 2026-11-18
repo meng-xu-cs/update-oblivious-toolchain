@@ -41,6 +41,28 @@ the bundle, the 428 tamper scenarios are rejected, and the 99 files of
 `results/reproducibility_manifest.json` match their sizes and digests. What
 the gate does not check is R5 of the validation.
 
+The repaired baseline is `88d3338`, the last commit of Wave 11, and the
+research issues 43 to 46 of the previous review start from it. Issue 69
+measured on its runtime the capacity sweep's full profile, with every commit
+synced, and the matched baselines' full profile
+(`results/capacity_sweep_full.json`, `results/matched_baselines_full.json`).
+The sweep's counts are those of the full profile before it (`990b054`), to
+their digest, and the matched baselines' report is the committed one byte
+for byte. What the repairs cost a call is counted, since no control
+timed them: one commit, one journal entry and one sync per call, where a
+call at `990b054` sometimes made a reservation entry with a sync of its own
+too, and 58 to 60 bytes more per commit, the generation and the reservations
+in the tagged metadata. The baseline does not measure:
+
+- what a production call adds: the receipt's digest of every sealed record
+  of a Path ORAM object the call changed, which reads all of them (Issue 44
+  of the previous review would make the transition certified incrementally).
+  The sweep runs the diagnostics build, which builds proof bundles instead;
+- memory beyond the backend planner's model: the planner charges each
+  backend the enclave memory its model gives, and the sweep reports the
+  probe process's resident memory in the diagnostics build, not an
+  enclave's.
+
 ## Positions
 
 | The review recommends | Position | Issues |
@@ -86,7 +108,7 @@ Issue 60 has the options and the reasoning.
      on what a storage error leaves in the files.
 4. **Wave 12, Issue 69: the repaired baseline.** The full capacity sweep
    and matched baselines are measured on the final commit of Wave 11, with
-   what the repairs cost a call.
+   what the repairs cost a call. Done: see Baseline.
 
 The research issues of the previous review (43 to 46) start from the
 baseline of Issue 69. Issue 50 stays deferred.
@@ -103,5 +125,5 @@ baseline of Issue 69. Issue 50 stays deferred.
 | 65 | Fail closed on storage errors, and test every failure | 11 | M to L | 60 (D8) | done | `988b876` |
 | 66 | Make a dropped call's restart point durable before the call runs, and bound a call's seals | 11 | M | 65 | done | `d102318` |
 | 67 | Advance a commit generation with every committed call, and check it at restart | 11 | M | 60 (D9), 65 | done | `51d0ab7` |
-| 68 | Keep a restart from resuming a key below a count it has used | 11 | M | 66, 67 | done | |
-| 69 | Measure the repaired baseline | 12 | M | 61 to 68 | todo | |
+| 68 | Keep a restart from resuming a key below a count it has used | 11 | M | 66, 67 | done | `88d3338` |
+| 69 | Measure the repaired baseline | 12 | M | 61 to 68 | done | |

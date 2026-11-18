@@ -6,7 +6,8 @@
 For each kind of call that both reports measured on the same backend, at the
 same capacity and with the same number of stored keys, prints the counts that
 changed and, for each timing, the baseline's median, the current one and
-their ratio. By default it compares the largest capacity both reports have;
+their ratio, then what a call's commit cost the store: the bytes it appended,
+its commits and its syncs, "n/a" where a report has no such field. By default it compares the largest capacity both reports have;
 --capacity, --backend, --stored-keys and --operation select other rows, and
 --all compares every row. The exit status is 0 whether or not anything moved:
 the script reports, it does not judge.
@@ -37,6 +38,19 @@ TIMINGS = [
     ("witness", "p50_witness_ns"),
     ("proof objects", "p50_proof_objects_ns"),
     ("JSON", "p50_json_serialization_ns"),
+    ("persistence", "p50_persistence_ns"),
+]
+
+# What a call's commit costs the store, inside `timing` since it depends on
+# where the store keeps its records. Reports measured before the commit and
+# sync counts were added have the bytes alone.
+PERSISTENCE = [
+    "p50_persisted_bytes",
+    "max_persisted_bytes",
+    "p50_commits",
+    "max_commits",
+    "p50_syncs",
+    "max_syncs",
 ]
 
 
@@ -117,6 +131,12 @@ def main():
             print(f"  {label + ':':<15}{milliseconds(old):>12} ms -> {milliseconds(new):>12} ms  {ratio}")
         old, new = before["timing"]["p50_peak_rss_bytes"], after["timing"]["p50_peak_rss_bytes"]
         print(f"  {'peak RSS:':<15}{old / 2**20:>12.1f} MB -> {new / 2**20:>12.1f} MB")
+        for name in PERSISTENCE:
+            old, new = before["timing"].get(name), after["timing"].get(name)
+            if old is None and new is None:
+                continue
+            show = lambda value: "n/a" if value is None else str(value)
+            print(f"  {name + ':':<22}{show(old):>10} -> {show(new):>10}")
     if not compared:
         sys.exit("no common row matches the selection")
 

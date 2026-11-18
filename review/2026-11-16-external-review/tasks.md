@@ -1119,3 +1119,50 @@ the code they change.
 - Both full reports are regenerated on the final commit of Wave 11.
 - The tracker's baseline names that commit, and Issues 43 to 46 start
   from it.
+
+**As built.** The capacity sweep counts what a call's commit costs the
+store. A call's sample takes the store's statistics before and after the
+call, and each row's `timing` gives, beside `p50_persisted_bytes`, the most
+bytes a call appended (`max_persisted_bytes`), the call's commits
+(`p50_commits`, `max_commits`), each one entry of the journal when the
+records are in files, and the syncs of the store's journal (`p50_syncs`,
+`max_syncs`). They depend on where the store keeps its records, so they are
+inside `timing`, `counts_sha256` does not cover them, and the schema stays
+`uo-capacity-sweep-v4`. `scripts/compare_capacity_sweep.py` compares the
+median time of the commit too, and prints each row's commits, syncs and
+bytes, with `n/a` for a report from before them. The quick profile,
+`results/capacity_sweep.json`, was run again to carry them.
+
+Both full reports were measured on the runtime of `88d3338`, the last commit
+of Wave 11: the probe had this issue's counters, and the runtime, the store
+and the compiler were those of `88d3338`.
+
+- `scripts/run_capacity_sweep_full.sh`, with every commit synced, took 37.5
+  minutes on four cores: 1,141 rows and 978 workloads. Its `counts_sha256`
+  (`4722bc65…`) is that of the report it replaces, measured at `990b054`:
+  neither Issues 47 to 49 of the previous review nor the repairs moved a
+  count.
+- `mplus-probe --only matched-baselines-full` took 24 minutes and wrote the
+  committed report again, byte for byte.
+
+What the repairs cost a call, from the two full reports:
+
+- Every call makes one commit, one journal entry, and one sync of the
+  journal. In 69 rows a call's commit takes the journal past its checkpoint,
+  which writes and syncs a snapshot of every record and syncs the emptied
+  journal a second time; the snapshot's syncs are not counted. Before the
+  repairs a key's reservation was an entry of its own with a sync of its
+  own, made 2^20 seals ahead whenever a seal passed it: one every 64 calls
+  for a write on a full-scan map of 16,384 entries, which seals every slot.
+- A commit appends 58 to 60 bytes more in every row (59 in 704 rows, 60 in
+  406, 58 in 31): the generation and each key's reservation in the tagged
+  metadata.
+- The time is not set against the report before, which another state of
+  the machine measured, and no control timed the repairs. The commit takes
+  0.6 ms of a full-scan read at 16,384 entries, which appends 368 bytes, and
+  8.3 ms of a full-scan insert, which appends 2.1 MB.
+
+`docs/path-oram.md` has the profile's figures, the cost of the repairs and
+the memory, and its break-evens; `docs/evaluation.md` has the sweep's new
+fields and the commit the two full reports were measured on. The README's
+Baseline names `88d3338` and what the baseline does not measure.

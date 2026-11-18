@@ -22,7 +22,10 @@
 //! JSON a call exports) is reported outside the `timing` objects, and
 //! `counts_sha256` is the digest of the report without them: it repeats
 //! between runs and machines. Wall-clock times, memory and the provenance of
-//! the build are inside `timing` and `provenance`.
+//! the build are inside `timing` and `provenance`, and so is what a call's
+//! commit costs the store, which depends on where it keeps its records: the
+//! bytes it appended to the store's files, its commits, each one journal
+//! entry in files, and the syncs of its journal.
 //!
 //! Two profiles share the schema. The quick one, which the validation script
 //! runs, takes few trials and fills only small maps. The full one takes the
@@ -638,6 +641,14 @@ struct SweepSample {
     totals: InstrumentationTotals,
     /// Bytes the call's commit appended to the store's files.
     persisted_bytes: u64,
+    /// The commits the store made in the call, each one entry of its
+    /// journal when it keeps its records in files.
+    commits: u64,
+    /// The syncs of the store's journal in the call: one for the commit's
+    /// entry, and one more when the commit took the journal past its
+    /// checkpoint and the store emptied it. The checkpoint's syncs of its
+    /// snapshot and directory are not among them.
+    syncs: u64,
     /// Serializing the call's trace to JSON, after the call.
     json_ns: u128,
     rss_before_kb: u64,
@@ -722,12 +733,15 @@ fn run_sweep_call(
     uo_evm::take_instrumentation_totals();
     reset_peak_rss();
     let rss_before_kb = read_rss_kb();
-    let persisted_before = instance.storage_stats().persisted_bytes;
+    let stored_before = instance.storage_stats();
     let started = Instant::now();
     let result = instance.call(entrypoint, plan.args)?;
     let latency_ns = started.elapsed().as_nanos();
     let totals = uo_evm::take_instrumentation_totals();
-    let persisted_bytes = instance.storage_stats().persisted_bytes - persisted_before;
+    let stored_after = instance.storage_stats();
+    let persisted_bytes = stored_after.persisted_bytes - stored_before.persisted_bytes;
+    let commits = stored_after.commits - stored_before.commits;
+    let syncs = stored_after.syncs - stored_before.syncs;
     let peak_rss_kb = read_max_rss_kb().unwrap_or(0);
 
     let aborts = operation == SweepOperation::Abort;
@@ -783,6 +797,8 @@ fn run_sweep_call(
         latency_ns,
         totals,
         persisted_bytes,
+        commits,
+        syncs,
         json_ns,
         rss_before_kb,
         peak_rss_kb,
@@ -980,6 +996,32 @@ fn operation_row(
         (
             "p50_persisted_bytes",
             median(&|sample| u128::from(sample.persisted_bytes)),
+        ),
+        (
+            "max_persisted_bytes",
+            samples
+                .iter()
+                .map(|sample| u128::from(sample.persisted_bytes))
+                .max()
+                .unwrap_or(0),
+        ),
+        ("p50_commits", median(&|sample| u128::from(sample.commits))),
+        (
+            "max_commits",
+            samples
+                .iter()
+                .map(|sample| u128::from(sample.commits))
+                .max()
+                .unwrap_or(0),
+        ),
+        ("p50_syncs", median(&|sample| u128::from(sample.syncs))),
+        (
+            "max_syncs",
+            samples
+                .iter()
+                .map(|sample| u128::from(sample.syncs))
+                .max()
+                .unwrap_or(0),
         ),
         (
             "p50_rss_before_bytes",

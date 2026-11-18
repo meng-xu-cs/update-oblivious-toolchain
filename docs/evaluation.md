@@ -93,22 +93,30 @@ establish and what they do not).
   persistence, which the report gives as a part of its own
   (`p50_persistence_ns`, `p50_persisted_bytes`; `UO_SWEEP_STORAGE` is
   `memory`, `files` or `files_synced`, and `provenance.storage` says which
-  ran). Where the records are kept changes no count. It takes
-  about an hour on four cores and wants the machine to itself, so
-  `run_validation.sh` does not run it; run it when a change claims a saving.
+  ran), with what each call's commit cost the store: the bytes it appended,
+  its commits, each one journal entry in files, and the syncs of the journal
+  (`max_persisted_bytes`, `p50_commits`, `max_commits`, `p50_syncs`,
+  `max_syncs`, since Issue 69 of the review of 16 November 2026). Where the
+  records are kept changes no count. It takes about an hour on four cores
+  and wants the machine to itself, so `run_validation.sh` does not run it;
+  run it when a change claims a saving.
   `scripts/compare_capacity_sweep.py` compares two reports, and
   `review/2026-11-external-review/capacity_sweep_baseline.json` is the full
   profile from before the optimizations that review asked for; its gas is
   that of cost model v1, which charged no reads. The committed full report
-  was measured when Issues 30 to 42 and 51 to 59 of that review were in,
-  and its `provenance` names the build that measured it and where the
-  records were kept. The latencies of two reports compare only if one
-  machine in one state measured both, so the review directory also holds
-  four controls, for Issues 36 to 38, for the stash cap of Issue 40, for
-  the storage adapter of Issue 41 and for the eviction networks of Issue
-  47: the largest maps measured on the code before the change and on the
-  code after it, one run after the other. No control covers Issues 51 to
-  59 (see [`path-oram.md`](./path-oram.md)).
+  was measured on the runtime of `88d3338`, the last commit of the repairs
+  of the review of 16 November 2026, from which the research issues 43 to
+  46 start, and its `provenance` names the build that measured it and where
+  the records were kept. Its counts are those of the full report before it,
+  measured at `990b054`, to their digest. The latencies of two reports
+  compare only if one machine in one state measured both, so the review
+  directory also holds four controls, for Issues 36 to 38, for the stash
+  cap of Issue 40, for the storage adapter of Issue 41 and for the eviction
+  networks of Issue 47: the largest maps measured on the code before the
+  change and on the code after it, one run after the other. No control
+  covers Issues 51 to 59, nor the repairs of the review of 16 November
+  2026, whose cost to a call the full report counts in commits, bytes and
+  syncs (see [`path-oram.md`](./path-oram.md)).
 - The matched baselines have two profiles with one schema
   (`uo-matched-baselines-v2`). `run_validation.sh` runs the quick one into
   `results/matched_baselines.json` from a release build: three maps, with
@@ -118,9 +126,10 @@ establish and what they do not).
   their capacity (about a minute). The full one fills every map to every
   level into `results/matched_baselines_full.json`
   (`mplus-probe --only matched-baselines-full`, about 27 minutes on four
-  cores, most of them filling the trees). Both count bytes, which are a
-  function of the programs and the capacities and repeat on every run and
-  machine, and neither times anything.
+  cores, most of them filling the trees), which a run on the same commit as
+  the full capacity sweep reproduced byte for byte. Both count bytes, which
+  are a function of the programs and the capacities and repeat on every run
+  and machine, and neither times anything.
 
 ## Index
 
@@ -130,7 +139,7 @@ establish and what they do not).
 | Correctness | `correctness.json` (differential runs against the raw baseline), `abort_rollback.json` (aborting and committing calls on the exact backend and on both Path ORAM schemes), and the model columns of `trace_equivalence.json` (each run's public outcome and final public state against their Lean models, and the exact store's encoding on the exact backends) |
 | Does the runtime's Path ORAM follow its Lean models? Tested, not proved | `path_oram_avl_map_replay.json` and `path_oram_avl_map_replay_full.json` (random operations on the runtime's AVL map replayed on the Lean model: every result, every node access's kind, every size and the recorded trees, on maps of up to 31 and up to 2,048 nodes, with the map's pointers, free list and stash checked after every operation); `tape_substitution.json` and `tape_substitution_full.json` (calls of seven kinds on maps of both schemes, each run on other deployment seeds and compared, whole, with the representative run under that run's own tape: 42 and 1,344 tapes) |
 | Runtime and storage cost | `overheads.json` (modeled gas, physical reads and writes, bytes moved, trace and artifact sizes per benchmark and backend) |
-| Scalability | `capacity_sweep.json` and `capacity_sweep_full.json` (one map of 1 to 16,384 entries on every backend, at five occupancy levels: the traced counts of seven kinds of call, the untraced reads in the decode of the position-map witness, which the runtime keeps from call to call, with an audit of the kept witness after every level, read/write mixes computed and executed, break-even capacities, and release-build latencies with medians, 95th percentiles and bootstrap intervals, split into staging, loading, the runtime's own work, witnesses, proof objects, JSON serialization and Lean's check of a sampled call, with peak resident memory and evidence sizes) |
+| Scalability | `capacity_sweep.json` and `capacity_sweep_full.json` (one map of 1 to 16,384 entries on every backend, at five occupancy levels: the traced counts of seven kinds of call, the untraced reads in the decode of the position-map witness, which the runtime keeps from call to call, with an audit of the kept witness after every level, read/write mixes computed and executed, break-even capacities, and release-build latencies with medians, 95th percentiles and bootstrap intervals, split into staging, loading, the runtime's own work, witnesses, proof objects, JSON serialization and Lean's check of a sampled call, with peak resident memory, what each call's commit cost the store in bytes, commits and journal syncs, and evidence sizes) |
 | Which backend moves the fewest bytes at a map's key and value widths, and does the compiler's backend planner choose it? | `matched_baselines.json` and `matched_baselines_full.json` (three maps of different key and value widths on every backend at seven capacities and up to three occupancy levels: which backends can hold each map and the diagnostics of those that cannot, each call's bytes against the planner's model, the planner's choice against the measured calls at six shares of reads with every competitor present, maps compiled with `backend: auto` with and without an enclave memory budget, the break-even capacities of each width, each backend's modeled enclave memory, and counts checked against the grid) |
 | Does a call's public-state snapshot cost more as public objects it does not load grow? | `public_state.json` (a contract with a public array of 16 to 16,384 sealed slots, a public cell and a confidential cell: for a call on each, the public objects its snapshots decode and the bytes of their state, which do not depend on the array's size for the calls that do not load it, and the time of each call) |
 | What crosses the storage boundary, does a runtime start again from its files, and does a storage failure fail closed? | `storage_boundary.json` (every benchmark on every sealed backend: the log a storage adapter keeps of the sealed records the runtime opens and seals against the reads and writes of each call's trace, one for one; a call dropped after it handed records over; a record refused before its nonce is reserved; each benchmark restarted from a store in files, which a restart takes only at the attested generation or one past it, whose keys resume at the reservations of its last commit, and which must answer as before and repeat no nonce; ERC20Lite's files from before a committed abort, refused with the generation after it; and every failure a file store can be made to meet, on each sealed backend of ERC20Lite and at each of a call's two commits, its own and the reservation a dropped call commits: the call's result, the operations the store refuses after it, what opening the files cuts off, the commit they hold and the attested generations a restart accepts) |

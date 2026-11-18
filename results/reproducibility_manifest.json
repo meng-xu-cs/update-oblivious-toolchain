@@ -49,13 +49,13 @@
     },
     {
       "path": "capacity_sweep.json",
-      "bytes": 2034237,
-      "sha256": "b15c66b41cd966a243dd665c260bedec8e44df9d20f8935eefa097419c7d6e3c"
+      "bytes": 2141691,
+      "sha256": "d0a5de829d8850e0571b225098e96162f666027ed198d0e0efe4f243ef69c9e6"
     },
     {
       "path": "capacity_sweep_full.json",
-      "bytes": 2927885,
-      "sha256": "18da9da9268ac94f41bbfa5e4b84a8d797903875c918b2a98cb5c291eb84879f"
+      "bytes": 3082033,
+      "sha256": "f63871cd944cb4f4082d54d64e76c11c817fb22435494882fa9f94b94b582364"
     },
     {
       "path": "claim_artifact_manifest.json",
